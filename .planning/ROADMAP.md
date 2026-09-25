@@ -43,7 +43,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — Scaffold (Next.js, Vitest, shadcn), failing E2E finder test, fixture-tested bonus-bet engine + no-push market filter + top-10 ranking
+- [x] 01-01-PLAN.md — Scaffold (Next.js, Vitest, shadcn), failing E2E finder test, fixture-tested bonus-bet engine + no-push market filter + top-10 ranking
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Bonus Bet Finder | 0/5 | Not started | - |
+| 1. Bonus Bet Finder | 1/5 | In Progress|  |
 | 2. Private Access & My Books | 0/? | Not started | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |

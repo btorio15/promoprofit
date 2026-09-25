@@ -9,11 +9,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Hedge Engine
 
-- [ ] **CALC-01**: System computes bonus-bet (stake-not-returned) hedges: exact stakes for both legs, guaranteed profit, and conversion % of the bonus amount
+- [x] **CALC-01**: System computes bonus-bet (stake-not-returned) hedges: exact stakes for both legs, guaranteed profit, and conversion % of the bonus amount
 - [ ] **CALC-02**: System computes profit-boost hedges from either a boost % applied to profit or a book-published boosted price: exact stakes, guaranteed profit, and ROI % on cash risked
 - [ ] **CALC-03**: Profit-boost calculations respect the promo's max-stake and max-winnings caps, choosing the optimal stake when a cap binds
-- [ ] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
-- [ ] **CALC-05**: Hedges only use markets with no push/void outcome (e.g. 2-way moneylines, half-point lines)
+- [x] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
+- [x] **CALC-05**: Hedges only use markets with no push/void outcome (e.g. 2-way moneylines, half-point lines)
 - [ ] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
 - [ ] **CALC-07**: System computes tandem hedges where both legs are promos on opposite outcomes of the same market (boost + boost, boost + bonus bet), each leg's promo mechanics and caps applied
 
@@ -27,7 +27,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Bonus-Bet Finder
 
-- [ ] **BONUS-01**: User enters a book and bonus-bet amount and sees a ranked list of the best conversion markets across upcoming games, each with the hedge book, both stakes, guaranteed profit, and conversion %
+- [x] **BONUS-01**: User enters a book and bonus-bet amount and sees a ranked list of the best conversion markets across upcoming games, each with the hedge book, both stakes, guaranteed profit, and conversion %
 - [ ] **BONUS-02**: Bonus-bet finder hedge suggestions only use books the user has selected
 
 ### Promo Capture
@@ -96,11 +96,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CALC-01 | Phase 1 | Pending |
+| CALC-01 | Phase 1 | Complete |
 | CALC-02 | Phase 3 | Pending |
 | CALC-03 | Phase 3 | Pending |
-| CALC-04 | Phase 1 | Pending |
-| CALC-05 | Phase 1 | Pending |
+| CALC-04 | Phase 1 | Complete |
+| CALC-05 | Phase 1 | Complete |
 | CALC-06 | Phase 2 | Pending |
 | CALC-07 | Phase 4 | Pending |
 | ODDS-01 | Phase 1 | Pending |
@@ -108,7 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ODDS-03 | Phase 1 | Pending |
 | ODDS-04 | Phase 1 | Pending |
 | ODDS-05 | Phase 1 | Pending |
-| BONUS-01 | Phase 1 | Pending |
+| BONUS-01 | Phase 1 | Complete |
 | BONUS-02 | Phase 2 | Pending |
 | PROMO-01 | Phase 5 | Pending |
 | PROMO-02 | Phase 5 | Pending |
