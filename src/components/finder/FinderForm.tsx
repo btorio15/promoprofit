@@ -123,7 +123,12 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
               control={form.control}
               name="bookKey"
               render={({ field }) => (
-                <Select value={field.value || undefined} onValueChange={field.onChange}>
+                // Always controlled: Base UI treats `undefined` as uncontrolled, so the
+                // empty state must be `null` or picking a book flips control mode.
+                <Select
+                  value={field.value || null}
+                  onValueChange={(value) => field.onChange(value ?? "")}
+                >
                   <SelectTrigger id="bookKey" className="h-10 w-full">
                     <SelectValue placeholder="Choose a book" />
                   </SelectTrigger>
