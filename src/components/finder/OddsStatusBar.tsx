@@ -87,6 +87,13 @@ export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
       return;
     }
 
+    if (outcome.status === "busy") {
+      // Another tab/user/CLI is mid-refresh (WR-03); the server lock
+      // rejected this one before any credits were spent.
+      setBanner({ kind: "error", message: outcome.message });
+      return;
+    }
+
     setBanner({
       kind: "error",
       message: `Couldn't refresh odds — the Odds API didn't respond. Try again, or keep using the odds cached ${age.minutes ?? 0} min ago below.`,

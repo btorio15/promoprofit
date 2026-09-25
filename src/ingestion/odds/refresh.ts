@@ -5,12 +5,15 @@
  */
 import { fetchSportOdds, listSports } from "./client";
 import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
+import { randomUUID } from "node:crypto";
 import {
   getLatestCreditUsage,
   purgeStartedEvents,
   purgeUnrefreshedEvents,
   recordCreditUsage,
+  releaseRefreshLock,
   replaceSportOdds,
+  tryAcquireRefreshLock,
 } from "./store";
 import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
@@ -18,6 +21,13 @@ import { SPORT_KEYS } from "@/config/sports";
 const FETCH_WINDOW_DAYS = 7;
 const MISSING_KEY_MESSAGE = "ODDS_API_KEY is not set";
 const GENERIC_FAILURE_MESSAGE = "Couldn't refresh odds: the Odds API didn't respond.";
+const BUSY_MESSAGE = "Another odds refresh is already running. Try again in a minute.";
+/**
+ * Upper bound on how long one refresh may hold the server-side lock. A
+ * crashed refresh frees the lock after this long; a normal refresh releases
+ * it as soon as it finishes.
+ */
+export const REFRESH_LOCK_TTL_MS = 5 * 60_000;
 
 export type RefreshOutcome =
   | { status: "ok"; fetchedAt: string; sportsFetched: string[]; creditsSpent: number; remaining: number | null }
@@ -29,6 +39,7 @@ export type RefreshOutcome =
       estimatedCredits: number;
       resetsOn: string;
     }
+  | { status: "busy"; message: string }
   | { status: "error"; message: string };
 
 function safeMessage(err: unknown): string {
@@ -40,7 +51,38 @@ function safeMessage(err: unknown): string {
   return GENERIC_FAILURE_MESSAGE;
 }
 
+/**
+ * Serializes refreshes server-side (WR-03): the gate reads the latest
+ * credit_usage row and only writes a new one at the end, so two refreshes
+ * started close together (two tabs, two users, UI + CLI) would both pass the
+ * 15-minute confirm gate and both spend credits. The lock is taken BEFORE
+ * the gate is evaluated and held until the credit row is written.
+ */
 export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): Promise<RefreshOutcome> {
+  const holder = randomUUID();
+
+  let acquired: boolean;
+  try {
+    acquired = await tryAcquireRefreshLock(holder, REFRESH_LOCK_TTL_MS);
+  } catch (err) {
+    return { status: "error", message: safeMessage(err) };
+  }
+  if (!acquired) {
+    return { status: "busy", message: BUSY_MESSAGE };
+  }
+
+  try {
+    return await runGuardedRefresh(opts);
+  } finally {
+    try {
+      await releaseRefreshLock(holder);
+    } catch {
+      // Best-effort: the lock expires on its own after REFRESH_LOCK_TTL_MS.
+    }
+  }
+}
+
+async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Promise<RefreshOutcome> {
   const now = opts.now ?? new Date();
 
   let latest;

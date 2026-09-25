@@ -49,3 +49,16 @@ export const creditUsage = pgTable("credit_usage", {
   sportsFetched: integer("sports_fetched").notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Single-row server-side lock serializing odds refreshes (WR-03). neon-http
+ * is stateless, so a session-level advisory lock can't span the refresh's
+ * several API calls; instead a refresh claims row id=1 with a conditional
+ * upsert that only succeeds when no unexpired lock is held. locked_until
+ * bounds how long a crashed refresh can hold the lock.
+ */
+export const refreshLock = pgTable("refresh_lock", {
+  id: integer("id").primaryKey(),
+  holder: text("holder").notNull(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
+});

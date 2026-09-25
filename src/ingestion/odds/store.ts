@@ -5,9 +5,9 @@
  * the persisted credit meter (D-11's thresholds read the latest row, never
  * a fresh API call).
  */
-import { desc, eq, lt, lte } from "drizzle-orm";
+import { and, desc, eq, lt, lte } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { cachedOdds, creditUsage } from "@/db/schema";
+import { cachedOdds, creditUsage, refreshLock } from "@/db/schema";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 export interface CreditUsageRow {
@@ -89,4 +89,36 @@ export async function getLatestCreditUsage(): Promise<CreditUsageRow | null> {
     sportsFetched: row.sportsFetched,
     recordedAt: row.recordedAt instanceof Date ? row.recordedAt : new Date(row.recordedAt),
   };
+}
+
+const REFRESH_LOCK_ID = 1;
+
+/**
+ * Claims the single refresh lock row for `holder` (WR-03). Succeeds when no
+ * lock row exists or the existing lock has expired; returns false while
+ * another refresh holds an unexpired lock. One atomic statement, so two
+ * concurrent callers can never both succeed.
+ */
+export async function tryAcquireRefreshLock(holder: string, ttlMs: number): Promise<boolean> {
+  const db = getDb();
+  const now = new Date();
+  const lockedUntil = new Date(now.getTime() + ttlMs);
+  const rows = await db
+    .insert(refreshLock)
+    .values({ id: REFRESH_LOCK_ID, holder, lockedUntil })
+    .onConflictDoUpdate({
+      target: refreshLock.id,
+      set: { holder, lockedUntil },
+      setWhere: lt(refreshLock.lockedUntil, now),
+    })
+    .returning({ holder: refreshLock.holder });
+  return rows.length > 0;
+}
+
+/** Releases the refresh lock, but only if `holder` still owns it. */
+export async function releaseRefreshLock(holder: string): Promise<void> {
+  const db = getDb();
+  await db
+    .delete(refreshLock)
+    .where(and(eq(refreshLock.id, REFRESH_LOCK_ID), eq(refreshLock.holder, holder)));
 }

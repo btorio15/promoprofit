@@ -23,6 +23,10 @@ async function main() {
       );
       process.exit(2);
       break;
+    case "busy":
+      console.error(outcome.message);
+      process.exit(1);
+      break;
     case "blocked":
     case "error":
       process.exit(1);

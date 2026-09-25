@@ -16,6 +16,8 @@ vi.mock("@/ingestion/odds/store", () => ({
   purgeStartedEvents: vi.fn(),
   purgeUnrefreshedEvents: vi.fn(),
   recordCreditUsage: vi.fn(),
+  tryAcquireRefreshLock: vi.fn(),
+  releaseRefreshLock: vi.fn(),
 }));
 
 vi.mock("@/db/queries", () => ({
@@ -30,7 +32,9 @@ import {
   purgeStartedEvents,
   purgeUnrefreshedEvents,
   recordCreditUsage,
+  releaseRefreshLock,
   replaceSportOdds,
+  tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
 import { getBonusBooks, getCachedEvents, getHedgeBookKeys } from "@/db/queries";
 import { runOddsRefresh } from "@/ingestion/odds/refresh";
@@ -44,6 +48,8 @@ const mockReplaceSportOdds = vi.mocked(replaceSportOdds);
 const mockPurgeStartedEvents = vi.mocked(purgeStartedEvents);
 const mockPurgeUnrefreshedEvents = vi.mocked(purgeUnrefreshedEvents);
 const mockRecordCreditUsage = vi.mocked(recordCreditUsage);
+const mockTryAcquireRefreshLock = vi.mocked(tryAcquireRefreshLock);
+const mockReleaseRefreshLock = vi.mocked(releaseRefreshLock);
 const mockGetBonusBooks = vi.mocked(getBonusBooks);
 const mockGetHedgeBookKeys = vi.mocked(getHedgeBookKeys);
 const mockGetCachedEvents = vi.mocked(getCachedEvents);
@@ -54,6 +60,8 @@ beforeEach(() => {
   mockPurgeUnrefreshedEvents.mockResolvedValue(undefined);
   mockReplaceSportOdds.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
+  mockTryAcquireRefreshLock.mockResolvedValue(true);
+  mockReleaseRefreshLock.mockResolvedValue(undefined);
 });
 
 describe("runOddsRefresh", () => {
@@ -287,6 +295,61 @@ describe("runOddsRefresh credit capture (WR-02)", () => {
       sportsFetched: 0,
       recordedAt: now,
     });
+  });
+});
+
+describe("runOddsRefresh server-side lock (WR-03)", () => {
+  it("returns busy without reading the gate or spending credits when another refresh holds the lock", async () => {
+    mockTryAcquireRefreshLock.mockResolvedValue(false);
+
+    const outcome = await runOddsRefresh({ confirmed: true, now: new Date("2026-10-15T12:00:00.000Z") });
+
+    expect(outcome).toEqual({
+      status: "busy",
+      message: "Another odds refresh is already running. Try again in a minute.",
+    });
+    expect(mockGetLatestCreditUsage).not.toHaveBeenCalled();
+    expect(mockListSports).not.toHaveBeenCalled();
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+    expect(mockReleaseRefreshLock).not.toHaveBeenCalled();
+  });
+
+  it("acquires the lock before the gate and releases it with the same holder after the refresh", async () => {
+    const now = new Date("2026-10-15T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 499, used: 1, last: 1 } });
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockTryAcquireRefreshLock).toHaveBeenCalledTimes(1);
+    const holder = mockTryAcquireRefreshLock.mock.calls[0][0];
+    expect(mockReleaseRefreshLock).toHaveBeenCalledWith(holder);
+    expect(mockTryAcquireRefreshLock.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGetLatestCreditUsage.mock.invocationCallOrder[0],
+    );
+    expect(mockReleaseRefreshLock.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockRecordCreditUsage.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("releases the lock when the refresh is blocked or errors", async () => {
+    mockGetLatestCreditUsage.mockRejectedValue(new Error("db down"));
+
+    const outcome = await runOddsRefresh({ confirmed: false, now: new Date("2026-10-15T12:00:00.000Z") });
+
+    expect(outcome.status).toBe("error");
+    expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a key-free error when the lock itself can't be taken", async () => {
+    mockTryAcquireRefreshLock.mockRejectedValue(new Error("db down"));
+
+    const outcome = await runOddsRefresh({ confirmed: false });
+
+    expect(outcome).toEqual({ status: "error", message: "Couldn't refresh odds: the Odds API didn't respond." });
+    expect(mockGetLatestCreditUsage).not.toHaveBeenCalled();
   });
 });
 

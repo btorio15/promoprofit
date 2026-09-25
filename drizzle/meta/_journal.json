@@ -8,6 +8,13 @@
       "when": 1790364064995,
       "tag": "0000_opposite_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790377976162,
+      "tag": "0001_amazing_northstar",
+      "breakpoints": true
     }
   ]
 }
