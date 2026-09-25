@@ -2,11 +2,16 @@
  * Upserts the Colorado book config (src/config/books.ts) into the books
  * table. With `--fixtures`, also upserts buildFixtureEvents(now) into
  * cached_odds so the finder works end-to-end before an Odds API key exists.
+ * The fixture seed writes FAKE prices, so it only runs with an explicit
+ * ALLOW_FIXTURE_SEED=1 opt-in and never into a DB that already holds live
+ * Odds API data (WR-04).
  *
  * Usage: npm run db:seed [-- --fixtures]
+ *        ALLOW_FIXTURE_SEED=1 npm run db:seed -- --fixtures
  */
 import { getDb } from "../src/db/client";
-import { books, cachedOdds } from "../src/db/schema";
+import { books, cachedOdds, creditUsage } from "../src/db/schema";
+import { ALLOW_FIXTURE_SEED_ENV, fixtureSeedRefusal } from "../src/db/fixtureSeedGuard";
 import { COLORADO_BOOKS } from "../src/config/books";
 import { buildFixtureEvents } from "../src/test/fixtures/oddsEvents";
 
@@ -76,8 +81,26 @@ async function seedFixtureOdds(): Promise<number> {
   return count;
 }
 
+async function liveRefreshHasRun(): Promise<boolean> {
+  const db = getDb();
+  const rows = await db.select({ id: creditUsage.id }).from(creditUsage).limit(1);
+  return rows.length > 0;
+}
+
 async function main() {
   const withFixtures = process.argv.includes("--fixtures");
+
+  if (withFixtures) {
+    // Check before touching anything so a refused run writes nothing.
+    const refusal = fixtureSeedRefusal({
+      allowFlag: process.env[ALLOW_FIXTURE_SEED_ENV],
+      liveRefreshHasRun: await liveRefreshHasRun(),
+    });
+    if (refusal) {
+      console.error(refusal);
+      process.exit(1);
+    }
+  }
 
   const bookCount = await seedBooks();
   console.log(`Seeded ${bookCount} books.`);
