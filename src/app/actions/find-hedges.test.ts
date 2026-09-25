@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildFixtureEvents } from "@/test/fixtures/oddsEvents";
 import { usableOddsBooks } from "@/config/books";
 import type { FindHedgesResponse } from "@/domain/finder/types";
 
 /**
- * MVP end-to-end finder test (walking-skeleton Task 1). This is intended
- * to be RED until Plan 02 creates src/app/actions/find-hedges.ts — do not
- * "fix" the missing module here.
+ * MVP end-to-end finder test (walking-skeleton Task 1). Exercises the
+ * findHedges server action against mocked cached-odds queries only — no
+ * real DB connection in this test.
  */
-const now = new Date("2026-10-01T12:00:00.000Z");
+// vi.mock factories are hoisted above all other module-level code, so any
+// value they reference must be created via vi.hoisted() to avoid a
+// temporal-dead-zone "Cannot access before initialization" error.
+const now = vi.hoisted(() => new Date("2026-10-01T12:00:00.000Z"));
 
 vi.mock("@/db/queries", () => {
   const books = usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName }));
@@ -20,11 +23,21 @@ vi.mock("@/db/queries", () => {
   };
 });
 
-// @ts-expect-error - ./find-hedges is created in Plan 02; this import intentionally
-// fails (module not found) until then, so this test stays RED by design.
 import { findHedges } from "./find-hedges";
 
-describe("findHedges (MVP happy path — RED until Plan 02)", () => {
+describe("findHedges (MVP happy path)", () => {
+  // findHedges calls `new Date()` internally as "now" for the 7-day search
+  // window (per plan action step 4); pin the system clock to the fixture's
+  // `now` so the fixture events' commence_time offsets land inside it.
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it("returns the ranked hedge opportunities for draftkings / $100", async () => {
     const response: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
