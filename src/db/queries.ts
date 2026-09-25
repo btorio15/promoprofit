@@ -28,9 +28,13 @@ export async function getHedgeBookKeys(): Promise<string[]> {
 async function getMaxFetchedAt(): Promise<Date | null> {
   const db = getDb();
   const rows = await db
-    .select({ maxFetchedAt: sql<Date | null>`max(${cachedOdds.fetchedAt})` })
+    .select({ maxFetchedAt: sql<string | Date | null>`max(${cachedOdds.fetchedAt})` })
     .from(cachedOdds);
-  return rows[0]?.maxFetchedAt ?? null;
+  const raw = rows[0]?.maxFetchedAt ?? null;
+  // neon-http returns raw sql`` aggregate values as strings, not Date
+  // instances (unlike typed column selects) — normalize explicitly.
+  if (raw === null) return null;
+  return raw instanceof Date ? raw : new Date(raw);
 }
 
 /**

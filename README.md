@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PromoProfit
 
-## Getting Started
+PromoProfit is a private web app for a small group of friends that ranks guaranteed-profit
+betting opportunities at Colorado sportsbooks — including a bonus-bet finder that takes a
+bonus bet at one book and finds the best market to convert it on and the best book to hedge
+it at, with exact stakes computed to the cent from cached odds.
 
-First, run the development server:
+## Local run
+
+Requirements: Node >= 20.9.
 
 ```bash
+npm install
+cp .env.example .env.local
+# fill in DATABASE_URL (Neon pooled connection string) and ODDS_API_KEY in .env.local
+npm run db:migrate
+npm run db:seed          # add `-- --fixtures` to also seed demo odds without an Odds API key
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run test` — run the Vitest suite (hedge math, server actions, etc.)
+- `npm run odds:smoke` — one-off sanity check against The Odds API using `ODDS_API_KEY`
+- `npm run odds:refresh` — fetch fresh odds and cache them in Postgres (spends API credits)
+- `npm run db:check` — print the seeded book list and cached-odds freshness/count
 
-## Learn More
+## Status
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app has no authentication until Phase 2 (Private Access & My Books). Until then it must
+stay local/undeployed — the refresh button spends the shared Odds API credit budget
+(~500 credits/month on the free tier), and there is nothing gating access to it yet.
