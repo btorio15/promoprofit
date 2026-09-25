@@ -15,6 +15,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
 - [ ] **CALC-05**: Hedge search only uses markets with no push/void outcome (e.g. 2-way moneylines), so "guaranteed" profit is truly guaranteed
 - [ ] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
+- [ ] **CALC-07**: User can calculate a tandem hedge where both legs are promos on opposite outcomes of the same market (boost + boost, boost + bonus bet, bonus bet + bonus bet), each leg's promo mechanics and caps applied, showing exact stakes and guaranteed profit
 
 ### Odds Data
 
@@ -38,6 +39,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DASH-02**: User can select which Colorado sportsbooks they have accounts with, and the selection persists
 - [ ] **DASH-03**: Opportunities (promo side and hedge side) are filtered to the user's selected books
 - [ ] **DASH-04**: Only invited users (owner + friends) can log in; there is no public signup
+- [ ] **DASH-05**: System identifies competing promos (promos at different books on opposite outcomes of the same game/market), computes the tandem hedge, and lists it in the opportunities view alongside its profit vs. hedging each promo separately
 
 ## v2 Requirements
 
@@ -45,8 +47,8 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Hedge Calculation
 
-- **CALC-07**: Push/void-aware hedging on spreads/totals with explicit disclosure
-- **CALC-08**: Stake rounding to whole dollars with displayed profit impact
+- **CALC-08**: Push/void-aware hedging on spreads/totals with explicit disclosure
+- **CALC-09**: Stake rounding to whole dollars with displayed profit impact
 
 ### Odds Data
 
@@ -55,7 +57,7 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Dashboard
 
-- **DASH-05**: Mobile-optimized layout for use while placing bets
+- **DASH-06**: Mobile-optimized layout for use while placing bets
 
 ### Tracking
 
@@ -90,6 +92,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CALC-04 | Phase 1 | Pending |
 | CALC-05 | Phase 1 | Pending |
 | CALC-06 | Phase 1 | Pending |
+| CALC-07 | Phase 1 | Pending |
 | ODDS-01 | Phase 2 | Pending |
 | ODDS-02 | Phase 2 | Pending |
 | ODDS-03 | Phase 2 | Pending |
@@ -104,12 +107,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-02 | Phase 4 | Pending |
 | DASH-03 | Phase 4 | Pending |
 | DASH-04 | Phase 4 | Pending |
+| DASH-05 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 20
+- v1 requirements: 22 total
+- Mapped to phases: 22
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-25*
-*Last updated: 2026-09-25 after roadmap creation*
+*Last updated: 2026-09-25 after adding competing-promo (tandem) hedging*

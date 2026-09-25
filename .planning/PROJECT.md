@@ -21,6 +21,7 @@ Given a promo, instantly show the max-profit hedge across the user's books — w
 - [ ] Fetch current odds for competing Colorado books via an odds API (The Odds API or similar), on demand
 - [ ] **Hybrid promo discovery**: scrape promo pages/feeds where feasible; manual entry form for any promo (book, type, amount/boost %, market, max stake)
 - [ ] Opportunities view: list current promos with their best hedge and guaranteed profit, ranked by profit
+- [ ] **Competing promos**: detect promos at different books on opposite outcomes of the same game (e.g. two 50% profit boosts) and calculate the guaranteed profit from playing them in tandem
 - [ ] **Book selection filter**: each user selects which sportsbooks they use; hedge opportunities (both promo side and hedge side) are filtered to those books
 - [ ] Web dashboard usable by owner + a few friends (lightweight private access)
 
@@ -60,6 +61,7 @@ Given a promo, instantly show the max-profit hedge across the user's books — w
 | Hybrid promo discovery (scrape + manual entry) | Promo pages are inconsistent; manual entry guarantees coverage | — Pending |
 | v1 promo types: bonus bets + profit boosts | Most common, highest-value recurring promos | — Pending |
 | Book selection as a lightweight preference, full per-user tracking later | Delivers filtering value without building account management | — Pending |
+| Competing promos hedged in tandem (both legs promo-adjusted) | Two promos on opposite sides beat hedging each against plain odds | — Pending |
 | Colorado only, sportsbooks only | Owner's state; keeps scope tight | — Pending |
 
 ## Evolution

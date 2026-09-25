@@ -24,13 +24,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: User can compute exact, verified-correct hedge stakes and guaranteed profit for a bonus bet or profit boost by manually entering odds for both legs
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
-**Requirements**: CALC-01, CALC-02, CALC-03, CALC-04, CALC-05, CALC-06
+**Requirements**: CALC-01, CALC-02, CALC-03, CALC-04, CALC-05, CALC-06, CALC-07
 **Success Criteria** (what must be TRUE):
   1. User can enter a bonus-bet promo (bonus amount, promo odds, hedge odds) and see exact stakes for both legs, guaranteed profit, and conversion % of the bonus amount
   2. User can enter a profit-boost promo (boost % or boosted price, max stake/max winnings) and see exact stakes, guaranteed profit, and ROI % on cash risked
   3. When a boost's max-stake or max-winnings cap binds, the calculator clamps to the optimal stake within the cap
   4. Guaranteed profit is identical to the cent regardless of which leg wins, verified against documented fixtures (e.g. $100 bonus at +300 hedged at -275 → $220 hedge, $80 profit, 80%)
   5. The calculator restricts hedge search to 2-way, no-push markets and shows an account-risk advisory alongside every result
+  6. User can enter two promos on opposite outcomes of the same market (e.g. 50% boost on Team A at one book, 50% boost on Team B at another) and see the tandem stakes and guaranteed profit, with each leg's caps respected
 **Plans**: TBD
 **UI hint**: yes
 
@@ -64,12 +65,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: The owner and invited friends can log into a shared dashboard and see a ranked list of live hedge opportunities filtered to the books they actually use
 **Mode:** mvp
 **Depends on**: Phase 2, Phase 3
-**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04
+**Requirements**: DASH-01, DASH-02, DASH-03, DASH-04, DASH-05
 **Success Criteria** (what must be TRUE):
   1. Only invited users can log in; there is no public signup path
   2. User sees an opportunities view listing current promos with best hedge, exact stakes, and guaranteed profit, ranked by profit
   3. User can select which Colorado sportsbooks they have accounts with, and the selection persists across sessions
   4. Opportunities shown to the user, on both the promo side and hedge side, are filtered to their selected books
+  5. When two books have promos on opposite outcomes of the same game, the dashboard flags them as a competing-promo pair and shows the tandem profit next to the profit from hedging each separately (only if the user has both books)
 **Plans**: TBD
 **UI hint**: yes
 
