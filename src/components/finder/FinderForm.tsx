@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState } from "react";
+import { useEffect, useRef, useTransition, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -31,6 +31,15 @@ type FinderFormValues = z.input<typeof FinderInputSchema>;
 export interface FinderFormProps {
   bonusBooks: { key: string; displayName: string }[];
   hasCachedOdds: boolean;
+  /**
+   * Incremented by FinderScreen after a successful odds refresh. When it
+   * changes (never on initial mount), the last successfully validated
+   * search is silently re-submitted through findHedges so the results
+   * (including every sport tab) recompute from the newly refreshed cache
+   * (ODDS-04, D-13). The previous results stay rendered until the new
+   * response arrives.
+   */
+  recomputeKey?: number;
 }
 
 /**
@@ -41,10 +50,17 @@ export interface FinderFormProps {
  * client-side tab over that one response. The client-side zodResolver is
  * UX only — findHedges re-validates server-side with the same schema.
  */
-export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
+export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFormProps) {
   const [isPending, startTransition] = useTransition();
   const [response, setResponse] = useState<FindHedgesResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  // State (not a ref) so writing it from inside the submit-handler's
+  // transition callback never trips the "no ref writes during render"
+  // hooks lint rule -- react-hook-form's handleSubmit wrapper obscures the
+  // event-handler context enough that the linter can't prove a ref write
+  // there is safe.
+  const [lastValidValues, setLastValidValues] = useState<FinderFormValues | null>(null);
+  const isFirstRecompute = useRef(true);
 
   const form = useForm<FinderFormValues>({
     resolver: zodResolver(FinderInputSchema),
@@ -63,10 +79,31 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
         }
         return;
       }
+      setLastValidValues(values);
       setHasSearched(true);
       setResponse(result);
     });
   });
+
+  // recomputeKey fires after a refresh (never on initial mount, since the
+  // first effect run is swallowed below) -- silently re-run the last valid
+  // search so results and every sport tab reflect the refreshed cache.
+  useEffect(() => {
+    if (recomputeKey === undefined) return;
+    if (isFirstRecompute.current) {
+      isFirstRecompute.current = false;
+      return;
+    }
+    if (!lastValidValues) return;
+
+    startTransition(async () => {
+      const result = await findHedges(lastValidValues);
+      if (result.status !== "invalid") {
+        setResponse(result);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only recomputeKey should re-trigger this
+  }, [recomputeKey]);
 
   const hasPreviousResults =
     response?.status === "ok" &&

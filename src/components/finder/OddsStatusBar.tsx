@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { RefreshCw, TriangleAlert } from "lucide-react";
+import { refreshOdds } from "@/app/actions/refresh-odds";
+import type { RefreshOutcome } from "@/ingestion/odds/refresh";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { describeOddsAge } from "./oddsAge";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RefreshConfirmDialog } from "./RefreshConfirmDialog";
 
 const AGE_TICK_MS = 60_000;
 
 export interface OddsStatusBarProps {
   status: OddsStatus;
+  /** Called after a successful refresh so the finder recomputes (ODDS-04). */
+  onRefreshed?: () => void;
 }
 
 const LEVEL_INDICATOR_CLASS: Record<OddsStatus["level"], string> = {
@@ -19,14 +27,27 @@ const LEVEL_INDICATOR_CLASS: Record<OddsStatus["level"], string> = {
   blocked: "bg-destructive",
 };
 
+interface ConfirmState {
+  minutesSinceLastRefresh: number;
+  estimatedCredits: number;
+}
+
+type RefreshBanner = { kind: "none" } | { kind: "blocked" | "error"; message: string };
+
 /**
- * Sticky odds-age + credit-meter status bar (ODDS-02/ODDS-03, D-11/D-12).
- * The 60s timer only recomputes the age label from the already-loaded
- * `status.oddsFetchedAt` timestamp -- it never fetches or calls an action
- * (ODDS-01: no polling, T-01-20).
+ * Sticky odds-age + credit-meter + Refresh odds status bar (ODDS-02/03/04,
+ * D-10/D-11/D-12). The 60s age timer only recomputes a label from the
+ * already-loaded status.oddsFetchedAt -- it never fetches or calls an
+ * action (ODDS-01, T-01-20). The client-side disabled state on the button
+ * is UX only; runOddsRefresh re-evaluates the gate server-side on every
+ * call (T-01-18).
  */
-export function OddsStatusBar({ status }: OddsStatusBarProps) {
+export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
   const [, setTick] = useState(0);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [banner, setBanner] = useState<RefreshBanner>({ kind: "none" });
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), AGE_TICK_MS);
@@ -36,12 +57,58 @@ export function OddsStatusBar({ status }: OddsStatusBarProps) {
   const fetchedAt = status.oddsFetchedAt ? new Date(status.oddsFetchedAt) : null;
   const age = describeOddsAge(fetchedAt, new Date());
 
+  function handleOutcome(outcome: RefreshOutcome) {
+    if (outcome.status === "ok") {
+      setBanner({ kind: "none" });
+      setConfirmState(null);
+      router.refresh();
+      onRefreshed?.();
+      return;
+    }
+
+    if (outcome.status === "confirm_required") {
+      setConfirmState({
+        minutesSinceLastRefresh: outcome.minutesSinceLastRefresh,
+        estimatedCredits: outcome.estimatedCredits,
+      });
+      return;
+    }
+
+    setConfirmState(null);
+
+    if (outcome.status === "blocked") {
+      setBanner({
+        kind: "blocked",
+        message:
+          outcome.reason === "low_credits"
+            ? `Only ${outcome.remaining} credits left — refresh is disabled until next month's reset (1st).`
+            : `Refreshing needs about ${outcome.estimatedCredits} credits but only ${outcome.remaining} remain — refresh is disabled until next month's reset (1st).`,
+      });
+      return;
+    }
+
+    setBanner({
+      kind: "error",
+      message: `Couldn't refresh odds — the Odds API didn't respond. Try again, or keep using the odds cached ${age.minutes ?? 0} min ago below.`,
+    });
+  }
+
+  function startRefresh() {
+    setBanner({ kind: "none" });
+    startTransition(async () => {
+      const outcome = await refreshOdds({ confirmed: false });
+      handleOutcome(outcome);
+    });
+  }
+
   return (
     <div className="sticky top-0 z-40 border-b border-border bg-secondary px-4 py-3">
       <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm">
-            {age.stale ? (
+            {isPending ? (
+              <span className="text-muted-foreground">Refreshing odds…</span>
+            ) : age.stale ? (
               <span className="inline-flex items-center gap-1.5 text-warning">
                 <TriangleAlert className="size-4" aria-hidden="true" />
                 {age.label} — <span className="font-semibold">Refresh before betting</span>
@@ -50,6 +117,20 @@ export function OddsStatusBar({ status }: OddsStatusBarProps) {
               <span className="text-muted-foreground">{age.label}</span>
             )}
           </p>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10"
+            disabled={status.level === "blocked" || isPending}
+            onClick={startRefresh}
+          >
+            <RefreshCw
+              className={isPending ? "size-4 animate-spin" : "size-4"}
+              aria-hidden="true"
+            />
+            {isPending ? "Refreshing…" : "Refresh odds"}
+          </Button>
         </div>
 
         {status.level === "unknown" ? (
@@ -71,7 +152,32 @@ export function OddsStatusBar({ status }: OddsStatusBarProps) {
             </p>
           </div>
         )}
+
+        {banner.kind === "blocked" ? (
+          <Alert variant="destructive">
+            <AlertDescription className="num">{banner.message}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {banner.kind === "error" ? (
+          <Alert variant="destructive">
+            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+              <span>{banner.message}</span>
+              <Button type="button" variant="secondary" size="sm" onClick={startRefresh}>
+                Try again
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
       </div>
+
+      <RefreshConfirmDialog
+        open={confirmState !== null}
+        minutesSinceLastRefresh={confirmState?.minutesSinceLastRefresh ?? 0}
+        estimatedCredits={confirmState?.estimatedCredits ?? 0}
+        onCancel={() => setConfirmState(null)}
+        onOutcome={handleOutcome}
+      />
     </div>
   );
 }
