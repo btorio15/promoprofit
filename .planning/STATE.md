@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-09-25T19:16:38.794Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-09-25T19:34:57.572Z"
 last_activity: 2026-09-25
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 01 (bonus-bet-finder) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-25
 
-Progress: [██░░░░░░░░] 20%
+Progress: [████░░░░░░] 40%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██░░░░░░░░] 20%
 
 *Updated after each plan completion*
 | Phase 01 P01 | 20min | 3 tasks | 51 files |
+| Phase 01 P02 | 10min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 - Roadmap rewritten to 5 phases around the new shape: (1) Bonus Bet Finder — scaffold, book config, odds ingestion, hedge engine, finder UI; (2) Private Access & My Books; (3) Promo Scraping & Review (adds boost math + scraping); (4) Opportunities Feed (the main screen); (5) Group-Added Promos.
 - Hedge-engine rules and display rules from the superseded calculator discussion carry forward unchanged into Phase 1 and Phase 3 (see PROJECT.md Key Decisions table).
 - Phase 01 Plan 01: americanToDecimal uses a local precision-40 Decimal clone (not the default precision-20), and bonusBet.ts snaps intermediate results to 20dp before final cent rounding — American odds that reduce to base-10 repeating decimals (-300, -275, etc.) have no exact finite representation; precision-20 truncation was large enough to flip a 2-decimal rounding decision, producing a one-cent error in the MLB fixture's guaranteed profit
+- [Phase 01]: Neon project provisioned on Postgres 18.6 (research assumed 16/17); no schema/driver incompatibility observed with drizzle-orm/drizzle-kit at pinned versions
+- [Phase 01]: db:migrate/db:seed/db:check load env via dotenv or tsx --env-file, never shell 'source .env.local' -- the pooled Neon connection string contains an unescaped & that breaks zsh sourcing
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-25T19:16:38.787Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-09-25T19:34:57.563Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

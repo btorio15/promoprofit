@@ -19,11 +19,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Odds Data
 
-- [ ] **ODDS-01**: System fetches odds for Colorado books from The Odds API and caches them; nothing polls automatically
+- [x] **ODDS-01**: System fetches odds for Colorado books from The Odds API and caches them; nothing polls automatically
 - [ ] **ODDS-02**: User can see remaining monthly API credits, and refreshes are blocked or warned when credits run low
 - [ ] **ODDS-03**: User sees how old the odds behind each opportunity are
 - [ ] **ODDS-04**: Any user can press a refresh button to re-fetch odds and recompute opportunities; between refreshes the app shows the last computed results with their timestamp
-- [ ] **ODDS-05**: The Colorado book list (with Odds API keys, including theScore Bet as ESPN Bet's successor) is stored as configuration, verified against a live API call
+- [x] **ODDS-05**: The Colorado book list (with Odds API keys, including theScore Bet as ESPN Bet's successor) is stored as configuration, verified against a live API call
 
 ### Bonus-Bet Finder
 
@@ -103,11 +103,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CALC-05 | Phase 1 | Complete |
 | CALC-06 | Phase 2 | Pending |
 | CALC-07 | Phase 4 | Pending |
-| ODDS-01 | Phase 1 | Pending |
+| ODDS-01 | Phase 1 | Complete |
 | ODDS-02 | Phase 1 | Pending |
 | ODDS-03 | Phase 1 | Pending |
 | ODDS-04 | Phase 1 | Pending |
-| ODDS-05 | Phase 1 | Pending |
+| ODDS-05 | Phase 1 | Complete |
 | BONUS-01 | Phase 1 | Complete |
 | BONUS-02 | Phase 2 | Pending |
 | PROMO-01 | Phase 5 | Pending |
