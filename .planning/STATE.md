@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 01 complete (5/5) — ready to discuss Phase 2
-last_updated: 2026-09-25T23:24:58.509Z
+status: planning
+stopped_at: Phase 01.1 context gathered
+last_updated: "2026-09-25T23:47:30.720Z"
 last_activity: 2026-09-25
 progress:
-  total_phases: 5
-  completed_phases: 0
+  total_phases: 6
+  completed_phases: 1
   total_plans: 5
   completed_plans: 5
-  percent: 0
+  percent: 17
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 2 — private access & my books
+**Current focus:** Phase 01.1 — arbitrage tab (inserted)
 
 ## Current Position
 
-Phase: 2
+Phase: 01.1 (arbitrage-tab) — inserted after Phase 1
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-09-25
@@ -58,6 +58,10 @@ Progress: [██████████] 100%
 | Phase 01 P04 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 01.1 inserted after Phase 1: Arbitrage Tab: moneyline arbs from cached odds (no extra credits) + separate opt-in spreads/totals refresh button; odds-age + account-risk advisory (URGENT)
 
 ### Decisions
 
@@ -96,6 +100,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-25T20:12:00.344Z
-Stopped at: Completed 01-04-PLAN.md
-Resume file: None
+Last session: 2026-09-25T23:47:30.712Z
+Stopped at: Phase 01.1 context gathered
+Resume file: .planning/phases/01.1-arbitrage-tab/01.1-CONTEXT.md
