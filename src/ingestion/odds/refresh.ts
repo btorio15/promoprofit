@@ -103,15 +103,18 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
         commenceTimeFrom,
         commenceTimeTo,
       });
-      await replaceSportOdds(sport.key, events, now);
 
-      sportsFetched.push(sport.key);
+      // Capture the quota as soon as the fetch returns -- the credits are
+      // spent at this point, even if the cache write below fails (WR-02).
       quotaCaptured = true;
       if (quota.last !== null) refreshCost += quota.last;
       // Keep the last value the API actually reported; a response missing
       // the header must not erase an earlier sport's reading.
       if (quota.remaining !== null) lastRemaining = quota.remaining;
       if (quota.used !== null) lastUsed = quota.used;
+
+      await replaceSportOdds(sport.key, events, now);
+      sportsFetched.push(sport.key);
     }
     await purgeStartedEvents(now);
   } catch (err) {

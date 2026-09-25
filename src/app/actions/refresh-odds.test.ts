@@ -249,6 +249,33 @@ describe("runOddsRefresh", () => {
   });
 });
 
+describe("runOddsRefresh credit capture (WR-02)", () => {
+  it("records the credits spent when the first sport's cache write fails after a successful fetch", async () => {
+    const now = new Date("2026-10-15T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 300,
+      requestsUsed: 200,
+      refreshCost: 1,
+      sportsFetched: 1,
+      recordedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    });
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 299, used: 201, last: 1 } });
+    mockReplaceSportOdds.mockRejectedValueOnce(new Error("db write failed"));
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(outcome.status).toBe("error");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith({
+      requestsRemaining: 299,
+      requestsUsed: 201,
+      refreshCost: 1,
+      sportsFetched: 0,
+      recordedAt: now,
+    });
+  });
+});
+
 describe("refreshOdds server action", () => {
   it("rejects non-object input with a fixed message", async () => {
     const outcome = await refreshOdds(null);
