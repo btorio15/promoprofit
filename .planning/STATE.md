@@ -74,7 +74,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- Add max hedge amount input to bonus-bet finder (ui) — `.planning/todos/pending/2026-09-25-add-max-hedge-amount-input-to-bonus-bet-finder.md`
 
 ### Blockers/Concerns
 
