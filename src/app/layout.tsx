@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PromoProfit",
+  title: "PromoProfit — Bonus bet finder",
   description: "Bonus-bet finder for Colorado sportsbooks",
 };
 
