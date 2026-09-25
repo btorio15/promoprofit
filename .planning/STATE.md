@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Roadmap rewritten for opportunities-feed reframe
-last_updated: "2026-09-25T00:00:00.000Z"
+stopped_at: Phase 1 context gathered
+last_updated: "2026-09-25T17:20:01.565Z"
 last_activity: 2026-09-25 — Roadmap rewritten (feed + bonus-bet finder), 5 phases mapped to 24 v1 requirements
 progress:
   total_phases: 5
@@ -85,6 +85,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-25T00:00:00.000Z
-Stopped at: Roadmap rewritten for opportunities-feed reframe; no phase context gathered yet under the new structure
-Resume file: none — next step is `/gsd:plan-phase 1` against the rewritten ROADMAP.md
+Last session: 2026-09-25T17:20:01.557Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/phases/01-bonus-bet-finder/01-CONTEXT.md
