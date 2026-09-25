@@ -3,10 +3,15 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
-import type { FindHedgesResponse, FinderResultDTO, FinderLegDTO } from "@/domain/finder/types";
+import type {
+  FindHedgesResponse,
+  FinderResultDTO,
+  FinderLegDTO,
+  FinderResultsBySport,
+} from "@/domain/finder/types";
 import { getBonusBooks, getHedgeBookKeys, getCachedEvents } from "@/db/queries";
-import { extractTwoWayMoneylines } from "@/domain/hedge/marketFilter";
-import { rankBonusBetHedges, type BonusBetOpportunity, type HedgeLeg } from "@/domain/hedge/rankBonusBetHedges";
+import { extractTwoWayMoneylines, type TwoWayMoneylineMarket } from "@/domain/hedge/marketFilter";
+import { rankBonusBetHedges, type BonusBetOpportunity, type HedgeLeg, type RankOptions } from "@/domain/hedge/rankBonusBetHedges";
 import { SPORT_KEYS, getSportLabel } from "@/config/sports";
 
 const WINDOW_DAYS = 7;
@@ -50,9 +55,33 @@ function toResultDTO(
 }
 
 /**
- * findHedges: reads cached odds from Postgres and returns the top 10 ranked
- * bonus-bet hedge conversions (BONUS-01, D-06, D-13). Zero Odds API calls on
- * this path — this file must never call the odds-fetch layer directly.
+ * Ranks markets for a single sport scope (either "all" D-01 sports, or one
+ * sport's own markets) completely independently -- never by slicing the
+ * "all" ranking -- so a sport can appear in its own tab even when none of
+ * its markets crack the overall top 10 (owner-requested scope change, 01-05).
+ */
+function rankForSportKeys(
+  events: Parameters<typeof extractTwoWayMoneylines>[0],
+  sportKeys: ReadonlySet<string>,
+  now: Date,
+  rankOpts: RankOptions,
+): BonusBetOpportunity[] {
+  const markets: TwoWayMoneylineMarket[] = extractTwoWayMoneylines(events, {
+    now,
+    windowDays: WINDOW_DAYS,
+    allowedBookKeys: rankOpts.hedgeBookKeys,
+    sportKeys,
+  });
+  return rankBonusBetHedges(markets, rankOpts);
+}
+
+/**
+ * findHedges: reads cached odds from Postgres and returns, for one search,
+ * the top 10 ranked bonus-bet hedge conversions overall plus each sport's
+ * own top 10 (BONUS-01, D-06, D-13). The sport is a client-side tab, not a
+ * search input, so this always computes every scope from one cache read.
+ * Zero Odds API calls on this path — this file must never call the
+ * odds-fetch layer directly.
  */
 export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
   const parsed = FinderInputSchema.safeParse(input);
@@ -61,7 +90,7 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     return { status: "invalid", fieldErrors };
   }
 
-  const { bookKey, bonusAmount, sportKey } = parsed.data;
+  const { bookKey, bonusAmount } = parsed.data;
 
   const bonusBooks = await getBonusBooks();
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -79,30 +108,32 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
   }
 
   const hedgeBookKeys = new Set(await getHedgeBookKeys());
-  const sportKeys = sportKey === "all" ? new Set(SPORT_KEYS) : new Set([sportKey]);
+  const normalizedBonusAmount = new Decimal(bonusAmount).toFixed(2);
+  const now = new Date();
 
-  const markets = extractTwoWayMoneylines(events, {
-    now: new Date(),
-    windowDays: WINDOW_DAYS,
-    allowedBookKeys: hedgeBookKeys,
-    sportKeys,
-  });
-
-  const opportunities = rankBonusBetHedges(markets, {
+  const rankOpts: RankOptions = {
     bonusBookKey: bookKey,
     bonusAmount: new Decimal(bonusAmount),
     hedgeBookKeys,
     limit: RESULT_LIMIT,
-  });
+  };
 
-  const normalizedBonusAmount = new Decimal(bonusAmount).toFixed(2);
+  const resultsBySport: FinderResultsBySport = {
+    all: rankForSportKeys(events, new Set(SPORT_KEYS), now, rankOpts).map((o) =>
+      toResultDTO(o, bookNames, normalizedBonusAmount),
+    ),
+  };
+  for (const sportKey of SPORT_KEYS) {
+    resultsBySport[sportKey] = rankForSportKeys(events, new Set([sportKey]), now, rankOpts).map(
+      (o) => toResultDTO(o, bookNames, normalizedBonusAmount),
+    );
+  }
 
   return {
     status: "ok",
-    results: opportunities.map((o) => toResultDTO(o, bookNames, normalizedBonusAmount)),
+    resultsBySport,
     oddsFetchedAt: fetchedAt.toISOString(),
     bonusBookName: bonusBook.displayName,
     bonusAmount: normalizedBonusAmount,
-    sportKey,
   };
 }

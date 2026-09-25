@@ -17,10 +17,29 @@ const COPY: Record<EmptyStateVariant, { heading: string; body: string }> = {
 
 interface EmptyStateProps {
   variant: EmptyStateVariant;
+  /**
+   * Sport tab label (owner-requested scope change, 01-05): when a single
+   * sport's tab has zero results, name that sport instead of showing the
+   * "clear the sport filter" copy that no longer applies now that sport is
+   * a results-view tab, not a search input. Omit (or "All") for the
+   * verbatim UI-SPEC "no-results" copy.
+   */
+  sportLabel?: string;
 }
 
 /** Verbatim UI-SPEC copy for the finder's three non-error empty states. */
-export function EmptyState({ variant }: EmptyStateProps) {
+export function EmptyState({ variant, sportLabel }: EmptyStateProps) {
+  if (variant === "no-results" && sportLabel) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
+        <h3 className="text-xl font-semibold">No qualifying {sportLabel} markets right now</h3>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          Try another sport tab, or refresh odds to look for new games.
+        </p>
+      </div>
+    );
+  }
+
   const { heading, body } = COPY[variant];
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">

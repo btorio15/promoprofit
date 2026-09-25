@@ -7,7 +7,6 @@ import type { z } from "zod";
 import { findHedges } from "@/app/actions/find-hedges";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
 import type { FindHedgesResponse } from "@/domain/finder/types";
-import { SPORTS } from "@/config/sports";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,18 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "./EmptyState";
 import { ResultsList } from "./ResultsList";
 
 // react-hook-form's Resolver type expects the *input* shape of the zod
-// schema (sportKey optional, pre-.default()), not the output shape
-// (`FinderInput`, sportKey required) — using the output type here trips
-// the @hookform/resolvers + zod@4 overload mismatch documented in
-// resolvers issue #842. See 01-RESEARCH.md "Common Pitfalls".
+// schema, not the output shape -- using the output type here trips the
+// @hookform/resolvers + zod@4 overload mismatch documented in resolvers
+// issue #842. See 01-RESEARCH.md "Common Pitfalls".
 type FinderFormValues = z.input<typeof FinderInputSchema>;
-type SportFilterValue = "all" | (typeof SPORTS)[number]["key"];
 
 export interface FinderFormProps {
   bonusBooks: { key: string; displayName: string }[];
@@ -38,10 +34,12 @@ export interface FinderFormProps {
 }
 
 /**
- * Bonus book + amount + sport filter form. Calls the findHedges server
- * action inside a transition and keeps the last response in state
- * (BONUS-01). The client-side zodResolver is UX only — findHedges
- * re-validates server-side with the same schema.
+ * Bonus book + amount form. Calls the findHedges server action inside a
+ * transition and keeps the last response in state (BONUS-01). Sport is no
+ * longer a search input (owner-requested scope change, 01-05) -- every
+ * search returns every sport's ranking, and ResultsList renders sport as a
+ * client-side tab over that one response. The client-side zodResolver is
+ * UX only — findHedges re-validates server-side with the same schema.
  */
 export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
   const [isPending, startTransition] = useTransition();
@@ -50,7 +48,7 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
 
   const form = useForm<FinderFormValues>({
     resolver: zodResolver(FinderInputSchema),
-    defaultValues: { bookKey: "", bonusAmount: "", sportKey: "all" },
+    defaultValues: { bookKey: "", bonusAmount: "" },
   });
 
   const onSubmit = form.handleSubmit((values) => {
@@ -70,7 +68,9 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
     });
   });
 
-  const hasPreviousResults = response?.status === "ok" && response.results.length > 0;
+  const hasPreviousResults =
+    response?.status === "ok" &&
+    Object.values(response.resultsBySport).some((results) => results.length > 0);
   const showSkeleton = isPending && !hasPreviousResults;
 
   return (
@@ -117,30 +117,6 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
             {form.formState.errors.bonusAmount ? (
               <p className="text-sm text-destructive">{form.formState.errors.bonusAmount.message}</p>
             ) : null}
-          </div>
-
-          <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-2">
-            <Label>Sport</Label>
-            <Controller
-              control={form.control}
-              name="sportKey"
-              render={({ field }) => (
-                <ToggleGroup
-                  aria-label="Sport filter"
-                  value={[(field.value ?? "all") as SportFilterValue]}
-                  onValueChange={(values: SportFilterValue[]) =>
-                    field.onChange(values[0] ?? "all")
-                  }
-                >
-                  <ToggleGroupItem value="all">All sports</ToggleGroupItem>
-                  {SPORTS.map((sport) => (
-                    <ToggleGroupItem key={sport.key} value={sport.key}>
-                      {sport.label}
-                    </ToggleGroupItem>
-                  ))}
-                </ToggleGroup>
-              )}
-            />
           </div>
 
           <Button type="submit" disabled={isPending} className="h-10 w-full md:w-auto">

@@ -23,6 +23,7 @@ vi.mock("@/db/queries", () => {
   };
 });
 
+import { getBonusBooks, getHedgeBookKeys, getCachedEvents } from "@/db/queries";
 import { findHedges } from "./find-hedges";
 
 describe("findHedges (MVP happy path)", () => {
@@ -42,15 +43,15 @@ describe("findHedges (MVP happy path)", () => {
     const response: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
       bonusAmount: "100",
-      sportKey: "all",
     });
 
     expect(response.status).toBe("ok");
     if (response.status !== "ok") return;
 
-    expect(response.results).toHaveLength(3);
+    const all = response.resultsBySport.all;
+    expect(all).toHaveLength(3);
 
-    const [first] = response.results;
+    const [first] = all;
     expect(first.homeTeam).toBe("Denver Nuggets");
     expect(first.awayTeam).toBe("Utah Jazz");
     expect(first.bonus.bookKey).toBe("draftkings");
@@ -65,19 +66,25 @@ describe("findHedges (MVP happy path)", () => {
     expect(first.conversionPct).toBe("80.00");
     expect(first.sameBook).toBe(false);
 
-    const nfl = response.results.find((r) => r.sportKey === "americanfootball_nfl");
+    const nfl = all.find((r) => r.sportKey === "americanfootball_nfl");
     expect(nfl?.tieRisk).toBe(true);
 
-    const mlb = response.results.find((r) => r.sportKey === "baseball_mlb");
+    const mlb = all.find((r) => r.sportKey === "baseball_mlb");
     expect(mlb?.hedge.bookKey).toBe("draftkings");
     expect(mlb?.sameBook).toBe(true);
+
+    // Each sport's tab is ranked independently, not sliced from "all".
+    expect(response.resultsBySport.basketball_nba).toHaveLength(1);
+    expect(response.resultsBySport.baseball_mlb).toHaveLength(1);
+    expect(response.resultsBySport.americanfootball_nfl).toHaveLength(1);
+    expect(response.resultsBySport.americanfootball_ncaaf).toHaveLength(0);
+    expect(response.resultsBySport.basketball_ncaab).toHaveLength(0);
   });
 
   it("rejects a zero bonus amount", async () => {
     const response: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
       bonusAmount: "0",
-      sportKey: "all",
     });
 
     expect(response.status).toBe("invalid");
@@ -89,11 +96,124 @@ describe("findHedges (MVP happy path)", () => {
     const response: FindHedgesResponse = await findHedges({
       bookKey: "circa",
       bonusAmount: "100",
-      sportKey: "all",
     });
 
     expect(response.status).toBe("invalid");
     if (response.status !== "invalid") return;
     expect(response.fieldErrors.bookKey).toBeTruthy();
+  });
+});
+
+describe("findHedges (per-sport tabs, owner-requested scope change)", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  it("shows a sport in its own tab even when it doesn't crack the overall top 10", async () => {
+    // 11 NBA markets all at the reference $100@+300 / -275 fixture (profit
+    // $80.00 each) so they fill every "all" top-10 slot, plus one MLB
+    // market with a smaller (but still positive) profit that must still
+    // surface in its own baseball_mlb tab.
+    const nbaEvents = Array.from({ length: 11 }, (_, i) => ({
+      id: `nba-fill-${i}`,
+      sport_key: "basketball_nba",
+      sport_title: "NBA",
+      commence_time: new Date(now.getTime() + (24 + i) * 60 * 60 * 1000).toISOString(),
+      home_team: `Home Team ${i}`,
+      away_team: `Away Team ${i}`,
+      bookmakers: [
+        {
+          key: "draftkings",
+          title: "DraftKings",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: `Away Team ${i}`, price: 300 },
+                { name: `Home Team ${i}`, price: -400 },
+              ],
+            },
+          ],
+        },
+        {
+          key: "fanduel",
+          title: "FanDuel",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: `Away Team ${i}`, price: 250 },
+                { name: `Home Team ${i}`, price: -275 },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+
+    const mlbEvent = {
+      id: "mlb-low-profit",
+      sport_key: "baseball_mlb",
+      sport_title: "MLB",
+      commence_time: new Date(now.getTime() + 30 * 60 * 60 * 1000).toISOString(),
+      home_team: "Home Nine",
+      away_team: "Away Nine",
+      bookmakers: [
+        {
+          key: "draftkings",
+          title: "DraftKings",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: "Away Nine", price: 150 },
+                { name: "Home Nine", price: -170 },
+              ],
+            },
+          ],
+        },
+        {
+          key: "fanduel",
+          title: "FanDuel",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: "Away Nine", price: 140 },
+                { name: "Home Nine", price: -140 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    vi.mocked(getBonusBooks).mockResolvedValueOnce(
+      usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName })),
+    );
+    vi.mocked(getHedgeBookKeys).mockResolvedValueOnce(usableOddsBooks().map((b) => b.key));
+    vi.mocked(getCachedEvents).mockResolvedValueOnce({
+      events: [...nbaEvents, mlbEvent] as never,
+      fetchedAt: now,
+    });
+
+    const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+
+    expect(response.resultsBySport.all).toHaveLength(10);
+    expect(response.resultsBySport.all.every((r) => r.sportKey === "basketball_nba")).toBe(true);
+    expect(response.resultsBySport.all.some((r) => r.eventId === "mlb-low-profit")).toBe(false);
+
+    expect(response.resultsBySport.baseball_mlb).toHaveLength(1);
+    expect(response.resultsBySport.baseball_mlb[0].eventId).toBe("mlb-low-profit");
+    expect(Number(response.resultsBySport.baseball_mlb[0].guaranteedProfit)).toBeGreaterThan(0);
+    expect(Number(response.resultsBySport.baseball_mlb[0].guaranteedProfit)).toBeLessThan(80);
   });
 });

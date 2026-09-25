@@ -194,10 +194,10 @@ describe("ODDS-04: findHedges recomputes from the current cache", () => {
     const oldEvents = buildFixtureEvents(now);
     mockGetCachedEvents.mockResolvedValueOnce({ events: oldEvents, fetchedAt: now });
 
-    const before = await findHedges({ bookKey: "draftkings", bonusAmount: "100", sportKey: "all" });
+    const before = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
     expect(before.status).toBe("ok");
     if (before.status !== "ok") throw new Error("expected status ok");
-    expect(before.results[0].guaranteedProfit).toBe("80.00");
+    expect(before.resultsBySport.all[0].guaranteedProfit).toBe("80.00");
 
     const refreshedEvent: OddsEvent = {
       id: "refreshed-event",
@@ -226,11 +226,13 @@ describe("ODDS-04: findHedges recomputes from the current cache", () => {
       fetchedAt: new Date(now.getTime() + 1000),
     });
 
-    const after = await findHedges({ bookKey: "draftkings", bonusAmount: "100", sportKey: "all" });
+    const after = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
     expect(after.status).toBe("ok");
     if (after.status !== "ok") throw new Error("expected status ok");
-    expect(after.results[0].guaranteedProfit).toBe("200.00");
-    expect(after.results[0].guaranteedProfit).not.toBe(before.results[0].guaranteedProfit);
+    expect(after.resultsBySport.all[0].guaranteedProfit).toBe("200.00");
+    expect(after.resultsBySport.all[0].guaranteedProfit).not.toBe(
+      before.resultsBySport.all[0].guaranteedProfit,
+    );
 
     vi.useRealTimers();
   });
