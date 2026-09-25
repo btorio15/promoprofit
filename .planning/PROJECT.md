@@ -12,17 +12,16 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ **Bonus-bet finder**: user enters book + bonus amount → top-10 ranked conversion markets (overall and per sport, via tabs) with hedge book, both stakes, guaranteed profit, and conversion % — Validated in Phase 1: Bonus Bet Finder
+- ✓ **Odds**: cached odds from The Odds API free tier (7 free-tier Colorado books, live-verified), user-triggered refresh with credit meter, low-credit block, 15-min confirm, and concurrency lock — Validated in Phase 1: Bonus Bet Finder
 
 ### Active
 
 - [ ] **Opportunities feed** (main screen): opportunities computed automatically from current promos and cached odds, sortable by guaranteed profit, filtered to the user's books
 - [ ] **Promo scraping**: scrape public Colorado sportsbook promo pages on a schedule; uncertain event matches go to a review queue
 - [ ] **Group-added promos**: anyone in the group can add a promo they see in their app, feeding the same opportunities feed (fallback for books that can't be scraped)
-- [ ] **Bonus-bet finder**: user enters book + bonus amount → ranked best conversion markets with hedge book, stakes, and profit
 - [ ] **Competing promos**: detect promos at different books on opposite outcomes of the same game (e.g. two 50% profit boosts) and compute the tandem hedge profit
-- [ ] **Hedge engine**: exact bonus-bet, profit-boost (with caps), and tandem math, fixture-tested to the cent
-- [ ] **Odds**: cached odds from The Odds API free tier, refreshed by a user-triggered refresh button guarded by a credit meter
+- [ ] **Hedge engine**: exact bonus-bet, profit-boost (with caps), and tandem math, fixture-tested to the cent (bonus-bet math done in Phase 1; boost and tandem remain)
 - [ ] **Book selection**: each user selects their sportsbooks; feed and hedge suggestions are filtered to them
 - [ ] Invite-only access for owner + friends
 
@@ -61,16 +60,18 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Use an odds API for hedge odds, scrape only promos | Odds scraping is brittle and gets blocked; API is reliable | — Pending |
+| Use an odds API for hedge odds, scrape only promos | Odds scraping is brittle and gets blocked; API is reliable | ✓ Good (Phase 1: The Odds API live-verified; Caesars/Fanatics are paid-tier only) |
 | Feed is the main product; calculator dropped from v1 | Users want to view and sort ready-made opportunities, not do math | — Pending |
-| Free tier + user-triggered refresh button; smart scheduled refresh later | Keeps cost at $0 while making the feed refreshable on demand | — Pending |
+| Free tier + user-triggered refresh button; smart scheduled refresh later | Keeps cost at $0 while making the feed refreshable on demand | ✓ Good (Phase 1: ~3 credits per refresh using bookmakers= instead of regions=) |
 | Scraping primary, group-added promos as fallback | Scraping may be blocked for some books; friends can fill gaps | — Pending |
-| Bonus-bet finder is enter book + amount, nothing saved | Bonus bets are per-account and can't be scraped | — Pending |
+| Bonus-bet finder is enter book + amount, nothing saved | Bonus bets are per-account and can't be scraped | ✓ Good (Phase 1) |
 | v1 promo types: bonus bets + profit boosts | Most common, highest-value recurring promos | — Pending |
 | Competing promos hedged in tandem (both legs promo-adjusted) | Two promos on opposite sides beat hedging each against plain odds | — Pending |
 | Hedge engine rules: equal profit on both outcomes; boost stake defaults to the max allowed by caps; binding max-winnings cap auto-reduces the stake with an explanation; boost % applies to profit | Carried from the superseded Phase 1 discussion | — Pending |
 | Display rules: American odds only; money to the cent; conversion % for bonus bets, ROI % for cash legs; account-risk advisory as a small footnote | Carried from the superseded Phase 1 discussion | — Pending |
 | Colorado only, sportsbooks only | Owner's state; keeps scope tight | — Pending |
+| Sport filter is client-side tabs over results (top 10 overall + top 10 per sport) | Owner didn't want to re-submit the search to change sport | ✓ Good (Phase 1) |
+| NFL moneylines shown with a "Tie risk" badge rather than excluded | A tie voids both legs: $0 profit, no cash lost | ✓ Good (Phase 1, owner sign-off) |
 
 ## Evolution
 
@@ -90,4 +91,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-25 after reframing around the opportunities feed*
+*Last updated: 2026-09-25 after Phase 1 (Bonus Bet Finder) completion*
