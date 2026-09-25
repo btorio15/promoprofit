@@ -81,3 +81,24 @@ export function evaluateRefreshGate(i: EvaluateRefreshGateInput): RefreshGate {
 export function nextMonthlyReset(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 }
+
+/**
+ * The Odds API resets its monthly credit count on the 1st (UTC). A
+ * credit_usage row recorded before the most recent reset describes last
+ * month's balance, so it must be treated as unknown -- otherwise a month
+ * that ended below the block threshold would lock refresh out forever
+ * (only a successful refresh writes a new row, and a blocked refresh never
+ * runs). Returns null when there is no row or the row predates a reset.
+ */
+export function effectiveRemaining(
+  latest: { requestsRemaining: number; recordedAt: Date } | null,
+  now: Date,
+): number | null {
+  if (!latest) return null;
+  return isFromEarlierBillingMonth(latest.recordedAt, now) ? null : latest.requestsRemaining;
+}
+
+/** True when a monthly reset (1st, 00:00Z) has happened between recordedAt and now. */
+export function isFromEarlierBillingMonth(recordedAt: Date, now: Date): boolean {
+  return nextMonthlyReset(recordedAt).getTime() <= now.getTime();
+}

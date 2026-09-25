@@ -9,6 +9,7 @@ import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 import {
   creditLevel,
+  effectiveRemaining,
   estimateRefreshCredits,
   nextMonthlyReset,
   FREE_TIER_MONTHLY_CREDITS,
@@ -32,8 +33,11 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     getLatestCreditUsage(),
   ]);
 
-  const remaining = latest?.requestsRemaining ?? null;
-  const total = latest ? latest.requestsRemaining + latest.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
+  // A row from before the last monthly reset is last month's balance --
+  // show it as unknown (not blocked) once the quota has reset (CR-01).
+  const remaining = effectiveRemaining(latest, now);
+  const total =
+    latest && remaining !== null ? latest.requestsRemaining + latest.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
 
   // Never hardcode the estimate: use the last refresh's real cost when it
   // spent credits, otherwise the pure upper-bound formula (research

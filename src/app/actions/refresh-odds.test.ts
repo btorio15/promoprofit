@@ -89,7 +89,8 @@ describe("runOddsRefresh", () => {
   });
 
   it("blocks the refresh (low_credits) when remaining is below the threshold, without calling fetchSportOdds", async () => {
-    const now = new Date("2026-10-01T12:00:00.000Z");
+    // The low-credit row is from the SAME billing month as now (CR-01).
+    const now = new Date("2026-10-15T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 15,
       requestsUsed: 485,
@@ -110,6 +111,85 @@ describe("runOddsRefresh", () => {
       estimatedCredits: 1,
       resetsOn: "2026-11-01T00:00:00.000Z",
     });
+  });
+
+  it("does not block on a low-credit row from the previous billing month -- the quota reset on the 1st (CR-01)", async () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 15,
+      requestsUsed: 485,
+      refreshCost: 2,
+      sportsFetched: 1,
+      recordedAt: new Date("2026-09-30T12:00:00.000Z"), // before the Oct 1 reset
+    });
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 499, used: 1, last: 1 } });
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(mockFetchSportOdds).toHaveBeenCalledTimes(1);
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith({
+      requestsRemaining: 499,
+      requestsUsed: 1,
+      refreshCost: 1,
+      sportsFetched: 1,
+      recordedAt: now,
+    });
+  });
+
+  it("never records a made-up 0 when x-requests-remaining is missing; carries the prior balance forward less the cost (CR-01)", async () => {
+    const now = new Date("2026-10-15T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 300,
+      requestsUsed: 200,
+      refreshCost: 1,
+      sportsFetched: 1,
+      recordedAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+    });
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: null, used: null, last: 1 } });
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith({
+      requestsRemaining: 299,
+      requestsUsed: 201,
+      refreshCost: 1,
+      sportsFetched: 1,
+      recordedAt: now,
+    });
+  });
+
+  it("skips recording (instead of writing 0) when the header is missing and no same-month balance is known (CR-01)", async () => {
+    const now = new Date("2026-10-15T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: null, used: null, last: 1 } });
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).not.toHaveBeenCalled();
+  });
+
+  it("keeps an earlier sport's reported balance when a later response lacks the header (CR-01)", async () => {
+    const now = new Date("2026-10-15T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([
+      { key: "basketball_nba", group: "Basketball", title: "NBA", active: true },
+      { key: "baseball_mlb", group: "Baseball", title: "MLB", active: true },
+    ]);
+    mockFetchSportOdds
+      .mockResolvedValueOnce({ events: [], quota: { remaining: 250, used: 250, last: 1 } })
+      .mockResolvedValueOnce({ events: [], quota: { remaining: null, used: null, last: 1 } });
+
+    await runOddsRefresh({ confirmed: false, now });
+
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestsRemaining: 250, requestsUsed: 250, refreshCost: 2 }),
+    );
   });
 
   it("returns confirm_required within the 15-minute window when not confirmed, and proceeds when confirmed", async () => {

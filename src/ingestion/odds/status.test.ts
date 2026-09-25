@@ -78,4 +78,21 @@ describe("getOddsStatus", () => {
       estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length),
     );
   });
+
+  it("reports unknown (not blocked) when the latest row is from before the monthly reset (CR-01)", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 5,
+      requestsUsed: 495,
+      refreshCost: 3,
+      sportsFetched: 3,
+      recordedAt: new Date("2026-09-30T20:00:00.000Z"),
+    });
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.remaining).toBeNull();
+    expect(status.level).toBe("unknown");
+    expect(status.total).toBe(500);
+  });
 });

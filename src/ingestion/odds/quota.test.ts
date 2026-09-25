@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONFIRM_WINDOW_MINUTES,
   creditLevel,
+  effectiveRemaining,
   estimateRefreshCredits,
   evaluateRefreshGate,
   nextMonthlyReset,
@@ -120,5 +121,37 @@ describe("nextMonthlyReset", () => {
     expect(nextMonthlyReset(new Date("2026-12-31T23:59:00.000Z")).toISOString()).toBe(
       "2027-01-01T00:00:00.000Z",
     );
+  });
+});
+
+describe("effectiveRemaining (CR-01)", () => {
+  const row = (recordedAt: string, requestsRemaining = 15) => ({ requestsRemaining, recordedAt: new Date(recordedAt) });
+
+  it("returns null when there is no credit row", () => {
+    expect(effectiveRemaining(null, new Date("2026-10-15T00:00:00.000Z"))).toBeNull();
+  });
+
+  it("returns the recorded balance when the row is from the current billing month", () => {
+    expect(effectiveRemaining(row("2026-10-01T00:00:00.000Z"), new Date("2026-10-31T23:59:59.999Z"))).toBe(15);
+  });
+
+  it("returns null when the row predates the monthly reset (last month's balance)", () => {
+    expect(effectiveRemaining(row("2026-09-30T23:59:59.999Z"), new Date("2026-10-01T00:00:00.000Z"))).toBeNull();
+  });
+
+  it("returns null across a year rollover", () => {
+    expect(effectiveRemaining(row("2026-12-31T23:00:00.000Z"), new Date("2027-01-01T01:00:00.000Z"))).toBeNull();
+  });
+
+  it("a stale low-credit row no longer blocks the gate", () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    const gate = evaluateRefreshGate({
+      remaining: effectiveRemaining(row("2026-09-30T12:00:00.000Z", 5), now),
+      lastRefreshAt: new Date("2026-09-30T12:00:00.000Z"),
+      estimatedCredits: 3,
+      now,
+      confirmed: false,
+    });
+    expect(gate).toEqual({ action: "proceed" });
   });
 });

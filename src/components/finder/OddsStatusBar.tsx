@@ -135,7 +135,7 @@ export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
 
         {status.level === "unknown" ? (
           <p className="text-sm text-muted-foreground">
-            Credit balance appears after the first refresh
+            Credit balance appears after the next refresh
           </p>
         ) : (
           <div className="flex flex-col gap-1">

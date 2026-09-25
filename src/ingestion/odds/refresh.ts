@@ -4,7 +4,7 @@
  * and only from there. This module never triggers itself automatically.
  */
 import { fetchSportOdds, listSports } from "./client";
-import { estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
+import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
 import { getLatestCreditUsage, purgeStartedEvents, recordCreditUsage, replaceSportOdds } from "./store";
 import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
@@ -55,8 +55,13 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
   const bookKeys = usableOddsBooks().map((b) => b.key); // D-15, never paid_only
   const estimatedCredits = estimateRefreshCredits(inSeason.length, bookKeys.length);
 
+  // A row from before the last monthly reset is last month's balance:
+  // treat it as unknown so the low-credit block lifts on the 1st (CR-01).
+  const priorRemaining = effectiveRemaining(latest, now);
+  const priorUsed = priorRemaining === null ? null : (latest?.requestsUsed ?? null);
+
   const gate = evaluateRefreshGate({
-    remaining: latest?.requestsRemaining ?? null,
+    remaining: priorRemaining,
     lastRefreshAt: latest?.recordedAt ?? null,
     estimatedCredits,
     now,
@@ -103,8 +108,10 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
       sportsFetched.push(sport.key);
       quotaCaptured = true;
       if (quota.last !== null) refreshCost += quota.last;
-      lastRemaining = quota.remaining;
-      lastUsed = quota.used;
+      // Keep the last value the API actually reported; a response missing
+      // the header must not erase an earlier sport's reading.
+      if (quota.remaining !== null) lastRemaining = quota.remaining;
+      if (quota.used !== null) lastUsed = quota.used;
     }
     await purgeStartedEvents(now);
   } catch (err) {
@@ -112,11 +119,18 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
   } finally {
     // Persist whatever was actually spent, even on a mid-way error -- the
     // credit meter must reflect real usage, not just successful refreshes.
-    if (quotaCaptured) {
+    // Never invent a balance (CR-01): if no response carried
+    // x-requests-remaining, carry the prior same-month balance forward less
+    // the credits this run reported spending. With no known balance at all,
+    // skip the row rather than record a fake 0 that would block refresh.
+    const remainingToRecord =
+      lastRemaining ?? (priorRemaining !== null ? Math.max(0, priorRemaining - refreshCost) : null);
+    const usedToRecord = lastUsed ?? (priorUsed !== null ? priorUsed + refreshCost : 0);
+    if (quotaCaptured && remainingToRecord !== null) {
       try {
         await recordCreditUsage({
-          requestsRemaining: lastRemaining ?? 0,
-          requestsUsed: lastUsed ?? 0,
+          requestsRemaining: remainingToRecord,
+          requestsUsed: usedToRecord,
           refreshCost,
           sportsFetched: sportsFetched.length,
           recordedAt: now,
