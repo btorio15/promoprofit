@@ -25,6 +25,19 @@ export interface BonusBetHedgeResult {
 // Local clone so this module never mutates the shared global Decimal config.
 const LocalDecimal = Decimal.clone({ precision: 40 });
 
+// American odds like -300 (1 + 1/3) or -275 (1 + 4/11) have no exact base-10
+// representation, so every division/multiplication through them carries an
+// unavoidable truncation of a few units in the ~38th-40th decimal place
+// (see americanOdds.ts). A value that is mathematically cent-exact (e.g.
+// 217.5) can come out as 217.50000000000000000054 or 219.99999999999999999996
+// as a result. Snapping to 20 decimal places with normal rounding erases
+// that noise — it is many orders of magnitude below a cent — while leaving
+// genuine sub-cent content (e.g. 109.63414634146341463415, which needs a
+// real floor/ceiling decision) untouched.
+function clean(value: Decimal): Decimal {
+  return value.toDecimalPlaces(20, Decimal.ROUND_HALF_UP);
+}
+
 interface Candidate {
   hedgeStake: Decimal;
   hedgePayout: Decimal;
@@ -49,12 +62,15 @@ export function calculateBonusBetHedge(input: BonusBetHedgeInput): BonusBetHedge
   const hedgeDecimalOdds = new LocalDecimal(americanToDecimal(input.hedgeOddsAmerican));
 
   // Books pay whole cents; flooring is the conservative assumption everywhere.
-  const bonusPayout = bonusAmount
-    .times(bonusDecimalOdds.minus(1))
-    .toDecimalPlaces(2, Decimal.ROUND_DOWN);
+  const bonusPayout = clean(bonusAmount.times(bonusDecimalOdds.minus(1))).toDecimalPlaces(
+    2,
+    Decimal.ROUND_DOWN,
+  );
 
   // Exact, unrounded hedge stake: H = B * (Ob - 1) / Oh
-  const hedgeStakeExact = bonusAmount.times(bonusDecimalOdds.minus(1)).dividedBy(hedgeDecimalOdds);
+  const hedgeStakeExact = clean(
+    bonusAmount.times(bonusDecimalOdds.minus(1)).dividedBy(hedgeDecimalOdds),
+  );
 
   const roundedCandidates = [
     hedgeStakeExact.toDecimalPlaces(2, Decimal.ROUND_DOWN),
@@ -67,7 +83,10 @@ export function calculateBonusBetHedge(input: BonusBetHedgeInput): BonusBetHedge
 
   let best: Candidate | null = null;
   for (const hedgeStake of candidateStakes) {
-    const hedgePayout = hedgeStake.times(hedgeDecimalOdds).toDecimalPlaces(2, Decimal.ROUND_DOWN);
+    const hedgePayout = clean(hedgeStake.times(hedgeDecimalOdds)).toDecimalPlaces(
+      2,
+      Decimal.ROUND_DOWN,
+    );
     const netIfBonusWins = bonusPayout.minus(hedgeStake);
     const netIfHedgeWins = hedgePayout.minus(hedgeStake);
     const guaranteedProfit = Decimal.min(netIfBonusWins, netIfHedgeWins);
