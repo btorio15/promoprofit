@@ -84,12 +84,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| CALC-01 | Phase 1 | Pending |
+| CALC-02 | Phase 1 | Pending |
+| CALC-03 | Phase 1 | Pending |
+| CALC-04 | Phase 1 | Pending |
+| CALC-05 | Phase 1 | Pending |
+| CALC-06 | Phase 1 | Pending |
+| ODDS-01 | Phase 2 | Pending |
+| ODDS-02 | Phase 2 | Pending |
+| ODDS-03 | Phase 2 | Pending |
+| ODDS-04 | Phase 2 | Pending |
+| ODDS-05 | Phase 2 | Pending |
+| PROMO-01 | Phase 3 | Pending |
+| PROMO-02 | Phase 3 | Pending |
+| PROMO-03 | Phase 5 | Pending |
+| PROMO-04 | Phase 5 | Pending |
+| PROMO-05 | Phase 3 | Pending |
+| DASH-01 | Phase 4 | Pending |
+| DASH-02 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Pending |
+| DASH-04 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-25*
-*Last updated: 2026-09-25 after initial definition*
+*Last updated: 2026-09-25 after roadmap creation*
