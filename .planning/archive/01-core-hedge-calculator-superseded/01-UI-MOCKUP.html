@@ -1,0 +1,438 @@
+<title>PromoProfit Hedge Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=Geist+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #FAFAFA;
+    --surface-2: #F4F4F5;
+    --border: #E4E4E7;
+    --fg: #09090B;
+    --muted: #71717A;
+    --input-bg: #FFFFFF;
+    --accent: #059669;
+    --accent-fg: #FFFFFF;
+    --destructive: #DC2626;
+    --destructive-bg: #FEF2F2;
+    --destructive-border: #FECACA;
+    --warning: #B45309;
+    --warning-icon: #D97706;
+    --warning-bg: #FFFBEB;
+    --warning-border: #FDE68A;
+    --radius: 10px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(9, 9, 11, 0.05);
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #09090B;
+      --surface: #18181B;
+      --surface-2: #1F1F23;
+      --border: #27272A;
+      --fg: #FAFAFA;
+      --muted: #A1A1AA;
+      --input-bg: #09090B;
+      --accent: #10B981;
+      --accent-fg: #022C22;
+      --destructive: #EF4444;
+      --destructive-bg: rgba(239, 68, 68, 0.08);
+      --destructive-border: rgba(239, 68, 68, 0.35);
+      --warning: #F59E0B;
+      --warning-icon: #F59E0B;
+      --warning-bg: rgba(245, 158, 11, 0.08);
+      --warning-border: rgba(245, 158, 11, 0.3);
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #09090B;
+    --surface: #18181B;
+    --surface-2: #1F1F23;
+    --border: #27272A;
+    --fg: #FAFAFA;
+    --muted: #A1A1AA;
+    --input-bg: #09090B;
+    --accent: #10B981;
+    --accent-fg: #022C22;
+    --destructive: #EF4444;
+    --destructive-bg: rgba(239, 68, 68, 0.08);
+    --destructive-border: rgba(239, 68, 68, 0.35);
+    --warning: #F59E0B;
+    --warning-icon: #F59E0B;
+    --warning-bg: rgba(245, 158, 11, 0.08);
+    --warning-border: rgba(245, 158, 11, 0.3);
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-inline: 16px;
+    padding-block: 0 64px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .mono, input.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* Mockup chrome (not part of the app) */
+  .mockbar {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+    padding-block: 16px; border-bottom: 1px dashed var(--border); margin-bottom: 48px;
+    font-size: 14px; color: var(--muted);
+  }
+  .mockbar strong { color: var(--fg); font-weight: 600; }
+  .themeswitch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; gap: 2px; }
+  .themeswitch button {
+    font: inherit; font-size: 14px; color: var(--muted); background: transparent; border: 0;
+    border-radius: 6px; padding: 4px 12px; cursor: pointer;
+  }
+  .themeswitch button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); }
+
+  /* App */
+  .app-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 32px; }
+  h1, h2, h3 { font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0; text-wrap: balance; }
+  .sub { font-size: 14px; color: var(--muted); margin: 0; }
+
+  .layout { display: grid; gap: 32px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 1024px) {
+    .layout { grid-template-columns: 55fr 45fr; }
+    .results-col { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); }
+  }
+  .form-col { display: flex; flex-direction: column; gap: 24px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 16px;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+  .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .row { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+  label, .label { font-size: 14px; font-weight: 400; color: var(--fg); }
+  .label .opt { color: var(--muted); }
+  input, .select {
+    height: 40px; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--input-bg); color: var(--fg); padding: 0 12px; font: inherit; font-size: 16px;
+    box-shadow: var(--shadow);
+  }
+  input::placeholder { color: var(--muted); }
+  input:focus-visible, .select:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  input[readonly] { background: var(--surface-2); }
+  .select { display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; }
+  .select svg { color: var(--muted); flex: none; }
+  .invalid { border-color: var(--destructive); }
+  .field-error { font-size: 14px; color: var(--destructive); margin: 0; }
+  .hint { font-size: 14px; color: var(--muted); margin: 0; }
+
+  .toggle {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px;
+  }
+  .toggle button {
+    height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--muted);
+    font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; padding: 0 8px;
+  }
+  .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .toggle-wrap { min-height: 40px; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 14px; line-height: 1;
+    padding: 4px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .badge.warn { border-color: var(--warning-border); color: var(--warning); background: var(--warning-bg); }
+
+  .alert {
+    display: flex; gap: 8px; align-items: flex-start; border-radius: var(--radius-sm);
+    padding: 8px 16px; font-size: 14px; border: 1px solid;
+  }
+  .alert svg { flex: none; margin-top: 3px; }
+  .alert.warn { background: var(--warning-bg); border-color: var(--warning-border); color: var(--fg); }
+  .alert.warn svg { color: var(--warning-icon); }
+  .alert.err { background: var(--destructive-bg); border-color: var(--destructive-border); color: var(--destructive); }
+
+  /* Results */
+  .headline { display: flex; flex-direction: column; gap: 4px; }
+  .headline .label { color: var(--muted); }
+  .profit { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 36px; font-weight: 600; line-height: 1.2; color: var(--accent); }
+  .metric { font-size: 16px; color: var(--muted); }
+  .metric .mono { color: var(--fg); }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .steps li { display: flex; gap: 8px; font-size: 16px; }
+  .steps .leg {
+    flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-2);
+    border: 1px solid var(--border); font-size: 14px; display: grid; place-items: center; color: var(--muted);
+  }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 12px; text-align: left; white-space: nowrap; }
+  th { font-weight: 400; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg); }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr:nth-child(even) td { background: var(--surface-2); }
+  tbody tr:nth-child(odd) td { background: var(--bg); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    height: 40px; padding: 0 16px; border-radius: var(--radius-sm); font: inherit; font-size: 14px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent;
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); }
+  .btn.ghost { background: transparent; color: var(--fg); border-color: var(--border); }
+
+  .sep { height: 1px; background: var(--border); border: 0; margin: 0; }
+  details.advisory { font-size: 14px; color: var(--muted); }
+  details.advisory summary { cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: flex-start; }
+  details.advisory summary::-webkit-details-marker { display: none; }
+  details.advisory summary svg { color: var(--warning-icon); flex: none; margin-top: 3px; }
+  details.advisory summary u { color: var(--fg); text-underline-offset: 3px; }
+  details.advisory p { margin: 8px 0 0 24px; max-width: 65ch; }
+
+  .empty {
+    border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 24px;
+    display: flex; flex-direction: column; gap: 8px; text-align: left;
+  }
+  .empty p { margin: 0; font-size: 14px; color: var(--muted); max-width: 48ch; }
+
+  /* State gallery */
+  .gallery-head { margin-top: 64px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 4px; }
+  .gallery { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items: start; }
+  .state-tag { font-size: 14px; color: var(--muted); letter-spacing: 0.02em; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .toggle button, .btn, .themeswitch button { transition: background-color .15s, color .15s; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="mockbar">
+    <span><strong>Style mockup</strong> · Phase 1 UI-SPEC · nothing here calculates</span>
+    <span class="themeswitch" role="group" aria-label="Preview theme">
+      <button type="button" id="th-auto" data-t="auto" aria-pressed="true">Auto</button>
+      <button type="button" id="th-light" data-t="light" aria-pressed="false">Light</button>
+      <button type="button" id="th-dark" data-t="dark" aria-pressed="false">Dark</button>
+    </span>
+  </div>
+
+  <header class="app-head">
+    <h1>PromoProfit</h1>
+    <p class="sub">Hedge calculator · Colorado sportsbooks</p>
+  </header>
+
+  <div class="layout">
+    <!-- Form column -->
+    <div class="form-col">
+      <div class="field">
+        <span class="label">Market type</span>
+        <button type="button" class="select" id="market" aria-haspopup="listbox">
+          <span>Moneyline</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <section class="card" aria-labelledby="legA">
+        <div class="card-head"><h2 id="legA">Leg A</h2></div>
+        <div class="toggle" role="group" aria-label="Leg A type">
+          <button type="button" aria-pressed="false">Plain</button>
+          <button type="button" aria-pressed="true">Bonus bet</button>
+          <button type="button" aria-pressed="false">Boost</button>
+        </div>
+        <div class="row">
+          <div class="field"><label for="a-odds">American odds</label><input class="num" id="a-odds" value="+300"></div>
+          <div class="field"><label for="a-amt">Bonus amount</label><input class="num" id="a-amt" value="$100.00"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="label" for="a-book">Book <span class="opt">(optional)</span></label><input id="a-book" value="DraftKings"></div>
+          <div class="field"><label class="label" for="a-out">Outcome <span class="opt">(optional)</span></label><input id="a-out" value="Chiefs ML"></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="legB">
+        <div class="card-head"><h2 id="legB">Leg B</h2></div>
+        <div class="toggle" role="group" aria-label="Leg B type">
+          <button type="button" aria-pressed="true">Plain</button>
+          <button type="button" aria-pressed="false">Bonus bet</button>
+          <button type="button" aria-pressed="false">Boost</button>
+        </div>
+        <div class="row">
+          <div class="field"><label for="b-odds">American odds</label><input class="num" id="b-odds" value="-275"></div>
+          <div class="field"><label for="b-stake">Hedge stake</label><input class="num" id="b-stake" value="$220.00" readonly></div>
+        </div>
+        <div class="row">
+          <div class="field"><label class="label" for="b-book">Book <span class="opt">(optional)</span></label><input id="b-book" value="FanDuel"></div>
+          <div class="field"><label class="label" for="b-out">Outcome <span class="opt">(optional)</span></label><input id="b-out" value="Bills ML"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Results column -->
+    <div class="results-col">
+      <section class="card" aria-labelledby="res">
+        <div class="card-head"><h2 id="res">Results</h2><span class="badge">Example values</span></div>
+        <div class="headline">
+          <span class="label">Guaranteed profit</span>
+          <span class="profit">$80.00</span>
+          <span class="metric">Conversion <span class="mono">80.00%</span> of bonus</span>
+        </div>
+        <ol class="steps">
+          <li><span class="leg">A</span><span>Bet <span class="mono">$100.00</span> bonus at DraftKings on Chiefs ML <span class="mono">+300</span></span></li>
+          <li><span class="leg">B</span><span>Bet <span class="mono">$220.00</span> at FanDuel on Bills ML <span class="mono">−275</span></span></li>
+        </ol>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Outcome</th><th>Bet</th><th class="num">Payout</th><th class="num">Net profit</th></tr></thead>
+            <tbody>
+              <tr><td>Chiefs win</td><td>Leg A · DraftKings</td><td class="num">$300.00</td><td class="num">$80.00</td></tr>
+              <tr><td>Bills win</td><td>Leg B · FanDuel</td><td class="num">$300.00</td><td class="num">$80.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="copy">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>Copy link</span>
+          </button>
+          <button type="button" class="btn ghost">Reset form</button>
+        </div>
+        <hr class="sep">
+        <details class="advisory">
+          <summary>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <span>Precise, promo-optimized stakes can lead to sportsbook account limits. <u>Learn more</u></span>
+          </summary>
+          <p>Sportsbooks track betting patterns and may limit or restrict accounts that consistently bet mathematically optimal, promo-only stakes with little variance from normal bettor behavior. This calculator shows you the optimal hedge. How much promo activity to run, and on which accounts, is your call.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+
+  <!-- State gallery -->
+  <div class="gallery-head">
+    <h2>Other states</h2>
+    <p class="sub">How the same components look for empty, error, warning, capped, and tandem cases.</p>
+  </div>
+
+  <div class="gallery">
+    <!-- Empty -->
+    <section class="card">
+      <span class="state-tag">Empty results</span>
+      <div class="empty">
+        <h3>Enter both legs to see your hedge</h3>
+        <p>Choose a bet type and enter odds for Leg A and Leg B. Your guaranteed profit appears here once both sides are valid.</p>
+      </div>
+    </section>
+
+    <!-- Validation error -->
+    <section class="card">
+      <span class="state-tag">Validation error</span>
+      <div class="field">
+        <label for="e-odds">American odds</label>
+        <input class="num invalid" id="e-odds" value="+50" aria-invalid="true" aria-describedby="e-odds-err">
+        <p class="field-error" id="e-odds-err">American odds must be +100 or higher, or −100 or lower.</p>
+      </div>
+      <div class="alert err" role="alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        <span>Fix the highlighted fields to see your hedge calculation.</span>
+      </div>
+    </section>
+
+    <!-- Push warning -->
+    <section class="card">
+      <span class="state-tag">Push-line warning</span>
+      <div class="row">
+        <div class="field">
+          <span class="label">Market type</span>
+          <button type="button" class="select" id="p-market"><span>Spread</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+        </div>
+        <div class="field"><label for="p-line">Line</label><input class="num" id="p-line" value="-3"></div>
+      </div>
+      <div class="alert warn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>Whole-number lines can push (tie), which breaks the guarantee. Use a half-point line or switch to Moneyline.</span>
+      </div>
+    </section>
+
+    <!-- Boost with cap clamp -->
+    <section class="card">
+      <div class="card-head"><span class="state-tag">Boost leg, max winnings reached</span><span class="badge warn">Capped</span></div>
+      <div class="toggle" role="group" aria-label="Boost leg type">
+        <button type="button" aria-pressed="false">Plain</button>
+        <button type="button" aria-pressed="false">Bonus bet</button>
+        <button type="button" aria-pressed="true">Boost</button>
+      </div>
+      <div class="toggle" role="group" aria-label="Boost input mode">
+        <button type="button" aria-pressed="true">Boost %</button>
+        <button type="button" aria-pressed="false">Boosted price</button>
+      </div>
+      <div class="row">
+        <div class="field"><label for="c-odds">Original odds</label><input class="num" id="c-odds" value="+200"></div>
+        <div class="field"><label for="c-pct">Boost</label><input class="num" id="c-pct" value="50%"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label for="c-max">Max stake</label><input class="num" id="c-max" value="$50.00"></div>
+        <div class="field"><label for="c-win">Max winnings</label><input class="num" id="c-win" value="$100.00"></div>
+      </div>
+      <div class="field">
+        <label for="c-stake">Stake</label>
+        <input class="num" id="c-stake" value="$33.33">
+        <p class="hint">Boosted to <span class="mono">+300</span>. Suggested stake, editable.</p>
+      </div>
+      <div class="alert warn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>Stake reduced to <span class="mono">$33.33</span>. Above this, boosted winnings are capped at <span class="mono">$100.00</span>.</span>
+      </div>
+    </section>
+
+    <!-- Tandem result -->
+    <section class="card">
+      <span class="state-tag">Tandem result · two 50% boosts, opposite sides</span>
+      <div class="headline">
+        <span class="label">Guaranteed profit</span>
+        <span class="profit">$15.16</span>
+        <span class="metric">ROI <span class="mono">19.20%</span> on <span class="mono">$78.96</span> risked</span>
+      </div>
+      <ol class="steps">
+        <li><span class="leg">A</span><span>Bet <span class="mono">$28.96</span> at DraftKings on Nuggets ML, boosted <span class="mono">+150 → +225</span></span></li>
+        <li><span class="leg">B</span><span>Bet <span class="mono">$50.00</span> at BetMGM on Lakers ML, boosted <span class="mono">−170 → −113</span></span></li>
+      </ol>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Outcome</th><th>Bet</th><th class="num">Payout</th><th class="num">Net profit</th></tr></thead>
+          <tbody>
+            <tr><td>Nuggets win</td><td>Leg A · DraftKings</td><td class="num">$94.12</td><td class="num">$15.16</td></tr>
+            <tr><td>Lakers win</td><td>Leg B · BetMGM</td><td class="num">$94.12</td><td class="num">$15.16</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint">Leg B is at its <span class="mono">$50.00</span> max stake, so Leg A is sized to match.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('.themeswitch button');
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = b.getAttribute('data-t');
+        if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+        buttons.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      });
+    });
+    var copy = document.getElementById('copy');
+    copy.addEventListener('click', function () {
+      var label = copy.querySelector('span');
+      label.textContent = 'Copied';
+      setTimeout(function () { label.textContent = 'Copy link'; }, 1500);
+    });
+  })();
+</script>

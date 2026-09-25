@@ -3,13 +3,13 @@
 
 **PromoProfit**
 
-PromoProfit is a web dashboard that scans popular Colorado sportsbooks for promotions (bonus bets and profit/odds boosts) and calculates the guaranteed profit available by hedging each promo against competing books. It's built for the owner and a small private group of friends who convert sportsbook promos into locked-in profit, and it filters hedge opportunities to the books each user actually has accounts with.
+PromoProfit is a private web app that already knows the current promotions at Colorado sportsbooks (scraped automatically, with group members adding any the scrapers miss) and shows a ranked feed of the guaranteed-profit opportunities they create, including pairs of competing promos on opposite sides of the same game. Users sort the feed by profit, filter it to the books they have, and place the bets themselves. A bonus-bet finder lets a user enter "I have a $X bonus bet at book Y" and see the best market to convert it on and the best book to hedge at. It's built for the owner and a small group of friends.
 
-**Core Value:** Given a promo, instantly show the max-profit hedge across the user's books — with exact stakes and the guaranteed profit — correctly, every time.
+**Core Value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
 
 ### Constraints
 
-- **Budget**: Free tier of the odds API only (~500 requests/month on The Odds API) — odds must be fetched on demand / cached aggressively, not polled continuously
+- **Budget**: The Odds API free tier (~500 credits/month) — odds refresh only when a user presses refresh, with cached results and a credit meter
 - **Geography**: Colorado sportsbooks only
 - **Hedge venues**: Regulated sportsbooks only
 - **Access**: Private, small group — no public signup

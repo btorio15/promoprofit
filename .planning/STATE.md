@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-09-25T16:47:04.999Z"
-last_activity: 2026-09-25 — Roadmap created, 5 phases mapped to 20 v1 requirements
+stopped_at: Roadmap rewritten for opportunities-feed reframe
+last_updated: "2026-09-25T00:00:00.000Z"
+last_activity: 2026-09-25 — Roadmap rewritten (feed + bonus-bet finder), 5 phases mapped to 24 v1 requirements
 progress:
   total_phases: 5
   completed_phases: 0
@@ -20,15 +20,15 @@ progress:
 
 See: .planning/PROJECT.md (updated 2026-09-25)
 
-**Core value:** Given a promo, instantly show the max-profit hedge across the user's books — with exact stakes and the guaranteed profit — correctly, every time.
-**Current focus:** Phase 1 — Core Hedge Calculator
+**Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
+**Current focus:** Phase 1 — Bonus Bet Finder
 
 ## Current Position
 
-Phase: 1 of 5 (Core Hedge Calculator)
+Phase: 1 of 5 (Bonus Bet Finder)
 Plan: 0 of ? in current phase
 Status: Ready to plan
-Last activity: 2026-09-25 — Roadmap created, 5 phases mapped to 20 v1 requirements
+Last activity: 2026-09-25 — Roadmap rewritten (feed + bonus-bet finder), 5 phases mapped to 24 v1 requirements
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -60,8 +60,9 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Roadmap: MVP mode — phases sequenced as vertical slices (manual-input calculator first, then odds API, then promo capture, then multi-user dashboard, then scraping) rather than horizontal layers.
-- Roadmap: Scraping (Phase 5) kept in v1 scope per project directive, sequenced last since it depends on the review-queue and dashboard built in earlier phases.
+- Product reframe (2026-09-25): the opportunities feed and bonus-bet finder are the v1 product; the standalone manual hedge calculator is dropped from v1 (v2 candidate as TOOL-01). Superseded Phase 1 docs (calculator-first plan) archived at `.planning/archive/01-core-hedge-calculator-superseded/`.
+- Roadmap rewritten to 5 phases around the new shape: (1) Bonus Bet Finder — scaffold, book config, odds ingestion, hedge engine, finder UI; (2) Private Access & My Books; (3) Promo Scraping & Review (adds boost math + scraping); (4) Opportunities Feed (the main screen); (5) Group-Added Promos.
+- Hedge-engine rules and display rules from the superseded calculator discussion carry forward unchanged into Phase 1 and Phase 3 (see PROJECT.md Key Decisions table).
 
 ### Pending Todos
 
@@ -69,10 +70,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 2: Live Odds API verification needed for Caesars/Fanatics free-tier access and the theScore Bet bookmaker key (research flagged, unresolved).
-- Phase 2/4: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
+- Phase 1: Live Odds API verification needed for Caesars/Fanatics free-tier access and the theScore Bet bookmaker key (research flagged, unresolved).
+- Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
-- Phase 5: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
+- Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
 
 ## Deferred Items
 
@@ -84,6 +85,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-25T16:47:04.991Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-core-hedge-calculator/01-CONTEXT.md
+Last session: 2026-09-25T00:00:00.000Z
+Stopped at: Roadmap rewritten for opportunities-feed reframe; no phase context gathered yet under the new structure
+Resume file: none — next step is `/gsd:plan-phase 1` against the rewritten ROADMAP.md
