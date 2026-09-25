@@ -28,7 +28,7 @@ Not in this phase: login and per-user book selection (Phase 2), the account-risk
 - **D-04:** Out-of-season sports are **skipped automatically** using the free (zero-credit) `/sports` endpoint, so no credits are spent on empty sports.
 
 ### Finder inputs & results
-- **D-05:** Inputs: **book** and **bonus amount** (required); **minimum-odds rule** (optional, e.g. "−200 or longer"; markets that don't qualify are excluded); **sport filter** (optional, limits results to one sport).
+- **D-05:** Inputs: **book** and **bonus amount** (required); **sport filter** (optional, limits results to one sport). **No minimum-odds field**: the owner says bonus bets almost always convert best with the bonus side at +200 to +400, so ranking by profit already surfaces the right lines and the filter adds nothing.
 - **D-06:** Show the **top 10** results, ranked by guaranteed profit (equivalently conversion %, since the amount is fixed).
 - **D-07:** **Compact rows with expand**: each row shows game, bonus side + odds, hedge book + odds, guaranteed profit $, and conversion %. Expanding shows both stakes and per-outcome payouts/net profit.
 - **D-08:** Each row uses **only the best-priced hedge book** for that market (one row per market).
@@ -99,6 +99,7 @@ Not in this phase: login and per-user book selection (Phase 2), the account-risk
 
 ### Notes for research/planning
 - **NFL moneyline ties:** US books typically refund (push) NFL moneylines on a tie. This conflicts with CALC-05's no-push rule. Research should confirm how CO books settle NFL moneyline ties and the planner should pick a treatment (e.g. accept with a small flag, or exclude). NBA/MLB/NCAAF/NCAAB moneylines cannot tie.
+- **Cent rounding:** rounding the hedge stake to the cent can make the two outcomes differ by $0.01 (found while building the mockup: $50 bonus at +290 hedged at −310 → hedge $109.63, profit $35.37 vs $35.36). CALC-04 requires identical profit to the cent, so the engine needs an explicit rule (e.g. report the lower of the two, or choose the rounding direction that equalizes) and a fixture for this case.
 - Confirm which regions (`us`, `us2`) are needed to cover all CO books and use the minimum set, since each region doubles credit cost.
 
 </specifics>

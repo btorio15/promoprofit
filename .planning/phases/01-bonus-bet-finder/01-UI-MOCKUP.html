@@ -1,0 +1,519 @@
+<title>PromoProfit Bonus Bet Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=Geist+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #FAFAFA;
+    --surface-2: #F4F4F5;
+    --border: #E4E4E7;
+    --fg: #09090B;
+    --muted: #71717A;
+    --input-bg: #FFFFFF;
+    --accent: #059669;
+    --accent-fg: #FFFFFF;
+    --destructive: #DC2626;
+    --destructive-bg: #FEF2F2;
+    --destructive-border: #FECACA;
+    --warning: #B45309;
+    --warning-icon: #D97706;
+    --warning-bg: #FFFBEB;
+    --warning-border: #FDE68A;
+    --overlay: rgba(9, 9, 11, 0.35);
+    --radius: 10px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(9, 9, 11, 0.05);
+    --shadow-lg: 0 10px 30px rgba(9, 9, 11, 0.12);
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #09090B; --surface: #18181B; --surface-2: #1F1F23; --border: #27272A;
+      --fg: #FAFAFA; --muted: #A1A1AA; --input-bg: #09090B;
+      --accent: #10B981; --accent-fg: #022C22;
+      --destructive: #EF4444; --destructive-bg: rgba(239, 68, 68, 0.08); --destructive-border: rgba(239, 68, 68, 0.35);
+      --warning: #F59E0B; --warning-icon: #F59E0B; --warning-bg: rgba(245, 158, 11, 0.08); --warning-border: rgba(245, 158, 11, 0.3);
+      --overlay: rgba(0, 0, 0, 0.55); --shadow: none; --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #09090B; --surface: #18181B; --surface-2: #1F1F23; --border: #27272A;
+    --fg: #FAFAFA; --muted: #A1A1AA; --input-bg: #09090B;
+    --accent: #10B981; --accent-fg: #022C22;
+    --destructive: #EF4444; --destructive-bg: rgba(239, 68, 68, 0.08); --destructive-border: rgba(239, 68, 68, 0.35);
+    --warning: #F59E0B; --warning-icon: #F59E0B; --warning-bg: rgba(245, 158, 11, 0.08); --warning-border: rgba(245, 158, 11, 0.3);
+    --overlay: rgba(0, 0, 0, 0.55); --shadow: none; --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--sans);
+    font-size: 16px; line-height: 1.5; margin: 0;
+    padding-inline: 16px; padding-block: 0 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-size: 20px; font-weight: 600; line-height: 1.2; margin: 0; text-wrap: balance; }
+  .sub, .cap { font-size: 14px; color: var(--muted); margin: 0; }
+
+  /* Mockup chrome */
+  .mockbar {
+    display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+    padding-block: 16px; font-size: 14px; color: var(--muted); border-bottom: 1px dashed var(--border);
+  }
+  .mockbar strong { color: var(--fg); font-weight: 600; }
+  .themeswitch { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; gap: 2px; }
+  .themeswitch button { font: inherit; font-size: 14px; color: var(--muted); background: transparent; border: 0; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+  .themeswitch button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); }
+
+  /* Odds status bar */
+  .statusbar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+    background: var(--surface); border: 1px solid var(--border); border-top: 0;
+    border-radius: 0 0 var(--radius) var(--radius);
+    padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 32px;
+  }
+  .status-line { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+  .age { font-size: 14px; display: inline-flex; gap: 8px; align-items: center; }
+  .age.stale { color: var(--warning); }
+  .credits { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .progress { flex: 1 1 160px; max-width: 280px; height: 8px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .progress > span { display: block; height: 100%; background: var(--muted); border-radius: 999px; }
+  .progress.warn > span { background: var(--warning-icon); }
+  .progress.block > span { background: var(--destructive); }
+
+  .app-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 24px; }
+
+  /* Form */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+  .form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 180px; }
+  .field.wide { flex: 2 1 340px; }
+  label, .label { font-size: 14px; color: var(--fg); }
+  .opt { color: var(--muted); }
+  input, .select {
+    height: 40px; width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--input-bg); color: var(--fg); padding: 0 12px; font: inherit; font-size: 16px; box-shadow: var(--shadow);
+  }
+  input::placeholder { color: var(--muted); }
+  .select { display: flex; align-items: center; justify-content: space-between; cursor: pointer; text-align: left; }
+  .select svg { color: var(--muted); flex: none; }
+  input:focus-visible, .select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 3px; }
+  .chips button { height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 14px; padding: 0 12px; cursor: pointer; }
+  .chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .btn { height: 40px; padding: 0 16px; border-radius: var(--radius-sm); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; white-space: nowrap; }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); }
+  .btn.outline { background: var(--bg); color: var(--fg); border-color: var(--border); }
+  .btn.ghost { background: transparent; color: var(--fg); }
+  .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .hint { font-size: 14px; color: var(--muted); margin: 0; }
+
+  /* Results */
+  .results-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin: 32px 0 16px; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .cols, .row > summary {
+    display: grid; gap: 8px 16px; align-items: center;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.2fr) 120px 96px 20px;
+  }
+  .cols { padding: 0 16px; font-size: 14px; color: var(--muted); }
+  .cols .r, .row .r { text-align: right; }
+  .row { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .row > summary { list-style: none; cursor: pointer; padding: 12px 16px; min-height: 44px; }
+  .row > summary::-webkit-details-marker { display: none; }
+  .row .game { display: flex; flex-direction: column; min-width: 0; }
+  .row .game b { font-weight: 400; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .game span { font-size: 14px; color: var(--muted); }
+  .side { display: flex; flex-direction: column; min-width: 0; font-size: 16px; }
+  .side .who { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .side .at { font-size: 14px; color: var(--muted); }
+  .profit-sm { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--accent); }
+  .conv { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 16px; }
+  .conv small { display: block; font-family: var(--sans); font-size: 14px; color: var(--muted); }
+  .chev { color: var(--muted); transition: transform .15s; }
+  .row[open] .chev { transform: rotate(180deg); }
+  .rank { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+  .badge { display: inline-flex; align-items: center; font-size: 14px; line-height: 1; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); background: var(--bg); }
+  .mlabel { display: none; }
+
+  .panel { border-top: 1px solid var(--border); padding: 24px; display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
+  .headline { display: flex; flex-direction: column; gap: 4px; }
+  .profit-lg { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 36px; font-weight: 600; line-height: 1.2; color: var(--accent); }
+  .steps { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .steps li { display: flex; gap: 8px; }
+  .leg { flex: none; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); font-size: 14px; display: grid; place-items: center; color: var(--muted); }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  table { width: 100%; border-collapse: collapse; font-size: 16px; }
+  th, td { padding: 8px 12px; text-align: left; white-space: nowrap; }
+  th { font-size: 14px; font-weight: 400; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--bg); }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr:nth-child(odd) td { background: var(--bg); }
+  tbody tr:nth-child(even) td { background: var(--surface-2); }
+
+  /* Alerts */
+  .alert { display: flex; gap: 8px; align-items: flex-start; border-radius: var(--radius-sm); padding: 12px 16px; font-size: 14px; border: 1px solid; }
+  .alert svg { flex: none; margin-top: 3px; }
+  .alert.warn { background: var(--warning-bg); border-color: var(--warning-border); color: var(--fg); }
+  .alert.warn svg { color: var(--warning-icon); }
+  .alert.err { background: var(--destructive-bg); border-color: var(--destructive-border); color: var(--fg); }
+  .alert.err svg { color: var(--destructive); }
+  .alert .body { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+  /* Gallery */
+  .gallery-head { margin: 64px 0 24px; display: flex; flex-direction: column; gap: 4px; }
+  .gallery { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); align-items: start; }
+  .state { display: flex; flex-direction: column; gap: 16px; }
+  .state-tag { font-size: 14px; color: var(--muted); }
+  .mini-status { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .empty { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 24px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+  .empty p { margin: 0; font-size: 14px; color: var(--muted); max-width: 52ch; }
+  .dialog-stage { position: relative; background: var(--overlay); border-radius: var(--radius-sm); padding: 24px 16px; }
+  .dialog { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 8px; }
+  .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .skel { height: 56px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } .chev { transition: none; } }
+
+  /* Phone layout: rows stack */
+  @media (max-width: 767px) {
+    .cols { display: none; }
+    .row > summary { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "game chev" "bonus bonus" "hedge hedge" "profit conv"; }
+    .row .game { grid-area: game; } .row .chev { grid-area: chev; }
+    .row .s-bonus { grid-area: bonus; } .row .s-hedge { grid-area: hedge; }
+    .row .p { grid-area: profit; text-align: left; } .row .c { grid-area: conv; }
+    .mlabel { display: inline; font-size: 14px; color: var(--muted); margin-right: 4px; }
+    .side { flex-direction: row; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+    .panel { grid-template-columns: 1fr; padding: 16px; }
+    .statusbar { margin-inline: -16px; border-radius: 0; border-inline: 0; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="mockbar">
+    <span><strong>Style mockup</strong> · Phase 1 Bonus Bet Finder · example data, nothing calculates</span>
+    <span class="themeswitch" role="group" aria-label="Preview theme">
+      <button type="button" id="th-auto" data-t="auto" aria-pressed="true">Auto</button>
+      <button type="button" id="th-light" data-t="light" aria-pressed="false">Light</button>
+      <button type="button" id="th-dark" data-t="dark" aria-pressed="false">Dark</button>
+    </span>
+  </div>
+
+  <!-- Odds status bar -->
+  <div class="statusbar">
+    <div class="status-line">
+      <span class="age">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Odds updated <span class="mono">18</span> min ago
+      </span>
+      <button type="button" class="btn outline" id="refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        Refresh odds
+      </button>
+    </div>
+    <div class="credits">
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="500" aria-valuenow="412" aria-label="API credits remaining"><span style="width: 82.4%"></span></div>
+      <span class="cap"><span class="mono">412</span> of <span class="mono">500</span> credits remaining this month</span>
+    </div>
+  </div>
+
+  <header class="app-head">
+    <h1>Bonus bet finder</h1>
+    <p class="sub">Find the best market to convert a bonus bet, and the best Colorado book to hedge it at.</p>
+  </header>
+
+  <!-- Finder form -->
+  <form class="card form" onsubmit="return false">
+    <div class="field">
+      <span class="label">Bonus book</span>
+      <button type="button" class="select" id="book"><span>DraftKings</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+    <div class="field">
+      <label for="amt">Bonus amount</label>
+      <input class="mono" id="amt" value="$50.00">
+    </div>
+    <div class="field wide">
+      <span class="label">Sport</span>
+      <div class="chips" role="group" aria-label="Sport filter">
+        <button type="button" aria-pressed="true">All sports</button>
+        <button type="button" aria-pressed="false">NFL</button>
+        <button type="button" aria-pressed="false">NBA</button>
+        <button type="button" aria-pressed="false">MLB</button>
+        <button type="button" aria-pressed="false">NCAAF</button>
+        <button type="button" aria-pressed="false">NCAAB</button>
+      </div>
+    </div>
+    <button type="submit" class="btn primary">Find hedges</button>
+  </form>
+
+  <!-- Results -->
+  <div class="results-head">
+    <h2>Results</h2>
+    <p class="cap">Top 10 for a <span class="mono">$50.00</span> DraftKings bonus bet · ranked by guaranteed profit</p>
+  </div>
+
+  <div class="cols" aria-hidden="true">
+    <span>Game</span><span>Bonus side</span><span>Hedge side</span><span class="r">Guaranteed profit</span><span class="r">Conversion</span><span></span>
+  </div>
+
+  <div class="list">
+    <details class="row" open>
+      <summary>
+        <span class="game"><b>Panthers @ Packers</b><span>NFL · Sun 11:00 AM</span></span>
+        <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Panthers <span class="mono">+380</span></span><span class="at">DraftKings</span></span>
+        <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Packers <span class="mono">−420</span></span><span class="at">FanDuel</span></span>
+        <span class="profit-sm r p">$36.54</span>
+        <span class="conv r c">73.08%<small>Conversion</small></span>
+        <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="panel">
+        <div>
+          <div class="headline">
+            <span class="cap">Guaranteed profit</span>
+            <span class="profit-lg">$36.54</span>
+            <span class="cap"><span class="mono">73.08%</span> conversion of your <span class="mono">$50.00</span> bonus</span>
+          </div>
+          <ol class="steps">
+            <li><span class="leg">A</span><span>Bet <span class="mono">$50.00</span> bonus at DraftKings on Panthers <span class="mono">+380</span></span></li>
+            <li><span class="leg">B</span><span>Bet <span class="mono">$153.46</span> at FanDuel on Packers <span class="mono">−420</span></span></li>
+          </ol>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Outcome</th><th class="num">Stake</th><th class="num">Payout</th><th class="num">Net profit</th></tr></thead>
+            <tbody>
+              <tr><td>Panthers win</td><td class="num">$50.00 bonus</td><td class="num">$190.00</td><td class="num">$36.54</td></tr>
+              <tr><td>Packers win</td><td class="num">$153.46</td><td class="num">$190.00</td><td class="num">$36.54</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+    <details class="row">
+      <summary>
+        <span class="game"><b>Rockies @ Dodgers</b><span>MLB · Sat 6:40 PM</span></span>
+        <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Rockies <span class="mono">+290</span></span><span class="at">DraftKings</span></span>
+        <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Dodgers <span class="mono">−300</span> <span class="badge" title="Both legs are at the same sportsbook.">Same book</span></span><span class="at">DraftKings</span></span>
+        <span class="profit-sm r p">$36.25</span>
+        <span class="conv r c">72.50%<small>Conversion</small></span>
+        <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="panel">
+        <div>
+          <div class="headline"><span class="cap">Guaranteed profit</span><span class="profit-lg">$36.25</span><span class="cap"><span class="mono">72.50%</span> conversion of your <span class="mono">$50.00</span> bonus</span></div>
+          <ol class="steps">
+            <li><span class="leg">A</span><span>Bet <span class="mono">$50.00</span> bonus at DraftKings on Rockies <span class="mono">+290</span></span></li>
+            <li><span class="leg">B</span><span>Bet <span class="mono">$108.75</span> at DraftKings on Dodgers <span class="mono">−300</span></span></li>
+          </ol>
+        </div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Outcome</th><th class="num">Stake</th><th class="num">Payout</th><th class="num">Net profit</th></tr></thead>
+          <tbody>
+            <tr><td>Rockies win</td><td class="num">$50.00 bonus</td><td class="num">$145.00</td><td class="num">$36.25</td></tr>
+            <tr><td>Dodgers win</td><td class="num">$108.75</td><td class="num">$145.00</td><td class="num">$36.25</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Colorado State @ Colorado</b><span>NCAAF · Sat 1:30 PM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Colorado State <span class="mono">+450</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Colorado <span class="mono">−540</span></span><span class="at">FanDuel</span></span>
+      <span class="profit-sm r p">$35.16</span><span class="conv r c">70.32%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Titans @ 49ers</b><span>NFL · Sun 2:25 PM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Titans <span class="mono">+320</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">49ers <span class="mono">−360</span></span><span class="at">BetMGM</span></span>
+      <span class="profit-sm r p">$34.78</span><span class="conv r c">69.56%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Jets @ Bills</b><span>NFL · Sun 11:00 AM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Jets <span class="mono">+300</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Bills <span class="mono">−340</span></span><span class="at">BetRivers</span></span>
+      <span class="profit-sm r p">$34.09</span><span class="conv r c">68.18%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Arizona @ Utah</b><span>NCAAF · Sat 5:00 PM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Arizona <span class="mono">+260</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Utah <span class="mono">−290</span></span><span class="at">Hard Rock Bet</span></span>
+      <span class="profit-sm r p">$33.33</span><span class="conv r c">66.66%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>White Sox @ Yankees</b><span>MLB · Sun 11:05 AM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">White Sox <span class="mono">+250</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Yankees <span class="mono">−275</span></span><span class="at">theScore Bet</span></span>
+      <span class="profit-sm r p">$33.33</span><span class="conv r c">66.66%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Cowboys @ Eagles</b><span>NFL · Mon 6:15 PM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Cowboys <span class="mono">+230</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Eagles <span class="mono">−250</span></span><span class="at">FanDuel</span></span>
+      <span class="profit-sm r p">$32.86</span><span class="conv r c">65.72%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Nationals @ Braves</b><span>MLB · Sat 5:20 PM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Nationals <span class="mono">+210</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Braves <span class="mono">−230</span></span><span class="at">BetMGM</span></span>
+      <span class="profit-sm r p">$31.82</span><span class="conv r c">63.64%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+
+    <details class="row"><summary>
+      <span class="game"><b>Purdue @ Ohio State</b><span>NCAAF · Sat 10:00 AM</span></span>
+      <span class="side s-bonus"><span class="mlabel">Bonus</span><span class="who">Purdue <span class="mono">+700</span></span><span class="at">DraftKings</span></span>
+      <span class="side s-hedge"><span class="mlabel">Hedge</span><span class="who">Ohio State <span class="mono">−1100</span></span><span class="at">Bally Bet</span></span>
+      <span class="profit-sm r p">$29.17</span><span class="conv r c">58.34%<small>Conversion</small></span>
+      <svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    </summary></details>
+  </div>
+
+  <!-- State gallery -->
+  <div class="gallery-head">
+    <h2>Other states</h2>
+    <p class="sub">Warnings, blocks, the refresh confirmation, errors, and empty states.</p>
+  </div>
+
+  <div class="gallery">
+    <section class="card state">
+      <span class="state-tag">Stale odds (over 2 hours)</span>
+      <div class="mini-status">
+        <div class="status-line">
+          <span class="age stale">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+            <span>Odds updated <span class="mono">155</span> min ago · <b style="font-weight:600">Refresh before betting</b></span>
+          </span>
+          <button type="button" class="btn outline">Refresh odds</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Credits running low (under 100)</span>
+      <div class="mini-status">
+        <div class="credits">
+          <div class="progress warn"><span style="width: 17.2%"></span></div>
+          <span class="cap"><span class="mono">86</span> of <span class="mono">500</span> credits remaining this month</span>
+        </div>
+      </div>
+      <div class="alert warn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        <span>Only <span class="mono">86</span> credits remaining this month. A refresh uses about <span class="mono">6</span> credits.</span>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Refresh blocked (under 20 credits)</span>
+      <div class="mini-status">
+        <div class="status-line">
+          <span class="age">Odds updated <span class="mono">3</span> hr ago</span>
+          <button type="button" class="btn outline" disabled>Refresh odds</button>
+        </div>
+        <div class="credits">
+          <div class="progress block"><span style="width: 2.8%"></span></div>
+          <span class="cap"><span class="mono">14</span> of <span class="mono">500</span> credits remaining this month</span>
+        </div>
+      </div>
+      <div class="alert err">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+        <span>Only <span class="mono">14</span> credits left. Refresh is disabled until next month's reset on the 1st.</span>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Refresh within 15 minutes of the last one</span>
+      <div class="dialog-stage">
+        <div class="dialog" role="alertdialog" aria-labelledby="dlg-h">
+          <h3 id="dlg-h">Odds were refreshed <span class="mono">6</span> min ago.</h3>
+          <p class="sub">Refreshing again will spend about <span class="mono">6</span> credits. Refresh anyway?</p>
+          <div class="actions">
+            <button type="button" class="btn ghost">Cancel</button>
+            <button type="button" class="btn primary">Refresh anyway</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Refreshing</span>
+      <div class="mini-status">
+        <div class="status-line">
+          <span class="age">
+            <svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>
+            Refreshing odds…
+          </span>
+          <button type="button" class="btn outline" disabled>Refreshing…</button>
+        </div>
+      </div>
+      <div class="skel"></div>
+      <div class="skel"></div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Refresh failed</span>
+      <div class="alert err">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        <div class="body">
+          <span>Couldn't refresh odds because the Odds API didn't respond. Try again, or keep using the odds cached <span class="mono">18</span> min ago below.</span>
+          <button type="button" class="btn outline">Try again</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Empty · no inputs yet</span>
+      <div class="empty">
+        <h3>Enter a book and bonus amount to find your hedge</h3>
+        <p>Pick the book holding your bonus bet, enter the amount, and press Find hedges to see ranked conversion markets.</p>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Empty · nothing qualifies</span>
+      <div class="empty">
+        <h3>No qualifying markets right now</h3>
+        <p>No games in the selected sport are in season this week. Clear the sport filter or refresh odds.</p>
+      </div>
+    </section>
+
+    <section class="card state">
+      <span class="state-tag">Empty · odds never fetched</span>
+      <div class="empty">
+        <h3>No odds cached yet</h3>
+        <p>Press Refresh odds to pull current Colorado odds before searching.</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll('.themeswitch button');
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var t = b.getAttribute('data-t');
+        if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+        buttons.forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      });
+    });
+  })();
+</script>

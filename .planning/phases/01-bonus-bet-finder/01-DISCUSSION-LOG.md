@@ -32,6 +32,8 @@
 | Row detail | Compact + expand / Everything inline | Compact + expand |
 | Hedge pick | Best book only / Best + runners-up | Best book only |
 
+**Later change (UI review):** Owner removed the minimum-odds field. Bonus bets almost always convert best at +200 to +400, so ranking by profit already surfaces the right lines.
+
 ---
 
 ## Refresh & credits
