@@ -51,7 +51,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — Finder UI: form → ranked rows → expand panel, sport filter, same-book/NFL tie badges, empty states
+- [x] 01-03-PLAN.md — Finder UI: form → ranked rows → expand panel, sport filter, same-book/NFL tie badges, empty states
 - [ ] 01-04-PLAN.md — Odds API client, credit gate, refreshOdds action + odds:refresh CLI, live ODDS-05 book-key smoke test (checkpoint)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Bonus Bet Finder | 2/5 | In Progress|  |
+| 1. Bonus Bet Finder | 3/5 | In Progress|  |
 | 2. Private Access & My Books | 0/? | Not started | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
