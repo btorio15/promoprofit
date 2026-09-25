@@ -575,17 +575,19 @@ export async function listInSeasonSports(): Promise<string[]> {
 | A3 | The disclosure-not-exclusion treatment of NFL tie/push risk satisfies the intent of CALC-05, given the symmetric (no real-cash-loss) nature of the push in this specific bonus-bet-hedge context | NFL Moneyline Tie/Push Resolution | Medium — this is an interpretation, not a locked decision; if the owner disagrees, NFL hedges may instead need explicit exclusion or a stronger warning gate. Flagged in Open Questions for confirmation. |
 | A4 | The Odds API's `/sports` and `/events` endpoints do not return meaningful `x-requests-remaining` freshness info that could substitute for a metered call | Common Pitfalls | Low — worst case, the credit meter is slightly more conservative (relies only on last refresh) than strictly necessary; verify at execution time with a live call |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the NFL tie/push scenario be a disclosure badge or a stronger gate (e.g., require explicit user acknowledgment before showing NFL rows)?**
    - What we know: A tie voids both legs symmetrically with no real cash loss, only forgone profit, in <1% of NFL games (see resolution above).
    - What's unclear: Whether CALC-05's "no push/void outcome" requirement was written with this symmetric case in mind, or whether the owner wants NFL moneylines held to the same bar as spread/total pushes (which PITFALLS.md's Pitfall 6 treats as a hard risk to flag).
    - Recommendation: Ship the lightweight disclosure badge (this research's recommendation) for Phase 1; revisit if the owner flags it during review. This is a reasonable default, not a blocking unknown.
+   - RESOLVED: Disclosure badge ("Tie risk") — implemented in 01-01 Task 3 and 01-03 Task 2; owner sign-off requested in 01-05 Task 3 walkthrough step 7.
 
 2. **Exact live-verification method for ODDS-05 at execution time.**
    - What we know: No API key is available in this research session; the bookmaker-tier table above is sourced from official documentation, not a live call.
    - What's unclear: Whether the plan should perform this check as an automated startup smoke-test (e.g., a script run once during scaffold setup) or a manual `checkpoint:human-verify` task the owner runs themselves with their own API key.
    - Recommendation: Automated startup check is preferable (one `GET /v4/sports/{sport}/odds` call for one sport, asserting the expected bookmaker keys appear in the response) — cheap (2-6 credits, one-time) and self-documenting; the planner should decide based on whether the owner wants to gate scaffold completion on having an API key in hand yet.
+   - RESOLVED: Standalone `scripts/odds-smoke.ts` (`npm run odds:smoke`) plus a `checkpoint:human-verify` task — 01-04 Task 3.
 
 ## Environment Availability
 
