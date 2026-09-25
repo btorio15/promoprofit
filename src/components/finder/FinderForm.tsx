@@ -7,13 +7,7 @@ import type { z } from "zod";
 import { findHedges } from "@/app/actions/find-hedges";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
 import type { FindHedgesResponse } from "@/domain/finder/types";
-
-// react-hook-form's Resolver type expects the *input* shape of the zod
-// schema (sportKey optional, pre-.default()), not the output shape
-// (`FinderInput`, sportKey required) — using the output type here trips
-// the @hookform/resolvers + zod@4 overload mismatch documented in
-// resolvers issue #842. See 01-RESEARCH.md "Common Pitfalls".
-type FinderFormValues = z.input<typeof FinderInputSchema>;
+import { SPORTS } from "@/config/sports";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,7 +19,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "./EmptyState";
 import { ResultsList } from "./ResultsList";
+
+// react-hook-form's Resolver type expects the *input* shape of the zod
+// schema (sportKey optional, pre-.default()), not the output shape
+// (`FinderInput`, sportKey required) — using the output type here trips
+// the @hookform/resolvers + zod@4 overload mismatch documented in
+// resolvers issue #842. See 01-RESEARCH.md "Common Pitfalls".
+type FinderFormValues = z.input<typeof FinderInputSchema>;
+type SportFilterValue = "all" | (typeof SPORTS)[number]["key"];
 
 export interface FinderFormProps {
   bonusBooks: { key: string; displayName: string }[];
@@ -33,14 +38,15 @@ export interface FinderFormProps {
 }
 
 /**
- * Bonus book + amount form. Calls the findHedges server action inside a
- * transition and keeps the last response in state (BONUS-01). The
- * client-side zodResolver is UX only — findHedges re-validates server-side
- * with the same schema.
+ * Bonus book + amount + sport filter form. Calls the findHedges server
+ * action inside a transition and keeps the last response in state
+ * (BONUS-01). The client-side zodResolver is UX only — findHedges
+ * re-validates server-side with the same schema.
  */
 export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
   const [isPending, startTransition] = useTransition();
   const [response, setResponse] = useState<FindHedgesResponse | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
 
   const form = useForm<FinderFormValues>({
     resolver: zodResolver(FinderInputSchema),
@@ -59,9 +65,13 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
         }
         return;
       }
+      setHasSearched(true);
       setResponse(result);
     });
   });
+
+  const hasPreviousResults = response?.status === "ok" && response.results.length > 0;
+  const showSkeleton = isPending && !hasPreviousResults;
 
   return (
     <div className="flex flex-col gap-8">
@@ -109,16 +119,48 @@ export function FinderForm({ bonusBooks, hasCachedOdds }: FinderFormProps) {
             ) : null}
           </div>
 
+          <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-2">
+            <Label>Sport</Label>
+            <Controller
+              control={form.control}
+              name="sportKey"
+              render={({ field }) => (
+                <ToggleGroup
+                  aria-label="Sport filter"
+                  value={[(field.value ?? "all") as SportFilterValue]}
+                  onValueChange={(values: SportFilterValue[]) =>
+                    field.onChange(values[0] ?? "all")
+                  }
+                >
+                  <ToggleGroupItem value="all">All sports</ToggleGroupItem>
+                  {SPORTS.map((sport) => (
+                    <ToggleGroupItem key={sport.key} value={sport.key}>
+                      {sport.label}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              )}
+            />
+          </div>
+
           <Button type="submit" disabled={isPending} className="h-10 w-full md:w-auto">
             Find hedges
           </Button>
         </form>
       </Card>
 
-      {response?.status === "ok" ? (
+      {showSkeleton ? (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      ) : !hasSearched ? (
+        <EmptyState variant={hasCachedOdds ? "no-search" : "no-cached-odds"} />
+      ) : response?.status === "no_cached_odds" ? (
+        <EmptyState variant="no-cached-odds" />
+      ) : response?.status === "ok" ? (
         <ResultsList response={response} />
-      ) : response?.status === "no_cached_odds" || !hasCachedOdds ? (
-        <p className="text-sm text-muted-foreground">No odds cached yet.</p>
       ) : null}
     </div>
   );

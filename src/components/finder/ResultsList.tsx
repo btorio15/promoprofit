@@ -1,5 +1,6 @@
 import type { FindHedgesResponse } from "@/domain/finder/types";
 import { formatUsd } from "@/lib/format";
+import { EmptyState } from "./EmptyState";
 import { ResultRow } from "./ResultRow";
 
 interface ResultsListProps {
@@ -24,22 +25,29 @@ export function ResultsList({ response }: ResultsListProps) {
         </p>
       </div>
 
-      <div
-        className="hidden text-sm text-muted-foreground md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_120px_96px] md:gap-4 md:px-4"
-        aria-hidden="true"
-      >
-        <span>Game</span>
-        <span>Bonus side</span>
-        <span>Hedge side</span>
-        <span className="text-right">Guaranteed profit</span>
-        <span className="text-right">Conversion</span>
-      </div>
+      {results.length === 0 ? (
+        <EmptyState variant="no-results" />
+      ) : (
+        <>
+          <div
+            className="hidden text-sm text-muted-foreground md:grid md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_120px_96px_20px] md:gap-4 md:px-4"
+            aria-hidden="true"
+          >
+            <span>Game</span>
+            <span>Bonus side</span>
+            <span>Hedge side</span>
+            <span className="text-right">Guaranteed profit</span>
+            <span className="text-right">Conversion</span>
+            <span />
+          </div>
 
-      <div className="flex flex-col gap-2">
-        {results.map((result) => (
-          <ResultRow key={result.eventId} result={result} />
-        ))}
-      </div>
+          <div className="flex flex-col gap-2">
+            {results.map((result) => (
+              <ResultRow key={result.eventId} result={result} />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
