@@ -5,7 +5,7 @@
  * the persisted credit meter (D-11's thresholds read the latest row, never
  * a fresh API call).
  */
-import { desc, eq, lte } from "drizzle-orm";
+import { desc, eq, lt, lte } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { cachedOdds, creditUsage } from "@/db/schema";
 import type { OddsEvent } from "@/domain/odds/schemas";
@@ -50,6 +50,17 @@ export async function replaceSportOdds(sportKey: string, events: OddsEvent[], fe
 export async function purgeStartedEvents(now: Date): Promise<void> {
   const db = getDb();
   await db.delete(cachedOdds).where(lte(cachedOdds.commenceTime, now));
+}
+
+/**
+ * After a fully successful refresh, removes every cached row that this run
+ * did not write (fetched_at before the run's timestamp) -- e.g. sports that
+ * are no longer in season -- so days-old odds never linger in the cache
+ * (WR-01).
+ */
+export async function purgeUnrefreshedEvents(refreshFetchedAt: Date): Promise<void> {
+  const db = getDb();
+  await db.delete(cachedOdds).where(lt(cachedOdds.fetchedAt, refreshFetchedAt));
 }
 
 /** Persists one row per refresh from the Odds API's own x-requests-* headers. */

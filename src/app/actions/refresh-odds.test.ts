@@ -14,6 +14,7 @@ vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
   replaceSportOdds: vi.fn(),
   purgeStartedEvents: vi.fn(),
+  purgeUnrefreshedEvents: vi.fn(),
   recordCreditUsage: vi.fn(),
 }));
 
@@ -24,7 +25,13 @@ vi.mock("@/db/queries", () => ({
 }));
 
 import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
-import { getLatestCreditUsage, purgeStartedEvents, recordCreditUsage, replaceSportOdds } from "@/ingestion/odds/store";
+import {
+  getLatestCreditUsage,
+  purgeStartedEvents,
+  purgeUnrefreshedEvents,
+  recordCreditUsage,
+  replaceSportOdds,
+} from "@/ingestion/odds/store";
 import { getBonusBooks, getCachedEvents, getHedgeBookKeys } from "@/db/queries";
 import { runOddsRefresh } from "@/ingestion/odds/refresh";
 import { refreshOdds } from "./refresh-odds";
@@ -35,6 +42,7 @@ const mockFetchSportOdds = vi.mocked(fetchSportOdds);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
 const mockReplaceSportOdds = vi.mocked(replaceSportOdds);
 const mockPurgeStartedEvents = vi.mocked(purgeStartedEvents);
+const mockPurgeUnrefreshedEvents = vi.mocked(purgeUnrefreshedEvents);
 const mockRecordCreditUsage = vi.mocked(recordCreditUsage);
 const mockGetBonusBooks = vi.mocked(getBonusBooks);
 const mockGetHedgeBookKeys = vi.mocked(getHedgeBookKeys);
@@ -43,6 +51,7 @@ const mockGetCachedEvents = vi.mocked(getCachedEvents);
 beforeEach(() => {
   vi.clearAllMocks();
   mockPurgeStartedEvents.mockResolvedValue(undefined);
+  mockPurgeUnrefreshedEvents.mockResolvedValue(undefined);
   mockReplaceSportOdds.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
 });
@@ -77,6 +86,8 @@ describe("runOddsRefresh", () => {
     expect(calledSports).toEqual(["baseball_mlb", "basketball_nba"]);
     expect(mockReplaceSportOdds).toHaveBeenCalledTimes(2);
     expect(mockPurgeStartedEvents).toHaveBeenCalledWith(now);
+    // WR-01: rows not rewritten by this run (e.g. out-of-season NFL) are purged.
+    expect(mockPurgeUnrefreshedEvents).toHaveBeenCalledWith(now);
     expect(mockRecordCreditUsage).toHaveBeenCalledTimes(1);
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 480,
@@ -234,6 +245,9 @@ describe("runOddsRefresh", () => {
     const outcome = await runOddsRefresh({ confirmed: false, now });
 
     expect(mockReplaceSportOdds).toHaveBeenCalledTimes(1);
+    // WR-01: a partial run must not purge -- the failed sport's old rows are
+    // hidden by getCachedEvents' latest-batch filter instead.
+    expect(mockPurgeUnrefreshedEvents).not.toHaveBeenCalled();
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 299,
       requestsUsed: 201,

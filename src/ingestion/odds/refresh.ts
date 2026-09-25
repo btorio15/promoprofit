@@ -5,7 +5,13 @@
  */
 import { fetchSportOdds, listSports } from "./client";
 import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
-import { getLatestCreditUsage, purgeStartedEvents, recordCreditUsage, replaceSportOdds } from "./store";
+import {
+  getLatestCreditUsage,
+  purgeStartedEvents,
+  purgeUnrefreshedEvents,
+  recordCreditUsage,
+  replaceSportOdds,
+} from "./store";
 import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 
@@ -116,6 +122,10 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
       await replaceSportOdds(sport.key, events, now);
       sportsFetched.push(sport.key);
     }
+    // Every in-season sport was replaced with this run's timestamp; drop
+    // rows from earlier runs (out-of-season sports) so they can't be shown
+    // as fresh (WR-01). Only reached when the whole loop succeeded.
+    await purgeUnrefreshedEvents(now);
     await purgeStartedEvents(now);
   } catch (err) {
     refreshError = err;

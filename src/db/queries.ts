@@ -38,11 +38,14 @@ async function getMaxFetchedAt(): Promise<Date | null> {
 }
 
 /**
- * Cached events with commence_time in the future. fetchedAt is the max
- * fetched_at over ALL cached_odds rows (not just the filtered ones), so the
- * odds-age display reflects the last refresh even if every upcoming event
- * happens to share the same fetch batch. Rows that fail OddsEventSchema
- * parsing are dropped (and logged), never passed to the hedge engine.
+ * Cached events with commence_time in the future, restricted to the most
+ * recent refresh batch (fetched_at = max(fetched_at)). Every row a refresh
+ * writes shares that run's timestamp, so rows left over from an earlier
+ * refresh -- a sport whose fetch failed mid-run, or one that dropped out of
+ * season -- are excluded rather than ranked under a "just updated" label
+ * (WR-01). The returned fetchedAt is therefore the true age of every
+ * returned event. Rows that fail OddsEventSchema parsing are dropped (and
+ * logged), never passed to the hedge engine.
  */
 export async function getCachedEvents(): Promise<{ events: OddsEvent[]; fetchedAt: Date | null }> {
   const fetchedAt = await getMaxFetchedAt();
@@ -54,7 +57,12 @@ export async function getCachedEvents(): Promise<{ events: OddsEvent[]; fetchedA
   const rows = await db
     .select({ eventId: cachedOdds.eventId, rawResponse: cachedOdds.rawResponse })
     .from(cachedOdds)
-    .where(gt(cachedOdds.commenceTime, new Date()));
+    .where(
+      and(
+        gt(cachedOdds.commenceTime, new Date()),
+        sql`${cachedOdds.fetchedAt} = (select max(${cachedOdds.fetchedAt}) from ${cachedOdds})`,
+      ),
+    );
 
   const events: OddsEvent[] = [];
   for (const row of rows) {
