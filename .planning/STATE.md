@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-09-25T19:49:38.500Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-09-25T20:12:11.208Z"
 last_activity: 2026-09-25
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 01 (bonus-bet-finder) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-25
 
-Progress: [██████░░░░] 60%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [██████░░░░] 60%
 | Phase 01 P01 | 20min | 3 tasks | 51 files |
 | Phase 01 P02 | 10min | 3 tasks | 10 files |
 | Phase 01 P03 | 15min | 2 tasks | 10 files |
+| Phase 01 P04 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 01]: db:migrate/db:seed/db:check load env via dotenv or tsx --env-file, never shell 'source .env.local' -- the pooled Neon connection string contains an unescaped & that breaks zsh sourcing
 - [Phase 01]: Dark mode driven purely by prefers-color-scheme media query (not shadcn's class-based .dark selector), matching UI-SPEC's OS-preference-only requirement without a client-side theme-toggle script
 - [Phase 01]: Used z.input<typeof FinderInputSchema> (not the exported FinderInput output type) as the react-hook-form generic to route around the @hookform/resolvers + zod@4 overload mismatch (resolvers issue #842) without touching the shared schema contract
+- [Phase 01]: Plan 04: Requested with bookmakers=<7 free-tier keys> instead of regions=us,us2, halving credit cost per in-season sport (1 credit instead of 2)
+- [Phase 01]: Plan 04: Live ODDS-05 verification confirmed the D-16 expectation exactly (7 free-tier CO books present, williamhill_us/fanatics absent) -- no book-config drift, src/config/books.ts unchanged
+- [Phase 01]: Plan 04: First live refresh spent 4 of 500 monthly Odds API credits (1 smoke + 3 refresh); 496 remaining
 
 ### Pending Todos
 
@@ -78,7 +82,6 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- Phase 1: Live Odds API verification needed for Caesars/Fanatics free-tier access and the theScore Bet bookmaker key (research flagged, unresolved).
 - Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
 - Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
@@ -93,6 +96,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-25T19:49:38.493Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-09-25T20:12:00.344Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
