@@ -15,7 +15,7 @@ PromoProfit ships as five vertical slices. Phase 1 builds the bonus-bet finder e
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Bonus Bet Finder** - Scaffold, verified book config, odds ingestion/cache/refresh, fixture-tested bonus-bet hedge engine, finder screen
+- [x] **Phase 1: Bonus Bet Finder** - Scaffold, verified book config, odds ingestion/cache/refresh, fixture-tested bonus-bet hedge engine, finder screen (completed 2026-09-25)
 - [ ] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books
 - [ ] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches
 - [ ] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection
@@ -56,7 +56,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01-05-PLAN.md — Status bar: odds age (amber at 2h), credit meter/banners, Refresh odds with 15-min confirm dialog + recompute, phase walkthrough
+- [x] 01-05-PLAN.md — Status bar: odds age (amber at 2h), credit meter/banners, Refresh odds with 15-min confirm dialog + recompute, phase walkthrough
 
 *Research flag: live Odds API verification needed for Caesars/Fanatics free-tier access and the theScore Bet bookmaker key before finalizing the book list (see research/SUMMARY.md Open Conflicts).*
 
@@ -133,7 +133,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Bonus Bet Finder | 4/5 | In Progress|  |
+| 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 2. Private Access & My Books | 0/? | Not started | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
