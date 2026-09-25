@@ -4,11 +4,16 @@
  *
  * Usage: npm run db:check
  */
+import { getDb } from "../src/db/client";
+import { books as booksTable } from "../src/db/schema";
 import { getBonusBooks, getCachedEvents } from "../src/db/queries";
 
 async function main() {
+  // getBonusBooks reads the config (WR-05); count the DB mirror directly
+  // so this still detects an un-seeded database.
+  const seededRows = await getDb().select({ key: booksTable.key }).from(booksTable);
   const books = await getBonusBooks();
-  console.log(`Bonus books (${books.length}):`);
+  console.log(`Bonus books (${books.length}), seeded books rows: ${seededRows.length}:`);
   for (const book of books) {
     console.log(`  - ${book.key}: ${book.displayName}`);
   }
@@ -20,7 +25,7 @@ async function main() {
     }`,
   );
 
-  if (books.length === 0) {
+  if (seededRows.length === 0) {
     console.error("No books found — run `npm run db:seed` first.");
     process.exit(1);
   }

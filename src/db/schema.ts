@@ -3,7 +3,8 @@ import { pgTable, text, boolean, integer, serial, timestamp, jsonb, index } from
 /**
  * Colorado sportsbook configuration (ODDS-05, D-14, D-16). Seeded from
  * src/config/books.ts — the config file remains the single source of
- * truth; this table is the DB mirror the app actually queries.
+ * truth and is what the app reads at runtime (WR-05); this table is a
+ * display/seed metadata mirror only.
  */
 export const books = pgTable("books", {
   key: text("key").primaryKey(),
