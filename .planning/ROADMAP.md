@@ -16,6 +16,7 @@ PromoProfit ships as five vertical slices. Phase 1 builds the bonus-bet finder e
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Bonus Bet Finder** - Scaffold, verified book config, odds ingestion/cache/refresh, fixture-tested bonus-bet hedge engine, finder screen (completed 2026-09-25)
+- [ ] **Phase 01.1: Arbitrage Tab** (INSERTED) - Moneyline arbs from cached odds, opt-in spreads/totals refresh, odds-age + account-risk advisory
 - [ ] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books
 - [ ] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches
 - [ ] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection
@@ -59,6 +60,21 @@ Plans:
 - [x] 01-05-PLAN.md — Status bar: odds age (amber at 2h), credit meter/banners, Refresh odds with 15-min confirm dialog + recompute, phase walkthrough
 
 *Research flag: live Odds API verification needed for Caesars/Fanatics free-tier access and the theScore Bet bookmaker key before finalizing the book list (see research/SUMMARY.md Open Conflicts).*
+
+### Phase 01.1: Arbitrage Tab (INSERTED)
+
+**Goal:** A user can open an Arbitrage tab (no promos involved) and see cross-book sure-bet arbitrage among the Colorado books from cached odds, with exact cent-level stakes for both legs, guaranteed profit, and return %
+**Requirements**: TBD
+**Depends on:** Phase 1
+**Success Criteria** (what must be TRUE):
+
+  1. An Arbitrage tab lists two-way moneyline arbs across different Colorado books from the odds the existing refresh already fetches (no extra credits), ranked by return %, each with both books, odds, stakes for a user-chosen total stake, and guaranteed profit correct to the cent (decimal.js, reusing the Phase 1 hedge math)
+  2. Spreads and totals are fetched only when the user presses a separate "Search spreads & totals" button with its own credit estimate and confirm (~3x credits), guarded by the existing credit gate and refresh lock; only half-point (no-push) lines matched exactly across books are considered
+  3. Odds age is shown prominently on the tab (stale cached odds produce phantom arbs), and an account-limiting risk advisory is visible
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 01.1 to break down)
 
 ### Phase 2: Private Access & My Books
 
