@@ -1,7 +1,7 @@
 ---
 phase: 01-bonus-bet-finder
 verified: 2026-09-25T23:59:00Z
-status: human_needed
+status: passed
 score: 9/9 must-haves verified
 overrides_applied: 0
 human_verification:
@@ -190,3 +190,7 @@ No must-have truths failed. All 5 roadmap success criteria and all 9 phase requi
 
 _Verified: 2026-09-25T23:59:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+## Human Verification Outcome
+
+- 2026-09-25: Owner ran a live refresh after migration 0001 (refresh_lock). DB confirmed: cached_odds + credit_usage written at 2026-09-25T23:27:43Z, refresh_cost 3, 487 credits remaining, refresh_lock released (empty). WR-03 lock path verified end-to-end. Status updated human_needed -> passed.
