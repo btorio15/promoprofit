@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeOddsAge, STALE_AFTER_MINUTES } from "./oddsAge";
+import { describeExtendedOddsAge, describeOddsAge, STALE_AFTER_MINUTES } from "./oddsAge";
 
 const NOW = new Date("2026-10-01T12:00:00.000Z");
 
@@ -39,5 +39,35 @@ describe("describeOddsAge", () => {
     const result = describeOddsAge(minutesAgo(121), NOW);
     expect(result.stale).toBe(true);
     expect(result.label).toBe("Odds updated 121 min ago");
+  });
+});
+
+describe("describeExtendedOddsAge", () => {
+  it("returns the not-fetched-yet label when fetchedAt is null", () => {
+    expect(describeExtendedOddsAge(null, NOW)).toEqual({
+      minutes: null,
+      stale: false,
+      label: "Spreads & totals not fetched yet — press Search spreads & totals to include them",
+    });
+  });
+
+  it("labels a fresh fetch as 'Spreads & totals updated N min ago' and not stale", () => {
+    const result = describeExtendedOddsAge(minutesAgo(42), NOW);
+    expect(result).toEqual({
+      minutes: 42,
+      stale: false,
+      label: "Spreads & totals updated 42 min ago",
+    });
+  });
+
+  it("is not stale at exactly STALE_AFTER_MINUTES (120 min)", () => {
+    const result = describeExtendedOddsAge(minutesAgo(120), NOW);
+    expect(result.stale).toBe(false);
+  });
+
+  it("is stale one minute past STALE_AFTER_MINUTES (121 min)", () => {
+    const result = describeExtendedOddsAge(minutesAgo(121), NOW);
+    expect(result.stale).toBe(true);
+    expect(result.label).toBe("Spreads & totals updated 121 min ago");
   });
 });
