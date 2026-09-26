@@ -130,7 +130,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 02-05-PLAN.md — Finder hedges and arb legs scoped to the user's books, "No games at your books right now" empty state
+- [x] 02-05-PLAN.md — Finder hedges and arb legs scoped to the user's books, "No games at your books right now" empty state
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 4/6 | In Progress|  |
+| 2. Private Access & My Books | 5/6 | In Progress|  |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

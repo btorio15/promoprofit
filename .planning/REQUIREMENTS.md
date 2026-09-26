@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Bonus-Bet Finder
 
 - [x] **BONUS-01**: User enters a book and bonus-bet amount and sees a ranked list of the best conversion markets across upcoming games, each with the hedge book, both stakes, guaranteed profit, and conversion %
-- [ ] **BONUS-02**: Bonus-bet finder hedge suggestions only use books the user has selected
+- [x] **BONUS-02**: Bonus-bet finder hedge suggestions only use books the user has selected
 
 ### Promo Capture
 
@@ -109,7 +109,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ODDS-04 | Phase 1 | Complete |
 | ODDS-05 | Phase 1 | Complete |
 | BONUS-01 | Phase 1 | Complete |
-| BONUS-02 | Phase 2 | Pending |
+| BONUS-02 | Phase 2 | Complete |
 | PROMO-01 | Phase 5 | Pending |
 | PROMO-02 | Phase 5 | Pending |
 | PROMO-03 | Phase 3 | Pending |
