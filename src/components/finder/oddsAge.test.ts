@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeExtendedOddsAge, describeOddsAge, STALE_AFTER_MINUTES } from "./oddsAge";
+import { describeExtendedOddsAge, describeOddsAge, STALE_AFTER_MINUTES, withAttribution } from "./oddsAge";
 
 const NOW = new Date("2026-10-01T12:00:00.000Z");
 
@@ -69,5 +69,24 @@ describe("describeExtendedOddsAge", () => {
     const result = describeExtendedOddsAge(minutesAgo(121), NOW);
     expect(result.stale).toBe(true);
     expect(result.label).toBe("Spreads & totals updated 121 min ago");
+  });
+});
+
+describe("withAttribution", () => {
+  it("appends ' · Refreshed by {name}' when a display name is given", () => {
+    expect(withAttribution("Odds updated 5 min ago", "Refreshed by", "Mike")).toBe(
+      "Odds updated 5 min ago · Refreshed by Mike",
+    );
+  });
+
+  it("appends ' · Searched by {name}' when a display name is given", () => {
+    expect(withAttribution("Spreads & totals updated 5 min ago", "Searched by", "Sue")).toBe(
+      "Spreads & totals updated 5 min ago · Searched by Sue",
+    );
+  });
+
+  it("returns the label unchanged (no placeholder) when the display name is null", () => {
+    const label = "Odds updated 5 min ago";
+    expect(withAttribution(label, "Searched by", null)).toBe(label);
   });
 });

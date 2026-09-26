@@ -10,15 +10,17 @@ vi.mock("@/db/queries", () => ({
 
 vi.mock("./store", () => ({
   getLatestCreditUsage: vi.fn(),
+  getSpendAttribution: vi.fn(),
 }));
 
 import { getExtendedOddsFreshness, getOddsFreshness } from "@/db/queries";
-import { getLatestCreditUsage } from "./store";
+import { getLatestCreditUsage, getSpendAttribution } from "./store";
 import { getOddsStatus } from "./status";
 
 const mockGetOddsFreshness = vi.mocked(getOddsFreshness);
 const mockGetExtendedOddsFreshness = vi.mocked(getExtendedOddsFreshness);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
+const mockGetSpendAttribution = vi.mocked(getSpendAttribution);
 
 const NOW = new Date("2026-10-01T12:00:00.000Z");
 const EXTENDED_MARKET_COUNT = 3;
@@ -26,6 +28,7 @@ const EXTENDED_MARKET_COUNT = 3;
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetExtendedOddsFreshness.mockResolvedValue(null);
+  mockGetSpendAttribution.mockResolvedValue(null);
 });
 
 describe("getOddsStatus", () => {
@@ -172,5 +175,47 @@ describe("getOddsStatus", () => {
     expect(status.estimatedExtendedRefreshCredits).toBe(
       estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
     );
+  });
+
+  it("oddsRefreshedBy/extendedSearchedBy resolve from getSpendAttribution keyed by each cache's own fetched_at (D-21)", async () => {
+    const oddsFetchedAt = new Date(NOW.getTime() - 10 * 60_000);
+    const extendedFetchedAt = new Date(NOW.getTime() - 20 * 60_000);
+    mockGetOddsFreshness.mockResolvedValue(oddsFetchedAt);
+    mockGetExtendedOddsFreshness.mockResolvedValue(extendedFetchedAt);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockGetSpendAttribution.mockImplementation(async (recordedAt: Date) => {
+      if (recordedAt.getTime() === oddsFetchedAt.getTime()) return "Mike";
+      if (recordedAt.getTime() === extendedFetchedAt.getTime()) return "Sue";
+      return null;
+    });
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.oddsRefreshedBy).toBe("Mike");
+    expect(status.extendedSearchedBy).toBe("Sue");
+  });
+
+  it("oddsRefreshedBy/extendedSearchedBy are null and getSpendAttribution isn't called when a cache has never been fetched", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetExtendedOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.oddsRefreshedBy).toBeNull();
+    expect(status.extendedSearchedBy).toBeNull();
+    expect(mockGetSpendAttribution).not.toHaveBeenCalled();
+  });
+
+  it("oddsRefreshedBy is null when getSpendAttribution resolves null (legacy/CLI row)", async () => {
+    const oddsFetchedAt = new Date(NOW.getTime() - 10 * 60_000);
+    mockGetOddsFreshness.mockResolvedValue(oddsFetchedAt);
+    mockGetExtendedOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockGetSpendAttribution.mockResolvedValue(null);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.oddsRefreshedBy).toBeNull();
   });
 });
