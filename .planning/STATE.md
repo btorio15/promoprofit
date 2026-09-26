@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-07-PLAN.md
-last_updated: "2026-09-26T19:51:37.853Z"
+stopped_at: Completed 02-08-PLAN.md
+last_updated: "2026-09-26T20:00:26.511Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
   percent: 33
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [█████████░] 91%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [█████████░] 91%
 | Phase 02 P05 | 4min | 3 tasks | 11 files |
 | Phase 02 P06 | 2min | 2 tasks | 1 files |
 | Phase 02 P07 | 9min | 2 tasks | 4 files |
+| Phase 02 P08 | 9min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 06: Owner completed the live walkthrough approving steps 1-8 (invite bootstrap, book selection, scoped suggestions, shared risk advisory, settings persistence, invite reuse rejection); closed CALC-06 as the phase's last manual-only verification
 - [Phase 02]: Plan 07: reserveLoginAttempt's CASE arithmetic mirrors nextFailedLoginState exactly, so sequential lockout behavior is unchanged; only concurrent behavior is fixed (bounded to MAX_FAILED_LOGIN_ATTEMPTS)
 - [Phase 02]: Plan 07: recordFailedLogin deleted entirely rather than kept alongside reserveLoginAttempt, closing the lost-update path CR-01/T-02-G2 by removing the second way to write the counter
+- [Phase 02]: Plan 08: getUsableUserBooks composes getUserBookKeys + getBonusBooks(new Set(...)) rather than duplicating the intersection logic, so it can never drift from getBonusBooks' own usable-book filtering
+- [Phase 02]: Plan 08: getUserBookKeys and getBonusBooks themselves left unchanged -- find-hedges.ts/find-arbs.ts already intersect independently via getHedgeBookKeys, out of this plan's scope
 
 ### Pending Todos
 
@@ -150,6 +153,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T19:51:37.846Z
-Stopped at: Completed 02-07-PLAN.md
+Last session: 2026-09-26T20:00:26.504Z
+Stopped at: Completed 02-08-PLAN.md
 Resume file: None
