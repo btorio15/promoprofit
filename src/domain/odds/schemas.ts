@@ -3,8 +3,9 @@ import { z } from "zod";
 /**
  * Zod schemas for The Odds API v4 responses (oddsFormat=american).
  * Unknown extra fields on each object are preserved (z.looseObject), since
- * the upstream API adds fields (e.g. "point" on spreads/totals outcomes)
- * that this phase does not consume but must not fail parsing on.
+ * the upstream API can add fields this phase does not model. "point" is
+ * modeled explicitly below (present on spreads/totals outcomes, absent on
+ * h2h) because spreadsTotalsFilter.ts needs a typed accessor for it.
  */
 
 export const AmericanPriceSchema = z
@@ -17,6 +18,7 @@ export const AmericanPriceSchema = z
 export const OddsOutcomeSchema = z.looseObject({
   name: z.string(),
   price: AmericanPriceSchema,
+  point: z.number().optional(), // present for spreads/totals, absent for h2h
 });
 
 export const OddsMarketSchema = z.looseObject({
