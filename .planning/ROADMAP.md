@@ -111,7 +111,7 @@ Plans:
   3. Bonus-bet finder hedge suggestions only surface books the user has selected
   4. User sees a brief account-risk advisory near hedge results explaining that precise stakes and promo-only play can lead to account limiting
 
-**Plans**: 6 plans
+**Plans**: 9 plans (6 + 3 gap closure)
 **UI hint**: yes
 
 Plans:
@@ -135,6 +135,15 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 02-06-PLAN.md — Phase gate: full suite/build, validation map, owner walkthrough (checkpoint)
+
+**Gap closure — Wave 1**
+
+- [ ] 02-07-PLAN.md — CR-01: atomic reserveLoginAttempt before argon2 verify + concurrency test (lockout holds under parallel requests)
+- [ ] 02-08-PLAN.md — CR-02/WR-01: shared getUsableUserBooks predicate for /, /onboarding/books, /settings (no redirect loop, no stale settings keys)
+
+**Gap closure — Wave 2** *(blocked on 02-08)*
+
+- [ ] 02-09-PLAN.md — Settings navigation: header wordmark links home, "Back to PromoProfit" link, link after save, UI-SPEC amendment (owner checkpoint)
 
 ### Phase 3: Promo Scraping & Review
 
