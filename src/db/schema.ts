@@ -38,6 +38,32 @@ export const cachedOdds = pgTable(
 );
 
 /**
+ * Cached spreads/totals odds events (D-16). This is the independent
+ * spreads/totals cache: written only by the "Search spreads & totals"
+ * refresh (Plan 04's refreshExtended), and purged only by its own
+ * lifecycle (purgeStartedExtendedEvents / purgeUnrefreshedExtendedEvents).
+ * A normal h2h refresh never touches this table, and this table never
+ * touches cached_odds -- keeping the finder's WR-01 latest-batch query on
+ * cached_odds correct by construction (RESEARCH.md "Pattern 3").
+ * raw_response stores the full event including h2h+spreads+totals
+ * bookmakers.
+ */
+export const cachedExtendedOdds = pgTable(
+  "cached_extended_odds",
+  {
+    eventId: text("event_id").primaryKey(),
+    sportKey: text("sport_key").notNull(),
+    commenceTime: timestamp("commence_time", { withTimezone: true }).notNull(),
+    rawResponse: jsonb("raw_response").notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("cached_extended_odds_sport_key_idx").on(table.sportKey),
+    index("cached_extended_odds_commence_time_idx").on(table.commenceTime),
+  ],
+);
+
+/**
  * Credit-quota history (ODDS-02, D-10/D-11). Plan 04's refreshOdds action
  * writes one row per refresh from the Odds API's x-requests-* headers;
  * Plan 05's credit meter reads the most recent row.

@@ -15,6 +15,13 @@
       "when": 1790377976162,
       "tag": "0001_amazing_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790385457267,
+      "tag": "0002_flaky_hammerhead",
+      "breakpoints": true
     }
   ]
 }
