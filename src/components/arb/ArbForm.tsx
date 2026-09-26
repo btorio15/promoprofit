@@ -80,6 +80,9 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
         setServerFieldError(
           result.fieldErrors.totalStake?.[0] ?? "Enter a total stake greater than $0.",
         );
+        // Never keep showing stakes computed for a previous total next to
+        // a field error (01.1 review WR-02b).
+        setResponse(null);
         return;
       }
       setServerFieldError(null);
@@ -91,7 +94,13 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
   // (SC1, no submit step), debounced ~300ms so fast typing doesn't call
   // findArbs on every keystroke (T-01.1-26).
   useEffect(() => {
-    if (!validation.success) return;
+    if (!validation.success) {
+      // Invalidate any in-flight request for the previous (valid) stake so
+      // its late response can't overwrite the list while the field shows
+      // an error (01.1 review WR-02a).
+      requestIdRef.current += 1;
+      return;
+    }
     const timeoutId = window.setTimeout(() => {
       runFindArbs(validation.data);
     }, DEBOUNCE_MS);
@@ -168,6 +177,11 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
     searchPending;
 
   const hasOkResponse = response?.status === "ok";
+  // Results only render for a stake that is currently valid on both the
+  // client and the server. Otherwise the field error stands alone: no stale
+  // rows for an old total, and no endless skeleton when a persisted stake is
+  // invalid and so never triggers a request (01.1 review WR-02).
+  const canShowResults = validation.success && serverFieldError === null;
   const showSkeleton = isPending && !hasOkResponse;
 
   return (
@@ -182,7 +196,11 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
               className="num h-10"
               placeholder="$0.00"
               value={totalStake}
-              onChange={(event) => setTotalStake(event.target.value)}
+              onChange={(event) => {
+                // A server-side rejection applied to the previous value only.
+                setServerFieldError(null);
+                setTotalStake(event.target.value);
+              }}
             />
             {fieldError ? <p className="text-sm text-destructive">{fieldError}</p> : null}
           </div>
@@ -266,7 +284,7 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
         </AlertDescription>
       </Alert>
 
-      {showSkeleton || (response === null && hasCachedOdds) ? (
+      {!canShowResults ? null : showSkeleton || (response === null && hasCachedOdds) ? (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
