@@ -1,7 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
-import { getBonusBooks, getUserBookKeys } from "@/db/queries";
+import { getBonusBooks, getUsableUserBooks } from "@/db/queries";
 import { requireUser } from "@/lib/session";
 
 // Always reads the user's live saved selection; never prerendered.
@@ -17,7 +17,12 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const user = await requireUser();
 
-  const [books, initialKeys] = await Promise.all([getBonusBooks(), getUserBookKeys(user.userId)]);
+  // usableSaved comes from getUsableUserBooks (CR-02/WR-01, the same
+  // predicate / and /onboarding/books use), so a stale saved key that no
+  // longer renders as a checkbox is never seeded into initialKeys -- Save
+  // changes can always succeed.
+  const [books, usableSaved] = await Promise.all([getBonusBooks(), getUsableUserBooks(user.userId)]);
+  const initialKeys = usableSaved.map((b) => b.key);
 
   return (
     <>
