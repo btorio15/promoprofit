@@ -417,17 +417,19 @@ export async function logout() {
 
 **If this table is empty:** N/A — see entries above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `credit_usage.triggered_by_user_id` be `ON DELETE SET NULL` or `ON DELETE RESTRICT`?**
    - What we know: There is no user-deletion feature anywhere in this phase or the roadmap (owner manages users manually via scripts, per D-02/D-07; no delete script was requested).
    - What's unclear: Whether a future phase might add user deletion/deactivation.
    - Recommendation: Use `ON DELETE SET NULL` (matches the "no attribution suffix when unknown" fallback D-21 already specifies) — it's the safer default and costs nothing now, since it only matters if deletion is ever added.
+   - RESOLVED: Adopted `onDelete: "set null"` in 02-01-PLAN.md Task 2.
 
 2. **Exact invite token transport format for the printed link (e.g. `https://promoprofit.vercel.app/invite/<token>` vs. a shorter path)?**
    - What we know: D-02 says the script "prints the link"; the specifics of the app's deployed base URL aren't in CONTEXT.md.
    - What's unclear: Whether the script should read a `NEXT_PUBLIC_APP_URL`-style env var or just print the token/path for the owner to prepend manually.
    - Recommendation: Add an `APP_URL` env var (server-only, since it's only read by a CLI script, not the browser) read by `scripts/invite-create.ts`; fall back to printing just the path (`/invite/<token>`) with a note to prepend the deployed domain if the env var is unset. This keeps the script usable in local dev (no deployed URL yet) without blocking on infra decisions out of this phase's scope ("deployment decisions beyond 'auth now exists'" is explicitly out of scope per CONTEXT.md's Phase Boundary).
+   - RESOLVED: Adopted `APP_URL` with `/invite/<token>` path fallback in 02-01-PLAN.md Task 3.
 
 ## Environment Availability
 
