@@ -28,7 +28,8 @@ function tabLabel(key: string): string {
  * mounted, satisfying the "persist across refresh" requirement for free.
  */
 export function ResultsList({ response }: ResultsListProps) {
-  const { resultsBySport, bonusAmount, bonusBookName, maxHedgeAmount, limitExcludedAll } = response;
+  const { resultsBySport, bonusAmount, bonusBookName, maxHedgeAmount, limitExcludedAll, booksExcludedAll } =
+    response;
   const [tab, setTab] = useState<string>("all");
 
   return (
@@ -62,6 +63,8 @@ export function ResultsList({ response }: ResultsListProps) {
                   variant="no-results-under-limit"
                   maxHedgeAmount={maxHedgeAmount ?? undefined}
                 />
+              ) : results.length === 0 && key === "all" && booksExcludedAll ? (
+                <EmptyState variant="no-books-covered" />
               ) : results.length === 0 ? (
                 <EmptyState
                   variant="no-results"

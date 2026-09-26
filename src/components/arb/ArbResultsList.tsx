@@ -27,7 +27,7 @@ function tabLabel(key: string): string {
  * already sorted each sport's list by return % -- no client-side re-sort.
  */
 export function ArbResultsList({ response }: ArbResultsListProps) {
-  const { resultsBySport, totalStake } = response;
+  const { resultsBySport, totalStake, booksExcludedAll } = response;
   const [tab, setTab] = useState<string>("all");
   const totalArbs = (resultsBySport.all ?? []).length;
 
@@ -57,7 +57,9 @@ export function ArbResultsList({ response }: ArbResultsListProps) {
           const results = resultsBySport[key] ?? [];
           return (
             <TabsContent key={key} value={key} className="flex flex-col gap-4 pt-2">
-              {results.length === 0 ? (
+              {results.length === 0 && key === "all" && booksExcludedAll ? (
+                <ArbEmptyState variant="no-books-covered" />
+              ) : results.length === 0 ? (
                 <ArbEmptyState
                   variant="no-arbs"
                   sportLabel={key === "all" ? undefined : tabLabel(key)}

@@ -1,9 +1,13 @@
-export type ArbEmptyStateVariant = "no-arbs" | "no-cached-odds";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+
+export type ArbEmptyStateVariant = "no-arbs" | "no-cached-odds" | "no-books-covered";
 
 // "no-arbs" needs an optional runtime sportLabel to render its per-sport
-// override copy, so it's handled by an early-return branch below rather
-// than a plain COPY entry (mirrors the finder's EmptyState pattern).
-const COPY: Record<ArbEmptyStateVariant, { heading: string; body: string }> = {
+// override copy, and "no-books-covered" renders a "Manage your books" link
+// -- both are handled by early-return branches below rather than a plain
+// COPY entry (mirrors the finder's EmptyState pattern).
+const COPY: Record<Exclude<ArbEmptyStateVariant, "no-books-covered">, { heading: string; body: string }> = {
   "no-arbs": {
     heading: "No arbs right now",
     body: "No two-way price gaps across your Colorado books at the moment. Try refreshing odds, or search spreads & totals for more markets.",
@@ -33,6 +37,22 @@ export function ArbEmptyState({ variant, sportLabel }: ArbEmptyStateProps) {
         <p className="max-w-prose text-sm text-muted-foreground">
           Try another sport tab, or refresh odds to look for new games.
         </p>
+      </div>
+    );
+  }
+
+  if (variant === "no-books-covered") {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
+        <h3 className="text-xl font-semibold">No games at your books right now</h3>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          None of the upcoming games are offered at the sportsbooks you&apos;ve selected. Add more books to see more opportunities.
+        </p>
+        <div>
+          <Button variant="outline" render={<Link href="/settings" />}>
+            Manage your books
+          </Button>
+        </div>
       </div>
     );
   }
