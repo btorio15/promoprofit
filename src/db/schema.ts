@@ -39,12 +39,12 @@ export const cachedOdds = pgTable(
 
 /**
  * Cached spreads/totals odds events (D-16). This is the independent
- * spreads/totals cache: written only by the "Search spreads & totals"
- * refresh (Plan 04's refreshExtended), and purged only by its own
- * lifecycle (purgeStartedExtendedEvents / purgeUnrefreshedExtendedEvents).
- * A normal h2h refresh never touches this table, and this table never
- * touches cached_odds -- keeping the finder's WR-01 latest-batch query on
- * cached_odds correct by construction (RESEARCH.md "Pattern 3").
+ * spreads/totals cache: written and purged only by the "Search spreads &
+ * totals" refresh (refreshExtended -> store.commitSpreadsTotalsRefresh), in
+ * the same transaction as that run's h2h projection into cached_odds.
+ * A normal h2h refresh never touches this table. Because both caches are
+ * committed all-or-nothing, a failed search leaves the finder's WR-01
+ * latest-batch query on cached_odds unaffected.
  * raw_response stores the full event including h2h+spreads+totals
  * bookmakers.
  */

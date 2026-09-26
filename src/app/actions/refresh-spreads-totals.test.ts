@@ -9,12 +9,8 @@ vi.mock("@/ingestion/odds/client", () => ({
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
-  replaceSportOdds: vi.fn(),
-  replaceExtendedSportOdds: vi.fn(),
-  purgeStartedEvents: vi.fn(),
-  purgeUnrefreshedEvents: vi.fn(),
-  purgeStartedExtendedEvents: vi.fn(),
-  purgeUnrefreshedExtendedEvents: vi.fn(),
+  commitOddsRefresh: vi.fn(),
+  commitSpreadsTotalsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
   tryAcquireRefreshLock: vi.fn(),
   releaseRefreshLock: vi.fn(),
@@ -23,15 +19,10 @@ vi.mock("@/ingestion/odds/store", () => ({
 import { revalidatePath } from "next/cache";
 import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
 import {
+  commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
-  purgeStartedEvents,
-  purgeStartedExtendedEvents,
-  purgeUnrefreshedEvents,
-  purgeUnrefreshedExtendedEvents,
   recordCreditUsage,
   releaseRefreshLock,
-  replaceExtendedSportOdds,
-  replaceSportOdds,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
 import { refreshSpreadsTotals } from "./refresh-spreads-totals";
@@ -40,12 +31,7 @@ const mockRevalidatePath = vi.mocked(revalidatePath);
 const mockListSports = vi.mocked(listSports);
 const mockFetchSportOdds = vi.mocked(fetchSportOdds);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
-const mockReplaceSportOdds = vi.mocked(replaceSportOdds);
-const mockReplaceExtendedSportOdds = vi.mocked(replaceExtendedSportOdds);
-const mockPurgeStartedEvents = vi.mocked(purgeStartedEvents);
-const mockPurgeUnrefreshedEvents = vi.mocked(purgeUnrefreshedEvents);
-const mockPurgeStartedExtendedEvents = vi.mocked(purgeStartedExtendedEvents);
-const mockPurgeUnrefreshedExtendedEvents = vi.mocked(purgeUnrefreshedExtendedEvents);
+const mockCommitSpreadsTotalsRefresh = vi.mocked(commitSpreadsTotalsRefresh);
 const mockRecordCreditUsage = vi.mocked(recordCreditUsage);
 const mockTryAcquireRefreshLock = vi.mocked(tryAcquireRefreshLock);
 const mockReleaseRefreshLock = vi.mocked(releaseRefreshLock);
@@ -56,12 +42,7 @@ function sport(key: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPurgeStartedEvents.mockResolvedValue(undefined);
-  mockPurgeUnrefreshedEvents.mockResolvedValue(undefined);
-  mockPurgeStartedExtendedEvents.mockResolvedValue(undefined);
-  mockPurgeUnrefreshedExtendedEvents.mockResolvedValue(undefined);
-  mockReplaceSportOdds.mockResolvedValue(undefined);
-  mockReplaceExtendedSportOdds.mockResolvedValue(undefined);
+  mockCommitSpreadsTotalsRefresh.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);

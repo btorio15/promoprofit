@@ -8,12 +8,8 @@ vi.mock("@/ingestion/odds/client", () => ({
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
-  replaceSportOdds: vi.fn(),
-  replaceExtendedSportOdds: vi.fn(),
-  purgeStartedEvents: vi.fn(),
-  purgeUnrefreshedEvents: vi.fn(),
-  purgeStartedExtendedEvents: vi.fn(),
-  purgeUnrefreshedExtendedEvents: vi.fn(),
+  commitOddsRefresh: vi.fn(),
+  commitSpreadsTotalsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
   tryAcquireRefreshLock: vi.fn(),
   releaseRefreshLock: vi.fn(),
@@ -21,15 +17,11 @@ vi.mock("@/ingestion/odds/store", () => ({
 
 import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
 import {
+  commitOddsRefresh,
+  commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
-  purgeStartedEvents,
-  purgeStartedExtendedEvents,
-  purgeUnrefreshedEvents,
-  purgeUnrefreshedExtendedEvents,
   recordCreditUsage,
   releaseRefreshLock,
-  replaceExtendedSportOdds,
-  replaceSportOdds,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
 import { EXTENDED_MARKETS, runSpreadsTotalsRefresh, toH2hOnlyEvents } from "./refreshExtended";
@@ -38,12 +30,8 @@ import { runOddsRefresh } from "./refresh";
 const mockListSports = vi.mocked(listSports);
 const mockFetchSportOdds = vi.mocked(fetchSportOdds);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
-const mockReplaceSportOdds = vi.mocked(replaceSportOdds);
-const mockReplaceExtendedSportOdds = vi.mocked(replaceExtendedSportOdds);
-const mockPurgeStartedEvents = vi.mocked(purgeStartedEvents);
-const mockPurgeUnrefreshedEvents = vi.mocked(purgeUnrefreshedEvents);
-const mockPurgeStartedExtendedEvents = vi.mocked(purgeStartedExtendedEvents);
-const mockPurgeUnrefreshedExtendedEvents = vi.mocked(purgeUnrefreshedExtendedEvents);
+const mockCommitOddsRefresh = vi.mocked(commitOddsRefresh);
+const mockCommitSpreadsTotalsRefresh = vi.mocked(commitSpreadsTotalsRefresh);
 const mockRecordCreditUsage = vi.mocked(recordCreditUsage);
 const mockTryAcquireRefreshLock = vi.mocked(tryAcquireRefreshLock);
 const mockReleaseRefreshLock = vi.mocked(releaseRefreshLock);
@@ -65,12 +53,8 @@ function eventWith(id: string, markets: { key: string; outcomes: { name: string;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPurgeStartedEvents.mockResolvedValue(undefined);
-  mockPurgeUnrefreshedEvents.mockResolvedValue(undefined);
-  mockPurgeStartedExtendedEvents.mockResolvedValue(undefined);
-  mockPurgeUnrefreshedExtendedEvents.mockResolvedValue(undefined);
-  mockReplaceSportOdds.mockResolvedValue(undefined);
-  mockReplaceExtendedSportOdds.mockResolvedValue(undefined);
+  mockCommitOddsRefresh.mockResolvedValue(undefined);
+  mockCommitSpreadsTotalsRefresh.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
@@ -211,7 +195,7 @@ describe("runSpreadsTotalsRefresh", () => {
     });
   });
 
-  it("confirmed ok: fetches h2h+spreads+totals per sport, writes both caches, purges only after the loop, and records total spend", async () => {
+  it("confirmed ok: fetches h2h+spreads+totals per sport, commits both caches in one transaction after the loop, and records total spend", async () => {
     const now = new Date("2026-10-01T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 300,
@@ -246,19 +230,29 @@ describe("runSpreadsTotalsRefresh", () => {
       expect(call[1].markets).toEqual(EXTENDED_MARKETS);
     }
 
-    expect(mockReplaceExtendedSportOdds).toHaveBeenCalledWith("basketball_nba", nbaEvents, now);
-    expect(mockReplaceExtendedSportOdds).toHaveBeenCalledWith("baseball_mlb", mlbEvents, now);
-    expect(mockReplaceSportOdds).toHaveBeenCalledWith("basketball_nba", toH2hOnlyEvents(nbaEvents), now);
-    expect(mockReplaceSportOdds).toHaveBeenCalledWith("baseball_mlb", toH2hOnlyEvents(mlbEvents), now);
-
-    expect(mockPurgeUnrefreshedExtendedEvents).toHaveBeenCalledTimes(1);
-    expect(mockPurgeUnrefreshedExtendedEvents).toHaveBeenCalledWith(now);
-    expect(mockPurgeStartedExtendedEvents).toHaveBeenCalledTimes(1);
-    expect(mockPurgeStartedExtendedEvents).toHaveBeenCalledWith(now);
-    expect(mockPurgeUnrefreshedEvents).toHaveBeenCalledTimes(1);
-    expect(mockPurgeUnrefreshedEvents).toHaveBeenCalledWith(now);
-    expect(mockPurgeStartedEvents).toHaveBeenCalledTimes(1);
-    expect(mockPurgeStartedEvents).toHaveBeenCalledWith(now);
+    // One all-or-nothing commit carries both caches' rows (extended events
+    // plus their h2h projection) and both caches' purges (WR-01).
+    expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
+    expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledWith(
+      [
+        {
+          sportKey: "basketball_nba",
+          extendedEvents: nbaEvents,
+          h2hEvents: toH2hOnlyEvents(nbaEvents),
+        },
+        {
+          sportKey: "baseball_mlb",
+          extendedEvents: mlbEvents,
+          h2hEvents: toH2hOnlyEvents(mlbEvents),
+        },
+      ],
+      now,
+    );
+    // The commit runs only after every fetch returned.
+    expect(mockCommitSpreadsTotalsRefresh.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockFetchSportOdds.mock.invocationCallOrder[1],
+    );
+    expect(mockCommitOddsRefresh).not.toHaveBeenCalled();
 
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 294,
@@ -279,7 +273,7 @@ describe("runSpreadsTotalsRefresh", () => {
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
   });
 
-  it("mid-loop error: no purge runs, the first sport's spend is still recorded, and the result is a key-free error", async () => {
+  it("mid-loop error: neither cache changes (no write, no purge), the first sport's spend is still recorded, and the result is a key-free error", async () => {
     const now = new Date("2026-10-01T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 300,
@@ -296,10 +290,11 @@ describe("runSpreadsTotalsRefresh", () => {
 
     const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now });
 
-    expect(mockPurgeUnrefreshedExtendedEvents).not.toHaveBeenCalled();
-    expect(mockPurgeStartedExtendedEvents).not.toHaveBeenCalled();
-    expect(mockPurgeUnrefreshedEvents).not.toHaveBeenCalled();
-    expect(mockPurgeStartedEvents).not.toHaveBeenCalled();
+    // 01.1 review WR-01: the first sport's fetched events are discarded, so
+    // both caches keep their previous batch intact -- a failed search can
+    // no longer hide sports from the Arbitrage tab or the finder.
+    expect(mockCommitSpreadsTotalsRefresh).not.toHaveBeenCalled();
+    expect(mockCommitOddsRefresh).not.toHaveBeenCalled();
 
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 297,
@@ -326,9 +321,33 @@ describe("runSpreadsTotalsRefresh", () => {
     const outcome = await runOddsRefresh({ confirmed: true, now });
 
     expect(outcome.status).toBe("ok");
-    expect(mockReplaceExtendedSportOdds).not.toHaveBeenCalled();
-    expect(mockPurgeStartedExtendedEvents).not.toHaveBeenCalled();
-    expect(mockPurgeUnrefreshedExtendedEvents).not.toHaveBeenCalled();
+    expect(mockCommitOddsRefresh).toHaveBeenCalledTimes(1);
+    expect(mockCommitSpreadsTotalsRefresh).not.toHaveBeenCalled();
+  });
+
+  it("commit failure: returns a key-free error but still records every fetched sport's spend", async () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([sport("basketball_nba"), sport("baseball_mlb")]);
+    mockFetchSportOdds
+      .mockResolvedValueOnce({ events: [], quota: { remaining: 297, used: 203, last: 3 } })
+      .mockResolvedValueOnce({ events: [], quota: { remaining: 294, used: 206, last: 3 } });
+    mockCommitSpreadsTotalsRefresh.mockRejectedValueOnce(new Error("db write failed"));
+
+    const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now });
+
+    expect(outcome).toEqual({
+      status: "error",
+      message: "Couldn't search spreads & totals: the Odds API didn't respond.",
+    });
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith({
+      requestsRemaining: 294,
+      requestsUsed: 206,
+      refreshCost: 6,
+      sportsFetched: 2,
+      recordedAt: now,
+    });
+    expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
   });
 });
 

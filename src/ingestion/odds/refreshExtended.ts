@@ -14,8 +14,9 @@
  * benefit from one fetch and every market in the tab shares one "fetched at"
  * timestamp (D-14). This refines RESEARCH.md, which sketched cached_odds as
  * untouched by the extended refresh. WR-01 still holds: every in-season
- * sport's cached_odds rows are rewritten with this run's timestamp before
- * any purge runs. The reverse direction remains forbidden -- refresh.ts must
+ * sport's rows in both caches are written with this run's timestamp in the
+ * same transaction as the purges, only after every fetch succeeded, so a
+ * failed run changes neither cache. The reverse direction remains forbidden -- refresh.ts must
  * never import from this file or reference cached_extended_odds (D-16); this
  * plan does not modify refresh.ts.
  */
@@ -24,16 +25,12 @@ import { fetchSportOdds, listSports } from "./client";
 import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
 import { REFRESH_LOCK_TTL_MS } from "./refresh";
 import {
+  commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
-  purgeStartedEvents,
-  purgeStartedExtendedEvents,
-  purgeUnrefreshedEvents,
-  purgeUnrefreshedExtendedEvents,
   recordCreditUsage,
   releaseRefreshLock,
-  replaceExtendedSportOdds,
-  replaceSportOdds,
   tryAcquireRefreshLock,
+  type ExtendedSportOddsWrite,
 } from "./store";
 import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
@@ -177,6 +174,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: 
   const commenceTimeTo = new Date(now.getTime() + FETCH_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const sportsFetched: string[] = [];
+  const pendingWrites: ExtendedSportOddsWrite[] = [];
   let lastRemaining: number | null = null;
   let lastUsed: number | null = null;
   let refreshCost = 0;
@@ -184,6 +182,10 @@ async function runGuardedSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: 
   let refreshError: unknown = null;
 
   try {
+    // Buffer every sport in memory first (01.1 review WR-01). Nothing is
+    // written until the whole loop succeeds, so a failed search leaves BOTH
+    // caches exactly as they were -- it can no longer hide not-yet-fetched
+    // sports from the Arbitrage tab or the Bonus-bets finder.
     for (const sport of inSeason) {
       const { events, quota } = await fetchSportOdds(sport.key, {
         bookmakerKeys: bookKeys,
@@ -193,24 +195,23 @@ async function runGuardedSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: 
       });
 
       // Capture the quota as soon as the fetch returns -- the credits are
-      // spent at this point, even if a cache write below fails (WR-02).
+      // spent at this point, even if the cache commit below fails (WR-02).
       quotaCaptured = true;
       if (quota.last !== null) refreshCost += quota.last;
       if (quota.remaining !== null) lastRemaining = quota.remaining;
       if (quota.used !== null) lastUsed = quota.used;
 
-      await replaceExtendedSportOdds(sport.key, events, now);
-      await replaceSportOdds(sport.key, toH2hOnlyEvents(events), now);
+      pendingWrites.push({
+        sportKey: sport.key,
+        extendedEvents: events,
+        h2hEvents: toH2hOnlyEvents(events),
+      });
       sportsFetched.push(sport.key);
     }
-    // Only reached when every in-season sport was written with this run's
-    // timestamp: purge both caches now, extended-table purges first, then
-    // the normal-cache purges the h2h projection just wrote (D-16: this is
-    // the ONLY call site that purges cached_extended_odds).
-    await purgeUnrefreshedExtendedEvents(now);
-    await purgeStartedExtendedEvents(now);
-    await purgeUnrefreshedEvents(now);
-    await purgeStartedEvents(now);
+    // One transaction: both caches' per-sport rows plus both caches'
+    // purges (D-16: the ONLY call site that writes or purges
+    // cached_extended_odds). All-or-nothing.
+    await commitSpreadsTotalsRefresh(pendingWrites, now);
   } catch (err) {
     refreshError = err;
   } finally {

@@ -7,13 +7,12 @@ import { fetchSportOdds, listSports } from "./client";
 import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
 import { randomUUID } from "node:crypto";
 import {
+  commitOddsRefresh,
   getLatestCreditUsage,
-  purgeStartedEvents,
-  purgeUnrefreshedEvents,
   recordCreditUsage,
   releaseRefreshLock,
-  replaceSportOdds,
   tryAcquireRefreshLock,
+  type SportOddsWrite,
 } from "./store";
 import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
@@ -138,6 +137,7 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
   const commenceTimeTo = new Date(now.getTime() + FETCH_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const sportsFetched: string[] = [];
+  const pendingWrites: SportOddsWrite[] = [];
   let lastRemaining: number | null = null;
   let lastUsed: number | null = null;
   let refreshCost = 0;
@@ -145,6 +145,10 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
   let refreshError: unknown = null;
 
   try {
+    // Buffer every sport in memory first (01.1 review WR-01). Nothing is
+    // written until the whole loop succeeds, so a mid-loop failure leaves
+    // the cache exactly as it was instead of moving some sports to this
+    // run's timestamp and hiding the rest behind the latest-batch filter.
     for (const sport of inSeason) {
       const { events, quota } = await fetchSportOdds(sport.key, {
         bookmakerKeys: bookKeys,
@@ -153,7 +157,7 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
       });
 
       // Capture the quota as soon as the fetch returns -- the credits are
-      // spent at this point, even if the cache write below fails (WR-02).
+      // spent at this point, even if the cache commit below fails (WR-02).
       quotaCaptured = true;
       if (quota.last !== null) refreshCost += quota.last;
       // Keep the last value the API actually reported; a response missing
@@ -161,14 +165,13 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
       if (quota.remaining !== null) lastRemaining = quota.remaining;
       if (quota.used !== null) lastUsed = quota.used;
 
-      await replaceSportOdds(sport.key, events, now);
+      pendingWrites.push({ sportKey: sport.key, events });
       sportsFetched.push(sport.key);
     }
-    // Every in-season sport was replaced with this run's timestamp; drop
-    // rows from earlier runs (out-of-season sports) so they can't be shown
-    // as fresh (WR-01). Only reached when the whole loop succeeded.
-    await purgeUnrefreshedEvents(now);
-    await purgeStartedEvents(now);
+    // One transaction: every in-season sport's rows plus the purges of rows
+    // this run did not write (out-of-season sports, WR-01) and of started
+    // events. All-or-nothing.
+    await commitOddsRefresh(pendingWrites, now);
   } catch (err) {
     refreshError = err;
   } finally {

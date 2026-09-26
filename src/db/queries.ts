@@ -43,9 +43,9 @@ async function getMaxFetchedAt(): Promise<Date | null> {
  * Cached events with commence_time in the future, restricted to the most
  * recent refresh batch (fetched_at = max(fetched_at)). Every row a refresh
  * writes shares that run's timestamp, so rows left over from an earlier
- * refresh -- a sport whose fetch failed mid-run, or one that dropped out of
- * season -- are excluded rather than ranked under a "just updated" label
- * (WR-01). The returned fetchedAt is therefore the true age of every
+ * refresh -- e.g. a sport that dropped out of season -- are excluded rather
+ * than ranked under a "just updated" label (WR-01). Refreshes commit
+ * all-or-nothing, so a failed run never moves only some sports forward. The returned fetchedAt is therefore the true age of every
  * returned event. Rows that fail OddsEventSchema parsing are dropped (and
  * logged), never passed to the hedge engine.
  */

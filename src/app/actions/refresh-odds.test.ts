@@ -12,9 +12,7 @@ vi.mock("@/ingestion/odds/client", () => ({
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
-  replaceSportOdds: vi.fn(),
-  purgeStartedEvents: vi.fn(),
-  purgeUnrefreshedEvents: vi.fn(),
+  commitOddsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
   tryAcquireRefreshLock: vi.fn(),
   releaseRefreshLock: vi.fn(),
@@ -28,12 +26,10 @@ vi.mock("@/db/queries", () => ({
 
 import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
 import {
+  commitOddsRefresh,
   getLatestCreditUsage,
-  purgeStartedEvents,
-  purgeUnrefreshedEvents,
   recordCreditUsage,
   releaseRefreshLock,
-  replaceSportOdds,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
 import { getBonusBooks, getCachedEvents, getHedgeBookKeys } from "@/db/queries";
@@ -44,9 +40,7 @@ import { findHedges } from "./find-hedges";
 const mockListSports = vi.mocked(listSports);
 const mockFetchSportOdds = vi.mocked(fetchSportOdds);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
-const mockReplaceSportOdds = vi.mocked(replaceSportOdds);
-const mockPurgeStartedEvents = vi.mocked(purgeStartedEvents);
-const mockPurgeUnrefreshedEvents = vi.mocked(purgeUnrefreshedEvents);
+const mockCommitOddsRefresh = vi.mocked(commitOddsRefresh);
 const mockRecordCreditUsage = vi.mocked(recordCreditUsage);
 const mockTryAcquireRefreshLock = vi.mocked(tryAcquireRefreshLock);
 const mockReleaseRefreshLock = vi.mocked(releaseRefreshLock);
@@ -56,9 +50,7 @@ const mockGetCachedEvents = vi.mocked(getCachedEvents);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPurgeStartedEvents.mockResolvedValue(undefined);
-  mockPurgeUnrefreshedEvents.mockResolvedValue(undefined);
-  mockReplaceSportOdds.mockResolvedValue(undefined);
+  mockCommitOddsRefresh.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
@@ -92,10 +84,12 @@ describe("runOddsRefresh", () => {
     expect(mockFetchSportOdds).toHaveBeenCalledTimes(2);
     const calledSports = mockFetchSportOdds.mock.calls.map((c) => c[0]).sort();
     expect(calledSports).toEqual(["baseball_mlb", "basketball_nba"]);
-    expect(mockReplaceSportOdds).toHaveBeenCalledTimes(2);
-    expect(mockPurgeStartedEvents).toHaveBeenCalledWith(now);
-    // WR-01: rows not rewritten by this run (e.g. out-of-season NFL) are purged.
-    expect(mockPurgeUnrefreshedEvents).toHaveBeenCalledWith(now);
+    // WR-01: both sports land in ONE commit, which also purges rows not
+    // rewritten by this run (e.g. out-of-season NFL) and started events.
+    expect(mockCommitOddsRefresh).toHaveBeenCalledTimes(1);
+    const [writes, fetchedAt] = mockCommitOddsRefresh.mock.calls[0];
+    expect(writes.map((w) => w.sportKey).sort()).toEqual(["baseball_mlb", "basketball_nba"]);
+    expect(fetchedAt).toBe(now);
     expect(mockRecordCreditUsage).toHaveBeenCalledTimes(1);
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 480,
@@ -252,10 +246,10 @@ describe("runOddsRefresh", () => {
 
     const outcome = await runOddsRefresh({ confirmed: false, now });
 
-    expect(mockReplaceSportOdds).toHaveBeenCalledTimes(1);
-    // WR-01: a partial run must not purge -- the failed sport's old rows are
-    // hidden by getCachedEvents' latest-batch filter instead.
-    expect(mockPurgeUnrefreshedEvents).not.toHaveBeenCalled();
+    // 01.1 review WR-01: a partial run writes NOTHING -- the first sport's
+    // fetched events are discarded, so the cache stays exactly as it was
+    // (no sport moves to the new timestamp, no purge runs).
+    expect(mockCommitOddsRefresh).not.toHaveBeenCalled();
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 299,
       requestsUsed: 201,
@@ -272,7 +266,7 @@ describe("runOddsRefresh", () => {
 });
 
 describe("runOddsRefresh credit capture (WR-02)", () => {
-  it("records the credits spent when the first sport's cache write fails after a successful fetch", async () => {
+  it("records the credits spent when the cache commit fails after a successful fetch", async () => {
     const now = new Date("2026-10-15T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 300,
@@ -283,16 +277,18 @@ describe("runOddsRefresh credit capture (WR-02)", () => {
     });
     mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
     mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 299, used: 201, last: 1 } });
-    mockReplaceSportOdds.mockRejectedValueOnce(new Error("db write failed"));
+    mockCommitOddsRefresh.mockRejectedValueOnce(new Error("db write failed"));
 
     const outcome = await runOddsRefresh({ confirmed: false, now });
 
     expect(outcome.status).toBe("error");
+    // sportsFetched counts sports whose credits were spent (fetched), even
+    // though the all-or-nothing commit then failed.
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 299,
       requestsUsed: 201,
       refreshCost: 1,
-      sportsFetched: 0,
+      sportsFetched: 1,
       recordedAt: now,
     });
   });

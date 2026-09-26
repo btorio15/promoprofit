@@ -145,6 +145,12 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
       return;
     }
 
+    // error/busy: an error can come after some sports were already fetched
+    // (credits spent and recorded server-side), and busy means another
+    // refresh is mid-flight -- re-read the page so the credit meter and
+    // status bar reflect the real balance instead of the pre-search one
+    // (01.1 review WR-01). The caches themselves are unchanged on error.
+    router.refresh();
     setSearchBanner({ kind: outcome.status, message: outcome.message });
   }
 

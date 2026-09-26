@@ -105,6 +105,10 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
       return;
     }
 
+    // A failed refresh may still have spent (and recorded) credits for the
+    // sports fetched before the failure -- re-read the page so the credit
+    // meter is current. The cache itself is unchanged (01.1 review WR-01).
+    router.refresh();
     setBanner({
       kind: "error",
       message: `Couldn't refresh odds — the Odds API didn't respond. Try again, or keep using the odds cached ${age.minutes ?? 0} min ago below.`,
