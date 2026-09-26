@@ -111,8 +111,30 @@ Plans:
   3. Bonus-bet finder hedge suggestions only surface books the user has selected
   4. User sees a brief account-risk advisory near hedge results explaining that precise stakes and promo-only play can lead to account limiting
 
-**Plans**: TBD
+**Plans**: 6 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Join by invite: auth deps, whole-phase schema + [BLOCKING] migrate, iron-session helper, atomic single-use redeemInvite, invite:create + password:reset scripts, /invite/[token] page
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — Log in / log out: DB-backed lockout, /login page, proxy.ts gate, requireUser on main page, header account menu
+- [ ] 02-03-PLAN.md — Credit spends login-only (closes WR-05) and attributed ("Refreshed by"), finder account-risk advisory (CALC-06)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-04-PLAN.md — My books: user_books queries, saveBooks action, pick-your-books onboarding, Settings page, book-gated main page with scoped bonus-book dropdown
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-05-PLAN.md — Finder hedges and arb legs scoped to the user's books, "No games at your books right now" empty state
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-06-PLAN.md — Phase gate: full suite/build, validation map, owner walkthrough (checkpoint)
 
 ### Phase 3: Promo Scraping & Review
 
@@ -173,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 0/? | Not started | - |
+| 2. Private Access & My Books | 0/6 | Planned | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
