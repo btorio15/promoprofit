@@ -46,7 +46,7 @@ created: 2026-09-26
 | 02-03-T1 | 02-03 | 2 | DASH-04 | T-02-16 | `refreshOdds`/`refreshSpreadsTotals` reject a logged-out caller via `requireUser()` before any lock, API, or credit-spend call | unit | `npx vitest run src/app/actions/refresh-odds.test.ts src/app/actions/refresh-spreads-totals.test.ts` | ✅ | ✅ green |
 | 02-04-T1/T2 | 02-04 | 3 | DASH-02 | T-02-21, T-02-22 | Saved book selection (`user_books`) is returned unchanged on a subsequent read; `saveBooks` rejects empty/unknown/unusable book keys and scopes strictly to the session user | unit | `npx vitest run src/db/queries.test.ts src/app/actions/save-books.test.ts` | ✅ | ✅ green |
 | 02-05-T1/T2 | 02-05 | 4 | BONUS-02 | T-02-26, T-02-27, T-02-28 | `findHedges`/`findArbs` never return a leg (or arb "Multiple books" tie entry) at a book outside the session user's selected books; logged-out calls are rejected before any cache read | unit | `npx vitest run src/app/actions/find-hedges.test.ts src/app/actions/find-arbs.test.ts` | ✅ | ✅ green |
-| 02-03-T3 | 02-03 | 2 | CALC-06 | — | The bonus-bet finder renders the same account-risk advisory copy as the Arbitrage tab, from one shared component (`RiskAdvisory.tsx`), not two duplicated copies | grep + manual | `grep -rl "known pattern sportsbooks use to detect" src` (confirms single source: `src/components/RiskAdvisory.tsx`); owner walkthrough step 4 confirms the rendered result | ✅ (grep green) | ⬜ pending owner walkthrough |
+| 02-03-T3 | 02-03 | 2 | CALC-06 | — | The bonus-bet finder renders the same account-risk advisory copy as the Arbitrage tab, from one shared component (`RiskAdvisory.tsx`), not two duplicated copies | grep + manual | `grep -rl "known pattern sportsbooks use to detect" src` (confirms single source: `src/components/RiskAdvisory.tsx`); owner walkthrough step 4 confirms the rendered result | ✅ (grep green) | ✅ green (owner walkthrough approved 2026-09-26) |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -84,4 +84,4 @@ created: 2026-09-26
 
 **Automated gate (2026-09-26):** `npm test` (272/272 passed), `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:check` all exit 0 on the live Neon database.
 
-**Approval:** pending owner walkthrough (02-06 Task 2)
+**Approval:** approved 2026-09-26 (owner walkthrough)
