@@ -24,3 +24,22 @@ export function describeOddsAge(fetchedAt: Date | null, now: Date): OddsAgeDescr
   const stale = minutes > STALE_AFTER_MINUTES;
   return { minutes, stale, label: `Odds updated ${minutes} min ago` };
 }
+
+/**
+ * Same shape/threshold as describeOddsAge (D-16, same STALE_AFTER_MINUTES),
+ * but for the spreads/totals cache -- the second, tab-conditional age line
+ * shown only while the Arbitrage tab is active (SC3).
+ */
+export function describeExtendedOddsAge(fetchedAt: Date | null, now: Date): OddsAgeDescription {
+  if (fetchedAt === null) {
+    return {
+      minutes: null,
+      stale: false,
+      label: "Spreads & totals not fetched yet — press Search spreads & totals to include them",
+    };
+  }
+
+  const minutes = Math.floor((now.getTime() - fetchedAt.getTime()) / 60_000);
+  const stale = minutes > STALE_AFTER_MINUTES;
+  return { minutes, stale, label: `Spreads & totals updated ${minutes} min ago` };
+}
