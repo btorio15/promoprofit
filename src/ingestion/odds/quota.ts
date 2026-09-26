@@ -20,12 +20,19 @@ export function creditLevel(remaining: number | null): CreditLevel {
 }
 
 /**
- * sports * ceil(bookmakers / 10) region-groups * 1 market (h2h only, D-02).
- * The Odds API bills every group of 10 bookmakers as one region.
+ * sports * ceil(bookmakers / 10) region-groups * marketCount. The Odds API
+ * bills every group of 10 bookmakers as one region; cost = markets x
+ * regions. marketCount defaults to 1 (h2h only, D-02) to preserve the
+ * existing normal-refresh call site untouched (SC1); the extended
+ * spreads/totals refresh passes marketCount: 3 (D-13/D-14).
  */
-export function estimateRefreshCredits(inSeasonSportCount: number, bookmakerCount: number): number {
+export function estimateRefreshCredits(
+  inSeasonSportCount: number,
+  bookmakerCount: number,
+  marketCount: number = 1,
+): number {
   const regionGroups = Math.ceil(bookmakerCount / 10);
-  return inSeasonSportCount * regionGroups;
+  return inSeasonSportCount * regionGroups * marketCount;
 }
 
 export type RefreshGate =

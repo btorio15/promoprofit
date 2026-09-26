@@ -83,12 +83,15 @@ export interface FetchSportOddsOptions {
   bookmakerKeys: string[];
   commenceTimeFrom: Date;
   commenceTimeTo: Date;
+  /** Defaults to ["h2h"] (SC1: the normal refresh never requests extra markets). */
+  markets?: readonly string[];
 }
 
 /**
- * GET /v4/sports/{sportKey}/odds/ -- markets=h2h (D-02), american odds,
- * bookmakers= the given CO book keys (D-15). Cost = ceil(bookmakers/10)
- * credits (one region-group), per The Odds API's cost formula.
+ * GET /v4/sports/{sportKey}/odds/ -- markets defaults to h2h only (D-02),
+ * american odds, bookmakers= the given CO book keys (D-15). Cost =
+ * [number of markets] x ceil(bookmakers/10) credits (D-14) -- e.g. 3x a
+ * normal refresh when markets is ["h2h","spreads","totals"].
  */
 export async function fetchSportOdds(
   sportKey: string,
@@ -98,7 +101,7 @@ export async function fetchSportOdds(
   const url = new URL(`${BASE_URL}/sports/${sportKey}/odds/`);
   url.searchParams.set("apiKey", apiKey);
   url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
-  url.searchParams.set("markets", "h2h");
+  url.searchParams.set("markets", (opts.markets ?? ["h2h"]).join(","));
   url.searchParams.set("oddsFormat", "american");
   url.searchParams.set("dateFormat", "iso");
   url.searchParams.set("commenceTimeFrom", formatDateParam(opts.commenceTimeFrom));
