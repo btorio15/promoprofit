@@ -114,6 +114,39 @@ describe("client (Odds API v4 wrapper)", () => {
     expect(calledUrl).toContain("commenceTimeTo=2026-10-02T00%3A00%3A00Z");
   });
 
+  it("fetchSportOdds defaults to markets=h2h when markets is not given (SC1: no extra credits)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeOddsResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchSportOdds } = await import("./client");
+    await fetchSportOdds("basketball_nba", {
+      bookmakerKeys: ["draftkings"],
+      commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
+      commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
+    });
+
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain("markets=h2h");
+    expect(calledUrl).not.toContain("spreads");
+  });
+
+  it("fetchSportOdds requests markets=h2h,spreads,totals when markets is given", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeOddsResponse());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchSportOdds } = await import("./client");
+    await fetchSportOdds("basketball_nba", {
+      bookmakerKeys: ["draftkings"],
+      commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
+      commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
+      markets: ["h2h", "spreads", "totals"],
+    });
+
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    const decodedUrl = decodeURIComponent(calledUrl);
+    expect(decodedUrl).toContain("markets=h2h,spreads,totals");
+  });
+
   it("parseQuotaHeaders returns null for absent headers", async () => {
     const { parseQuotaHeaders } = await import("./client");
     const headers = new Headers();

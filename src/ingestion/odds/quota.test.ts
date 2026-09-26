@@ -32,6 +32,21 @@ describe("estimateRefreshCredits", () => {
   });
 });
 
+describe("market count", () => {
+  it("estimateRefreshCredits(4, 7, 3) === 12 === 3 * estimateRefreshCredits(4, 7)", () => {
+    expect(estimateRefreshCredits(4, 7, 3)).toBe(12);
+    expect(estimateRefreshCredits(4, 7, 3)).toBe(3 * estimateRefreshCredits(4, 7));
+  });
+
+  it("estimateRefreshCredits(4, 7) === 4 (default marketCount 1)", () => {
+    expect(estimateRefreshCredits(4, 7)).toBe(4);
+  });
+
+  it("estimateRefreshCredits(2, 12, 3) === 12 (2 region-groups)", () => {
+    expect(estimateRefreshCredits(2, 12, 3)).toBe(12);
+  });
+});
+
 describe("evaluateRefreshGate", () => {
   const now = new Date("2026-09-25T12:00:00.000Z");
 
