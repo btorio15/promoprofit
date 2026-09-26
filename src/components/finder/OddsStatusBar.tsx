@@ -6,7 +6,7 @@ import { RefreshCw, TriangleAlert } from "lucide-react";
 import { refreshOdds } from "@/app/actions/refresh-odds";
 import type { RefreshOutcome } from "@/ingestion/odds/refresh";
 import type { OddsStatus } from "@/ingestion/odds/status";
-import { describeOddsAge } from "./oddsAge";
+import { describeExtendedOddsAge, describeOddsAge } from "./oddsAge";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,6 +18,13 @@ export interface OddsStatusBarProps {
   status: OddsStatus;
   /** Called after a successful refresh so the finder recomputes (ODDS-04). */
   onRefreshed?: () => void;
+  /**
+   * Renders a second, tab-conditional line for the spreads/totals cache's
+   * age -- only while the Arbitrage tab is active (D-16, SC3). Does not
+   * change the moneyline age line, the Refresh odds button, or the credit
+   * meter above.
+   */
+  showExtendedAge?: boolean;
 }
 
 const LEVEL_INDICATOR_CLASS: Record<OddsStatus["level"], string> = {
@@ -42,7 +49,7 @@ type RefreshBanner = { kind: "none" } | { kind: "blocked" | "error"; message: st
  * is UX only; runOddsRefresh re-evaluates the gate server-side on every
  * call (T-01-18).
  */
-export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
+export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: OddsStatusBarProps) {
   const [, setTick] = useState(0);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -56,6 +63,10 @@ export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
 
   const fetchedAt = status.oddsFetchedAt ? new Date(status.oddsFetchedAt) : null;
   const age = describeOddsAge(fetchedAt, new Date());
+  const extendedFetchedAt = status.extendedOddsFetchedAt
+    ? new Date(status.extendedOddsFetchedAt)
+    : null;
+  const extendedAge = describeExtendedOddsAge(extendedFetchedAt, new Date());
 
   function handleOutcome(outcome: RefreshOutcome) {
     if (outcome.status === "ok") {
@@ -139,6 +150,20 @@ export function OddsStatusBar({ status, onRefreshed }: OddsStatusBarProps) {
             {isPending ? "Refreshing…" : "Refresh odds"}
           </Button>
         </div>
+
+        {showExtendedAge ? (
+          <p className="text-sm">
+            {extendedAge.stale ? (
+              <span className="inline-flex items-center gap-1.5 text-warning">
+                <TriangleAlert className="size-4" aria-hidden="true" />
+                {extendedAge.label} —{" "}
+                <span className="font-semibold">may be phantom arbs, refresh before betting</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">{extendedAge.label}</span>
+            )}
+          </p>
+        ) : null}
 
         {status.level === "unknown" ? (
           <p className="text-sm text-muted-foreground">
