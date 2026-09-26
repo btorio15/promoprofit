@@ -1,4 +1,5 @@
-import { getBonusBooks, getOddsFreshness } from "@/db/queries";
+import { redirect } from "next/navigation";
+import { getBonusBooks, getOddsFreshness, getUserBookKeys } from "@/db/queries";
 import { getOddsStatus } from "@/ingestion/odds/status";
 import { AppShell } from "@/components/AppShell";
 import { requireUser } from "@/lib/session";
@@ -10,11 +11,16 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const user = await requireUser();
 
-  const [bonusBooks, freshness, status] = await Promise.all([
-    getBonusBooks(),
-    getOddsFreshness(),
-    getOddsStatus(),
-  ]);
+  // A brand-new user has no saved books yet, and a user whose only books
+  // later lost API coverage would otherwise see an empty dropdown with no
+  // way out -- both send them to the one-time picker instead (D-08, D-13).
+  const userBookKeys = await getUserBookKeys(user.userId);
+  const bonusBooks = await getBonusBooks(new Set(userBookKeys));
+  if (bonusBooks.length === 0) {
+    redirect("/onboarding/books");
+  }
+
+  const [freshness, status] = await Promise.all([getOddsFreshness(), getOddsStatus()]);
 
   return (
     <AppShell
