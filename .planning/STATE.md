@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 01.1-08-PLAN.md -- Phase 01.1 (arbitrage-tab) complete
-last_updated: "2026-09-26T02:29:22.330Z"
+status: ready_to_plan
+stopped_at: Phase 01.1 complete (8/8) — ready to discuss Phase 2
+last_updated: 2026-09-26T05:51:52.459Z
 last_activity: 2026-09-26
 progress:
   total_phases: 6
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 01.1 — arbitrage-tab
+**Current focus:** Phase 2 — private access & my books
 
 ## Current Position
 
-Phase: 01.1 (arbitrage-tab) — EXECUTING
-Plan: 8 of 8
-Status: Phase complete — ready for verification
-Last activity: 2026-09-26 - Completed quick task 260925-wy0: revert CR-02: apply hedge cap after picking best orientation
+Phase: 2
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-26
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 5
+- Total plans completed: 13
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -45,6 +45,7 @@ Progress: [██████████] 100%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 5 | - | - |
+| 01.1 | 8 | - | - |
 
 **Recent Trend:**
 
