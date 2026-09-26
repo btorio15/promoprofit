@@ -117,3 +117,7 @@ None for local development — `SESSION_SECRET` was generated with `openssl rand
 - `getSessionUser`/`requireUser`/`startSession`/`endSession`, the `users`/`invites`/`user_books` schema, and `redeemInviteAndCreateUser`/`setPasswordByEmail` are all in place for Plan 02 (login) to build on directly — no schema or session-shape changes anticipated.
 - One invite row was created live during Task 3's smoke test (`npm run invite:create`, unredeemed, expires 2026-10-03) and is available for the owner to use in a later walkthrough, or will simply expire naturally.
 - No blockers.
+
+## Self-Check: PASSED
+
+All 16 files listed under Files Created/Modified verified present on disk; all 4 commits (7d0b0c4, 7f51ae8, 3f941d9, c3165d4) verified present in git log.

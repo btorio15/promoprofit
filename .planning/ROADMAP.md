@@ -117,7 +117,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Join by invite: auth deps, whole-phase schema + [BLOCKING] migrate, iron-session helper, atomic single-use redeemInvite, invite:create + password:reset scripts, /invite/[token] page
+- [x] 02-01-PLAN.md — Join by invite: auth deps, whole-phase schema + [BLOCKING] migrate, iron-session helper, atomic single-use redeemInvite, invite:create + password:reset scripts, /invite/[token] page
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 0/6 | Planned | - |
+| 2. Private Access & My Books | 1/6 | In Progress|  |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

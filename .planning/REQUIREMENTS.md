@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DASH-01**: User sees an opportunities feed (the main screen) computed automatically from current promos and cached odds, each showing the promo, best hedge book, both stakes, guaranteed profit, and ROI/conversion, sortable by guaranteed profit and ROI
 - [ ] **DASH-02**: User can select which Colorado sportsbooks they have accounts with, and the selection persists
 - [ ] **DASH-03**: Feed opportunities (promo side and hedge side) are filtered to the user's selected books
-- [ ] **DASH-04**: Only invited users (owner + friends) can log in; there is no public signup
+- [x] **DASH-04**: Only invited users (owner + friends) can log in; there is no public signup
 - [ ] **DASH-05**: Feed identifies competing promos (promos at different books on opposite outcomes of the same game/market) and lists the tandem opportunity with its profit next to hedging each promo separately
 
 ## v2 Requirements
@@ -118,7 +118,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-01 | Phase 4 | Pending |
 | DASH-02 | Phase 2 | Pending |
 | DASH-03 | Phase 4 | Pending |
-| DASH-04 | Phase 2 | Pending |
+| DASH-04 | Phase 2 | Complete |
 | DASH-05 | Phase 4 | Pending |
 
 **Coverage:**
