@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 01.1 UI-SPEC approved
-last_updated: "2026-09-26T00:45:02.799Z"
-last_activity: 2026-09-26 -- Phase 01.1 planning complete
+last_updated: "2026-09-26T01:16:18.594Z"
+last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 13
-  completed_plans: 5
+  completed_plans: 6
   percent: 17
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 01.1 — arbitrage tab (inserted)
+**Current focus:** Phase 01.1 — arbitrage-tab
 
 ## Current Position
 
-Phase: 01.1 (arbitrage-tab) — inserted after Phase 1
-Plan: Not started
+Phase: 01.1 (arbitrage-tab) — EXECUTING
+Plan: 2 of 8
 Status: Ready to execute
-Last activity: 2026-09-26 -- Phase 01.1 planning complete
+Last activity: 2026-09-26
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 46%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 | Phase 01 P02 | 10min | 3 tasks | 10 files |
 | Phase 01 P03 | 15min | 2 tasks | 10 files |
 | Phase 01 P04 | 25min | 3 tasks | 10 files |
+| Phase 01 P01 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Plan 04: Requested with bookmakers=<7 free-tier keys> instead of regions=us,us2, halving credit cost per in-season sport (1 credit instead of 2)
 - [Phase 01]: Plan 04: Live ODDS-05 verification confirmed the D-16 expectation exactly (7 free-tier CO books present, williamhill_us/fanatics absent) -- no book-config drift, src/config/books.ts unchanged
 - [Phase 01]: Plan 04: First live refresh spent 4 of 500 monthly Odds API credits (1 smoke + 3 refresh); 496 remaining
+- [Phase 01.1]: Plan 01: calculateArb treats the entered total stake as a hard cap (tightens RESEARCH.md's independent-rounding sketch, which could exceed the stake)
+- [Phase 01.1]: Plan 01: findBestArbPair does an explicit O(n^2) cross-book pair search, not per-side independent-best lookups, to satisfy D-06 (different books required)
+- [Phase 01.1]: Plan 01: spreads are grouped by the home team's signed point (not magnitude) to avoid mispairing a flipped favorite across books
 
 ### Pending Todos
 
@@ -100,6 +104,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T00:03:07.543Z
+Last session: 2026-09-26T01:14:39.686Z
 Stopped at: Phase 01.1 UI-SPEC approved
-Resume file: .planning/phases/01.1-arbitrage-tab/01.1-UI-SPEC.md
+Resume file: None

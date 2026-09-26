@@ -71,13 +71,13 @@ Plans:
   1. An Arbitrage tab lists two-way moneyline arbs across different Colorado books from the odds the existing refresh already fetches (no extra credits), ranked by return %, each with both books, odds, stakes for a user-chosen total stake, and guaranteed profit correct to the cent (decimal.js, reusing the Phase 1 hedge math)
   2. Spreads and totals are fetched only when the user presses a separate "Search spreads & totals" button with its own credit estimate and confirm (~3x credits), guarded by the existing credit gate and refresh lock; only half-point (no-push) lines matched exactly across books are considered
   3. Odds age is shown prominently on the tab (stale cached odds produce phantom arbs), and an account-limiting risk advisory is visible
-**Plans:** 8 plans
+**Plans:** 1/8 plans executed
 **UI hint**: yes
 
 Plans:
 **Wave 1**
 
-- [ ] 01.1-01-PLAN.md — Arb domain: arbMath (cent-exact stake split, whole/cents rounding under the total-stake cap), rankArbs (book-pair search, exact ties, return-% sort), half-point spreads/totals extractor
+- [x] 01.1-01-PLAN.md — Arb domain: arbMath (cent-exact stake split, whole/cents rounding under the total-stake cap), rankArbs (book-pair search, exact ties, return-% sort), half-point spreads/totals extractor
 - [ ] 01.1-02-PLAN.md — cached_extended_odds table + migration, extended store/queries, [BLOCKING] db:migrate on live Neon
 - [ ] 01.1-03-PLAN.md — Finder max hedge amount (folded todo): checkbox-gated cap before top-10, under-limit empty state, localStorage persistence helper
 
@@ -172,7 +172,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
-| 01.1. Arbitrage Tab (INSERTED) | 0/8 | Planned | - |
+| 01.1. Arbitrage Tab (INSERTED) | 1/8 | In Progress|  |
 | 2. Private Access & My Books | 0/? | Not started | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
