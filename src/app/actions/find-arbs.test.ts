@@ -125,8 +125,10 @@ describe("findArbs", () => {
     expect(response.precision).toBe("cents");
 
     const nbaRow = response.resultsBySport.all.find((r) => r.eventId === "nba-jazz-nuggets-arb")!;
-    expect(nbaRow.stakeA).toBe("94.03");
-    expect(nbaRow.stakeB).toBe("105.96");
+    // CR-01 (01.1 review fix): the exact solver reaches the same $6.87 on a
+    // smaller lay ($199.71) than the old 94.03/105.96 ($199.99) split.
+    expect(nbaRow.stakeA).toBe("93.90");
+    expect(nbaRow.stakeB).toBe("105.81");
     expect(nbaRow.guaranteedProfit).toBe("6.87");
     expect(nbaRow.returnPct).toBe("3.43");
   });

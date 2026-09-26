@@ -55,12 +55,6 @@ interface Candidate {
   guaranteedProfit: Decimal;
 }
 
-function roundingCandidates(exact: Decimal, dp: number): Decimal[] {
-  const down = exact.toDecimalPlaces(dp, Decimal.ROUND_DOWN);
-  const up = exact.toDecimalPlaces(dp, Decimal.ROUND_UP);
-  return down.equals(up) ? [down] : [down, up];
-}
-
 export function calculateArb(input: ArbInput): ArbResult | null {
   const totalStake = new LocalDecimal(input.totalStake);
 
@@ -78,7 +72,8 @@ export function calculateArb(input: ArbInput): ArbResult | null {
 
   const pA = new LocalDecimal(1).dividedBy(oddsA);
   const pB = new LocalDecimal(1).dividedBy(oddsB);
-  const impliedSum = clean(pA.plus(pB));
+  const rawImpliedSum = pA.plus(pB);
+  const impliedSum = clean(rawImpliedSum);
 
   // No epsilon and no minimum-return threshold (D-04, D-05): a true arb is
   // strictly below 1, an exact break-even (== 1) is not shown.
@@ -86,76 +81,125 @@ export function calculateArb(input: ArbInput): ArbResult | null {
     return null;
   }
 
-  const stakeAExact = clean(totalStake.times(pA).dividedBy(impliedSum));
-  const stakeBExact = clean(totalStake.minus(stakeAExact));
-
+  // D-01: the entered total is a CAP, not a target. The best whole-dollar
+  // (or whole-cent) allocation frequently lays noticeably less than the cap,
+  // because a smaller pair can land much closer to the balanced ratio
+  // (e.g. -150/+200 at $10: the $10 split has no positive pair, but 5/3
+  // lays $8 and guarantees $0.33). So this is an exact search over every
+  // total-laid value L (in precision units) from the cap downward:
+  //
+  // * For a fixed L, f(a) = floor_c(a * Da) is strictly increasing in a and
+  //   g(a) = floor_c((L - a) * Db) is strictly decreasing (each unit step
+  //   moves a payout by more than one cent because Da, Db > 1). So
+  //   min(f, g) is maximized at the discrete crossing, which provably lies
+  //   within two units of the continuous balance point a* = L * pA / sum
+  //   (one unit of a moves f - g by unit * (Da + Db) > 2 cents, more than
+  //   the two cent-floors can absorb). Checking a* +/- 2 units plus the
+  //   legal endpoints (both legs >= one unit) is therefore exhaustive for L.
+  // * Across L the profit is not monotone, but it is bounded above by the
+  //   unrounded balanced profit L / sum - L. Once that bound drops below
+  //   the best profit found so far (or below one cent when nothing positive
+  //   has been found — profit is always a whole number of cents), no
+  //   smaller L can win or tie, so the scan stops.
+  //
+  // The comparator is order-independent (more profit, then less laid, then
+  // smaller stakeA), so the result equals an exhaustive search over every
+  // (stakeA, stakeB) with stakeA + stakeB <= totalStake.
   const dp = input.precision === "whole" ? 0 : 2;
-  const stakeACandidates = roundingCandidates(stakeAExact, dp);
-  const stakeBCandidates = roundingCandidates(stakeBExact, dp);
+  const unit = dp === 0 ? new LocalDecimal(1) : new LocalDecimal("0.01");
+  const twoUnits = unit.times(2);
+  const oneCent = new LocalDecimal("0.01");
 
-  let best: Candidate | null = null;
+  // Held in an object so TypeScript does not narrow it across the closure.
+  const search: { best: Candidate | null } = { best: null };
 
-  for (const stakeA of stakeACandidates) {
-    for (const stakeB of stakeBCandidates) {
-      if (stakeA.lte(0) || stakeB.lte(0)) continue;
+  const consider = (stakeA: Decimal, stakeB: Decimal): void => {
+    if (stakeA.lte(0) || stakeB.lte(0)) return;
 
-      const totalLaid = stakeA.plus(stakeB);
-      // The entered total stake is a cap, not just a target (D-01) — never
-      // lay more than the user actually put in, even if independently
-      // rounding each leg up would otherwise look attractive.
-      if (totalLaid.gt(totalStake)) continue;
+    const totalLaid = stakeA.plus(stakeB);
+    // Never lay more than the user actually put in (D-01).
+    if (totalLaid.gt(totalStake)) return;
 
-      // Books pay whole cents; flooring is the conservative assumption.
-      const payoutA = clean(stakeA.times(oddsA)).toDecimalPlaces(2, Decimal.ROUND_DOWN);
-      const payoutB = clean(stakeB.times(oddsB)).toDecimalPlaces(2, Decimal.ROUND_DOWN);
-      const netIfAWins = payoutA.minus(totalLaid);
-      const netIfBWins = payoutB.minus(totalLaid);
-      const guaranteedProfit = Decimal.min(netIfAWins, netIfBWins);
+    // Books pay whole cents; flooring is the conservative assumption.
+    const payoutA = clean(stakeA.times(oddsA)).toDecimalPlaces(2, Decimal.ROUND_DOWN);
+    const payoutB = clean(stakeB.times(oddsB)).toDecimalPlaces(2, Decimal.ROUND_DOWN);
+    const netIfAWins = payoutA.minus(totalLaid);
+    const netIfBWins = payoutB.minus(totalLaid);
+    const guaranteedProfit = Decimal.min(netIfAWins, netIfBWins);
 
-      const isBetter =
-        best === null ||
-        guaranteedProfit.gt(best.guaranteedProfit) ||
-        (guaranteedProfit.equals(best.guaranteedProfit) && totalLaid.lt(best.totalLaid)) ||
-        (guaranteedProfit.equals(best.guaranteedProfit) &&
-          totalLaid.equals(best.totalLaid) &&
-          stakeA.lt(best.stakeA));
+    const best = search.best;
+    const isBetter =
+      best === null ||
+      guaranteedProfit.gt(best.guaranteedProfit) ||
+      (guaranteedProfit.equals(best.guaranteedProfit) && totalLaid.lt(best.totalLaid)) ||
+      (guaranteedProfit.equals(best.guaranteedProfit) &&
+        totalLaid.equals(best.totalLaid) &&
+        stakeA.lt(best.stakeA));
 
-      if (isBetter) {
-        best = {
-          stakeA,
-          stakeB,
-          totalLaid,
-          payoutA,
-          payoutB,
-          netIfAWins,
-          netIfBWins,
-          guaranteedProfit,
-        };
-      }
+    if (isBetter) {
+      search.best = {
+        stakeA,
+        stakeB,
+        totalLaid,
+        payoutA,
+        payoutB,
+        netIfAWins,
+        netIfBWins,
+        guaranteedProfit,
+      };
     }
+  };
+
+  for (
+    let laid = totalStake.toDecimalPlaces(dp, Decimal.ROUND_DOWN);
+    laid.gte(twoUnits);
+    laid = laid.minus(unit)
+  ) {
+    const current = search.best;
+    const threshold =
+      current !== null && current.guaranteedProfit.gt(oneCent) ? current.guaranteedProfit : oneCent;
+    // Uses the 40-digit sum, not the 20dp display value: rounding the sum
+    // can nudge an exactly-tight bound (e.g. $0.04) just under the threshold.
+    const upperBound = clean(laid.dividedBy(rawImpliedSum).minus(laid));
+    if (upperBound.lt(threshold)) break;
+
+    const maxA = laid.minus(unit);
+    const aStar = clean(laid.times(pA).dividedBy(rawImpliedSum));
+    const lo = Decimal.max(aStar.toDecimalPlaces(dp, Decimal.ROUND_DOWN).minus(twoUnits), unit);
+    const hi = Decimal.min(aStar.toDecimalPlaces(dp, Decimal.ROUND_UP).plus(twoUnits), maxA);
+
+    for (let stakeA = lo; stakeA.lte(hi); stakeA = stakeA.plus(unit)) {
+      consider(stakeA, laid.minus(stakeA));
+    }
+    // Endpoints cover a crossing that falls outside the legal range
+    // (e.g. a longshot leg whose balanced stake is below one unit).
+    consider(unit, laid.minus(unit));
+    consider(maxA, unit);
   }
+
+  const chosen = search.best;
 
   // No surviving candidate, or rounding erased the arb entirely: never
   // display a "guaranteed profit" that rounding turned into a loss or $0.
-  if (best === null || best.guaranteedProfit.lte(0)) {
+  if (chosen === null || chosen.guaranteedProfit.lte(0)) {
     return null;
   }
 
-  const returnPct = best.guaranteedProfit
-    .dividedBy(best.totalLaid)
+  const returnPct = chosen.guaranteedProfit
+    .dividedBy(chosen.totalLaid)
     .times(100)
     .toDecimalPlaces(2, Decimal.ROUND_DOWN);
 
   return {
     impliedSum,
-    stakeA: best.stakeA,
-    stakeB: best.stakeB,
-    totalLaid: best.totalLaid,
-    payoutA: best.payoutA,
-    payoutB: best.payoutB,
-    netIfAWins: best.netIfAWins,
-    netIfBWins: best.netIfBWins,
-    guaranteedProfit: best.guaranteedProfit,
+    stakeA: chosen.stakeA,
+    stakeB: chosen.stakeB,
+    totalLaid: chosen.totalLaid,
+    payoutA: chosen.payoutA,
+    payoutB: chosen.payoutB,
+    netIfAWins: chosen.netIfAWins,
+    netIfBWins: chosen.netIfBWins,
+    guaranteedProfit: chosen.guaranteedProfit,
     returnPct,
   };
 }
