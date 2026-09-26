@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 01.1 UI-SPEC approved
-last_updated: "2026-09-26T01:35:40.797Z"
+stopped_at: Completed 01.1-04-PLAN.md
+last_updated: "2026-09-26T01:48:41.388Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 13
-  completed_plans: 8
+  completed_plans: 9
   percent: 17
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 01.1 (arbitrage-tab) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [██████░░░░] 62%
+Progress: [███████░░░] 69%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [██████░░░░] 62%
 | Phase 01 P01 | 25min | 3 tasks | 7 files |
 | Phase 01.1 P02 | 12min | 3 tasks | 7 files |
 | Phase 01.1 P03 | 10min | 2 tasks | 12 files |
+| Phase 01.1 P04 | 20min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Plan 02: cached_extended_odds is a structural twin of cached_odds with its own writer/purge/latest-batch lifecycle, no shared table-parameterized helper, to keep D-16's independence guarantee mechanically enforceable
 - [Phase 01.1]: Plan 03: Guarded bonusAmount/maxHedgeAmount Zod refines against non-numeric input, since zod v4 runs every chained check regardless of earlier failures and an unconditional Decimal construction threw on inputs like "abc"
 - [Phase 01.1]: Plan 03: limitExcludedAll[scope] only re-ranks without the cap when that scope's capped ranking is empty, so a sport tab with zero markets regardless of the cap never shows a misleading limit message
+- [Phase 01.1]: Plan 04: the extended refresh also writes an h2h projection of every fetched event into cached_odds (sharing one timestamp/purge sequence), refining RESEARCH.md's 'cached_odds untouched' sketch, since the user already paid for the h2h market as part of the 3x request
+- [Phase 01.1]: Plan 04: estimatedExtendedRefreshCredits re-derives from the latest credit row's sportsFetched with marketCount=3 rather than reusing its refreshCost verbatim, since the shared credit_usage ledger's latest row may reflect either fetch path
 
 ### Pending Todos
 
@@ -109,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T01:35:40.785Z
-Stopped at: Phase 01.1 UI-SPEC approved
+Last session: 2026-09-26T01:48:41.382Z
+Stopped at: Completed 01.1-04-PLAN.md
 Resume file: None
