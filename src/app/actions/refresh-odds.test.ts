@@ -3,7 +3,11 @@ import { buildFixtureEvents } from "@/test/fixtures/oddsEvents";
 import { usableOddsBooks } from "@/config/books";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
+const { mockRequireUser } = vi.hoisted(() => ({ mockRequireUser: vi.fn() }));
+
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
 
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
@@ -54,6 +58,7 @@ beforeEach(() => {
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
+  mockRequireUser.mockResolvedValue({ userId: 42, email: "mike@example.com", displayName: "Mike" });
 });
 
 describe("runOddsRefresh", () => {
@@ -97,6 +102,7 @@ describe("runOddsRefresh", () => {
       refreshCost: 2,
       sportsFetched: 2,
       recordedAt: now,
+      triggeredByUserId: null,
     });
     expect(outcome.status).toBe("ok");
   });
@@ -148,6 +154,7 @@ describe("runOddsRefresh", () => {
       refreshCost: 1,
       sportsFetched: 1,
       recordedAt: now,
+      triggeredByUserId: null,
     });
   });
 
@@ -172,6 +179,7 @@ describe("runOddsRefresh", () => {
       refreshCost: 1,
       sportsFetched: 1,
       recordedAt: now,
+      triggeredByUserId: null,
     });
   });
 
@@ -258,12 +266,27 @@ describe("runOddsRefresh", () => {
       refreshCost: 1,
       sportsFetched: 2,
       recordedAt: now,
+      triggeredByUserId: null,
     });
     expect(outcome.status).toBe("error");
     if (outcome.status === "error") {
       expect(outcome.message).toBe("Couldn't refresh odds: the Odds API didn't respond.");
       expect(outcome.message).not.toContain("super-secret-value");
     }
+  });
+
+  it("records triggeredByUserId null when the caller doesn't provide one (CLI path)", async () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 499, used: 1, last: 1 } });
+
+    const outcome = await runOddsRefresh({ confirmed: false, now });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredByUserId: null }),
+    );
   });
 });
 
@@ -292,6 +315,7 @@ describe("runOddsRefresh credit capture (WR-02)", () => {
       refreshCost: 1,
       sportsFetched: 1,
       recordedAt: now,
+      triggeredByUserId: null,
     });
   });
 });
@@ -360,6 +384,30 @@ describe("refreshOdds server action", () => {
   it("rejects a non-boolean confirmed field with a fixed message", async () => {
     const outcome = await refreshOdds({ confirmed: "yes" });
     expect(outcome).toEqual({ status: "error", message: "Invalid refresh request" });
+  });
+
+  it("rejects when logged out, before any lock/gate/API/credit-usage call (D-20, closes WR-05)", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+
+    await expect(refreshOdds({ confirmed: true })).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(mockTryAcquireRefreshLock).not.toHaveBeenCalled();
+    expect(mockListSports).not.toHaveBeenCalled();
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+    expect(mockRecordCreditUsage).not.toHaveBeenCalled();
+  });
+
+  it("records triggeredByUserId from the session on a successful refresh (D-21)", async () => {
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 499, used: 1, last: 1 } });
+
+    const outcome = await refreshOdds({ confirmed: true });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredByUserId: 42 }),
+    );
   });
 });
 

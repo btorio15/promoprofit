@@ -57,7 +57,11 @@ function safeMessage(err: unknown): string {
  * 15-minute confirm gate and both spend credits. The lock is taken BEFORE
  * the gate is evaluated and held until the credit row is written.
  */
-export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): Promise<RefreshOutcome> {
+export async function runOddsRefresh(opts: {
+  confirmed: boolean;
+  now?: Date;
+  triggeredByUserId?: number | null;
+}): Promise<RefreshOutcome> {
   const holder = randomUUID();
 
   let acquired: boolean;
@@ -81,7 +85,11 @@ export async function runOddsRefresh(opts: { confirmed: boolean; now?: Date }): 
   }
 }
 
-async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Promise<RefreshOutcome> {
+async function runGuardedRefresh(opts: {
+  confirmed: boolean;
+  now?: Date;
+  triggeredByUserId?: number | null;
+}): Promise<RefreshOutcome> {
   const now = opts.now ?? new Date();
 
   let latest;
@@ -196,6 +204,7 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
           // cost (01.1 review WR-03). Equal to sports fetched on success.
           sportsFetched: inSeason.length,
           recordedAt: now,
+          triggeredByUserId: opts.triggeredByUserId ?? null,
         });
       } catch {
         // Best-effort: a credit-recording failure must not mask the

@@ -24,6 +24,14 @@ export interface CreditUsageRow {
    */
   sportsFetched: number;
   recordedAt: Date;
+  /**
+   * The user who triggered this spend (D-21, closes 01.1 review WR-05),
+   * sourced only from the server-side session in the calling action --
+   * never from client input (T-02-20). Null for CLI-triggered runs
+   * (scripts/refresh-odds.ts) and legacy rows recorded before this column
+   * existed.
+   */
+  triggeredByUserId?: number | null;
 }
 
 /** One sport's freshly-fetched (already Zod-validated) events. */
@@ -137,6 +145,7 @@ export async function recordCreditUsage(row: CreditUsageRow): Promise<void> {
     refreshCost: row.refreshCost,
     sportsFetched: row.sportsFetched,
     recordedAt: row.recordedAt,
+    triggeredByUserId: row.triggeredByUserId ?? null,
   });
 }
 

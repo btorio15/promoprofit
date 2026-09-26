@@ -90,7 +90,11 @@ export function toH2hOnlyEvents(events: OddsEvent[]): OddsEvent[] {
  * row id=1, WR-03): the lock is taken before the gate is evaluated and held
  * until the credit row is written, exactly like runOddsRefresh.
  */
-export async function runSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: Date }): Promise<ExtendedRefreshOutcome> {
+export async function runSpreadsTotalsRefresh(opts: {
+  confirmed: boolean;
+  now?: Date;
+  triggeredByUserId?: number | null;
+}): Promise<ExtendedRefreshOutcome> {
   const holder = randomUUID();
 
   let acquired: boolean;
@@ -114,7 +118,11 @@ export async function runSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: 
   }
 }
 
-async function runGuardedSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: Date }): Promise<ExtendedRefreshOutcome> {
+async function runGuardedSpreadsTotalsRefresh(opts: {
+  confirmed: boolean;
+  now?: Date;
+  triggeredByUserId?: number | null;
+}): Promise<ExtendedRefreshOutcome> {
   const now = opts.now ?? new Date();
 
   let latest;
@@ -235,6 +243,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: { confirmed: boolean; now?: 
           // cost (01.1 review WR-03). Equal to sports fetched on success.
           sportsFetched: inSeason.length,
           recordedAt: now,
+          triggeredByUserId: opts.triggeredByUserId ?? null,
         });
       } catch {
         // Best-effort: a credit-recording failure must not mask the

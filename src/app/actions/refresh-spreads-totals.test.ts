@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockRequireUser } = vi.hoisted(() => ({ mockRequireUser: vi.fn() }));
+
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
 
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
@@ -46,6 +50,7 @@ beforeEach(() => {
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
+  mockRequireUser.mockResolvedValue({ userId: 42, email: "mike@example.com", displayName: "Mike" });
 });
 
 describe("refreshSpreadsTotals server action", () => {
@@ -120,5 +125,29 @@ describe("refreshSpreadsTotals server action", () => {
       expect(outcome.message).not.toContain("super-secret-value");
     }
     expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects when logged out, before any lock/gate/API/credit-usage call (D-20, closes WR-05)", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+
+    await expect(refreshSpreadsTotals({ confirmed: true })).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(mockTryAcquireRefreshLock).not.toHaveBeenCalled();
+    expect(mockListSports).not.toHaveBeenCalled();
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+    expect(mockRecordCreditUsage).not.toHaveBeenCalled();
+  });
+
+  it("records triggeredByUserId from the session on a successful search (D-21)", async () => {
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([sport("basketball_nba")]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 497, used: 3, last: 3 } });
+
+    const outcome = await refreshSpreadsTotals({ confirmed: true });
+
+    expect(outcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredByUserId: 42 }),
+    );
   });
 });

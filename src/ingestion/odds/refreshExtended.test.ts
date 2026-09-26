@@ -260,6 +260,7 @@ describe("runSpreadsTotalsRefresh", () => {
       refreshCost: 6,
       sportsFetched: 2,
       recordedAt: now,
+      triggeredByUserId: null,
     });
 
     expect(outcome).toEqual({
@@ -271,6 +272,26 @@ describe("runSpreadsTotalsRefresh", () => {
     });
 
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
+  });
+
+  it("records triggeredByUserId from opts when a caller provides one, and null when it doesn't (CLI path)", async () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockListSports.mockResolvedValue([sport("basketball_nba")]);
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 499, used: 1, last: 3 } });
+
+    const cliOutcome = await runSpreadsTotalsRefresh({ confirmed: true, now });
+    expect(cliOutcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredByUserId: null }),
+    );
+
+    mockRecordCreditUsage.mockClear();
+    const userOutcome = await runSpreadsTotalsRefresh({ confirmed: true, now, triggeredByUserId: 42 });
+    expect(userOutcome.status).toBe("ok");
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ triggeredByUserId: 42 }),
+    );
   });
 
   it("mid-loop error: neither cache changes (no write, no purge), the first sport's spend is still recorded, and the result is a key-free error", async () => {
@@ -304,6 +325,7 @@ describe("runSpreadsTotalsRefresh", () => {
       refreshCost: 3,
       sportsFetched: 2,
       recordedAt: now,
+      triggeredByUserId: null,
     });
 
     expect(outcome.status).toBe("error");
@@ -348,6 +370,7 @@ describe("runSpreadsTotalsRefresh", () => {
       refreshCost: 6,
       sportsFetched: 2,
       recordedAt: now,
+      triggeredByUserId: null,
     });
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
   });
