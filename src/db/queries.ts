@@ -52,6 +52,20 @@ export async function getUserBookKeys(userId: number): Promise<string[]> {
 }
 
 /**
+ * THE single "usable saved books" predicate (CR-02, WR-01): the user's
+ * saved keys intersected with usableOddsBooks(), in config order. /,
+ * /onboarding/books and /settings must all call this (not getUserBookKeys
+ * directly) so their redirect/seed decisions can never disagree with each
+ * other -- a saved key that has lost API/free-tier coverage (a "stale" key)
+ * is silently excluded here rather than left to strand the user between
+ * pages that disagree about whether they have usable books.
+ */
+export async function getUsableUserBooks(userId: number): Promise<BookOption[]> {
+  const savedKeys = await getUserBookKeys(userId);
+  return getBonusBooks(new Set(savedKeys));
+}
+
+/**
  * Replaces a user's entire book selection in one all-or-nothing db.batch
  * (a single Postgres transaction, following store.ts's
  * replaceSportStatements/db.batch idiom): delete every existing row for
