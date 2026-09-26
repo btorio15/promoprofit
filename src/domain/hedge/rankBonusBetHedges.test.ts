@@ -254,6 +254,45 @@ describe("rankBonusBetHedges", () => {
       expect(results[0].result.hedgeStake.toFixed(2)).toBe("100.00");
     });
 
+    it("keeps a game whose lower-profit orientation fits under the cap (CR-02)", () => {
+      const market: TwoWayMoneylineMarket = {
+        eventId: "both-orientations-capped",
+        sportKey: "basketball_nba",
+        commenceTime: new Date(now.getTime() + 86_400_000),
+        homeTeam: "Home",
+        awayTeam: "Away",
+        tieRisk: false,
+        quotes: [
+          { bookKey: "bookA", outcome: "home", team: "Home", oddsAmerican: 250 },
+          { bookKey: "bookA", outcome: "away", team: "Away", oddsAmerican: 150 },
+          { bookKey: "bookB", outcome: "away", team: "Away", oddsAmerican: -150 },
+          { bookKey: "bookB", outcome: "home", team: "Home", oddsAmerican: -150 },
+        ],
+      };
+      const baseOpts = {
+        bonusBookKey: "bookA",
+        bonusAmount: new Decimal(100),
+        hedgeBookKeys: new Set(["bookB"]),
+      };
+
+      // Uncapped: bonus on Home @ +250 wins ($100 profit, $150 hedge).
+      const uncapped = rankBonusBetHedges([market], baseOpts);
+      expect(uncapped).toHaveLength(1);
+      expect(uncapped[0].bonus.outcome).toBe("home");
+      expect(uncapped[0].result.hedgeStake.toFixed(2)).toBe("150.00");
+
+      // A $120 cap rules out the home orientation, but bonus on Away @ +150
+      // needs only a $90 hedge and still nets $60 -- the game must survive.
+      const capped = rankBonusBetHedges([market], {
+        ...baseOpts,
+        maxHedgeStake: new Decimal(120),
+      });
+      expect(capped).toHaveLength(1);
+      expect(capped[0].bonus.outcome).toBe("away");
+      expect(capped[0].result.hedgeStake.toFixed(2)).toBe("90.00");
+      expect(capped[0].result.guaranteedProfit.toFixed(2)).toBe("60.00");
+    });
+
     it("leaves the existing ranking output identical when maxHedgeStake is undefined", () => {
       const markets = fixtureMarkets();
       const withoutCapKey = rankBonusBetHedges(markets, {

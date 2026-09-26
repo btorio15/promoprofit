@@ -31,7 +31,8 @@ export interface RankOptions {
   bonusAmount: Decimal;
   hedgeBookKeys: ReadonlySet<string>;
   limit?: number;
-  /** Optional cap (D-18): rows whose hedgeStake exceeds this are dropped
+  /** Optional cap (D-18): orientations whose hedgeStake exceeds this are
+   * dropped per game (before picking that game's best orientation) and
    * before sort/slice, never scaled/partial. */
   maxHedgeStake?: Decimal;
 }
@@ -120,6 +121,17 @@ export function rankBonusBetHedges(
     for (const bonusQuote of bonusQuotes) {
       const opportunity = buildOrientation(market, bonusQuote, opts);
       if (!opportunity) continue;
+      // D-18: apply the cap per orientation, BEFORE choosing this game's
+      // best orientation and before the global sort/slice. The
+      // highest-profit orientation (bonus on the longshot) usually needs
+      // the largest hedge; capping only after picking it would discard a
+      // game whose other orientation fits under the limit.
+      if (
+        opts.maxHedgeStake !== undefined &&
+        opportunity.result.hedgeStake.gt(opts.maxHedgeStake)
+      ) {
+        continue;
+      }
       if (!best || opportunity.result.guaranteedProfit.gt(best.result.guaranteedProfit)) {
         best = opportunity;
       }
@@ -128,15 +140,9 @@ export function rankBonusBetHedges(
     if (best) opportunities.push(best);
   }
 
-  // D-18: apply the cap BEFORE sort/slice, not after -- otherwise an
-  // over-cap game occupying a top-10 slot would silently shrink the result
-  // count instead of letting the next affordable game take its place.
-  const withinCap =
-    opts.maxHedgeStake === undefined
-      ? opportunities
-      : opportunities.filter((o) => o.result.hedgeStake.lte(opts.maxHedgeStake as Decimal));
-
-  withinCap.sort((a, b) => {
+  // The cap already ran inside the per-game loop above, so an over-cap game
+  // never occupies a top-10 slot -- the next affordable game takes its place.
+  opportunities.sort((a, b) => {
     const profitDiff = b.result.guaranteedProfit.comparedTo(a.result.guaranteedProfit);
     if (profitDiff !== 0) return profitDiff;
 
@@ -146,5 +152,5 @@ export function rankBonusBetHedges(
     return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
   });
 
-  return withinCap.slice(0, limit);
+  return opportunities.slice(0, limit);
 }

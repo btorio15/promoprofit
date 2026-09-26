@@ -118,18 +118,20 @@ describe("findHedges (MVP happy path)", () => {
   });
 
   it("caps hedge stakes with maxHedgeAmount and reports limitExcludedAll per scope (D-18)", async () => {
-    // $50 is below every fixture hedge stake (220.00 / 306.92 / 217.50), so
-    // every sport that had a result now has none -- but only the sports
-    // that actually had a result before the cap should report excluded.
+    // $1 is below every fixture hedge stake in EITHER orientation (the
+    // longshot-bonus orientations need 220.00 / 306.92 / 217.50, the
+    // favorite-bonus ones 8.55 / 6.25 / 4.17), so every sport that had a
+    // result now has none -- but only the sports that actually had a result
+    // before the cap should report excluded.
     const capped: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
       bonusAmount: "100",
-      maxHedgeAmount: "50",
+      maxHedgeAmount: "1",
     });
 
     expect(capped.status).toBe("ok");
     if (capped.status !== "ok") return;
-    expect(capped.maxHedgeAmount).toBe("50.00");
+    expect(capped.maxHedgeAmount).toBe("1.00");
     for (const results of Object.values(capped.resultsBySport)) {
       expect(results).toHaveLength(0);
     }
@@ -150,6 +152,29 @@ describe("findHedges (MVP happy path)", () => {
     if (uncapped.status !== "ok") return;
     expect(uncapped.maxHedgeAmount).toBeNull();
     expect(Object.values(uncapped.limitExcludedAll).every((v) => v === false)).toBe(true);
+  });
+
+  it("keeps games whose favorite-side orientation fits under the cap (CR-02)", async () => {
+    // $50 rules out every longshot-bonus orientation (hedges of 217.50+),
+    // but bonus-on-the-favorite still needs only a small hedge and nets a
+    // positive profit, so all three games must still come back.
+    const capped: FindHedgesResponse = await findHedges({
+      bookKey: "draftkings",
+      bonusAmount: "100",
+      maxHedgeAmount: "50",
+    });
+
+    expect(capped.status).toBe("ok");
+    if (capped.status !== "ok") return;
+    expect(capped.resultsBySport.all.map((r) => r.eventId).sort()).toEqual([
+      "mlb-dodgers-rockies",
+      "nba-nuggets-jazz",
+      "nfl-packers-panthers",
+    ]);
+    expect(capped.limitExcludedAll.all).toBe(false);
+    const nba = capped.resultsBySport.all.find((r) => r.eventId === "nba-nuggets-jazz")!;
+    expect(nba.hedgeStake).toBe("6.25");
+    expect(nba.guaranteedProfit).toBe("18.75");
   });
 });
 
