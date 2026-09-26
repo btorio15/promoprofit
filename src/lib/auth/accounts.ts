@@ -1,6 +1,7 @@
 import { sql, eq, and, isNull, gt } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { invites, users } from "@/db/schema";
+import { nextFailedLoginState } from "@/lib/auth/lockout";
 
 /** A user row that includes secrets -- never returned by redeem/invite functions below. */
 export interface UserRecord {
@@ -124,4 +125,54 @@ export async function setPasswordByEmail(email: string, passwordHash: string): P
     .where(eq(users.email, email))
     .returning({ id: users.id });
   return rows.length > 0;
+}
+
+/**
+ * Looks up a user by exact email match for login (D-05). Callers must pass
+ * an already-lowercased+trimmed email -- the column is always stored that
+ * way (see users table doc comment), so no case-insensitive comparison is
+ * needed here.
+ */
+export async function findUserByEmail(email: string): Promise<UserRecord | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      passwordHash: users.passwordHash,
+      failedLoginAttempts: users.failedLoginAttempts,
+      lockedUntil: users.lockedUntil,
+    })
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Records one more failed login attempt (T-02-09). Reads the user's current
+ * failedLoginAttempts, applies nextFailedLoginState, and persists both
+ * columns -- the counter and any resulting lock live in Postgres, never in
+ * process memory, so they survive serverless cold starts.
+ */
+export async function recordFailedLogin(userId: number, now: Date): Promise<void> {
+  const db = getDb();
+  const rows = await db
+    .select({ failedLoginAttempts: users.failedLoginAttempts })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const current = rows[0]?.failedLoginAttempts ?? 0;
+  const next = nextFailedLoginState(current, now);
+  await db
+    .update(users)
+    .set({ failedLoginAttempts: next.failedLoginAttempts, lockedUntil: next.lockedUntil })
+    .where(eq(users.id, userId));
+}
+
+/** Clears the lockout state after a successful login. */
+export async function clearFailedLogins(userId: number): Promise<void> {
+  const db = getDb();
+  await db.update(users).set({ failedLoginAttempts: 0, lockedUntil: null }).where(eq(users.id, userId));
 }
