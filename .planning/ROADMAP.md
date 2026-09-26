@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Bonus Bet Finder** - Scaffold, verified book config, odds ingestion/cache/refresh, fixture-tested bonus-bet hedge engine, finder screen (completed 2026-09-25)
 - [x] **Phase 01.1: Arbitrage Tab** (INSERTED) - Moneyline arbs from cached odds, opt-in spreads/totals refresh, odds-age + account-risk advisory (completed 2026-09-26)
-- [ ] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books
+- [x] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books (completed 2026-09-26)
 - [ ] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches
 - [ ] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection
 - [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a promo, shared or private, feeding the same feed
@@ -134,7 +134,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-06-PLAN.md — Phase gate: full suite/build, validation map, owner walkthrough (checkpoint)
+- [x] 02-06-PLAN.md — Phase gate: full suite/build, validation map, owner walkthrough (checkpoint)
 
 ### Phase 3: Promo Scraping & Review
 
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 5/6 | In Progress|  |
+| 2. Private Access & My Books | 6/6 | Complete   | 2026-09-26 |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
