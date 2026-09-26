@@ -1,6 +1,15 @@
-export type EmptyStateVariant = "no-search" | "no-cached-odds" | "no-results";
+import { formatUsd } from "@/lib/format";
 
-const COPY: Record<EmptyStateVariant, { heading: string; body: string }> = {
+export type EmptyStateVariant =
+  | "no-search"
+  | "no-cached-odds"
+  | "no-results"
+  | "no-results-under-limit";
+
+// "no-results-under-limit" needs a runtime maxHedgeAmount to render its
+// body copy, so it's handled by an early-return branch below rather than a
+// static COPY entry.
+const COPY: Record<Exclude<EmptyStateVariant, "no-results-under-limit">, { heading: string; body: string }> = {
   "no-search": {
     heading: "Enter a book and bonus amount to find your hedge",
     body: "Pick the book holding your bonus bet, enter the amount, and press Find hedges to see ranked conversion markets.",
@@ -25,16 +34,33 @@ interface EmptyStateProps {
    * verbatim UI-SPEC "no-results" copy.
    */
   sportLabel?: string;
+  /**
+   * Required for variant "no-results-under-limit" (D-18): the 2dp max
+   * hedge amount string to interpolate into the body copy.
+   */
+  maxHedgeAmount?: string;
 }
 
-/** Verbatim UI-SPEC copy for the finder's three non-error empty states. */
-export function EmptyState({ variant, sportLabel }: EmptyStateProps) {
+/** Verbatim UI-SPEC copy for the finder's non-error empty states. */
+export function EmptyState({ variant, sportLabel, maxHedgeAmount }: EmptyStateProps) {
   if (variant === "no-results" && sportLabel) {
     return (
       <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
         <h3 className="text-xl font-semibold">No qualifying {sportLabel} markets right now</h3>
         <p className="max-w-prose text-sm text-muted-foreground">
           Try another sport tab, or refresh odds to look for new games.
+        </p>
+      </div>
+    );
+  }
+
+  if (variant === "no-results-under-limit") {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
+        <h3 className="text-xl font-semibold">No hedges fit under your limit</h3>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          Every result needs a hedge stake above your {formatUsd(maxHedgeAmount ?? "0.00")} limit.
+          Raise the limit or uncheck it to see all results.
         </p>
       </div>
     );

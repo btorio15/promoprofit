@@ -7,8 +7,10 @@ import type { z } from "zod";
 import { findHedges } from "@/app/actions/find-hedges";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
 import type { FindHedgesResponse } from "@/domain/finder/types";
+import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -62,24 +64,56 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
   const [lastValidValues, setLastValidValues] = useState<FinderFormValues | null>(null);
   const isFirstRecompute = useRef(true);
 
+  // "Limit hedge amount" checkbox + amount (D-17/D-19): persisted per
+  // browser via localStorage, not the DB, and not part of react-hook-form's
+  // registered fields -- validated directly against FinderInputSchema's
+  // maxHedgeAmount rule only when the checkbox is checked.
+  const [limitHedgeStored, setLimitHedgeStored] = usePersistentString(
+    STORAGE_KEYS.finderLimitHedge,
+    "false",
+  );
+  const [maxHedgeAmount, setMaxHedgeAmount] = usePersistentString(
+    STORAGE_KEYS.finderMaxHedgeAmount,
+    "",
+  );
+  const limitHedgeChecked = limitHedgeStored === "true";
+  const [maxHedgeAmountError, setMaxHedgeAmountError] = useState<string | null>(null);
+
   const form = useForm<FinderFormValues>({
     resolver: zodResolver(FinderInputSchema),
     defaultValues: { bookKey: "", bonusAmount: "" },
   });
 
   const onSubmit = form.handleSubmit((values) => {
+    let payload: FinderFormValues = values;
+
+    if (limitHedgeChecked) {
+      const validation = FinderInputSchema.shape.maxHedgeAmount.safeParse(maxHedgeAmount);
+      if (!validation.success) {
+        setMaxHedgeAmountError(
+          validation.error.issues[0]?.message ?? "Enter a max hedge amount greater than $0.",
+        );
+        return;
+      }
+      payload = { ...values, maxHedgeAmount };
+    }
+    setMaxHedgeAmountError(null);
+
     startTransition(async () => {
-      const result = await findHedges(values);
+      const result = await findHedges(payload);
       if (result.status === "invalid") {
         for (const [field, messages] of Object.entries(result.fieldErrors)) {
           const message = messages?.[0];
-          if (message) {
+          if (!message) continue;
+          if (field === "maxHedgeAmount") {
+            setMaxHedgeAmountError(message);
+          } else {
             form.setError(field as keyof FinderFormValues, { message });
           }
         }
         return;
       }
-      setLastValidValues(values);
+      setLastValidValues(payload);
       setHasSearched(true);
       setResponse(result);
     });
@@ -158,6 +192,40 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
             />
             {form.formState.errors.bonusAmount ? (
               <p className="text-sm text-destructive">{form.formState.errors.bonusAmount.message}</p>
+            ) : null}
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2 md:basis-full">
+            <Label
+              htmlFor="limitHedgeAmount"
+              className="min-h-10 w-fit cursor-pointer gap-2 font-normal"
+            >
+              <Checkbox
+                id="limitHedgeAmount"
+                checked={limitHedgeChecked}
+                onCheckedChange={(checked) => setLimitHedgeStored(checked ? "true" : "false")}
+              />
+              Limit hedge amount
+            </Label>
+
+            {limitHedgeChecked ? (
+              <div className="flex flex-col gap-2 md:max-w-[220px]">
+                <Label htmlFor="maxHedgeAmount">Max hedge amount</Label>
+                <Input
+                  id="maxHedgeAmount"
+                  inputMode="decimal"
+                  className="num h-10"
+                  placeholder="$0.00"
+                  value={maxHedgeAmount}
+                  onChange={(event) => {
+                    setMaxHedgeAmount(event.target.value);
+                    if (maxHedgeAmountError) setMaxHedgeAmountError(null);
+                  }}
+                />
+                {maxHedgeAmountError ? (
+                  <p className="text-sm text-destructive">{maxHedgeAmountError}</p>
+                ) : null}
+              </div>
             ) : null}
           </div>
 

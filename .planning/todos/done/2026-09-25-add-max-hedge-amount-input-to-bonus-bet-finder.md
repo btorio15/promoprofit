@@ -19,3 +19,7 @@ Add an optional "Max hedge amount" input to the finder form (validated in `Finde
 - Re-rank so affordable options come first, showing the over-cap ones de-emphasized.
 - Possibly offer a partial/scaled hedge when the cap is below the full hedge (profit is then no longer fully guaranteed — must be clearly labeled with worst-case outcome; math must stay exact via decimal.js).
 Also consider an empty state when nothing fits under the cap. Candidate for Phase 2+ (e.g. alongside the feed/filters work).
+
+## Resolved
+
+Implemented in Phase 01.1 Plan 03 (D-17/D-18/D-19): a checkbox-gated "Max hedge amount" input, unchecked by default, filters over-cap hedges before the top-10 slice (no partial/scaled hedges), shows a dedicated "No hedges fit under your limit" empty state, and persists to localStorage per browser.
