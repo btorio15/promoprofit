@@ -6,7 +6,7 @@
  */
 import { getDb } from "../src/db/client";
 import { books as booksTable } from "../src/db/schema";
-import { getBonusBooks, getCachedEvents } from "../src/db/queries";
+import { getBonusBooks, getCachedEvents, getCachedExtendedEvents } from "../src/db/queries";
 
 async function main() {
   // getBonusBooks reads the config (WR-05); count the DB mirror directly
@@ -22,6 +22,13 @@ async function main() {
   console.log(
     `Cached events (commence_time in future): ${events.length}, fetched_at: ${
       fetchedAt ? fetchedAt.toISOString() : "none (table empty)"
+    }`,
+  );
+
+  const { events: extendedEvents, fetchedAt: extendedFetchedAt } = await getCachedExtendedEvents();
+  console.log(
+    `Cached spreads/totals events (commence_time in future): ${extendedEvents.length}, fetched_at: ${
+      extendedFetchedAt ? extendedFetchedAt.toISOString() : "none (table empty)"
     }`,
   );
 

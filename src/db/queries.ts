@@ -1,6 +1,6 @@
 import { and, gt, sql } from "drizzle-orm";
 import { getDb } from "./client";
-import { cachedOdds } from "./schema";
+import { cachedExtendedOdds, cachedOdds } from "./schema";
 import { usableOddsBooks } from "@/config/books";
 import { OddsEventSchema, type OddsEvent } from "@/domain/odds/schemas";
 
@@ -82,4 +82,60 @@ export async function getCachedEvents(): Promise<{ events: OddsEvent[]; fetchedA
 /** max(fetched_at) from cached_odds; null if the table is empty. */
 export async function getOddsFreshness(): Promise<Date | null> {
   return getMaxFetchedAt();
+}
+
+async function getMaxExtendedFetchedAt(): Promise<Date | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ maxFetchedAt: sql<string | Date | null>`max(${cachedExtendedOdds.fetchedAt})` })
+    .from(cachedExtendedOdds);
+  const raw = rows[0]?.maxFetchedAt ?? null;
+  // neon-http returns raw sql`` aggregate values as strings, not Date
+  // instances (unlike typed column selects) — normalize explicitly.
+  if (raw === null) return null;
+  return raw instanceof Date ? raw : new Date(raw);
+}
+
+/**
+ * Cached spreads/totals events with commence_time in the future, restricted
+ * to the most recent extended-refresh batch (fetched_at = max(fetched_at)
+ * on cached_extended_odds only). This is a structural copy of
+ * getCachedEvents against the independent D-16 table; it never reads or
+ * writes cached_odds. Rows that fail OddsEventSchema parsing are dropped
+ * (and logged), never passed to the arb engine. Returns
+ * { events: [], fetchedAt: null } when the table is empty.
+ */
+export async function getCachedExtendedEvents(): Promise<{ events: OddsEvent[]; fetchedAt: Date | null }> {
+  const fetchedAt = await getMaxExtendedFetchedAt();
+  if (fetchedAt === null) {
+    return { events: [], fetchedAt: null };
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select({ eventId: cachedExtendedOdds.eventId, rawResponse: cachedExtendedOdds.rawResponse })
+    .from(cachedExtendedOdds)
+    .where(
+      and(
+        gt(cachedExtendedOdds.commenceTime, new Date()),
+        sql`${cachedExtendedOdds.fetchedAt} = (select max(${cachedExtendedOdds.fetchedAt}) from ${cachedExtendedOdds})`,
+      ),
+    );
+
+  const events: OddsEvent[] = [];
+  for (const row of rows) {
+    const parsed = OddsEventSchema.safeParse(row.rawResponse);
+    if (!parsed.success) {
+      console.warn(`getCachedExtendedEvents: dropping invalid cached_extended_odds row, event_id=${row.eventId}`);
+      continue;
+    }
+    events.push(parsed.data);
+  }
+
+  return { events, fetchedAt };
+}
+
+/** max(fetched_at) from cached_extended_odds; null if the table is empty (D-16). */
+export async function getExtendedOddsFreshness(): Promise<Date | null> {
+  return getMaxExtendedFetchedAt();
 }

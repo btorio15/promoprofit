@@ -1,13 +1,15 @@
 /**
  * Server-only Postgres cache writer for the odds refresh pipeline
- * (ODDS-01/ODDS-02). replaceSportOdds is the only writer of cached_odds;
+ * (ODDS-01/ODDS-02). replaceSportOdds remains the only writer of
+ * cached_odds; replaceExtendedSportOdds is the only writer of the
+ * independent spreads/totals cache, cached_extended_odds (D-16).
  * recordCreditUsage/getLatestCreditUsage are the only reader/writer pair for
  * the persisted credit meter (D-11's thresholds read the latest row, never
  * a fresh API call).
  */
 import { and, desc, eq, lt, lte } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { cachedOdds, creditUsage, refreshLock } from "@/db/schema";
+import { cachedExtendedOdds, cachedOdds, creditUsage, refreshLock } from "@/db/schema";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 export interface CreditUsageRow {
@@ -61,6 +63,53 @@ export async function purgeStartedEvents(now: Date): Promise<void> {
 export async function purgeUnrefreshedEvents(refreshFetchedAt: Date): Promise<void> {
   const db = getDb();
   await db.delete(cachedOdds).where(lt(cachedOdds.fetchedAt, refreshFetchedAt));
+}
+
+/**
+ * Atomically deletes every cached_extended_odds row for sportKey and inserts
+ * the freshly-fetched (already Zod-validated) events in its place. Skips the
+ * insert half of the batch when events is empty -- Drizzle rejects an empty
+ * `values([])` array. This is a structural copy of replaceSportOdds against
+ * the independent spreads/totals cache table (D-16); it never touches
+ * cached_odds.
+ */
+export async function replaceExtendedSportOdds(sportKey: string, events: OddsEvent[], fetchedAt: Date): Promise<void> {
+  const db = getDb();
+  const deleteStmt = db.delete(cachedExtendedOdds).where(eq(cachedExtendedOdds.sportKey, sportKey));
+
+  if (events.length === 0) {
+    await db.batch([deleteStmt]);
+    return;
+  }
+
+  const insertStmt = db.insert(cachedExtendedOdds).values(
+    events.map((event) => ({
+      eventId: event.id,
+      sportKey: event.sport_key,
+      commenceTime: new Date(event.commence_time),
+      rawResponse: event,
+      fetchedAt,
+    })),
+  );
+
+  await db.batch([deleteStmt, insertStmt]);
+}
+
+/** Removes cached extended events that have already started (commence_time <= now). */
+export async function purgeStartedExtendedEvents(now: Date): Promise<void> {
+  const db = getDb();
+  await db.delete(cachedExtendedOdds).where(lte(cachedExtendedOdds.commenceTime, now));
+}
+
+/**
+ * After a fully successful extended refresh, removes every cached_extended_odds
+ * row that this run did not write (fetched_at before the run's timestamp),
+ * mirroring purgeUnrefreshedEvents but scoped to the independent
+ * spreads/totals table only (D-16).
+ */
+export async function purgeUnrefreshedExtendedEvents(refreshFetchedAt: Date): Promise<void> {
+  const db = getDb();
+  await db.delete(cachedExtendedOdds).where(lt(cachedExtendedOdds.fetchedAt, refreshFetchedAt));
 }
 
 /** Persists one row per refresh from the Odds API's own x-requests-* headers. */
