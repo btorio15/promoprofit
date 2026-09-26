@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-08-PLAN.md
-last_updated: "2026-09-26T20:00:26.511Z"
+stopped_at: Completed 02-09-PLAN.md
+last_updated: "2026-09-26T23:55:38.213Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 22
-  completed_plans: 21
-  percent: 33
+  completed_plans: 22
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 3 of 9
+Plan: 4 of 9
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [██████████] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: [██████████] 95%
 | Phase 02 P06 | 2min | 2 tasks | 1 files |
 | Phase 02 P07 | 9min | 2 tasks | 4 files |
 | Phase 02 P08 | 9min | 2 tasks | 6 files |
+| Phase 02 P09 | 12min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 07: recordFailedLogin deleted entirely rather than kept alongside reserveLoginAttempt, closing the lost-update path CR-01/T-02-G2 by removing the second way to write the counter
 - [Phase 02]: Plan 08: getUsableUserBooks composes getUserBookKeys + getBonusBooks(new Set(...)) rather than duplicating the intersection logic, so it can never drift from getBonusBooks' own usable-book filtering
 - [Phase 02]: Plan 08: getUserBookKeys and getBonusBooks themselves left unchanged -- find-hedges.ts/find-arbs.ts already intersect independently via getHedgeBookKeys, out of this plan's scope
+- [Phase 02]: Plan 09: All navigation hrefs added (header wordmark, settings back-link, save-success link) are the hard-coded literal "/" -- no query-param or user-controlled redirect target -- closing the open-redirect threat (T-02-G8) at the source
+- [Phase 02]: Plan 09: Owner completed the live click-through approving steps 1-6 (header wordmark link, settings back-link, save-success link, book-change reflected on main page); closed DASH-02 as Phase 2's last outstanding must-have
 
 ### Pending Todos
 
@@ -153,6 +156,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T20:00:26.504Z
-Stopped at: Completed 02-08-PLAN.md
+Last session: 2026-09-26T23:55:38.206Z
+Stopped at: Completed 02-09-PLAN.md
 Resume file: None
