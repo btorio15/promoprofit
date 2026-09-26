@@ -14,6 +14,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 - ✓ **Bonus-bet finder**: user enters book + bonus amount → top-10 ranked conversion markets (overall and per sport, via tabs) with hedge book, both stakes, guaranteed profit, and conversion % — Validated in Phase 1: Bonus Bet Finder
 - ✓ **Odds**: cached odds from The Odds API free tier (7 free-tier Colorado books, live-verified), user-triggered refresh with credit meter, low-credit block, 15-min confirm, and concurrency lock — Validated in Phase 1: Bonus Bet Finder
+- ✓ **Arbitrage tab**: cross-book sure bets (no promos) among the 7 API-covered Colorado books — moneyline arbs from cached odds at no extra credit, opt-in "Search spreads & totals" (~3x credits, confirm every time, half-point lines matched exactly), exact whole-dollar/cent stakes under the total-stake cap, guaranteed profit and return %, prominent odds age, account-risk advisory — Validated in Phase 01.1: Arbitrage Tab
+- ✓ **Finder hedge cap**: optional "Limit hedge amount" on the bonus-bet finder; a game whose best hedge exceeds the cap is dropped (no fallback to a worse orientation) — Validated in Phase 01.1: Arbitrage Tab
 
 ### Active
 
@@ -72,6 +74,9 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 | Colorado only, sportsbooks only | Owner's state; keeps scope tight | — Pending |
 | Sport filter is client-side tabs over results (top 10 overall + top 10 per sport) | Owner didn't want to re-submit the search to change sport | ✓ Good (Phase 1) |
 | NFL moneylines shown with a "Tie risk" badge rather than excluded | A tie voids both legs: $0 profit, no cash lost | ✓ Good (Phase 1, owner sign-off) |
+| Arbitrage tab: strict implied-sum < 1 only (no near-arbs); total stake is a hard cap on rounded legs | Sure bets only; never lay more than the user entered | ✓ Good (Phase 01.1; owner saw zero arbs at verification — correct, closest market was break-even) |
+| Refreshes are all-or-nothing (fetch every sport, then one db.batch write) | A partial failure must never hide sports or shrink the finder | ✓ Good (Phase 01.1 review fix WR-01) |
+| Finder hedge cap drops a game whose best orientation exceeds the cap | A bonus bet on the favorite is a poor conversion; owner prefers hiding the game | ✓ Good (Phase 01.1 UAT, owner decision) |
 
 ## Evolution
 
@@ -91,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-25 after Phase 1 (Bonus Bet Finder) completion*
+*Last updated: 2026-09-26 after Phase 01.1 (Arbitrage Tab) completion*
