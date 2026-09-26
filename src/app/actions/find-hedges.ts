@@ -90,7 +90,7 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     return { status: "invalid", fieldErrors };
   }
 
-  const { bookKey, bonusAmount } = parsed.data;
+  const { bookKey, bonusAmount, maxHedgeAmount } = parsed.data;
 
   const bonusBooks = await getBonusBooks();
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -111,22 +111,44 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
   const normalizedBonusAmount = new Decimal(bonusAmount).toFixed(2);
   const now = new Date();
 
+  const maxHedgeStake = maxHedgeAmount !== undefined ? new Decimal(maxHedgeAmount) : undefined;
+  const normalizedMaxHedgeAmount = maxHedgeStake !== undefined ? maxHedgeStake.toFixed(2) : null;
+
   const rankOpts: RankOptions = {
     bonusBookKey: bookKey,
     bonusAmount: new Decimal(bonusAmount),
     hedgeBookKeys,
     limit: RESULT_LIMIT,
+    maxHedgeStake,
   };
 
-  const resultsBySport: FinderResultsBySport = {
-    all: rankForSportKeys(events, new Set(SPORT_KEYS), now, rankOpts).map((o) =>
+  const resultsBySport: FinderResultsBySport = {};
+  const limitExcludedAll: Record<string, boolean> = {};
+
+  /**
+   * Ranks one scope with the cap applied, records its DTOs, and -- only
+   * when a cap is set and the capped ranking came back empty -- re-ranks
+   * the same scope without the cap (pure in-memory, zero API calls) to
+   * decide whether the cap is the reason this scope is empty (D-18).
+   */
+  function computeScope(sportKeys: ReadonlySet<string>, key: string): void {
+    const opportunities = rankForSportKeys(events, sportKeys, now, rankOpts);
+    resultsBySport[key] = opportunities.map((o) =>
       toResultDTO(o, bookNames, normalizedBonusAmount),
-    ),
-  };
-  for (const sportKey of SPORT_KEYS) {
-    resultsBySport[sportKey] = rankForSportKeys(events, new Set([sportKey]), now, rankOpts).map(
-      (o) => toResultDTO(o, bookNames, normalizedBonusAmount),
     );
+
+    if (maxHedgeStake === undefined || opportunities.length > 0) {
+      limitExcludedAll[key] = false;
+      return;
+    }
+
+    const uncapped = rankForSportKeys(events, sportKeys, now, { ...rankOpts, maxHedgeStake: undefined });
+    limitExcludedAll[key] = uncapped.length > 0;
+  }
+
+  computeScope(new Set(SPORT_KEYS), "all");
+  for (const sportKey of SPORT_KEYS) {
+    computeScope(new Set([sportKey]), sportKey);
   }
 
   return {
@@ -135,5 +157,7 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     oddsFetchedAt: fetchedAt.toISOString(),
     bonusBookName: bonusBook.displayName,
     bonusAmount: normalizedBonusAmount,
+    maxHedgeAmount: normalizedMaxHedgeAmount,
+    limitExcludedAll,
   };
 }

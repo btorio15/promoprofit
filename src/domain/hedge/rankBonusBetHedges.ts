@@ -31,6 +31,9 @@ export interface RankOptions {
   bonusAmount: Decimal;
   hedgeBookKeys: ReadonlySet<string>;
   limit?: number;
+  /** Optional cap (D-18): rows whose hedgeStake exceeds this are dropped
+   * before sort/slice, never scaled/partial. */
+  maxHedgeStake?: Decimal;
 }
 
 function toLeg(quote: MoneylineQuote): HedgeLeg {
@@ -125,7 +128,15 @@ export function rankBonusBetHedges(
     if (best) opportunities.push(best);
   }
 
-  opportunities.sort((a, b) => {
+  // D-18: apply the cap BEFORE sort/slice, not after -- otherwise an
+  // over-cap game occupying a top-10 slot would silently shrink the result
+  // count instead of letting the next affordable game take its place.
+  const withinCap =
+    opts.maxHedgeStake === undefined
+      ? opportunities
+      : opportunities.filter((o) => o.result.hedgeStake.lte(opts.maxHedgeStake as Decimal));
+
+  withinCap.sort((a, b) => {
     const profitDiff = b.result.guaranteedProfit.comparedTo(a.result.guaranteedProfit);
     if (profitDiff !== 0) return profitDiff;
 
@@ -135,5 +146,5 @@ export function rankBonusBetHedges(
     return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
   });
 
-  return opportunities.slice(0, limit);
+  return withinCap.slice(0, limit);
 }

@@ -47,9 +47,18 @@ export type FindHedgesResponse =
       oddsFetchedAt: string;
       bonusBookName: string;
       bonusAmount: string;
+      /** 2dp string when the "Limit hedge amount" cap was set, else null (D-17). */
+      maxHedgeAmount: string | null;
+      /**
+       * Per-scope ("all" and each SPORT_KEYS entry): true only when a cap
+       * is set, that scope's capped ranking is empty, and the same scope's
+       * uncapped ranking is non-empty -- i.e. the cap is the reason this
+       * scope shows no results (D-18).
+       */
+      limitExcludedAll: Record<string, boolean>;
     }
   | { status: "no_cached_odds" }
   | {
       status: "invalid";
-      fieldErrors: Partial<Record<"bookKey" | "bonusAmount", string[]>>;
+      fieldErrors: Partial<Record<"bookKey" | "bonusAmount" | "maxHedgeAmount", string[]>>;
     };
