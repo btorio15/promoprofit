@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 01.1 (arbitrage-tab) — EXECUTING
 Plan: 8 of 8
 Status: Phase complete — ready for verification
-Last activity: 2026-09-26
+Last activity: 2026-09-26 - Completed quick task 260925-wy0: revert CR-02: apply hedge cap after picking best orientation
 
 Progress: [██████████] 100%
 
@@ -112,6 +112,12 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 - Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
 - Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260925-wy0 | revert CR-02: apply hedge cap after picking best orientation | 2026-09-26 | 5aef9e1 | [260925-wy0-revert-cr-02-apply-hedge-cap-after-picki](./quick/260925-wy0-revert-cr-02-apply-hedge-cap-after-picki/) |
 
 ## Deferred Items
 
