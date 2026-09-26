@@ -72,7 +72,16 @@ export function SearchSpreadsTotalsDialog({
           <AlertDialogDescription className="num">{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel variant="ghost" onClick={onCancel}>
+          {/* Locked while a confirmed (credit-spending) search is in flight:
+              closing the dialog would not stop the server action, and would
+              re-enable the main search button mid-spend (01.1 review WR-04). */}
+          <AlertDialogCancel
+            variant="ghost"
+            disabled={isPending}
+            onClick={() => {
+              if (!isPending) onCancel();
+            }}
+          >
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction onClick={confirmSearch} disabled={isPending}>
