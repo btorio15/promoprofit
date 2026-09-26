@@ -71,7 +71,7 @@ Plans:
   1. An Arbitrage tab lists two-way moneyline arbs across different Colorado books from the odds the existing refresh already fetches (no extra credits), ranked by return %, each with both books, odds, stakes for a user-chosen total stake, and guaranteed profit correct to the cent (decimal.js, reusing the Phase 1 hedge math)
   2. Spreads and totals are fetched only when the user presses a separate "Search spreads & totals" button with its own credit estimate and confirm (~3x credits), guarded by the existing credit gate and refresh lock; only half-point (no-push) lines matched exactly across books are considered
   3. Odds age is shown prominently on the tab (stale cached odds produce phantom arbs), and an account-limiting risk advisory is visible
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 **UI hint**: yes
 
 Plans:
@@ -92,7 +92,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01.1-07-PLAN.md — Arbitrage tab UI + page shell: top-level tabs, stake/precision controls, Search spreads & totals confirm, spreads/totals age line, risk advisory
+- [x] 01.1-07-PLAN.md — Arbitrage tab UI + page shell: top-level tabs, stake/precision controls, Search spreads & totals confirm, spreads/totals age line, risk advisory
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -172,7 +172,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
-| 01.1. Arbitrage Tab (INSERTED) | 6/8 | In Progress|  |
+| 01.1. Arbitrage Tab (INSERTED) | 7/8 | In Progress|  |
 | 2. Private Access & My Books | 0/? | Not started | - |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
