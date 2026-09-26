@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppHeader } from "@/components/AppHeader";
 import { OddsStatusBar } from "@/components/finder/OddsStatusBar";
 import { CreditBanner } from "@/components/finder/CreditBanner";
 import { FinderScreen } from "@/components/finder/FinderScreen";
@@ -13,6 +14,7 @@ export interface AppShellProps {
   status: OddsStatus;
   bonusBooks: { key: string; displayName: string }[];
   hasCachedOdds: boolean;
+  displayName: string;
 }
 
 type ActiveTab = "bonus" | "arbitrage";
@@ -26,13 +28,14 @@ type ActiveTab = "bonus" | "arbitrage";
  * TabsContent panels are keepMounted so switching tabs never discards the
  * other tab's results/state.
  */
-export function AppShell({ status, bonusBooks, hasCachedOdds }: AppShellProps) {
+export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: AppShellProps) {
   const [recomputeKey, setRecomputeKey] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>("bonus");
   const bumpRecompute = () => setRecomputeKey((key) => key + 1);
 
   return (
     <>
+      <AppHeader displayName={displayName} />
       <OddsStatusBar
         status={status}
         onRefreshed={bumpRecompute}
