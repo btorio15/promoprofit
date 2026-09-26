@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01.1-04-PLAN.md
-last_updated: "2026-09-26T01:48:41.388Z"
+stopped_at: Completed 01.1-05-PLAN.md
+last_updated: "2026-09-26T02:01:12.179Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 13
-  completed_plans: 9
+  completed_plans: 10
   percent: 17
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 01.1 (arbitrage-tab) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [███████░░░] 69%
+Progress: [████████░░] 77%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [███████░░░] 69%
 | Phase 01.1 P02 | 12min | 3 tasks | 7 files |
 | Phase 01.1 P03 | 10min | 2 tasks | 12 files |
 | Phase 01.1 P04 | 20min | 3 tasks | 11 files |
+| Phase 01.1 P05 | 20min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Plan 03: limitExcludedAll[scope] only re-ranks without the cap when that scope's capped ranking is empty, so a sport tab with zero markets regardless of the cap never shows a misleading limit message
 - [Phase 01.1]: Plan 04: the extended refresh also writes an h2h projection of every fetched event into cached_odds (sharing one timestamp/purge sequence), refining RESEARCH.md's 'cached_odds untouched' sketch, since the user already paid for the h2h market as part of the 3x request
 - [Phase 01.1]: Plan 04: estimatedExtendedRefreshCredits re-derives from the latest credit row's sportsFetched with marketCount=3 rather than reusing its refreshCost verbatim, since the shared credit_usage ledger's latest row may reflect either fetch path
+- [Phase 01.1]: Plan 05: ArbResultDTO exposes only marketBadge (formatted string), not the raw numeric line, per the plan's exact interface contract
+- [Phase 01.1]: Plan 05: fixture (d)'s three-book spread tie was designed so findBestArbPair's alphabetical-bookKey tiebreak can resolve to either candidate book as sideA without breaking the test
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T01:48:41.382Z
-Stopped at: Completed 01.1-04-PLAN.md
+Last session: 2026-09-26T02:01:12.172Z
+Stopped at: Completed 01.1-05-PLAN.md
 Resume file: None
