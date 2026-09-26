@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01.1-05-PLAN.md
-last_updated: "2026-09-26T02:01:12.179Z"
+stopped_at: Completed 01.1-06-PLAN.md
+last_updated: "2026-09-26T02:09:29.167Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 13
-  completed_plans: 10
+  completed_plans: 11
   percent: 17
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 01.1 (arbitrage-tab) — EXECUTING
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [████████░░] 77%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [████████░░] 77%
 | Phase 01.1 P03 | 10min | 2 tasks | 12 files |
 | Phase 01.1 P04 | 20min | 3 tasks | 11 files |
 | Phase 01.1 P05 | 20min | 2 tasks | 7 files |
+| Phase 01.1 P06 | 6min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,8 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Plan 04: estimatedExtendedRefreshCredits re-derives from the latest credit row's sportsFetched with marketCount=3 rather than reusing its refreshCost verbatim, since the shared credit_usage ledger's latest row may reflect either fetch path
 - [Phase 01.1]: Plan 05: ArbResultDTO exposes only marketBadge (formatted string), not the raw numeric line, per the plan's exact interface contract
 - [Phase 01.1]: Plan 05: fixture (d)'s three-book spread tie was designed so findBestArbPair's alphabetical-bookKey tiebreak can resolve to either candidate book as sideA without breaking the test
+- [Phase 01.1]: Plan 06: ArbDetails step markers use literal 'Leg A'/'Leg B' text (a pill badge) instead of the finder's single-letter circle, matching the plan's exact copy contract
+- [Phase 01.1]: Plan 06: MultipleBooksPopover uses Popover (not Tooltip) for the tied-book list since it must be reachable by tap on mobile; the trigger's onClick stops propagation so it doesn't also toggle the row's Collapsible
 
 ### Pending Todos
 
@@ -115,6 +118,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T02:01:12.172Z
-Stopped at: Completed 01.1-05-PLAN.md
+Last session: 2026-09-26T02:09:29.159Z
+Stopped at: Completed 01.1-06-PLAN.md
 Resume file: None
