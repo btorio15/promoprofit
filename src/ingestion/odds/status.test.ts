@@ -5,23 +5,27 @@ import { SPORT_KEYS } from "@/config/sports";
 
 vi.mock("@/db/queries", () => ({
   getOddsFreshness: vi.fn(),
+  getExtendedOddsFreshness: vi.fn(),
 }));
 
 vi.mock("./store", () => ({
   getLatestCreditUsage: vi.fn(),
 }));
 
-import { getOddsFreshness } from "@/db/queries";
+import { getExtendedOddsFreshness, getOddsFreshness } from "@/db/queries";
 import { getLatestCreditUsage } from "./store";
 import { getOddsStatus } from "./status";
 
 const mockGetOddsFreshness = vi.mocked(getOddsFreshness);
+const mockGetExtendedOddsFreshness = vi.mocked(getExtendedOddsFreshness);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
 
 const NOW = new Date("2026-10-01T12:00:00.000Z");
+const EXTENDED_MARKET_COUNT = 3;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetExtendedOddsFreshness.mockResolvedValue(null);
 });
 
 describe("getOddsStatus", () => {
@@ -94,5 +98,56 @@ describe("getOddsStatus", () => {
     expect(status.remaining).toBeNull();
     expect(status.level).toBe("unknown");
     expect(status.total).toBe(500);
+  });
+
+  it("extendedOddsFetchedAt is null when spreads/totals have never been fetched", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    mockGetExtendedOddsFreshness.mockResolvedValue(null);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.extendedOddsFetchedAt).toBeNull();
+  });
+
+  it("extendedOddsFetchedAt is an ISO string when spreads/totals have a freshness timestamp", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+    const extendedAt = new Date(NOW.getTime() - 42 * 60_000);
+    mockGetExtendedOddsFreshness.mockResolvedValue(extendedAt);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.extendedOddsFetchedAt).toBe(extendedAt.toISOString());
+  });
+
+  it("estimatedExtendedRefreshCredits uses the latest row's sportsFetched count with marketCount 3 when sportsFetched > 0", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetExtendedOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 400,
+      requestsUsed: 100,
+      refreshCost: 12,
+      sportsFetched: 4,
+      recordedAt: NOW,
+    });
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.estimatedExtendedRefreshCredits).toBe(
+      estimateRefreshCredits(4, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
+    );
+  });
+
+  it("estimatedExtendedRefreshCredits falls back to the SPORT_KEYS upper bound when no credit row has sportsFetched > 0", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetExtendedOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.estimatedExtendedRefreshCredits).toBe(
+      estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
+    );
   });
 });
