@@ -9,6 +9,7 @@ import type { FindArbsResponse } from "@/domain/arb/types";
 import type { ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
+import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -276,13 +277,7 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
         ) : null}
       </Card>
 
-      <Alert>
-        <AlertDescription>
-          Placing exact, identically-sized stakes across several books is a known pattern
-          sportsbooks use to detect and limit arbing accounts. That risk exists for every row
-          below — it&apos;s not a reason to skip a profitable one, just something to weigh.
-        </AlertDescription>
-      </Alert>
+      <RiskAdvisory />
 
       {!canShowResults ? null : showSkeleton || (response === null && hasCachedOdds) ? (
         <div className="flex flex-col gap-2">

@@ -8,6 +8,7 @@ import { findHedges } from "@/app/actions/find-hedges";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
 import type { FindHedgesResponse } from "@/domain/finder/types";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
+import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -234,6 +235,8 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
           </Button>
         </form>
       </Card>
+
+      {hasSearched ? <RiskAdvisory /> : null}
 
       {showSkeleton ? (
         <div className="flex flex-col gap-2">
