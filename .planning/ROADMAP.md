@@ -126,7 +126,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-04-PLAN.md — My books: user_books queries, saveBooks action, pick-your-books onboarding, Settings page, book-gated main page with scoped bonus-book dropdown
+- [x] 02-04-PLAN.md — My books: user_books queries, saveBooks action, pick-your-books onboarding, Settings page, book-gated main page with scoped bonus-book dropdown
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 3/6 | In Progress|  |
+| 2. Private Access & My Books | 4/6 | In Progress|  |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

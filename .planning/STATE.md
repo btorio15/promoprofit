@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-26T09:36:19.846Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-09-26T09:48:04.284Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
   percent: 33
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [████████░░] 84%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [████████░░] 84%
 | Phase 02 P01 | 25min | 3 tasks | 21 files |
 | Phase 02 P02 | 6min | 3 tasks | 15 files |
 | Phase 02 P03 | 5min | 3 tasks | 16 files |
+| Phase 02 P04 | 5min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 02: AccountMenu's Settings item uses router.push('/settings') rather than composing a Link into DropdownMenuItem's render prop, keeping both menu items' click handlers symmetrical
 - [Phase 02]: Plan 03: requireUser() is called only from the two server actions (refresh-odds.ts, refresh-spreads-totals.ts), never from refresh.ts/refreshExtended.ts, so the CLI path stays free of next/headers/iron-session; CLI runs record triggeredByUserId null
 - [Phase 02]: Plan 03: getSpendAttribution matches on exact credit_usage.recorded_at equality against each cache's own fetched_at, not the single most-recent row, so the Odds tab and the Arbitrage tab's spreads/totals line can each correctly name a different last-refreshing user
+- [Phase 02]: Plan 04: getBonusBooks/getHedgeBookKeys extend in place with an optional allowedKeys parameter rather than adding parallel scoped functions, so omitting the argument preserves the original 'every usable book' behavior and every existing call site is unaffected
+- [Phase 02]: Plan 04: SaveBooksInputSchema has no user-identifying field at all -- the user id enters saveUserBooks/getUserBookKeys only from requireUser()'s session inside save-books.ts, closing the IDOR threat at the schema level
 
 ### Pending Todos
 
@@ -139,6 +142,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T09:36:19.840Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-26T09:48:04.277Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None
