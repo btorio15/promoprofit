@@ -16,7 +16,7 @@ import {
   FREE_TIER_MONTHLY_CREDITS,
   type CreditLevel,
 } from "./quota";
-import { getLatestCreditUsage } from "./store";
+import { getLatestCreditUsage, getSpendAttribution } from "./store";
 
 /** h2h + spreads + totals -- matches refreshExtended.ts's EXTENDED_MARKETS.length (D-13/D-14). */
 const EXTENDED_MARKET_COUNT = 3;
@@ -31,6 +31,8 @@ export interface OddsStatus {
   resetsOn: string;
   extendedOddsFetchedAt: string | null;
   estimatedExtendedRefreshCredits: number;
+  oddsRefreshedBy: string | null;
+  extendedSearchedBy: string | null;
 }
 
 export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus> {
@@ -38,6 +40,16 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     getOddsFreshness(),
     getExtendedOddsFreshness(),
     getLatestCreditUsage(),
+  ]);
+
+  // Each cache's fetched_at IS the recorded_at of the credit_usage row that
+  // produced it (see refresh.ts/refreshExtended.ts's shared `now`), so
+  // looking each up by its own timestamp names the right user even when the
+  // two caches were last written by different runs (D-21). Skipped entirely
+  // when a cache has never been fetched -- never a placeholder lookup.
+  const [oddsRefreshedBy, extendedSearchedBy] = await Promise.all([
+    oddsFetchedAt ? getSpendAttribution(oddsFetchedAt) : Promise.resolve(null),
+    extendedOddsFetchedAt ? getSpendAttribution(extendedOddsFetchedAt) : Promise.resolve(null),
   ]);
 
   // A row from before the last monthly reset is last month's balance --
@@ -73,5 +85,7 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     resetsOn: nextMonthlyReset(now).toISOString(),
     extendedOddsFetchedAt: extendedOddsFetchedAt ? extendedOddsFetchedAt.toISOString() : null,
     estimatedExtendedRefreshCredits,
+    oddsRefreshedBy,
+    extendedSearchedBy,
   };
 }

@@ -43,3 +43,18 @@ export function describeExtendedOddsAge(fetchedAt: Date | null, now: Date): Odds
   const stale = minutes > STALE_AFTER_MINUTES;
   return { minutes, stale, label: `Spreads & totals updated ${minutes} min ago` };
 }
+
+/**
+ * Appends " · {verb} {displayName}" to an age label (D-21). Returns the
+ * label unchanged -- never a dash or "unknown" placeholder appended after
+ * the verb -- when there's no known attribution (legacy/CLI rows, or the
+ * cache has never been fetched).
+ */
+export function withAttribution(
+  label: string,
+  verb: "Refreshed by" | "Searched by",
+  displayName: string | null,
+): string {
+  if (displayName === null) return label;
+  return `${label} · ${verb} ${displayName}`;
+}

@@ -6,7 +6,7 @@ import { RefreshCw, TriangleAlert } from "lucide-react";
 import { refreshOdds } from "@/app/actions/refresh-odds";
 import type { RefreshOutcome } from "@/ingestion/odds/refresh";
 import type { OddsStatus } from "@/ingestion/odds/status";
-import { describeExtendedOddsAge, describeOddsAge } from "./oddsAge";
+import { describeExtendedOddsAge, describeOddsAge, withAttribution } from "./oddsAge";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -133,10 +133,13 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             ) : age.stale ? (
               <span className="inline-flex items-center gap-1.5 text-warning">
                 <TriangleAlert className="size-4" aria-hidden="true" />
-                {age.label} — <span className="font-semibold">Refresh before betting</span>
+                {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)} —{" "}
+                <span className="font-semibold">Refresh before betting</span>
               </span>
             ) : (
-              <span className="text-muted-foreground">{age.label}</span>
+              <span className="text-muted-foreground">
+                {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)}
+              </span>
             )}
           </p>
 
@@ -160,11 +163,13 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             {extendedAge.stale ? (
               <span className="inline-flex items-center gap-1.5 text-warning">
                 <TriangleAlert className="size-4" aria-hidden="true" />
-                {extendedAge.label} —{" "}
+                {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)} —{" "}
                 <span className="font-semibold">may be phantom arbs, refresh before betting</span>
               </span>
             ) : (
-              <span className="text-muted-foreground">{extendedAge.label}</span>
+              <span className="text-muted-foreground">
+                {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)}
+              </span>
             )}
           </p>
         ) : null}

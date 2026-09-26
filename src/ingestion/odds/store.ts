@@ -11,7 +11,7 @@
 import { and, desc, eq, lt, lte } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "@/db/client";
-import { cachedExtendedOdds, cachedOdds, creditUsage, refreshLock } from "@/db/schema";
+import { cachedExtendedOdds, cachedOdds, creditUsage, refreshLock, users } from "@/db/schema";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 export interface CreditUsageRow {
@@ -163,6 +163,26 @@ export async function getLatestCreditUsage(): Promise<CreditUsageRow | null> {
     sportsFetched: row.sportsFetched,
     recordedAt: row.recordedAt instanceof Date ? row.recordedAt : new Date(row.recordedAt),
   };
+}
+
+/**
+ * The display name of whoever triggered the credit_usage row recorded at
+ * exactly `recordedAt` (D-21) -- the same `now` a refresh commits its cache
+ * rows' fetched_at with (see refresh.ts/refreshExtended.ts), so this names
+ * the user who produced the odds/spreads-totals currently on screen. Never
+ * selects email or password_hash (T-02-19). Returns null when there's no
+ * matching row or it has no attributed user (CLI runs, legacy rows).
+ */
+export async function getSpendAttribution(recordedAt: Date): Promise<string | null> {
+  const db = getDb();
+  const rows = await db
+    .select({ displayName: users.displayName })
+    .from(creditUsage)
+    .innerJoin(users, eq(creditUsage.triggeredByUserId, users.id))
+    .where(eq(creditUsage.recordedAt, recordedAt))
+    .orderBy(desc(creditUsage.id))
+    .limit(1);
+  return rows[0]?.displayName ?? null;
 }
 
 const REFRESH_LOCK_ID = 1;
