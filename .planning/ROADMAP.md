@@ -121,7 +121,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — Log in / log out: DB-backed lockout, /login page, proxy.ts gate, requireUser on main page, header account menu
+- [x] 02-02-PLAN.md — Log in / log out: DB-backed lockout, /login page, proxy.ts gate, requireUser on main page, header account menu
 - [ ] 02-03-PLAN.md — Credit spends login-only (closes WR-05) and attributed ("Refreshed by"), finder account-risk advisory (CALC-06)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -195,7 +195,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 1/6 | In Progress|  |
+| 2. Private Access & My Books | 2/6 | In Progress|  |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

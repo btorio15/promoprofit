@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-09-26T09:14:30.056Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-26T09:24:19.614Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 19
-  completed_plans: 14
+  completed_plans: 15
   percent: 33
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [███████░░░] 74%
+Progress: [████████░░] 79%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [███████░░░] 74%
 | Phase 01.1 P07 | 7min | 2 tasks | 8 files |
 | Phase 01.1 P08 | 15min | 2 tasks | 0 files |
 | Phase 02 P01 | 25min | 3 tasks | 21 files |
+| Phase 02 P02 | 6min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Plan 08: No arbs in the live feed at verification time is correct behavior -- a post-verification diagnostic over the live cache (357 two-way markets, 306 with a cross-book pair) found zero implied-sum-under-1.0 opportunities; the closest market was an exact break-even (1.0000), correctly excluded by the strict D-04 threshold
 - [Phase 02]: Plan 01: redeemInviteAndCreateUser is the ONLY insert site into users, enforced by a single multi-CTE SQL statement (claim invite FOR UPDATE -> insert user FROM that CTE -> mark invite used) since neon-http has no interactive transactions
 - [Phase 02]: Plan 01: SESSION_COOKIE_NAME lives in a dependency-free src/lib/sessionCookie.ts, re-exported from session.ts, so a future proxy.ts can read the cookie name without importing next/headers/iron-session
+- [Phase 02]: Plan 02: nextFailedLoginState resets the counter to 0 when it sets lockedUntil, so the lock itself (not a growing counter) blocks further attempts once 5 consecutive failures occur
+- [Phase 02]: Plan 02: AccountMenu's Settings item uses router.push('/settings') rather than composing a Link into DropdownMenuItem's render prop, keeping both menu items' click handlers symmetrical
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T09:14:30.047Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-09-26T09:24:19.607Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
