@@ -9,7 +9,7 @@ vi.mock("./client", () => ({
 }));
 
 import { getDb } from "./client";
-import { getBonusBooks, getHedgeBookKeys, getUserBookKeys, saveUserBooks } from "./queries";
+import { getBonusBooks, getHedgeBookKeys, getUsableUserBooks, getUserBookKeys, saveUserBooks } from "./queries";
 
 describe("book lists share one runtime source with runOddsRefresh (WR-05)", () => {
   it("getBonusBooks returns exactly usableOddsBooks(), in config sort order", async () => {
@@ -40,6 +40,51 @@ describe("getBonusBooks/getHedgeBookKeys scoped to a user's allowed keys (D-13)"
       usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName })),
     );
     expect(await getHedgeBookKeys()).toEqual(usableOddsBooks().map((b) => b.key));
+  });
+});
+
+describe("getUsableUserBooks (CR-02, WR-01)", () => {
+  it("returns [] when the user's only saved book is stale (no longer usable)", async () => {
+    const mockWhere = vi.fn(() => Promise.resolve([{ bookKey: "williamhill_us" }]));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    expect(await getUsableUserBooks(7)).toEqual([]);
+  });
+
+  it("returns usable saved books in config order, dropping stale keys", async () => {
+    const mockWhere = vi.fn(() =>
+      Promise.resolve([{ bookKey: "fanduel" }, { bookKey: "williamhill_us" }, { bookKey: "draftkings" }]),
+    );
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    expect(await getUsableUserBooks(7)).toEqual([
+      { key: "draftkings", displayName: "DraftKings" },
+      { key: "fanduel", displayName: "FanDuel" },
+    ]);
+  });
+
+  it("returns [] when the user has no saved books", async () => {
+    const mockWhere = vi.fn(() => Promise.resolve([]));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    expect(await getUsableUserBooks(7)).toEqual([]);
+  });
+
+  it("passes the given userId through to the user_books query", async () => {
+    const mockWhere = vi.fn(() => Promise.resolve([]));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    await getUsableUserBooks(42);
+
+    expect(mockWhere).toHaveBeenCalledTimes(1);
   });
 });
 
