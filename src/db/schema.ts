@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, integer, serial, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, integer, serial, timestamp, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
 
 /**
  * Colorado sportsbook configuration (ODDS-05, D-14, D-16). Seeded from
@@ -64,9 +64,68 @@ export const cachedExtendedOdds = pgTable(
 );
 
 /**
+ * Invited-friends accounts (DASH-04, D-01, D-05). The ONLY code path that
+ * inserts a row here is src/lib/auth/accounts.ts's
+ * redeemInviteAndCreateUser (D-01) -- there is no signup route. email is
+ * always stored lowercased+trimmed (D-05) so "Mike@X.com" and "mike@x.com"
+ * are the same account. failed_login_attempts/locked_until are the
+ * DB-backed login-throttle columns (no in-memory rate limiter, since
+ * serverless functions don't share process state).
+ */
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Single-use invite links (D-02, D-03, D-04). token_hash is the SHA-256 hex
+ * digest of the plaintext token -- the plaintext itself is never stored,
+ * only ever printed once to the owner's terminal by scripts/invite-create.ts
+ * (T-02-01). expires_at enforces the 7-day TTL; used_at/used_by_user_id are
+ * set atomically by redeemInviteAndCreateUser's single CTE statement so a
+ * concurrent double-redemption can create at most one user (T-02-02).
+ */
+export const invites = pgTable("invites", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  usedByUserId: integer("used_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Per-user selected Colorado sportsbooks (D-12). Normalized join table --
+ * NOT a jsonb/array column on users -- so a future books.ts config change
+ * (e.g. a book losing API coverage) can never leave a silently-orphaned key
+ * in a user's selection (RESEARCH.md Pitfall 4). Composite PK enforces at
+ * most one row per (user, book) pair.
+ */
+export const userBooks = pgTable(
+  "user_books",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.bookKey] })],
+);
+
+/**
  * Credit-quota history (ODDS-02, D-10/D-11). Plan 04's refreshOdds action
  * writes one row per refresh from the Odds API's x-requests-* headers;
  * Plan 05's credit meter reads the most recent row.
+ * triggered_by_user_id (D-21) attributes a refresh to the user who clicked
+ * it -- nullable and ON DELETE SET NULL since legacy rows recorded before
+ * this phase (and any future user deletion) must never break this read.
  */
 export const creditUsage = pgTable("credit_usage", {
   id: serial("id").primaryKey(),
@@ -75,6 +134,7 @@ export const creditUsage = pgTable("credit_usage", {
   refreshCost: integer("refresh_cost").notNull(),
   sportsFetched: integer("sports_fetched").notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+  triggeredByUserId: integer("triggered_by_user_id").references(() => users.id, { onDelete: "set null" }),
 });
 
 /**

@@ -5,7 +5,7 @@
  * Usage: npm run db:check
  */
 import { getDb } from "../src/db/client";
-import { books as booksTable } from "../src/db/schema";
+import { books as booksTable, users, invites, userBooks } from "../src/db/schema";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents } from "../src/db/queries";
 
 async function main() {
@@ -36,6 +36,16 @@ async function main() {
     console.error("No books found — run `npm run db:seed` first.");
     process.exit(1);
   }
+
+  // Phase 2: proves the 0003 migration's tables exist on the live DB.
+  const userRows = await getDb().select({ id: users.id }).from(users);
+  console.log(`Users: ${userRows.length}`);
+
+  const inviteRows = await getDb().select({ id: invites.id }).from(invites);
+  console.log(`Invites: ${inviteRows.length}`);
+
+  const userBookRows = await getDb().select({ userId: userBooks.userId }).from(userBooks);
+  console.log(`User books: ${userBookRows.length}`);
 }
 
 main().catch((err) => {
