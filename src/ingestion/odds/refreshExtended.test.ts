@@ -135,7 +135,7 @@ describe("runSpreadsTotalsRefresh", () => {
   });
 
   it("blocks low_credits when remaining is 19, even when confirmed, and never fetches", async () => {
-    const now = new Date("2026-10-01T12:00:00.000Z");
+    const now = new Date("2026-10-15T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 19,
       requestsUsed: 481,
@@ -158,7 +158,7 @@ describe("runSpreadsTotalsRefresh", () => {
   });
 
   it("blocks low_credits before insufficient_credits when remaining is 10 with an estimate of 12", async () => {
-    const now = new Date("2026-10-01T12:00:00.000Z");
+    const now = new Date("2026-10-15T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 10,
       requestsUsed: 490,
@@ -187,7 +187,7 @@ describe("runSpreadsTotalsRefresh", () => {
   });
 
   it("blocks insufficient_credits when remaining is 25 with 9 in-season sports (estimate 27), even when confirmed", async () => {
-    const now = new Date("2026-10-01T12:00:00.000Z");
+    const now = new Date("2026-10-15T12:00:00.000Z");
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 25,
       requestsUsed: 475,
