@@ -1,7 +1,7 @@
 import { sql, eq, and, isNull, gt } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { invites, users } from "@/db/schema";
-import { nextFailedLoginState } from "@/lib/auth/lockout";
+import { LOCKOUT_MINUTES, MAX_FAILED_LOGIN_ATTEMPTS } from "@/lib/auth/lockout";
 
 /** A user row that includes secrets -- never returned by redeem/invite functions below. */
 export interface UserRecord {
@@ -151,24 +151,30 @@ export async function findUserByEmail(email: string): Promise<UserRecord | null>
 }
 
 /**
- * Records one more failed login attempt (T-02-09). Reads the user's current
- * failedLoginAttempts, applies nextFailedLoginState, and persists both
- * columns -- the counter and any resulting lock live in Postgres, never in
- * process memory, so they survive serverless cold starts.
+ * Atomically reserves one login attempt for a user BEFORE argon2 runs
+ * (CR-01, T-02-09/T-02-G1). neon-http has no interactive transactions, so
+ * this is a single conditional UPDATE ... RETURNING statement: Postgres
+ * takes a row lock for the UPDATE and, under READ COMMITTED, re-evaluates
+ * the WHERE clause against the latest committed row version after a
+ * concurrent updater commits -- so once one request writes locked_until,
+ * every queued request's WHERE fails and it returns zero rows. This
+ * serializes concurrent reservations so at most MAX_FAILED_LOGIN_ATTEMPTS
+ * attempts per lock window ever reach verifyPassword. Returns true when the
+ * attempt was reserved (caller may verify the password); false when the
+ * account is currently locked (caller must refuse without verifying). A
+ * successful login must still call clearFailedLogins.
  */
-export async function recordFailedLogin(userId: number, now: Date): Promise<void> {
+export async function reserveLoginAttempt(userId: number, now: Date): Promise<boolean> {
   const db = getDb();
-  const rows = await db
-    .select({ failedLoginAttempts: users.failedLoginAttempts })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  const current = rows[0]?.failedLoginAttempts ?? 0;
-  const next = nextFailedLoginState(current, now);
-  await db
-    .update(users)
-    .set({ failedLoginAttempts: next.failedLoginAttempts, lockedUntil: next.lockedUntil })
-    .where(eq(users.id, userId));
+  const lockUntil = new Date(now.getTime() + LOCKOUT_MINUTES * 60_000);
+  const result = await db.execute<{ id: number }>(sql`
+    UPDATE users SET
+      failed_login_attempts = CASE WHEN failed_login_attempts + 1 >= ${MAX_FAILED_LOGIN_ATTEMPTS} THEN 0 ELSE failed_login_attempts + 1 END,
+      locked_until = CASE WHEN failed_login_attempts + 1 >= ${MAX_FAILED_LOGIN_ATTEMPTS} THEN ${lockUntil} ELSE locked_until END
+    WHERE id = ${userId} AND (locked_until IS NULL OR locked_until <= ${now})
+    RETURNING id
+  `);
+  return result.rows.length > 0;
 }
 
 /** Clears the lockout state after a successful login. */
