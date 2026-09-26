@@ -5,13 +5,14 @@ import Decimal from "decimal.js";
 import { ArbInputSchema } from "@/domain/arb/arbInput";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import type { ArbLegDTO, ArbResultDTO, ArbResultsBySport, FindArbsResponse } from "@/domain/arb/types";
-import { getBonusBooks, getHedgeBookKeys, getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
+import { getBonusBooks, getHedgeBookKeys, getUserBookKeys, getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { extractTwoWayMoneylines } from "@/domain/hedge/marketFilter";
 import { extractTwoWaySpreadsAndTotals } from "@/domain/hedge/spreadsTotalsFilter";
 import { rankArbs, moneylineToArbMarket, type ArbLeg, type ArbMarket, type ArbOpportunity } from "@/domain/hedge/rankArbs";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import { SPORT_KEYS, getSportLabel } from "@/config/sports";
 import type { OddsEvent } from "@/domain/odds/schemas";
+import { requireUser } from "@/lib/session";
 
 const WINDOW_DAYS = 7;
 
@@ -91,6 +92,8 @@ function buildMarkets(
 }
 
 export async function findArbs(input: unknown): Promise<FindArbsResponse> {
+  const user = await requireUser();
+
   const parsed = ArbInputSchema.safeParse(input);
   if (!parsed.success) {
     const { fieldErrors } = z.flattenError(parsed.error);
@@ -99,10 +102,12 @@ export async function findArbs(input: unknown): Promise<FindArbsResponse> {
 
   const { totalStake, precision } = parsed.data;
 
+  const userBookSet = new Set(await getUserBookKeys(user.userId));
+
   const [bonusBooks, hedgeBookKeys, { events: moneylineEvents, fetchedAt: oddsFetchedAt }, { events: extendedEvents, fetchedAt: extendedOddsFetchedAt }] =
     await Promise.all([
-      getBonusBooks(),
-      getHedgeBookKeys(),
+      getBonusBooks(userBookSet),
+      getHedgeBookKeys(userBookSet),
       getCachedEvents(),
       getCachedExtendedEvents(),
     ]);
@@ -130,6 +135,29 @@ export async function findArbs(input: unknown): Promise<FindArbsResponse> {
     computeScope(new Set([sportKey]), sportKey);
   }
 
+  /**
+   * D-16, D-18: true only when the "all" scope came back empty, the user
+   * hasn't selected every usable book, AND the same cached events (zero
+   * extra reads, D-19) DO produce at least one arb at the full usable-book
+   * set -- i.e. the user's own book selection, not a lack of arbs this
+   * week, is why nothing surfaced.
+   */
+  let booksExcludedAll = false;
+  if (resultsBySport.all.length === 0) {
+    const everyUsableBookKey = await getHedgeBookKeys();
+    const userHasEveryUsableBook = everyUsableBookKey.every((key) => userBookSet.has(key));
+    if (!userHasEveryUsableBook) {
+      const marketsAtEveryUsableBook = buildMarkets(
+        moneylineEvents,
+        extendedEvents,
+        new Set(SPORT_KEYS),
+        now,
+        new Set(everyUsableBookKey),
+      );
+      booksExcludedAll = rankArbs(marketsAtEveryUsableBook, rankOpts).length > 0;
+    }
+  }
+
   return {
     status: "ok",
     resultsBySport,
@@ -137,5 +165,6 @@ export async function findArbs(input: unknown): Promise<FindArbsResponse> {
     extendedOddsFetchedAt: extendedOddsFetchedAt !== null ? extendedOddsFetchedAt.toISOString() : null,
     totalStake: stake.toFixed(2),
     precision,
+    booksExcludedAll,
   };
 }

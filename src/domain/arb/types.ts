@@ -57,6 +57,14 @@ export type FindArbsResponse =
       extendedOddsFetchedAt: string | null;
       totalStake: string;
       precision: "whole" | "cents";
+      /**
+       * True only when the "all" scope is empty, the user hasn't selected
+       * every usable book, and the same cached events DO produce at least
+       * one arb for the full usable-book set -- i.e. the user's own book
+       * selection (not a lack of arbs this week) is why nothing surfaced
+       * (D-16, D-18).
+       */
+      booksExcludedAll: boolean;
     }
   | { status: "no_cached_odds" }
   | { status: "invalid"; fieldErrors: Partial<Record<"totalStake" | "precision", string[]>> };

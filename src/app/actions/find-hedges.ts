@@ -9,10 +9,11 @@ import type {
   FinderLegDTO,
   FinderResultsBySport,
 } from "@/domain/finder/types";
-import { getBonusBooks, getHedgeBookKeys, getCachedEvents } from "@/db/queries";
+import { getBonusBooks, getHedgeBookKeys, getUserBookKeys, getCachedEvents } from "@/db/queries";
 import { extractTwoWayMoneylines, type TwoWayMoneylineMarket } from "@/domain/hedge/marketFilter";
 import { rankBonusBetHedges, type BonusBetOpportunity, type HedgeLeg, type RankOptions } from "@/domain/hedge/rankBonusBetHedges";
 import { SPORT_KEYS, getSportLabel } from "@/config/sports";
+import { requireUser } from "@/lib/session";
 
 const WINDOW_DAYS = 7;
 const RESULT_LIMIT = 10;
@@ -84,6 +85,8 @@ function rankForSportKeys(
  * odds-fetch layer directly.
  */
 export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
+  const user = await requireUser();
+
   const parsed = FinderInputSchema.safeParse(input);
   if (!parsed.success) {
     const { fieldErrors } = z.flattenError(parsed.error);
@@ -92,7 +95,8 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
 
   const { bookKey, bonusAmount, maxHedgeAmount } = parsed.data;
 
-  const bonusBooks = await getBonusBooks();
+  const userBookSet = new Set(await getUserBookKeys(user.userId));
+  const bonusBooks = await getBonusBooks(userBookSet);
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
   const bonusBook = bonusBooks.find((b) => b.key === bookKey);
   if (!bonusBook) {
@@ -107,7 +111,7 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     return { status: "no_cached_odds" };
   }
 
-  const hedgeBookKeys = new Set(await getHedgeBookKeys());
+  const hedgeBookKeys = new Set(await getHedgeBookKeys(userBookSet));
   const normalizedBonusAmount = new Decimal(bonusAmount).toFixed(2);
   const now = new Date();
 
@@ -151,6 +155,28 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     computeScope(new Set([sportKey]), sportKey);
   }
 
+  /**
+   * D-18: true only when the "all" scope came back empty, the user hasn't
+   * selected every usable book, AND the same cached events (zero extra
+   * reads, D-19) DO qualify at least one market for the full usable-book
+   * set -- i.e. the user's own book selection, not a lack of games this
+   * week, is why nothing surfaced.
+   */
+  let booksExcludedAll = false;
+  if (resultsBySport.all.length === 0) {
+    const everyUsableBookKey = await getHedgeBookKeys();
+    const userHasEveryUsableBook = everyUsableBookKey.every((key) => userBookSet.has(key));
+    if (!userHasEveryUsableBook) {
+      const marketsAtEveryUsableBook = extractTwoWayMoneylines(events, {
+        now,
+        windowDays: WINDOW_DAYS,
+        allowedBookKeys: new Set(everyUsableBookKey),
+        sportKeys: new Set(SPORT_KEYS),
+      });
+      booksExcludedAll = marketsAtEveryUsableBook.length > 0;
+    }
+  }
+
   return {
     status: "ok",
     resultsBySport,
@@ -159,5 +185,6 @@ export async function findHedges(input: unknown): Promise<FindHedgesResponse> {
     bonusAmount: normalizedBonusAmount,
     maxHedgeAmount: normalizedMaxHedgeAmount,
     limitExcludedAll,
+    booksExcludedAll,
   };
 }

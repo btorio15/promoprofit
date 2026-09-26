@@ -56,6 +56,14 @@ export type FindHedgesResponse =
        * scope shows no results (D-18).
        */
       limitExcludedAll: Record<string, boolean>;
+      /**
+       * True only when the "all" scope is empty, the user hasn't selected
+       * every usable book, and the same cached events DO qualify at least
+       * one market for the full usable-book set -- i.e. the user's own book
+       * selection (not a lack of games this week) is why nothing surfaced
+       * (D-18).
+       */
+      booksExcludedAll: boolean;
     }
   | { status: "no_cached_odds" }
   | {
