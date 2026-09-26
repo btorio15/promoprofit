@@ -118,20 +118,23 @@ describe("findHedges (MVP happy path)", () => {
   });
 
   it("caps hedge stakes with maxHedgeAmount and reports limitExcludedAll per scope (D-18)", async () => {
-    // $1 is below every fixture hedge stake in EITHER orientation (the
-    // longshot-bonus orientations need 220.00 / 306.92 / 217.50, the
-    // favorite-bonus ones 8.55 / 6.25 / 4.17), so every sport that had a
-    // result now has none -- but only the sports that actually had a result
-    // before the cap should report excluded.
+    // $50 is below every fixture game's BEST-orientation hedge stake (the
+    // longshot-bonus orientations need 220.00 / 306.92 / 217.50). Under the
+    // owner's rule (UAT 01.1 Test 5), a game whose best orientation is over
+    // the cap is dropped entirely -- it does NOT fall back to its
+    // favorite-side orientation (8.55 / 6.25 / 4.17) even though that would
+    // fit under $50. So every sport that had a result now has none -- but
+    // only the sports that actually had a result before the cap should
+    // report excluded.
     const capped: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
       bonusAmount: "100",
-      maxHedgeAmount: "1",
+      maxHedgeAmount: "50",
     });
 
     expect(capped.status).toBe("ok");
     if (capped.status !== "ok") return;
-    expect(capped.maxHedgeAmount).toBe("1.00");
+    expect(capped.maxHedgeAmount).toBe("50.00");
     for (const results of Object.values(capped.resultsBySport)) {
       expect(results).toHaveLength(0);
     }
@@ -154,14 +157,23 @@ describe("findHedges (MVP happy path)", () => {
     expect(Object.values(uncapped.limitExcludedAll).every((v) => v === false)).toBe(true);
   });
 
-  it("keeps games whose favorite-side orientation fits under the cap (CR-02)", async () => {
-    // $50 rules out every longshot-bonus orientation (hedges of 217.50+),
-    // but bonus-on-the-favorite still needs only a small hedge and nets a
-    // positive profit, so all three games must still come back.
+  it("drops only games whose best orientation exceeds the cap (UAT 01.1 Test 5)", async () => {
+    // $250 sits between the fixture's best-orientation hedge stakes: nba
+    // (220.00) and mlb (217.50) fit under it, but nfl (306.92) does not.
+    // The owner's rule (UAT 01.1 Test 5) drops the nfl game entirely rather
+    // than falling back to its favorite-side orientation.
+    const uncapped: FindHedgesResponse = await findHedges({
+      bookKey: "draftkings",
+      bonusAmount: "100",
+    });
+    expect(uncapped.status).toBe("ok");
+    if (uncapped.status !== "ok") return;
+    const uncappedByEventId = new Map(uncapped.resultsBySport.all.map((r) => [r.eventId, r]));
+
     const capped: FindHedgesResponse = await findHedges({
       bookKey: "draftkings",
       bonusAmount: "100",
-      maxHedgeAmount: "50",
+      maxHedgeAmount: "250",
     });
 
     expect(capped.status).toBe("ok");
@@ -169,12 +181,20 @@ describe("findHedges (MVP happy path)", () => {
     expect(capped.resultsBySport.all.map((r) => r.eventId).sort()).toEqual([
       "mlb-dodgers-rockies",
       "nba-nuggets-jazz",
-      "nfl-packers-panthers",
     ]);
+    expect(capped.resultsBySport.all.some((r) => r.eventId === "nfl-packers-panthers")).toBe(
+      false,
+    );
+
+    // Surviving games keep their best (uncapped) orientation's numbers.
+    for (const row of capped.resultsBySport.all) {
+      const uncappedRow = uncappedByEventId.get(row.eventId)!;
+      expect(row.hedgeStake).toBe(uncappedRow.hedgeStake);
+      expect(row.guaranteedProfit).toBe(uncappedRow.guaranteedProfit);
+    }
+
     expect(capped.limitExcludedAll.all).toBe(false);
-    const nba = capped.resultsBySport.all.find((r) => r.eventId === "nba-nuggets-jazz")!;
-    expect(nba.hedgeStake).toBe("6.25");
-    expect(nba.guaranteedProfit).toBe("18.75");
+    expect(capped.limitExcludedAll.americanfootball_nfl).toBe(true);
   });
 });
 
