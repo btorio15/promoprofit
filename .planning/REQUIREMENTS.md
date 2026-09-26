@@ -14,7 +14,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **CALC-03**: Profit-boost calculations respect the promo's max-stake and max-winnings caps, choosing the optimal stake when a cap binds
 - [x] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
 - [x] **CALC-05**: Hedges only use markets with no push/void outcome (e.g. 2-way moneylines, half-point lines)
-- [ ] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
+- [x] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
 - [ ] **CALC-07**: System computes tandem hedges where both legs are promos on opposite outcomes of the same market (boost + boost, boost + bonus bet), each leg's promo mechanics and caps applied
 
 ### Odds Data
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CALC-03 | Phase 3 | Pending |
 | CALC-04 | Phase 1 | Complete |
 | CALC-05 | Phase 1 | Complete |
-| CALC-06 | Phase 2 | Pending |
+| CALC-06 | Phase 2 | Complete |
 | CALC-07 | Phase 4 | Pending |
 | ODDS-01 | Phase 1 | Complete |
 | ODDS-02 | Phase 1 | Complete |

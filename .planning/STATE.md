@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-09-26T09:24:19.614Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-09-26T09:36:19.846Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 19
-  completed_plans: 15
+  completed_plans: 16
   percent: 33
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [████████░░] 79%
+Progress: [████████░░] 84%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [████████░░] 79%
 | Phase 01.1 P08 | 15min | 2 tasks | 0 files |
 | Phase 02 P01 | 25min | 3 tasks | 21 files |
 | Phase 02 P02 | 6min | 3 tasks | 15 files |
+| Phase 02 P03 | 5min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 01: SESSION_COOKIE_NAME lives in a dependency-free src/lib/sessionCookie.ts, re-exported from session.ts, so a future proxy.ts can read the cookie name without importing next/headers/iron-session
 - [Phase 02]: Plan 02: nextFailedLoginState resets the counter to 0 when it sets lockedUntil, so the lock itself (not a growing counter) blocks further attempts once 5 consecutive failures occur
 - [Phase 02]: Plan 02: AccountMenu's Settings item uses router.push('/settings') rather than composing a Link into DropdownMenuItem's render prop, keeping both menu items' click handlers symmetrical
+- [Phase 02]: Plan 03: requireUser() is called only from the two server actions (refresh-odds.ts, refresh-spreads-totals.ts), never from refresh.ts/refreshExtended.ts, so the CLI path stays free of next/headers/iron-session; CLI runs record triggeredByUserId null
+- [Phase 02]: Plan 03: getSpendAttribution matches on exact credit_usage.recorded_at equality against each cache's own fetched_at, not the single most-recent row, so the Odds tab and the Arbitrage tab's spreads/totals line can each correctly name a different last-refreshing user
 
 ### Pending Todos
 
@@ -136,6 +139,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T09:24:19.607Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-09-26T09:36:19.840Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
