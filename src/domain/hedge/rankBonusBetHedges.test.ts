@@ -195,4 +195,80 @@ describe("rankBonusBetHedges", () => {
       Array.from({ length: 10 }, (_, i) => `game-${String(i).padStart(2, "0")}`),
     );
   });
+
+  describe("max hedge", () => {
+    // 50*(i+2) for i=0..N-1: bonus odds vary while hedge odds stay fixed at
+    // -100 (decimal 2.0), so hedgeStake and guaranteedProfit come out
+    // numerically identical and strictly increasing with i -- no
+    // sub-cent rounding candidates. That means "top by profit" and "top by
+    // hedge stake" are the same ordering, which is exactly what lets a
+    // single cap carve off the highest-profit games (D-18).
+    function stakeFixtureMarkets(count: number): TwoWayMoneylineMarket[] {
+      return Array.from({ length: count }, (_, i) => ({
+        eventId: `stake-${String(i).padStart(2, "0")}`,
+        sportKey: "basketball_nba",
+        commenceTime: new Date(now.getTime() + (i + 1) * 3_600_000),
+        homeTeam: `Home${i}`,
+        awayTeam: `Away${i}`,
+        tieRisk: false,
+        quotes: [
+          { bookKey: "bookA", outcome: "away", team: `Away${i}`, oddsAmerican: 100 * (i + 2) },
+          { bookKey: "bookB", outcome: "home", team: `Home${i}`, oddsAmerican: -100 },
+        ],
+      }));
+    }
+
+    it("filters over-cap hedges before the top-10 slice, so 10 results still come back (D-18)", () => {
+      // 13 markets -> hedgeStake 100..700 in steps of 50. A $550 cap excludes
+      // only the top 3 (stake-10/11/12 @ 600/650/700), leaving exactly the
+      // other 10 -- proving the filter ran before the slice, not after (a
+      // post-slice filter would return only 7).
+      const markets = stakeFixtureMarkets(13);
+      const results = rankBonusBetHedges(markets, {
+        bonusBookKey: "bookA",
+        bonusAmount: new Decimal(100),
+        hedgeBookKeys: new Set(["bookA", "bookB"]),
+        maxHedgeStake: new Decimal(550),
+        limit: 10,
+      });
+
+      expect(results).toHaveLength(10);
+      for (const r of results) {
+        expect(r.result.hedgeStake.lte(550)).toBe(true);
+      }
+      expect(results.some((r) => r.eventId === "stake-10")).toBe(false);
+      expect(results.some((r) => r.eventId === "stake-11")).toBe(false);
+      expect(results.some((r) => r.eventId === "stake-12")).toBe(false);
+    });
+
+    it("keeps a hedge stake exactly equal to the cap (lte, not lt)", () => {
+      const [market] = stakeFixtureMarkets(1); // hedgeStake = 100.00
+      const results = rankBonusBetHedges([market], {
+        bonusBookKey: "bookA",
+        bonusAmount: new Decimal(100),
+        hedgeBookKeys: new Set(["bookA", "bookB"]),
+        maxHedgeStake: new Decimal(100),
+      });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].result.hedgeStake.toFixed(2)).toBe("100.00");
+    });
+
+    it("leaves the existing ranking output identical when maxHedgeStake is undefined", () => {
+      const markets = fixtureMarkets();
+      const withoutCapKey = rankBonusBetHedges(markets, {
+        bonusBookKey: "draftkings",
+        bonusAmount: new Decimal(100),
+        hedgeBookKeys,
+      });
+      const withUndefinedCap = rankBonusBetHedges(markets, {
+        bonusBookKey: "draftkings",
+        bonusAmount: new Decimal(100),
+        hedgeBookKeys,
+        maxHedgeStake: undefined,
+      });
+
+      expect(withUndefinedCap.map((r) => r.eventId)).toEqual(withoutCapKey.map((r) => r.eventId));
+    });
+  });
 });

@@ -102,6 +102,55 @@ describe("findHedges (MVP happy path)", () => {
     if (response.status !== "invalid") return;
     expect(response.fieldErrors.bookKey).toBeTruthy();
   });
+
+  it("rejects invalid maxHedgeAmount values", async () => {
+    for (const bad of ["0", "-5", "abc", "1.234"]) {
+      const response: FindHedgesResponse = await findHedges({
+        bookKey: "draftkings",
+        bonusAmount: "100",
+        maxHedgeAmount: bad,
+      });
+
+      expect(response.status).toBe("invalid");
+      if (response.status !== "invalid") continue;
+      expect(response.fieldErrors.maxHedgeAmount).toBeTruthy();
+    }
+  });
+
+  it("caps hedge stakes with maxHedgeAmount and reports limitExcludedAll per scope (D-18)", async () => {
+    // $50 is below every fixture hedge stake (220.00 / 306.92 / 217.50), so
+    // every sport that had a result now has none -- but only the sports
+    // that actually had a result before the cap should report excluded.
+    const capped: FindHedgesResponse = await findHedges({
+      bookKey: "draftkings",
+      bonusAmount: "100",
+      maxHedgeAmount: "50",
+    });
+
+    expect(capped.status).toBe("ok");
+    if (capped.status !== "ok") return;
+    expect(capped.maxHedgeAmount).toBe("50.00");
+    for (const results of Object.values(capped.resultsBySport)) {
+      expect(results).toHaveLength(0);
+    }
+    expect(capped.limitExcludedAll.all).toBe(true);
+    expect(capped.limitExcludedAll.basketball_nba).toBe(true);
+    expect(capped.limitExcludedAll.baseball_mlb).toBe(true);
+    expect(capped.limitExcludedAll.americanfootball_nfl).toBe(true);
+    // These sports had zero results even without a cap, so the cap excludes nothing.
+    expect(capped.limitExcludedAll.americanfootball_ncaaf).toBe(false);
+    expect(capped.limitExcludedAll.basketball_ncaab).toBe(false);
+
+    const uncapped: FindHedgesResponse = await findHedges({
+      bookKey: "draftkings",
+      bonusAmount: "100",
+    });
+
+    expect(uncapped.status).toBe("ok");
+    if (uncapped.status !== "ok") return;
+    expect(uncapped.maxHedgeAmount).toBeNull();
+    expect(Object.values(uncapped.limitExcludedAll).every((v) => v === false)).toBe(true);
+  });
 });
 
 describe("findHedges (per-sport tabs, owner-requested scope change)", () => {
