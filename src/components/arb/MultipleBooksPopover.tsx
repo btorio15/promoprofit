@@ -11,9 +11,11 @@ interface MultipleBooksPopoverProps {
 /**
  * "Multiple books" badge + tap-friendly popover (D-07): shown next to a
  * side whose best price is exactly tied at other books. Uses Popover, not
- * Tooltip, because the list must be reachable by tap on mobile. The
- * trigger's click is stopped from propagating so tapping the badge does
- * not also toggle the parent row's Collapsible.
+ * Tooltip, because the list must be reachable by tap on mobile. ArbRow
+ * renders it outside the row's trigger button (WR-06); it opts back into
+ * pointer events over the row's pointer-events-none content layer, and its
+ * click is still stopped from propagating as a belt-and-braces guard so
+ * tapping the badge never toggles the parent row.
  */
 export function MultipleBooksPopover({ bookNames }: MultipleBooksPopoverProps) {
   return (
@@ -22,7 +24,7 @@ export function MultipleBooksPopover({ bookNames }: MultipleBooksPopoverProps) {
         render={
           <Badge
             variant="outline"
-            className="cursor-pointer"
+            className="pointer-events-auto cursor-pointer"
             onClick={(event: MouseEvent) => event.stopPropagation()}
           >
             Multiple books
