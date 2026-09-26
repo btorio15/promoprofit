@@ -1,10 +1,11 @@
 ---
 phase: 2
 slug: private-access-my-books
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "base-nova / neutral / css-variables (components.json unchanged since Phase 1/01.1 — no re-init, no new base tokens; two new official blocks added: dropdown-menu)"
 created: 2026-09-26
+reviewed_at: 2026-09-26
 ---
 
 # Phase 2 — UI Design Contract
@@ -244,11 +245,11 @@ Unchanged palette from Phase 1/01.1 — same hex values, same light/dark pairs. 
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: FLAG (non-blocking — onboarding "Continue" CTA lacks a noun)
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-26
