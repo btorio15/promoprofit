@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { saveBooks } from "@/app/actions/save-books";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,11 @@ function sameKeys(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
  * disabled while the selection is empty, a save is in flight, or the
  * selection exactly matches what's already saved (no-op guard). Any
  * checkbox change clears a prior save confirmation, per UI-SPEC.
+ *
+ * The save-success confirmation includes a link back to / (owner gap
+ * closure) so a successful save always leaves an obvious next step, with
+ * no auto-redirect -- the inline confirmation must stay visible per
+ * UI-SPEC.
  */
 export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps) {
   const router = useRouter();
@@ -81,7 +87,12 @@ export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps
       </Button>
       {saved ? (
         <Alert>
-          <AlertDescription>Your books were updated.</AlertDescription>
+          <AlertDescription>
+            Your books were updated.{" "}
+            <Link href="/" className="underline underline-offset-4">
+              Back to PromoProfit
+            </Link>
+          </AlertDescription>
         </Alert>
       ) : null}
     </div>

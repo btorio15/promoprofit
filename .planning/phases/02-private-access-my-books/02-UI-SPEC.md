@@ -39,7 +39,7 @@ Unchanged from Phase 1/01.1 — confirmed against the live repo, not re-decided.
 ### App-wide: new header (D-11)
 
 - **`AppHeader`** (new, custom composition — not a single shadcn block): a slim row that now sits **above** `OddsStatusBar` inside the authenticated shell (`AppShell.tsx`). Secondary surface (`bg-secondary`), `border-b`, `px-4`, height `h-14` (56px), content constrained to the same `max-w-[1080px]` container as the rest of the app, `flex items-center justify-between`.
-  - Left: app name **"PromoProfit"** (Heading, 20px/600) — plain text, not a link (there is no other page to navigate "home" to in this phase).
+  - Left: app name **"PromoProfit"** (Heading, 20px/600) — links to `/` (amended after the 02-06 owner walkthrough: the Settings page made "no other page to navigate home to" false; the wordmark's styling is unchanged, no underline, so it still reads as a brand mark rather than a text link).
   - Right: **`AccountMenu`** trigger — a `Button variant="ghost"` (h-10, min 40px touch target) showing the user's display name (Label, 14px) + a `ChevronDown` icon (lucide, `size-4`).
   - **Claude's discretion — defaulted:** `AppHeader` is **not sticky** (unlike `OddsStatusBar`, which keeps its existing `sticky top-0 z-40`). It scrolls away with the page; only the odds status bar needs to stay pinned while scanning long result lists. This avoids stacking two sticky elements and consuming extra vertical space on mobile, and requires no change to `OddsStatusBar`'s existing sticky CSS.
 - **`AccountMenu`** (new, `dropdown-menu` shadcn block): opens below the trigger, right-aligned. Two items only: **Settings** (navigates to `/settings`) and **Log out** (calls the logout action, redirects to `/login`). Both items default menu-item styling (no destructive-red on Log out — see Color section for rationale). No avatar/profile image anywhere in this phase (no image upload, no email-derived avatar service — out of scope); the display-name text is the only identity affordance.
@@ -74,10 +74,11 @@ Two mutually exclusive states, same centered-column shell as `/login` (no `AppHe
 ### Settings page (`/settings`) — D-11
 
 - **Authenticated** route — renders **with** `AppHeader` (so Log out / navigation stay reachable) but **without** `OddsStatusBar`/`CreditBanner` (irrelevant here; this screen has no odds/credit concerns). Content uses the same `max-w-[1080px]` container as the finder/arb tabs but the actual content column is narrower (`max-w-[480px]`, left-aligned under the header, not centered — this is a normal app page, not a pre-login gate) with standard page padding (`px-4 py-12`, matching `AppShell`'s existing `main` padding).
+- Above the page heading, an explicit back link — muted (Label-size, `text-muted-foreground`) with a leading `ArrowLeft` icon (lucide, `size-4`), `min-h-10` tap target, linking to `/`: "Back to PromoProfit" (owner gap closure, added alongside the wordmark link above — never an accent button, since "Save changes" stays the one accent CTA on this page per the Color section's single-accent-per-view rule).
 - Structure: page heading **"Settings"** (Heading, 20px), one line of muted context below it (Label): "Signed in as {displayName} ({email})" — read-only, no edit affordance for name/email/password in this phase (owner-script-only per D-02/D-07).
 - Below that, a `Card` (`p-6`) titled **"My books"** (Heading) reusing the **identical** checkbox-list component from the onboarding book-picker step (same 7 rows, same tap-row idiom) — pre-checked with the user's current selection (D-12).
 - Primary CTA (accent, `h-10`, **not** full-width here — this is a settled page, not a gate): **"Save changes"**, disabled until at least one book remains checked (D-09) and enabled only while the selection differs from what's persisted (avoids a no-op save).
-- On successful save: an inline confirmation appears directly below the button — `Alert` (no variant, neutral surface, same treatment as the account-risk advisory), text: "Your books were updated." — no toast library is introduced (none in the stack); the message clears the next time the checkbox selection changes.
+- On successful save: an inline confirmation appears directly below the button — `Alert` (no variant, neutral surface, same treatment as the account-risk advisory), text: "Your books were updated." followed by a "Back to PromoProfit" link (underlined text link, same styling as the invite page's "Log in" link) — no toast library is introduced (none in the stack); no auto-redirect (the confirmation must stay visible); the message and link clear the next time the checkbox selection changes.
 - Validation error (attempted save with zero, defensive only): same copy as onboarding: "Select at least one book to continue." → reworded for this context: "Select at least one book to save."
 
 ### Finder — new risk advisory (D-23, CALC-06)
@@ -202,6 +203,8 @@ Unchanged palette from Phase 1/01.1 — same hex values, same light/dark pairs. 
 | Settings — primary CTA | **Save changes** |
 | Settings — validation error | "Select at least one book to save." |
 | Settings — save success | "Your books were updated." |
+| Settings — back link | Back to PromoProfit (links to `/`) |
+| Settings — save success link | Back to PromoProfit (links to `/`) |
 | **Account menu** — trigger | {displayName} with a chevron-down icon |
 | Account menu — items | **Settings** · **Log out** |
 | **Finder risk advisory** (CALC-06, reused verbatim from 01.1's Arbitrage tab) | "Placing exact, identically-sized stakes across several books is a known pattern sportsbooks use to detect and limit arbing accounts. That risk exists for every row below — it's not a reason to skip a profitable one, just something to weigh." |
