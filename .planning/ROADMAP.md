@@ -138,7 +138,7 @@ Plans:
 
 **Gap closure — Wave 1**
 
-- [ ] 02-07-PLAN.md — CR-01: atomic reserveLoginAttempt before argon2 verify + concurrency test (lockout holds under parallel requests)
+- [x] 02-07-PLAN.md — CR-01: atomic reserveLoginAttempt before argon2 verify + concurrency test (lockout holds under parallel requests)
 - [ ] 02-08-PLAN.md — CR-02/WR-01: shared getUsableUserBooks predicate for /, /onboarding/books, /settings (no redirect loop, no stale settings keys)
 
 **Gap closure — Wave 2** *(blocked on 02-08)*
@@ -204,7 +204,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
-| 2. Private Access & My Books | 6/6 | Complete   | 2026-09-26 |
+| 2. Private Access & My Books | 7/9 | In Progress|  |
 | 3. Promo Scraping & Review | 0/? | Not started | - |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

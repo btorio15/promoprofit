@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 02-06-PLAN.md
-last_updated: "2026-09-26T19:14:42.589Z"
+status: executing
+stopped_at: Completed 02-07-PLAN.md
+last_updated: "2026-09-26T19:51:37.853Z"
 last_activity: 2026-09-26
 progress:
   total_phases: 6
-  completed_phases: 3
-  total_plans: 19
-  completed_plans: 19
-  percent: 50
+  completed_phases: 2
+  total_plans: 22
+  completed_plans: 20
+  percent: 33
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 2 (Private Access & My Books) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Plan: 2 of 9
+Status: Ready to execute
 Last activity: 2026-09-26
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [██████████] 100%
 | Phase 02 P04 | 5min | 3 tasks | 12 files |
 | Phase 02 P05 | 4min | 3 tasks | 11 files |
 | Phase 02 P06 | 2min | 2 tasks | 1 files |
+| Phase 02 P07 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 05: requireUser() is the first statement in findHedges/findArbs, before Zod parsing, so a logged-out request never reaches getCachedEvents/getCachedExtendedEvents
 - [Phase 02]: Plan 05: booksExcludedAll is recomputed only when the 'all' scope is already empty and the user hasn't selected every usable book, re-deriving from the same cached events (zero extra DB reads, zero Odds API calls)
 - [Phase 02]: Plan 06: Owner completed the live walkthrough approving steps 1-8 (invite bootstrap, book selection, scoped suggestions, shared risk advisory, settings persistence, invite reuse rejection); closed CALC-06 as the phase's last manual-only verification
+- [Phase 02]: Plan 07: reserveLoginAttempt's CASE arithmetic mirrors nextFailedLoginState exactly, so sequential lockout behavior is unchanged; only concurrent behavior is fixed (bounded to MAX_FAILED_LOGIN_ATTEMPTS)
+- [Phase 02]: Plan 07: recordFailedLogin deleted entirely rather than kept alongside reserveLoginAttempt, closing the lost-update path CR-01/T-02-G2 by removing the second way to write the counter
 
 ### Pending Todos
 
@@ -147,6 +150,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-26T19:14:42.582Z
-Stopped at: Completed 02-06-PLAN.md
+Last session: 2026-09-26T19:51:37.846Z
+Stopped at: Completed 02-07-PLAN.md
 Resume file: None
