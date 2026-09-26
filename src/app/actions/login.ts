@@ -2,9 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { LoginInputSchema } from "@/domain/auth/authInput";
-import { clearFailedLogins, findUserByEmail, recordFailedLogin } from "@/lib/auth/accounts";
+import { clearFailedLogins, findUserByEmail, reserveLoginAttempt } from "@/lib/auth/accounts";
 import { verifyAgainstDummyHash, verifyPassword } from "@/lib/auth/password";
-import { isLockedOut } from "@/lib/auth/lockout";
 import { startSession } from "@/lib/session";
 
 export type LoginResponse =
@@ -13,13 +12,15 @@ export type LoginResponse =
   | { status: "locked" };
 
 /**
- * Login server action (D-05, T-02-09, T-02-10). Never returns a user's
- * passwordHash. Unknown email and wrong password both return the identical
- * "invalid_credentials" outcome so the UI shows one generic message
- * (T-02-10) -- verifyAgainstDummyHash equalizes response timing for the
- * unknown-email path. A locked account short-circuits before verifyPassword
- * is ever called, even with the correct password. On success, redirect()
- * runs outside any try/catch (it throws NEXT_REDIRECT).
+ * Login server action (D-05, T-02-09/T-02-G1, T-02-10). Never returns a
+ * user's passwordHash. Unknown email and wrong password both return the
+ * identical "invalid_credentials" outcome so the UI shows one generic
+ * message (T-02-10) -- verifyAgainstDummyHash equalizes response timing for
+ * the unknown-email path. For a known email, the attempt is reserved
+ * atomically (reserveLoginAttempt) BEFORE verifyPassword ever runs (CR-01) --
+ * this is not a pre-read lockedUntil check, so a locked account can never
+ * reach verifyPassword even if its findUserByEmail snapshot is stale. On
+ * success, redirect() runs outside any try/catch (it throws NEXT_REDIRECT).
  */
 export async function login(input: unknown): Promise<LoginResponse> {
   const parsed = LoginInputSchema.safeParse(input);
@@ -43,13 +44,13 @@ export async function login(input: unknown): Promise<LoginResponse> {
     return { status: "invalid_credentials" };
   }
 
-  if (isLockedOut(user.lockedUntil, now)) {
+  const reserved = await reserveLoginAttempt(user.id, now);
+  if (!reserved) {
     return { status: "locked" };
   }
 
   const passwordOk = await verifyPassword(user.passwordHash, password);
   if (!passwordOk) {
-    await recordFailedLogin(user.id, now);
     return { status: "invalid_credentials" };
   }
 
