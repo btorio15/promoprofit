@@ -1,6 +1,7 @@
-import { and, gt, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "./client";
-import { cachedExtendedOdds, cachedOdds } from "./schema";
+import { cachedExtendedOdds, cachedOdds, userBooks } from "./schema";
 import { usableOddsBooks } from "@/config/books";
 import { OddsEventSchema, type OddsEvent } from "@/domain/odds/schemas";
 
@@ -10,21 +11,64 @@ export interface BookOption {
 }
 
 /**
- * Books usable in the bonus-book dropdown (D-14): API-covered, free-tier,
- * sort_order ASC. Read from src/config/books.ts via usableOddsBooks() --
- * the SAME list runOddsRefresh fetches odds for -- never from the DB
- * `books` mirror, so the dropdown, the hedge venues and the refresh can't
- * drift apart when the config changes without a re-seed (WR-05). The DB
- * `books` table is display/seed metadata only.
+ * Books usable in the bonus-book dropdown (D-14, D-13): API-covered,
+ * free-tier, sort_order ASC. Read from src/config/books.ts via
+ * usableOddsBooks() -- the SAME list runOddsRefresh fetches odds for --
+ * never from the DB `books` mirror, so the dropdown, the hedge venues and
+ * the refresh can't drift apart when the config changes without a re-seed
+ * (WR-05). The DB `books` table is display/seed metadata only.
+ *
+ * When `allowedKeys` is provided (a user's saved book_key set), the result
+ * is further restricted to usable ∩ allowed, still in config order -- this
+ * is how D-13 scopes the bonus-book dropdown and hedge-book search to only
+ * the books a user actually has, superseding Phase 1's D-14 "every usable
+ * book" when a set is passed. Omitting the argument preserves the original
+ * "every usable book" behavior unchanged.
  */
-export async function getBonusBooks(): Promise<BookOption[]> {
-  return usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName }));
+export async function getBonusBooks(allowedKeys?: ReadonlySet<string>): Promise<BookOption[]> {
+  const usable = usableOddsBooks();
+  const scoped = allowedKeys ? usable.filter((b) => allowedKeys.has(b.key)) : usable;
+  return scoped.map((b) => ({ key: b.key, displayName: b.displayName }));
 }
 
-/** Every API-covered free-tier CO book key, usable as a hedge book (D-15). */
-export async function getHedgeBookKeys(): Promise<string[]> {
-  const bonusBooks = await getBonusBooks();
+/**
+ * Every hedge-book key usable as a hedge venue (D-15), optionally scoped to
+ * a user's allowed keys the same way getBonusBooks is (D-14 superseded by
+ * D-13 when a set is passed).
+ */
+export async function getHedgeBookKeys(allowedKeys?: ReadonlySet<string>): Promise<string[]> {
+  const bonusBooks = await getBonusBooks(allowedKeys);
   return bonusBooks.map((b) => b.key);
+}
+
+/** A user's saved book_key selection (D-12), in whatever order Postgres returns rows. */
+export async function getUserBookKeys(userId: number): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ bookKey: userBooks.bookKey })
+    .from(userBooks)
+    .where(eq(userBooks.userId, userId));
+  return rows.map((r) => r.bookKey);
+}
+
+/**
+ * Replaces a user's entire book selection in one all-or-nothing db.batch
+ * (a single Postgres transaction, following store.ts's
+ * replaceSportStatements/db.batch idiom): delete every existing row for
+ * userId, then insert the new set in the given order. The insert is
+ * omitted when bookKeys is empty -- Drizzle rejects an empty `values([])`
+ * array -- though SaveBooksInputSchema's min(1) means saveBooks never
+ * calls this with an empty array in practice (D-09).
+ */
+export async function saveUserBooks(userId: number, bookKeys: readonly string[]): Promise<void> {
+  const db = getDb();
+  type Statement = BatchItem<"pg">;
+  const statements: Statement[] = [db.delete(userBooks).where(eq(userBooks.userId, userId))];
+  if (bookKeys.length > 0) {
+    statements.push(db.insert(userBooks).values(bookKeys.map((bookKey) => ({ userId, bookKey }))));
+  }
+  const [first, ...rest] = statements;
+  await db.batch([first, ...rest]);
 }
 
 async function getMaxFetchedAt(): Promise<Date | null> {
