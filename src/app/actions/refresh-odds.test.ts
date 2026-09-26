@@ -26,6 +26,10 @@ vi.mock("@/db/queries", () => ({
   getBonusBooks: vi.fn(),
   getHedgeBookKeys: vi.fn(),
   getCachedEvents: vi.fn(),
+  // Plan 05: findHedges now resolves the session user's book set first --
+  // this suite's ODDS-04 describe calls findHedges directly, so it needs
+  // this mock to keep passing without exercising Plan 05's scoping itself.
+  getUserBookKeys: vi.fn(),
 }));
 
 import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
@@ -36,7 +40,7 @@ import {
   releaseRefreshLock,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
-import { getBonusBooks, getCachedEvents, getHedgeBookKeys } from "@/db/queries";
+import { getBonusBooks, getCachedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { runOddsRefresh } from "@/ingestion/odds/refresh";
 import { refreshOdds } from "./refresh-odds";
 import { findHedges } from "./find-hedges";
@@ -51,6 +55,7 @@ const mockReleaseRefreshLock = vi.mocked(releaseRefreshLock);
 const mockGetBonusBooks = vi.mocked(getBonusBooks);
 const mockGetHedgeBookKeys = vi.mocked(getHedgeBookKeys);
 const mockGetCachedEvents = vi.mocked(getCachedEvents);
+const mockGetUserBookKeys = vi.mocked(getUserBookKeys);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -59,6 +64,7 @@ beforeEach(() => {
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
   mockRequireUser.mockResolvedValue({ userId: 42, email: "mike@example.com", displayName: "Mike" });
+  mockGetUserBookKeys.mockResolvedValue(usableOddsBooks().map((b) => b.key));
 });
 
 describe("runOddsRefresh", () => {

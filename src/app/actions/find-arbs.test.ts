@@ -10,12 +10,21 @@ import type { FindArbsResponse } from "@/domain/arb/types";
  */
 const now = vi.hoisted(() => new Date("2026-10-01T12:00:00.000Z"));
 
+// Plan 05 (D-16..D-20): getBonusBooks/getHedgeBookKeys mocks honor their
+// allowedKeys argument by delegating to the REAL intersection over
+// usableOddsBooks() -- the same scoping src/db/queries.ts performs -- so
+// these tests exercise the real per-user scoping behavior, not a stub.
 vi.mock("@/db/queries", () => {
   const books = usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName }));
-  const hedgeBookKeys = books.map((b) => b.key);
+  const allKeys = books.map((b) => b.key);
   return {
-    getBonusBooks: vi.fn().mockResolvedValue(books),
-    getHedgeBookKeys: vi.fn().mockResolvedValue(hedgeBookKeys),
+    getUserBookKeys: vi.fn().mockResolvedValue(allKeys),
+    getBonusBooks: vi.fn((allowedKeys?: ReadonlySet<string>) =>
+      Promise.resolve(allowedKeys ? books.filter((b) => allowedKeys.has(b.key)) : books),
+    ),
+    getHedgeBookKeys: vi.fn((allowedKeys?: ReadonlySet<string>) =>
+      Promise.resolve(allowedKeys ? allKeys.filter((k) => allowedKeys.has(k)) : allKeys),
+    ),
     getCachedEvents: vi.fn().mockResolvedValue({ events: buildArbFixtureEvents(now), fetchedAt: now }),
     getCachedExtendedEvents: vi
       .fn()
@@ -28,13 +37,19 @@ vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
 }));
 
+vi.mock("@/lib/session", () => ({
+  requireUser: vi.fn().mockResolvedValue({ userId: 7, email: "test@example.com", displayName: "Test User" }),
+}));
+
 import {
   getBonusBooks,
   getHedgeBookKeys,
   getCachedEvents,
   getCachedExtendedEvents,
+  getUserBookKeys,
 } from "@/db/queries";
 import { fetchSportOdds, listSports } from "@/ingestion/odds/client";
+import { requireUser } from "@/lib/session";
 import { findArbs } from "./find-arbs";
 
 describe("findArbs", () => {
@@ -169,5 +184,62 @@ describe("findArbs", () => {
     expect(getBonusBooks).toHaveBeenCalled();
     expect(getHedgeBookKeys).toHaveBeenCalled();
     expect(getCachedEvents).toHaveBeenCalled();
+  });
+});
+
+describe("findArbs (per-user book scoping, D-16..D-20)", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  it("flags booksExcludedAll false when the user has every usable book", async () => {
+    const response = await findArbs({ totalStake: "200" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    expect(response.booksExcludedAll).toBe(false);
+  });
+
+  it("never surfaces an excluded book on a leg or in the Multiple-books tie list (D-16, D-17)", async () => {
+    const allKeys = usableOddsBooks().map((b) => b.key);
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(allKeys.filter((k) => k !== "draftkings"));
+
+    const response = await findArbs({ totalStake: "200" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    for (const results of Object.values(response.resultsBySport)) {
+      for (const row of results) {
+        expect(row.sideA.bookKey).not.toBe("draftkings");
+        expect(row.sideB.bookKey).not.toBe("draftkings");
+        expect(row.sideA.tiedBookNames).not.toContain("DraftKings");
+        expect(row.sideB.tiedBookNames).not.toContain("DraftKings");
+      }
+    }
+  });
+
+  it("flags booksExcludedAll when the user's single book has no arb coverage (D-18)", async () => {
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(["hardrockbet"]);
+
+    const response = await findArbs({ totalStake: "200" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    expect(response.resultsBySport.all).toEqual([]);
+    expect(response.booksExcludedAll).toBe(true);
+  });
+
+  it("rejects when logged out, before any cache read (D-20)", async () => {
+    vi.mocked(requireUser).mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    const callsBefore = vi.mocked(getCachedEvents).mock.calls.length;
+
+    await expect(findArbs({ totalStake: "200" })).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(vi.mocked(getCachedEvents).mock.calls.length).toBe(callsBefore);
   });
 });

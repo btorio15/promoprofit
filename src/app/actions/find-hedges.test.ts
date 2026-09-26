@@ -13,17 +13,31 @@ import type { FindHedgesResponse } from "@/domain/finder/types";
 // temporal-dead-zone "Cannot access before initialization" error.
 const now = vi.hoisted(() => new Date("2026-10-01T12:00:00.000Z"));
 
+// Plan 05 (D-13..D-20): getBonusBooks/getHedgeBookKeys mocks honor their
+// allowedKeys argument by delegating to the REAL intersection over
+// usableOddsBooks() -- the same scoping src/db/queries.ts performs -- so
+// these tests exercise the real per-user scoping behavior, not a stub.
 vi.mock("@/db/queries", () => {
   const books = usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName }));
-  const hedgeBookKeys = books.map((b) => b.key);
+  const allKeys = books.map((b) => b.key);
   return {
-    getBonusBooks: vi.fn().mockResolvedValue(books),
-    getHedgeBookKeys: vi.fn().mockResolvedValue(hedgeBookKeys),
+    getUserBookKeys: vi.fn().mockResolvedValue(allKeys),
+    getBonusBooks: vi.fn((allowedKeys?: ReadonlySet<string>) =>
+      Promise.resolve(allowedKeys ? books.filter((b) => allowedKeys.has(b.key)) : books),
+    ),
+    getHedgeBookKeys: vi.fn((allowedKeys?: ReadonlySet<string>) =>
+      Promise.resolve(allowedKeys ? allKeys.filter((k) => allowedKeys.has(k)) : allKeys),
+    ),
     getCachedEvents: vi.fn().mockResolvedValue({ events: buildFixtureEvents(now), fetchedAt: now }),
   };
 });
 
-import { getBonusBooks, getHedgeBookKeys, getCachedEvents } from "@/db/queries";
+vi.mock("@/lib/session", () => ({
+  requireUser: vi.fn().mockResolvedValue({ userId: 7, email: "test@example.com", displayName: "Test User" }),
+}));
+
+import { getBonusBooks, getHedgeBookKeys, getCachedEvents, getUserBookKeys } from "@/db/queries";
+import { requireUser } from "@/lib/session";
 import { findHedges } from "./find-hedges";
 
 describe("findHedges (MVP happy path)", () => {
@@ -309,5 +323,84 @@ describe("findHedges (per-sport tabs, owner-requested scope change)", () => {
     expect(response.resultsBySport.baseball_mlb[0].eventId).toBe("mlb-low-profit");
     expect(Number(response.resultsBySport.baseball_mlb[0].guaranteedProfit)).toBeGreaterThan(0);
     expect(Number(response.resultsBySport.baseball_mlb[0].guaranteedProfit)).toBeLessThan(80);
+  });
+});
+
+describe("findHedges (per-user book scoping, D-13..D-20)", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  it("flags booksExcludedAll false when the user has every usable book", async () => {
+    const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    expect(response.booksExcludedAll).toBe(false);
+  });
+
+  it("only ever suggests the user's own books on both legs (D-14)", async () => {
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(["draftkings", "betmgm"]);
+
+    const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    const allowed = new Set(["draftkings", "betmgm"]);
+    for (const results of Object.values(response.resultsBySport)) {
+      for (const row of results) {
+        expect(allowed.has(row.bonus.bookKey)).toBe(true);
+        expect(allowed.has(row.hedge.bookKey)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps the same-book hedge badge when that book is one of the user's books (D-15)", async () => {
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(["draftkings", "betmgm"]);
+
+    const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    const mlb = response.resultsBySport.all.find((r) => r.sportKey === "baseball_mlb");
+    expect(mlb?.hedge.bookKey).toBe("draftkings");
+    expect(mlb?.sameBook).toBe(true);
+  });
+
+  it("rejects a bonus book outside the user's selection (D-13)", async () => {
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(["draftkings"]);
+
+    const response = await findHedges({ bookKey: "fanduel", bonusAmount: "100" });
+
+    expect(response.status).toBe("invalid");
+    if (response.status !== "invalid") return;
+    expect(response.fieldErrors.bookKey).toEqual(["Choose the book holding your bonus bet."]);
+  });
+
+  it("flags booksExcludedAll when the user's books don't cover any qualifying game (D-18)", async () => {
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(["ballybet"]);
+
+    const response = await findHedges({ bookKey: "ballybet", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    expect(response.resultsBySport.all).toEqual([]);
+    expect(response.booksExcludedAll).toBe(true);
+  });
+
+  it("rejects when logged out, before any cache read (D-20)", async () => {
+    vi.mocked(requireUser).mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    const callsBefore = vi.mocked(getCachedEvents).mock.calls.length;
+
+    await expect(
+      findHedges({ bookKey: "draftkings", bonusAmount: "100" }),
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(vi.mocked(getCachedEvents).mock.calls.length).toBe(callsBefore);
   });
 });
