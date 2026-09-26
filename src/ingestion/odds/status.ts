@@ -46,23 +46,22 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
   const total =
     latest && remaining !== null ? latest.requestsRemaining + latest.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
 
-  // Never hardcode the estimate: use the last refresh's real cost when it
-  // spent credits, otherwise the pure upper-bound formula (research
-  // pitfall -- never a literal like "10 credits").
-  const estimatedRefreshCredits =
-    latest && latest.refreshCost > 0
-      ? latest.refreshCost
-      : estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length);
-
-  // The credit_usage ledger is shared between the normal and extended
-  // refresh (there is only one Odds API balance), so re-derive the
-  // extended estimate from the latest row's sport count with marketCount 3
-  // rather than reusing its refreshCost verbatim (that cost may reflect
-  // whichever fetch path last ran, not necessarily the extended one).
-  const estimatedExtendedRefreshCredits =
-    latest && latest.sportsFetched > 0
-      ? estimateRefreshCredits(latest.sportsFetched, usableOddsBooks().length, EXTENDED_MARKET_COUNT)
-      : estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length, EXTENDED_MARKET_COUNT);
+  // Never hardcode the estimate (research pitfall -- never a literal like
+  // "10 credits"). Both estimates use the same exact formula the server-side
+  // gate uses, from the latest row's in-season sport count, so neither
+  // depends on which fetch path ran last (01.1 review WR-03): reusing
+  // latest.refreshCost quoted ~3x after a spreads/totals search, and a
+  // partial run's fetched count under-stated the extended cost. The
+  // credit_usage ledger is shared (one Odds API balance) and each run
+  // records its full in-season count even when it fails mid-way.
+  const inSeasonSportCount =
+    latest && latest.sportsFetched > 0 ? latest.sportsFetched : SPORT_KEYS.length;
+  const estimatedRefreshCredits = estimateRefreshCredits(inSeasonSportCount, usableOddsBooks().length);
+  const estimatedExtendedRefreshCredits = estimateRefreshCredits(
+    inSeasonSportCount,
+    usableOddsBooks().length,
+    EXTENDED_MARKET_COUNT,
+  );
 
   return {
     oddsFetchedAt: oddsFetchedAt ? oddsFetchedAt.toISOString() : null,

@@ -190,7 +190,11 @@ async function runGuardedRefresh(opts: { confirmed: boolean; now?: Date }): Prom
           requestsRemaining: remainingToRecord,
           requestsUsed: usedToRecord,
           refreshCost,
-          sportsFetched: sportsFetched.length,
+          // The run's in-season sport count, not how many fetches
+          // finished: status.ts derives every credit estimate from this,
+          // and a partial run's count would under-state the next run's
+          // cost (01.1 review WR-03). Equal to sports fetched on success.
+          sportsFetched: inSeason.length,
           recordedAt: now,
         });
       } catch {

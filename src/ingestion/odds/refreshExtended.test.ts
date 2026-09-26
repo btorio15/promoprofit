@@ -296,11 +296,13 @@ describe("runSpreadsTotalsRefresh", () => {
     expect(mockCommitSpreadsTotalsRefresh).not.toHaveBeenCalled();
     expect(mockCommitOddsRefresh).not.toHaveBeenCalled();
 
+    // sportsFetched is the run's in-season count (2), not the 1 sport that
+    // finished, so the next extended estimate isn't under-stated (WR-03).
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 297,
       requestsUsed: 203,
       refreshCost: 3,
-      sportsFetched: 1,
+      sportsFetched: 2,
       recordedAt: now,
     });
 

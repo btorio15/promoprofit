@@ -18,6 +18,10 @@ export interface CreditUsageRow {
   requestsRemaining: number;
   requestsUsed: number;
   refreshCost: number;
+  /**
+   * In-season sport count the run targeted (== sports fetched on a complete
+   * run). The basis for every credit estimate in status.ts (WR-03).
+   */
   sportsFetched: number;
   recordedAt: Date;
 }

@@ -44,7 +44,9 @@ describe("getOddsStatus", () => {
     expect(status.remaining).toBe(412);
     expect(status.total).toBe(500); // remaining + used
     expect(status.level).toBe("normal");
-    expect(status.estimatedRefreshCredits).toBe(3);
+    // WR-03 (01.1 review): the formula over the row's in-season sport count,
+    // never the row's refreshCost verbatim.
+    expect(status.estimatedRefreshCredits).toBe(estimateRefreshCredits(4, usableOddsBooks().length));
     expect(status.oddsFetchedAt).toBe(new Date(NOW.getTime() - 42 * 60_000).toISOString());
     expect(status.lastRefreshAt).toBe(new Date(NOW.getTime() - 10 * 60_000).toISOString());
     expect(status.resetsOn).toBe("2026-11-01T00:00:00.000Z");
@@ -136,6 +138,27 @@ describe("getOddsStatus", () => {
 
     expect(status.estimatedExtendedRefreshCredits).toBe(
       estimateRefreshCredits(4, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
+    );
+  });
+
+  it("after a spreads/totals search, the normal-refresh estimate is not the 3x extended cost (WR-03)", async () => {
+    mockGetOddsFreshness.mockResolvedValue(NOW);
+    mockGetExtendedOddsFreshness.mockResolvedValue(NOW);
+    const books = usableOddsBooks().length;
+    // Latest row is an extended run over 4 sports: refreshCost is 3x.
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 400,
+      requestsUsed: 100,
+      refreshCost: estimateRefreshCredits(4, books, EXTENDED_MARKET_COUNT),
+      sportsFetched: 4,
+      recordedAt: NOW,
+    });
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.estimatedRefreshCredits).toBe(estimateRefreshCredits(4, books));
+    expect(status.estimatedExtendedRefreshCredits).toBe(
+      estimateRefreshCredits(4, books, EXTENDED_MARKET_COUNT),
     );
   });
 

@@ -250,11 +250,13 @@ describe("runOddsRefresh", () => {
     // fetched events are discarded, so the cache stays exactly as it was
     // (no sport moves to the new timestamp, no purge runs).
     expect(mockCommitOddsRefresh).not.toHaveBeenCalled();
+    // sportsFetched records the run's in-season count (2), not the partial
+    // fetched count, so the next credit estimate isn't under-stated (WR-03).
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 299,
       requestsUsed: 201,
       refreshCost: 1,
-      sportsFetched: 1,
+      sportsFetched: 2,
       recordedAt: now,
     });
     expect(outcome.status).toBe("error");
@@ -282,8 +284,8 @@ describe("runOddsRefresh credit capture (WR-02)", () => {
     const outcome = await runOddsRefresh({ confirmed: false, now });
 
     expect(outcome.status).toBe("error");
-    // sportsFetched counts sports whose credits were spent (fetched), even
-    // though the all-or-nothing commit then failed.
+    // sportsFetched records the run's in-season count even though the
+    // all-or-nothing commit then failed (WR-03).
     expect(mockRecordCreditUsage).toHaveBeenCalledWith({
       requestsRemaining: 299,
       requestsUsed: 201,
