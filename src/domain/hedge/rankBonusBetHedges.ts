@@ -31,9 +31,11 @@ export interface RankOptions {
   bonusAmount: Decimal;
   hedgeBookKeys: ReadonlySet<string>;
   limit?: number;
-  /** Optional cap (D-18): orientations whose hedgeStake exceeds this are
-   * dropped per game (before picking that game's best orientation) and
-   * before sort/slice, never scaled/partial. */
+  /** Optional cap (D-18): games whose best orientation's hedgeStake exceeds
+   * this are dropped before sort/slice, never scaled or partial, and no
+   * fallback orientation is used (owner decision 2026-09-26, UAT 01.1 Test
+   * 5) -- a game whose best orientation doesn't fit under the cap is
+   * dropped rather than replaced by its cheaper, worse orientation. */
   maxHedgeStake?: Decimal;
 }
 
@@ -121,17 +123,6 @@ export function rankBonusBetHedges(
     for (const bonusQuote of bonusQuotes) {
       const opportunity = buildOrientation(market, bonusQuote, opts);
       if (!opportunity) continue;
-      // D-18: apply the cap per orientation, BEFORE choosing this game's
-      // best orientation and before the global sort/slice. The
-      // highest-profit orientation (bonus on the longshot) usually needs
-      // the largest hedge; capping only after picking it would discard a
-      // game whose other orientation fits under the limit.
-      if (
-        opts.maxHedgeStake !== undefined &&
-        opportunity.result.hedgeStake.gt(opts.maxHedgeStake)
-      ) {
-        continue;
-      }
       if (!best || opportunity.result.guaranteedProfit.gt(best.result.guaranteedProfit)) {
         best = opportunity;
       }
@@ -140,9 +131,19 @@ export function rankBonusBetHedges(
     if (best) opportunities.push(best);
   }
 
-  // The cap already ran inside the per-game loop above, so an over-cap game
-  // never occupies a top-10 slot -- the next affordable game takes its place.
-  opportunities.sort((a, b) => {
+  // D-18: apply the cap BEFORE sort/slice, not after -- otherwise an
+  // over-cap game occupying a top-10 slot would silently shrink the result
+  // count instead of letting the next affordable game take its place. The
+  // best orientation is chosen above from the UNCAPPED candidates; a game
+  // whose best orientation is over the cap is dropped here rather than
+  // falling back to its cheaper, worse orientation (owner decision
+  // 2026-09-26, UAT 01.1 Test 5).
+  const withinCap =
+    opts.maxHedgeStake === undefined
+      ? opportunities
+      : opportunities.filter((o) => o.result.hedgeStake.lte(opts.maxHedgeStake as Decimal));
+
+  withinCap.sort((a, b) => {
     const profitDiff = b.result.guaranteedProfit.comparedTo(a.result.guaranteedProfit);
     if (profitDiff !== 0) return profitDiff;
 
@@ -152,5 +153,5 @@ export function rankBonusBetHedges(
     return a.eventId < b.eventId ? -1 : a.eventId > b.eventId ? 1 : 0;
   });
 
-  return opportunities.slice(0, limit);
+  return withinCap.slice(0, limit);
 }

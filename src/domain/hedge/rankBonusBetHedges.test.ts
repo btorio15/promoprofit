@@ -254,43 +254,53 @@ describe("rankBonusBetHedges", () => {
       expect(results[0].result.hedgeStake.toFixed(2)).toBe("100.00");
     });
 
-    it("keeps a game whose lower-profit orientation fits under the cap (CR-02)", () => {
+    it("drops a game whose best orientation exceeds the cap instead of falling back to its cheaper orientation (UAT 01.1 Test 5)", () => {
       const market: TwoWayMoneylineMarket = {
-        eventId: "both-orientations-capped",
-        sportKey: "basketball_nba",
+        eventId: "mlb-dodgers-giants",
+        sportKey: "baseball_mlb",
         commenceTime: new Date(now.getTime() + 86_400_000),
-        homeTeam: "Home",
-        awayTeam: "Away",
+        homeTeam: "San Francisco Giants",
+        awayTeam: "Los Angeles Dodgers",
         tieRisk: false,
         quotes: [
-          { bookKey: "bookA", outcome: "home", team: "Home", oddsAmerican: 250 },
-          { bookKey: "bookA", outcome: "away", team: "Away", oddsAmerican: 150 },
-          { bookKey: "bookB", outcome: "away", team: "Away", oddsAmerican: -150 },
-          { bookKey: "bookB", outcome: "home", team: "Home", oddsAmerican: -150 },
+          { bookKey: "draftkings", outcome: "home", team: "San Francisco Giants", oddsAmerican: 263 },
+          { bookKey: "draftkings", outcome: "away", team: "Los Angeles Dodgers", oddsAmerican: -334 },
+          { bookKey: "fanduel", outcome: "away", team: "Los Angeles Dodgers", oddsAmerican: -325 },
+          { bookKey: "fanduel", outcome: "home", team: "San Francisco Giants", oddsAmerican: 280 },
         ],
       };
       const baseOpts = {
-        bonusBookKey: "bookA",
+        bonusBookKey: "draftkings",
         bonusAmount: new Decimal(100),
-        hedgeBookKeys: new Set(["bookB"]),
+        hedgeBookKeys: new Set(["fanduel"]),
       };
 
-      // Uncapped: bonus on Home @ +250 wins ($100 profit, $150 hedge).
+      // Uncapped: bonus on Giants (home) @ +263 wins ($61.88 profit, $201.11
+      // hedge) over bonus on Dodgers (away) @ -334 ($22.06 profit, $7.88 hedge).
       const uncapped = rankBonusBetHedges([market], baseOpts);
       expect(uncapped).toHaveLength(1);
       expect(uncapped[0].bonus.outcome).toBe("home");
-      expect(uncapped[0].result.hedgeStake.toFixed(2)).toBe("150.00");
+      expect(uncapped[0].result.hedgeStake.toFixed(2)).toBe("201.11");
+      expect(uncapped[0].result.guaranteedProfit.toFixed(2)).toBe("61.88");
 
-      // A $120 cap rules out the home orientation, but bonus on Away @ +150
-      // needs only a $90 hedge and still nets $60 -- the game must survive.
+      // A cap exactly at the best orientation's hedge stake still includes
+      // it (lte, not lt).
+      const cappedAtBest = rankBonusBetHedges([market], {
+        ...baseOpts,
+        maxHedgeStake: new Decimal("201.11"),
+      });
+      expect(cappedAtBest).toHaveLength(1);
+      expect(cappedAtBest[0].bonus.outcome).toBe("home");
+      expect(cappedAtBest[0].result.hedgeStake.toFixed(2)).toBe("201.11");
+
+      // A $150 cap rules out the best (Giants) orientation. The owner's rule
+      // is that the game is dropped entirely -- it must NOT fall back to the
+      // cheaper Dodgers orientation ($7.88 hedge, $22.06 profit).
       const capped = rankBonusBetHedges([market], {
         ...baseOpts,
-        maxHedgeStake: new Decimal(120),
+        maxHedgeStake: new Decimal(150),
       });
-      expect(capped).toHaveLength(1);
-      expect(capped[0].bonus.outcome).toBe("away");
-      expect(capped[0].result.hedgeStake.toFixed(2)).toBe("90.00");
-      expect(capped[0].result.guaranteedProfit.toFixed(2)).toBe("60.00");
+      expect(capped).toHaveLength(0);
     });
 
     it("leaves the existing ranking output identical when maxHedgeStake is undefined", () => {
