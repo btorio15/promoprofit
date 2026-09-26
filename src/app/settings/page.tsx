@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
@@ -13,6 +15,10 @@ export const dynamic = "force-dynamic";
  * the main app page -- this screen has no odds/credit concerns. "My books"
  * reuses the identical BookPicker-backed form as onboarding, pre-checked
  * with the user's saved selection (D-12).
+ *
+ * Shows an explicit back-to-home link above the heading (owner gap closure:
+ * the header wordmark link alone wasn't discoverable enough) so there are
+ * two independent one-click routes back to the main page.
  */
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -29,6 +35,13 @@ export default async function SettingsPage() {
       <AppHeader displayName={user.displayName} />
       <main className="mx-auto w-full max-w-[1080px] px-4 py-12">
         <div className="flex max-w-[480px] flex-col gap-8">
+          <Link
+            href="/"
+            className="inline-flex min-h-10 w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Back to PromoProfit
+          </Link>
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold">Settings</h1>
             <p className="text-sm text-muted-foreground">

@@ -43,7 +43,7 @@ describe("settings navigation (owner-reported gap closure)", () => {
     const element = await SettingsPage();
     const markup = renderToStaticMarkup(element as Parameters<typeof renderToStaticMarkup>[0]);
 
-    expect(markup).toMatch(/<a href="\/"[^>]*>[^<]*Back to PromoProfit<\/a>/);
+    expect(markup).toMatch(/<a href="\/"[^>]*>(?:(?!<\/a>).)*Back to PromoProfit<\/a>/);
   });
 
   it("the Back to PromoProfit link appears before the Settings heading", async () => {
