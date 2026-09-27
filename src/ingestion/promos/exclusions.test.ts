@@ -14,11 +14,23 @@ describe("classifyExclusion — D-15 skip reasons", () => {
   it("classifies Parlay-shaped titles", () => {
     expect(classify("50% MLB Parlay Profit Boost")).toBe("parlay");
     expect(classify("College Football 50% Parlay Boost")).toBe("parlay");
+  });
+
+  it("classifies live-wager-only promos (title names the game, terms say Live Wagers Only)", () => {
+    expect(
+      classify(
+        "30% BAL Ravens vs. DAL Cowboys Live Wager Profit Boost",
+        "Live Wagers Only",
+      ),
+    ).toBe("live_only");
+  });
+
+  it("classifies a title-level Parlay signal over an incidental Scorer/prop mention", () => {
     expect(classify("25% NFL TD Scorer Parlay Profit Boost")).toBe("parlay");
   });
 
-  it("classifies live-wager-only titles", () => {
-    expect(classify("30% BAL Ravens vs. DAL Cowboys Live Wager Profit Boost")).toBe("live_only");
+  it("classifies a pure player-prop title (no parlay/sgp qualifier) as prop", () => {
+    expect(classify("NFL Anytime TD Scorer Boost")).toBe("prop");
   });
 
   it("classifies futures/outright titles", () => {
