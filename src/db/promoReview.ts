@@ -9,9 +9,12 @@ import {
   CAP_FIELDS,
   PROMO_TYPES,
   REVIEW_REASONS,
+  WINNINGS_CAP_KINDS,
   type CapField,
+  type PromoSelection,
   type PromoType,
   type ReviewReason,
+  type WinningsCapKind,
 } from "@/domain/promos/types";
 
 /**
@@ -35,6 +38,8 @@ export interface QueueRow {
   scope: ScopeGuess | null;
   maxStake: string | null;
   maxWinnings: string | null;
+  /** The book's own winnings-cap semantics (Plan 09, D-18) -- set independently of whether maxWinnings itself parsed; null means "unknown," which enterPromoCaps refuses to guess (T-03-09-03). */
+  maxWinningsKind: WinningsCapKind | null;
   minOddsAmerican: number | null;
   bonusAmount: string | null;
   unparsedCapFields: CapField[];
@@ -58,6 +63,7 @@ interface PendingPromoRow {
   windowEnd: Date | null;
   maxStake: string | null;
   maxWinnings: string | null;
+  maxWinningsKind: string | null;
   minOddsAmerican: number | null;
   bonusAmount: string | null;
   unparsedCapFields: unknown;
@@ -81,6 +87,7 @@ const SELECT_COLUMNS = {
   windowEnd: promos.windowEnd,
   maxStake: promos.maxStake,
   maxWinnings: promos.maxWinnings,
+  maxWinningsKind: promos.maxWinningsKind,
   minOddsAmerican: promos.minOddsAmerican,
   bonusAmount: promos.bonusAmount,
   unparsedCapFields: promos.unparsedCapFields,
@@ -115,6 +122,35 @@ function scopeGuessFromColumns(row: PendingPromoRow): ScopeGuess | null {
 }
 
 /**
+ * Drizzle `.set()` columns for a scope write, shared by applyConfirmedMatch
+ * (Plan 07) and applyCorrectedMatch (Plan 09) -- both write the exact same
+ * scope-column shape, just from a different source ScopeGuess.
+ */
+function scopeColumnsFrom(scope: ScopeGuess) {
+  return scope.kind === "event"
+    ? {
+        scopeKind: "event" as const,
+        sportKey: scope.sportKey,
+        eventId: scope.eventId,
+        eventCommenceTime: new Date(scope.commenceTime),
+        homeTeam: scope.homeTeam,
+        awayTeam: scope.awayTeam,
+        windowStart: null,
+        windowEnd: null,
+      }
+    : {
+        scopeKind: "sport_window" as const,
+        sportKey: scope.sportKey,
+        eventId: null,
+        eventCommenceTime: null,
+        homeTeam: null,
+        awayTeam: null,
+        windowStart: new Date(scope.windowStart),
+        windowEnd: new Date(scope.windowEnd),
+      };
+}
+
+/**
  * Validates and shapes one pending_review promos row into a QueueRow, or
  * drops it with a console.warn when its stored data is inconsistent with
  * the schemas that govern it (mirrors db/promos.ts's
@@ -145,6 +181,11 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
   const unparsedCapFieldsResult = CapFieldArraySchema.safeParse(row.unparsedCapFields);
   const unparsedCapFields = unparsedCapFieldsResult.success ? unparsedCapFieldsResult.data : [];
 
+  const maxWinningsKind: WinningsCapKind | null =
+    row.maxWinningsKind !== null && (WINNINGS_CAP_KINDS as readonly string[]).includes(row.maxWinningsKind)
+      ? (row.maxWinningsKind as WinningsCapKind)
+      : null;
+
   return {
     id: row.id,
     bookKey: row.bookKey,
@@ -156,6 +197,7 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
     scope: scopeGuessFromColumns(row),
     maxStake: row.maxStake,
     maxWinnings: row.maxWinnings,
+    maxWinningsKind,
     minOddsAmerican: row.minOddsAmerican,
     bonusAmount: row.bonusAmount,
     unparsedCapFields,
@@ -233,33 +275,10 @@ export async function applyConfirmedMatch(args: {
   const { promoId, userId, scope, next, now } = args;
   const db = getDb();
 
-  const scopeColumns =
-    scope.kind === "event"
-      ? {
-          scopeKind: "event" as const,
-          sportKey: scope.sportKey,
-          eventId: scope.eventId,
-          eventCommenceTime: new Date(scope.commenceTime),
-          homeTeam: scope.homeTeam,
-          awayTeam: scope.awayTeam,
-          windowStart: null,
-          windowEnd: null,
-        }
-      : {
-          scopeKind: "sport_window" as const,
-          sportKey: scope.sportKey,
-          eventId: null,
-          eventCommenceTime: null,
-          homeTeam: null,
-          awayTeam: null,
-          windowStart: new Date(scope.windowStart),
-          windowEnd: new Date(scope.windowEnd),
-        };
-
   const rows = await db
     .update(promos)
     .set({
-      ...scopeColumns,
+      ...scopeColumnsFrom(scope),
       marketType: null,
       line: null,
       side: null,
@@ -291,6 +310,87 @@ export async function applyDismissal(args: { promoId: number; userId: number; no
     .update(promos)
     .set({ status: "dismissed", dismissedByUserId: userId, reviewedAt: now })
     .where(and(eq(promos.id, promoId), eq(promos.status, "pending_review")))
+    .returning({ id: promos.id });
+
+  return rows.length === 1;
+}
+
+/**
+ * Writes a member-corrected scope (D-14, T-03-09-02/05) in the same
+ * conditional-UPDATE shape as applyConfirmedMatch, plus the optional pinned
+ * market/side (null clears any prior pin -- "Best available" is a real,
+ * writable choice, not just a UI default). Sets corrected_by_user_id
+ * (distinct attribution from confirmed_by_user_id) and auto_matched false;
+ * auto_match_blocked is left untouched (Plan 07/D-11's flag-back semantics
+ * are orthogonal to a member actively correcting a match).
+ */
+export async function applyCorrectedMatch(args: {
+  promoId: number;
+  userId: number;
+  scope: ScopeGuess;
+  pinned: PromoSelection | null;
+  next: ReturnType<typeof statusAfterMatch>;
+  now: Date;
+}): Promise<boolean> {
+  const { promoId, userId, scope, pinned, next, now } = args;
+  const db = getDb();
+
+  const pinnedColumns = pinned
+    ? { marketType: pinned.marketType, line: pinned.line, side: pinned.side }
+    : { marketType: null, line: null, side: null };
+
+  const rows = await db
+    .update(promos)
+    .set({
+      ...scopeColumnsFrom(scope),
+      ...pinnedColumns,
+      status: next.status,
+      reviewReason: next.reviewReason,
+      unparsedCapFields: next.unparsedCapFields,
+      correctedByUserId: userId,
+      reviewedAt: now,
+      autoMatched: false,
+    })
+    .where(and(eq(promos.id, promoId), eq(promos.status, "pending_review"), eq(promos.reviewReason, "match")))
+    .returning({ id: promos.id });
+
+  return rows.length === 1;
+}
+
+/**
+ * Writes member-supplied cap fields (D-18, T-03-09-03) in one conditional
+ * UPDATE gated on status = 'pending_review' AND review_reason = 'caps'.
+ * Callers pass every cap column's FINAL value (the caller -- enterPromoCaps
+ * -- is responsible for passing through the row's own already-known value
+ * for any field not being newly entered, so this function never blindly
+ * nulls out a cap the scraper already parsed correctly). Always activates
+ * the promo (D-18: caps review has no other way out besides Dismiss) and
+ * clears unparsed_cap_fields.
+ */
+export async function applyCapEntry(args: {
+  promoId: number;
+  userId: number;
+  maxStake: string | null;
+  maxWinnings: string | null;
+  minOddsAmerican: number | null;
+  now: Date;
+}): Promise<boolean> {
+  const { promoId, userId, maxStake, maxWinnings, minOddsAmerican, now } = args;
+  const db = getDb();
+
+  const rows = await db
+    .update(promos)
+    .set({
+      maxStake,
+      maxWinnings,
+      minOddsAmerican,
+      unparsedCapFields: [],
+      status: "active",
+      reviewReason: null,
+      capEnteredByUserId: userId,
+      reviewedAt: now,
+    })
+    .where(and(eq(promos.id, promoId), eq(promos.status, "pending_review"), eq(promos.reviewReason, "caps")))
     .returning({ id: promos.id });
 
   return rows.length === 1;
