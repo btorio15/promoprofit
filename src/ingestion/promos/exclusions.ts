@@ -17,7 +17,11 @@ const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 const NOT_A_PROMO_RE =
   /\bpick\s*'?em\b|\bsweepstakes?\b|\bgiveaway\b|\brefer[- ]a[- ]friend\b|\bbet protect\b|\blink your account\b|\baccount linking\b/i;
 
-const LIVE_ONLY_RE = /\blive wagers? only\b|\blive[- ]only\b/i;
+// Bally Bet's own title wording is just "Live Wager Profit Boost" (no
+// trailing "Only") while its detail bullet says "Live Wagers Only" -- both
+// must classify the same way (03-RECON.md Observed Promos row 3), so this
+// matches bare "live wager(s)" as well as the "... only" phrasing.
+const LIVE_ONLY_RE = /\blive[- ]wagers?\b|\blive[- ]only\b/i;
 
 const FUTURES_RE = /\bfutures?\b|\bchampion\b|\bto win the\b/i;
 const OUTRIGHT_RE =
