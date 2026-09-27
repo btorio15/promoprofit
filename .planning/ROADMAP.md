@@ -160,12 +160,12 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 2/11 plans executed
+**Plans:** 3/11 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Wave 0 recon: find the real logged-out single-game promo source (Bally Bet / BetRivers), capture fixture, owner's D-09 per-book call, Bluesky/X findings
+- [x] 03-01-PLAN.md — Wave 0 recon: find the real logged-out single-game promo source (Bally Bet / BetRivers), capture fixture, owner's D-09 per-book call, Bluesky/X findings
 - [x] 03-02-PLAN.md — Profit-boost engine (published vs derived price, cap-optimal stake, ROI) + whole-dollar bonus-bet precision, known-answer TDD
 - [x] 03-03-PLAN.md — Promos tab + promos/scrape_runs schema and migration [BLOCKING], per-book scrape status, empty states
 
@@ -237,6 +237,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
-| 3. Promo Scraping & Review | 2/11 | In Progress|  |
+| 3. Promo Scraping & Review | 3/11 | In Progress|  |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
