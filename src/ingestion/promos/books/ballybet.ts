@@ -11,7 +11,7 @@ import {
   type SkipReason,
   type SkippedEntry,
 } from "@/domain/promos/scraped";
-import { PROMO_MARKET_TYPES, type CapField } from "@/domain/promos/types";
+import { PROMO_MARKET_TYPES, type CapField, type WinningsCapKind } from "@/domain/promos/types";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import {
   extractFinePrintNote,
@@ -22,6 +22,9 @@ import {
 } from "@/ingestion/promos/finePrint";
 import { splitTeams } from "@/ingestion/promos/promoText";
 import { sportFromText, type SportHint } from "@/ingestion/promos/sportHints";
+
+/** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
+const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
 
 /**
  * Bally Bet parser (PROMO-03, D-06 first target, D-09 render:"http").
@@ -268,6 +271,7 @@ function buildFromListFallback(card: ListCard, slug: string, titleSportHint: Spo
     bonusAmount: null,
     maxStake: null,
     maxWinnings: null,
+    winningsCapKind: WINNINGS_CAP_KIND,
     minOddsAmerican: null,
     // D-18: the detail that would state these caps was planned but never
     // came back -- mark them unparsed (never guessed) rather than absent.
@@ -309,7 +313,7 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
 
   const maxStakeParse = parseMaxStake(text);
   const minOddsParse = parseMinOdds(text);
-  const maxWinningsParse = parseMaxWinnings(text, "boost_extra");
+  const maxWinningsParse = parseMaxWinnings(text, WINNINGS_CAP_KIND);
 
   const unparsedCapFields: CapField[] = [];
 
@@ -348,6 +352,7 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
     bonusAmount: null,
     maxStake,
     maxWinnings,
+    winningsCapKind: WINNINGS_CAP_KIND,
     minOddsAmerican,
     unparsedCapFields,
     claimRequired: "claim_token",

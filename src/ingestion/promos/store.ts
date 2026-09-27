@@ -60,7 +60,8 @@ function structuredCapColumns(parsed: ScrapedPromo) {
     bonusAmount: parsed.bonusAmount,
     maxStake: parsed.maxStake,
     maxWinnings: parsed.maxWinnings?.amount ?? null,
-    maxWinningsKind: parsed.maxWinnings?.kind ?? null,
+    // WR-01: the kind is stored even when the amount is unparsed.
+    maxWinningsKind: parsed.maxWinnings?.kind ?? parsed.winningsCapKind ?? null,
     minOddsAmerican: parsed.minOddsAmerican,
     unparsedCapFields: parsed.unparsedCapFields,
     finePrintNote: parsed.finePrintNote,

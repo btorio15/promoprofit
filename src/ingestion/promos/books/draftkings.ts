@@ -9,11 +9,14 @@ import {
   type SkipReason,
   type SkippedEntry,
 } from "@/domain/promos/scraped";
-import { PROMO_MARKET_TYPES } from "@/domain/promos/types";
+import { PROMO_MARKET_TYPES, type WinningsCapKind } from "@/domain/promos/types";
 import { slateWindow } from "@/domain/promos/etTime";
 import { parseMaxStake, parseMaxWinnings, parseMinOdds, extractFinePrintNote } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromText } from "@/ingestion/promos/sportHints";
+
+/** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
+const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
 
 /**
  * DraftKings parser (03-RECON.md "### DraftKings (`draftkings`)"). One POST
@@ -178,7 +181,7 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
   const maxStakeParse = parseMaxStake(text);
   const maxStake = maxStakeParse.status === "parsed" ? maxStakeParse.value : null;
 
-  const maxWinningsParse = parseMaxWinnings(text, "boost_extra");
+  const maxWinningsParse = parseMaxWinnings(text, WINNINGS_CAP_KIND);
   const maxWinnings = maxWinningsParse.status === "parsed" ? maxWinningsParse.value : null;
 
   const minOddsParse = parseMinOdds(text);
@@ -241,6 +244,7 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
     bonusAmount: null,
     maxStake,
     maxWinnings,
+    winningsCapKind: WINNINGS_CAP_KIND,
     minOddsAmerican,
     unparsedCapFields,
     claimRequired,

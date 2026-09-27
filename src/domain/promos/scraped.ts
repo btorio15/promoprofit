@@ -75,6 +75,13 @@ export interface ScrapedPromo {
   bonusAmount: string | null;
   maxStake: string | null;
   maxWinnings: { amount: string; kind: WinningsCapKind } | null;
+  /**
+   * WR-01: this book's winnings-cap semantics, known per book independently
+   * of whether the cap amount itself parsed -- lets a member enter an
+   * unparsed max-winnings amount without the app guessing the kind.
+   * Optional so rows stored before this field existed still validate.
+   */
+  winningsCapKind?: WinningsCapKind | null;
   minOddsAmerican: number | null;
   /** D-18. */
   unparsedCapFields: CapField[];
@@ -170,6 +177,7 @@ export const ScrapedPromoSchema = z
     bonusAmount: MoneyStringSchema.nullable(),
     maxStake: MoneyStringSchema.nullable(),
     maxWinnings: MaxWinningsSchema.nullable(),
+    winningsCapKind: z.enum(WINNINGS_CAP_KINDS).nullable().optional(),
     minOddsAmerican: AmericanOddsSchema.nullable(),
     unparsedCapFields: z.array(z.enum(CAP_FIELDS)),
     claimRequired: z.enum(["opt_in", "claim_token"]).nullable(),

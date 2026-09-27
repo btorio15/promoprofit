@@ -193,6 +193,7 @@ describe("draftkingsScraper — structured fields for the kept boosts (Task 2)",
     expect(candidate.maxStake).toBe("25.00");
     expect(candidate.minOddsAmerican).toBe(-200);
     expect(candidate.maxWinnings).toBeNull();
+    expect(candidate.winningsCapKind).toBe("boost_extra");
     expect(candidate.unparsedCapFields).toEqual([]);
     expect(candidate.sportKeyHint).toBe("americanfootball_nfl");
     expect(candidate.teamsText).toEqual([]);

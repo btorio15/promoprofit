@@ -23,6 +23,9 @@ import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromTags, sportFromText } from "@/ingestion/promos/sportHints";
 import { splitTeams } from "@/ingestion/promos/promoText";
 
+/** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
+const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
+
 /**
  * FanDuel parser (one of the three http books the owner cleared in D-09,
  * 03-RECON.md "### FanDuel (`fanduel`)"). Plain-fetch, logged-out, JSON-only
@@ -325,6 +328,7 @@ function buildCandidate(params: {
     bonusAmount: null,
     maxStake,
     maxWinnings,
+    winningsCapKind: WINNINGS_CAP_KIND,
     minOddsAmerican,
     unparsedCapFields,
     claimRequired: "claim_token",
@@ -347,7 +351,7 @@ function buildCandidateWithDetail(
 
   const maxStakeParse = parseMaxStake(descriptionText);
   const minOddsParse = parseMinOdds(descriptionText);
-  const maxWinningsParse = parseMaxWinnings(descriptionText, "boost_extra");
+  const maxWinningsParse = parseMaxWinnings(descriptionText, WINNINGS_CAP_KIND);
 
   const unparsedCapFields: CapField[] = [];
   if (maxStakeParse.status === "unparsed") unparsedCapFields.push("maxStake");

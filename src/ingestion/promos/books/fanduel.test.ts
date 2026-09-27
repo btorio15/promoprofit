@@ -111,6 +111,7 @@ describe("fanduelScraper — Task 2: parsing the real CFB boost with its hidden 
     expect(promo.unparsedCapFields).toEqual(["maxStake"]);
     expect(promo.minOddsAmerican).toBe(-200);
     expect(promo.maxWinnings).toBeNull();
+    expect(promo.winningsCapKind).toBe("boost_extra");
     expect(promo.sportKeyHint).toBe("americanfootball_ncaaf");
     expect(promo.teamsText).toEqual([]);
     expect(promo.scopeText).toContain("College Football Games on September 26th, 2026");

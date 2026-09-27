@@ -81,6 +81,13 @@ describe("ScrapedPromoSchema", () => {
     expectValid(sportWideBoost);
   });
 
+  it("WR-01: accepts winningsCapKind set, null, or absent (rows stored before the field existed)", () => {
+    expectValid({ ...sportWideBoost, winningsCapKind: "boost_extra" });
+    expectValid({ ...sportWideBoost, winningsCapKind: null });
+    expectValid(sportWideBoost);
+    expectInvalid({ ...sportWideBoost, winningsCapKind: "made_up" });
+  });
+
   it("accepts a game-named boost (two teams, no sport hint)", () => {
     expectValid(gameNamedBoost);
   });

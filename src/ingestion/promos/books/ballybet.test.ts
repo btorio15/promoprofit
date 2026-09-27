@@ -106,6 +106,7 @@ describe("ballybetScraper.parse — real fixture", () => {
     expect(promo.maxStake).toBe("20.00");
     expect(promo.minOddsAmerican).toBe(100);
     expect(promo.maxWinnings).toBeNull();
+    expect(promo.winningsCapKind).toBe("boost_extra");
     expect(promo.unparsedCapFields).toEqual([]);
     expect(promo.teamsText).toEqual(["LA Rams", "DEN Broncos"]);
     expect(promo.scopeText).toBe("LA Rams vs. DEN Broncos");
