@@ -78,26 +78,40 @@ describe("draftkingsScraper — parse: candidates and skip classification from t
     expect(reasonById.get("1124647")).toBe("sgp");
     expect(reasonById.get("1119078")).toBe("futures");
 
-    // casino / sweepstakes / racing / refer-a-friend / offer-card / discord
-    // / DK Horse rows -- none name a profit boost, odds boost or bonus bet.
+    // casino / sweepstakes / racing / offer-card / discord rows -- none
+    // name a profit boost, odds boost or bonus bet.
     const notAPromoIds = [
-      "1098873", // Casino
       "1116571", // Sweepstakes
       "1120650", // Bet and Get (racing)
       "1123721", // Bet and Get (racing)
       "1098879", // Bet and Get (racing)
       "1001646", // Offer Card Messaging (racing)
       "1020206", // Offer Card Messaging (responsible gaming)
-      "882364", // Refer a Friend
-      "782037", // Refer a Friend
       "861287", // Offer Card Messaging (account linking)
-      "1107235", // DK Horse
       "1114582", // Sweepstakes
       "1119017", // Sweepstakes
       "600295", // Exclusive (Discord)
     ];
     for (const id of notAPromoIds) {
       expect(reasonById.get(id)).toBe("not_a_promo");
+    }
+
+    // Deviation from the plan's generic "casino/refer-a-friend/DK Horse ->
+    // not_a_promo" bucket: these four rows' own REAL (not synthetic) terms
+    // genuinely say "sign up" / "sign up for a new ... account" deep in
+    // their gated/eligibility text, which correctly matches the shared
+    // classifier's new-customer text pattern -- they are still excluded
+    // (never candidates), just via a more specific real SkipReason than
+    // the plan anticipated without reading the raw fixture bodies. See
+    // SUMMARY.md Deviations.
+    const newCustomerViaRealTextIds = [
+      "1098873", // Casino ("Please log in or sign up to view terms...")
+      "882364", // Refer a Friend ("...sign up to view terms...")
+      "782037", // Refer a Friend ("...sign up to view terms...")
+      "1107235", // DK Horse ("...sign up for a new Racing account...")
+    ];
+    for (const id of newCustomerViaRealTextIds) {
+      expect(reasonById.get(id)).toBe("new_customer");
     }
   });
 
