@@ -390,24 +390,28 @@ on:
 | A3 | theScore Bet's and Bally Bet's default anti-bot posture (Cloudflare, apparently not actively blocking plain HTTP this session) will hold up under a **repeated, scheduled** (3x/day, indefinitely) access pattern, not just a single one-off probe | Scraping Feasibility by Book | Cloudflare's bot-management can escalate its response based on request-pattern history (frequency, consistency) even if a single request sails through — a book that looks fine in a one-off check could start challenging or blocking after weeks of identical scheduled requests |
 | A4 | Hard Rock Bet's live CO sportsbook app is reachable at some subdomain/path not identified this session (DNS resolution failed for the guessed `co.hardrockbet.com`) | Scraping Feasibility by Book | If Hard Rock Bet is actually unreachable/geofenced from outside a mobile app entirely, it should be dropped from D-06/D-09 consideration rather than left as a live candidate |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where does each candidate book actually render single-game boosted odds?**
    - What we know: The generic "/promotions"-style marketing page returns real, fetchable content on Bally Bet and BetRivers, but that content is sign-up-offer/loyalty-program text, not per-game boost data.
    - What's unclear: Whether single-game boosts live on a different, not-yet-identified page (a sport/game hub with inline boost badges) or are simply not exposed on any logged-out page at all for these books.
    - Recommendation: Wave 0 human/visual reconnaissance task (real browser, logged out) on Bally Bet and BetRivers before writing any scraper selector code. If neither exposes single-game boosts logged-out, D-06's "at least one book must work this phase" may need to fall back to scraping **bonus-bet sign-up-style offers** that still qualify under D-15 (bonus-bet promos on a 2-way market), which this session's probing suggests *is* present in the fetched content (Bally Bet's "BONUS BETS" text), even if profit-boost-specific content isn't confirmed.
+   - **RESOLVED:** the Wave 0 recon (03-RECON.md, 2026-09-27) found single-game boosts are exposed via a plain logged-out **JSON backend API**, not any HTML page, for three books at once: Bally Bet (`GET https://dx-config-service.eks00.prod.na00.aws.ballys.tech/view/promotions` + `/view/<promotionIdentifier>`), DraftKings (`POST https://api.draftkings.com/en/api/promotions/v3/promotions/query`), and FanDuel (`GET https://api.sportsbook.fanduel.com/promos/api/promotions?...` + `/promotions/<promoCode>?...`). `source_format=json`, `render_mode=http` for all three — no Playwright, no HTML parsing at all. Both profit boosts (all three books) and bonus-bet-token promos (FanDuel/Bally Bet phrase theirs as a claimable "boost token," functionally a bonus-bet-style offer) were observed. See 03-RECON.md "Scraper Contract" for full per-book endpoint/header/JSON-path detail.
 
 2. **Does BetMGM's app-route redirect (`/en/sports/promotions` → 302) lead somewhere scrapable, or is it a geo/device redirect?**
    - What we know: The blog URL loads without a JS challenge; the app route redirected and wasn't chased this session.
    - What's unclear: Destination and content of the redirect.
    - Recommendation: Low priority given BetRivers/Bally Bet are already stronger candidates — only worth chasing if both Kambi-platform books fail the Open Question 1 spike.
+   - **RESOLVED:** Not pursued this phase — D-06 is satisfied by three working books (`ballybet`, `draftkings`, `fanduel`), and the owner's Task 2 pass confirmed BetMGM's `GET https://www.co.betmgm.com/en/promo/api/offers` returns an HTML shell (not JSON) via plain `curl`, and even in a browser the boost details are gated behind "Log in to view details and terms." `skip` per 03-RECON.md's D-09 Decisions table; revisit opportunistically if a future phase needs a fourth book.
 
 3. **What is Hard Rock Bet's actual Colorado sportsbook app domain?**
    - What we know: `hardrockbet.com`/`hardrock.bet` resolve to a marketing/SEO site; the guessed `co.hardrockbet.com` app subdomain doesn't resolve.
    - What's unclear: The real subdomain/path.
    - Recommendation: Low priority this phase (D-06 only needs one book to work); revisit opportunistically per D-06's "others added opportunistically."
+   - **RESOLVED:** Not pursued further — the owner's Task 2 pass tried `app.hardrock.bet` (the app subdomain, a step further than this research's `co.hardrockbet.com` guess); `app.hardrock.bet/promotions` returned 404, and no promo page was found. `skip` per 03-RECON.md's D-09 Decisions table (recorded there as "❓ not found"). Not investigated further this phase — D-06 is already satisfied by three other books.
 
 4. **Max-winnings cap wording** — see Assumption A2. Recommendation: resolve empirically once real promo text from the chosen book is in hand (Wave 0/1), lock via a known-answer fixture, don't guess further in research.
+   - **RESOLVED:** none of the three target books (`ballybet`, `draftkings`, `fanduel`) states an independent max-**winnings** cap on any observed promo — only a max-**stake** (wager) cap (Bally Bet "Maximum Bet: $20"/"$10"; DraftKings "BOOSTED UP TO MAX $25 WAGER"; FanDuel's cap is hidden logged out entirely, going to the review queue per D-18). The boost percentage applies to winnings/profit only, never to the stake (DraftKings' verbatim wording: "Profit boost only applies to winnings, excluding original bet amount"; FanDuel's own T&Cs worked example: $100 winnings × 50% boost → $150). 03-RECON.md's Scraper Contract classifies `winnings_cap_kind` as `boost_extra` on that basis. Plan 05's fixture tests (`ballybet-promo-detail-rams-broncos.json`, `draftkings-promos.json`, `fanduel-promo-detail-cfb-boost.json`) lock this wording as the known-answer source — see 03-RECON.md "Max-Winnings Semantics" and "Observed Promos."
 
 ## Environment Availability
 
