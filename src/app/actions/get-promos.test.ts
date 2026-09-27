@@ -592,6 +592,8 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         autoMatched: true,
         bestGuaranteedProfit: "-0.65",
         note: "No profitable hedge right now (best: −$0.65)",
+        // The member only has BetMGM, not the promo's own book (WR-07).
+        hasPromoBook: false,
       },
     ]);
   });
@@ -808,5 +810,72 @@ describe("getPromos correction options (Plan 09, T-03-09-06)", () => {
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-odds");
     expect(result.correctionOptions).toEqual({ events: [], sportDays: [] });
+  });
+});
+
+describe("getPromos promo-book ordering (WR-07)", () => {
+  it("keeps other-book promos, flags them hasPromoBook false, and sorts them after own-book rows in profit order", async () => {
+    const event = moneylineEvent({
+      id: "nfl-order",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+        { bookKey: "fanduel", homePrice: -275, awayPrice: 220 },
+        { bookKey: "betmgm", homePrice: -275, awayPrice: 220 },
+      ],
+    });
+
+    const ownBig = activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" });
+    const ownSmall = activeBoostPromo({ id: 2, bookKey: "fanduel", maxStake: "10.00" });
+    const otherBiggest = activeBoostPromo({ id: 3, bookKey: "betmgm", maxStake: "100.00" });
+
+    mockGetActivePromos.mockResolvedValue([ownSmall, otherBiggest, ownBig]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetBonusBooks.mockResolvedValue([
+      { key: "draftkings", displayName: "DraftKings" },
+      { key: "fanduel", displayName: "FanDuel" },
+      { key: "betmgm", displayName: "BetMGM" },
+    ]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
+    mockGetHedgeBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+    // The other-book promo is the most profitable, but is still shown last.
+    expect(result.rows.map((r) => r.promoId)).toEqual([1, 2, 3]);
+    expect(result.rows.map((r) => r.hasPromoBook)).toEqual([true, true, false]);
+    // Within the own-book group, profit order is kept.
+    expect(Number(result.rows[0].guaranteedProfit)).toBeGreaterThan(Number(result.rows[1].guaranteedProfit));
+    expect(Number(result.rows[2].guaranteedProfit)).toBeGreaterThan(Number(result.rows[0].guaranteedProfit));
+  });
+
+  it("sorts other-book unprofitable rows after own-book ones, keeping each group's order", async () => {
+    const noEventsScope = {
+      kind: "sport_window" as const,
+      sportKey: "basketball_nba",
+      windowStart: new Date(NOW_ISO),
+      windowEnd: new Date(plusHours(48)),
+    };
+    mockGetActivePromos.mockResolvedValue([
+      activeBoostPromo({ id: 5, bookKey: "fanduel", scope: noEventsScope }),
+      activeBoostPromo({ id: 6, bookKey: "draftkings", scope: noEventsScope }),
+      activeBoostPromo({ id: 7, bookKey: "fanduel", scope: noEventsScope }),
+    ]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
+    mockGetHedgeBookKeys.mockResolvedValue(["draftkings"]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.rows).toEqual([]);
+    expect(result.emptyVariant).toBeNull();
+    expect(result.unprofitableRows.map((r) => r.promoId)).toEqual([6, 5, 7]);
+    expect(result.unprofitableRows.map((r) => r.hasPromoBook)).toEqual([true, false, false]);
   });
 });

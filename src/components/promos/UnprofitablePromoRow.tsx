@@ -3,6 +3,7 @@
 import type { UnprofitablePromoRowDTO } from "@/domain/promos/dto";
 import { Badge } from "@/components/ui/badge";
 import { FlagMatchButton } from "./FlagMatchButton";
+import { NO_PROMO_BOOK_HINT } from "./PromoRow";
 
 interface UnprofitablePromoRowProps {
   row: UnprofitablePromoRowDTO;
@@ -22,7 +23,11 @@ export function UnprofitablePromoRow({ row, onChanged }: UnprofitablePromoRowPro
   return (
     <div
       className="rounded-lg border border-border bg-secondary/40 p-4 opacity-60"
-      aria-label={`${row.bookName} ${row.title} — ${row.note}`}
+      aria-label={
+        row.hasPromoBook
+          ? `${row.bookName} ${row.title} — ${row.note}`
+          : `${row.bookName} ${row.title} — ${row.note} (${NO_PROMO_BOOK_HINT})`
+      }
     >
       <div className="flex flex-col gap-1">
         <span className="flex flex-wrap items-center gap-2 text-base">
@@ -38,6 +43,7 @@ export function UnprofitablePromoRow({ row, onChanged }: UnprofitablePromoRowPro
         </span>
         <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
         <span className="text-sm text-muted-foreground">{row.note}</span>
+        {row.hasPromoBook ? null : <span className="text-sm text-muted-foreground">{NO_PROMO_BOOK_HINT}</span>}
       </div>
     </div>
   );

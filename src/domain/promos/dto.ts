@@ -76,6 +76,12 @@ export interface PromoRowDTO {
   /** "Confirmed by X · Cap entered by Y" or null for auto-matched promos (no human to attribute). */
   attribution: string | null;
   worstCase: boolean;
+  /**
+   * WR-07: whether the member has an account at the promo's own book (set
+   * on the server from their saved books). Rows where this is false are
+   * still shown, but dimmed and sorted after every own-book row.
+   */
+  hasPromoBook: boolean;
 }
 
 /**
@@ -100,6 +106,8 @@ export interface UnprofitablePromoRowDTO {
   bestGuaranteedProfit: string | null;
   /** Display-ready: "No profitable hedge right now (best: −$0.65)" or "No eligible bets right now". */
   note: string;
+  /** WR-07: same meaning as PromoRowDTO.hasPromoBook -- false rows are sorted last. */
+  hasPromoBook: boolean;
 }
 
 /**

@@ -34,6 +34,15 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 const EMPTY_CORRECTION_OPTIONS: CorrectionOptions = { events: [], sportDays: [] };
 
 /**
+ * WR-07: promos at books the member has come first; promos at books they
+ * don't have are kept (shown dimmed) but sorted after them. A stable
+ * partition, so each group keeps its incoming (profit) order.
+ */
+function ownBooksFirst<T extends { hasPromoBook: boolean }>(rows: T[]): T[] {
+  return [...rows.filter((row) => row.hasPromoBook), ...rows.filter((row) => !row.hasPromoBook)];
+}
+
+/**
  * Correct sub-panel dropdown data (T-03-09-06): built ONLY when the queue
  * actually has a match-kind item -- there's no correction UI to populate
  * otherwise, so skip the extra cache reads entirely on every other visit.
@@ -137,7 +146,9 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
 
   const opportunities = rankPromoHedges(activePromos, rankOpts);
   const unprofitable = findUnprofitablePromos(activePromos, rankOpts);
-  const unprofitableRows = unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames));
+  const unprofitableRows = ownBooksFirst(
+    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet)),
+  );
 
   if (opportunities.length === 0) {
     /**
@@ -169,7 +180,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     return { status: "ok", scrapeStatus, emptyVariant, rows: [], unprofitableRows: [], queue, correctionOptions };
   }
 
-  const rows = opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames));
+  const rows = ownBooksFirst(opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet)));
 
   return { status: "ok", scrapeStatus, emptyVariant: null, rows, unprofitableRows, queue, correctionOptions };
 }
@@ -221,7 +232,11 @@ function attributionLineFor(promo: ActivePromo): string | null {
   return promo.attribution.map((a) => `${a.verb} ${a.displayName}`).join(" · ");
 }
 
-function toPromoRowDTO(opportunity: PromoOpportunity<ActivePromo>, bookNames: Map<string, string>): PromoRowDTO {
+function toPromoRowDTO(
+  opportunity: PromoOpportunity<ActivePromo>,
+  bookNames: Map<string, string>,
+  userBookSet: ReadonlySet<string>,
+): PromoRowDTO {
   const { promo, selection, hedge, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
 
   const marketBadge = marketBadgeLabel(selection.marketType, selection.line);
@@ -311,6 +326,7 @@ function toPromoRowDTO(opportunity: PromoOpportunity<ActivePromo>, bookNames: Ma
     capNote,
     attribution: attributionLineFor(promo),
     worstCase: netIfPromoWins !== netIfHedgeWins,
+    hasPromoBook: userBookSet.has(promo.bookKey),
   };
 }
 
@@ -347,6 +363,7 @@ function unprofitablePromoNote(bestGuaranteedProfit: Decimal | null): string {
 function toUnprofitablePromoRowDTO(
   entry: UnprofitablePromo<ActivePromo>,
   bookNames: Map<string, string>,
+  userBookSet: ReadonlySet<string>,
 ): UnprofitablePromoRowDTO {
   const { promo, bestGuaranteedProfit } = entry;
 
@@ -362,5 +379,6 @@ function toUnprofitablePromoRowDTO(
     autoMatched: promo.autoMatched,
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),
+    hasPromoBook: userBookSet.has(promo.bookKey),
   };
 }

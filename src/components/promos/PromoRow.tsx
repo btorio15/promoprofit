@@ -6,8 +6,12 @@ import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/forma
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { PromoDetails } from "./PromoDetails";
+
+/** WR-07: shown on rows whose promo is at a book the member hasn't saved. */
+export const NO_PROMO_BOOK_HINT = "You don't have this book";
 
 interface PromoRowProps {
   row: PromoRowDTO;
@@ -31,11 +35,22 @@ interface PromoRowProps {
  * also toggles the row.
  */
 export function PromoRow({ row, onChanged }: PromoRowProps) {
+  // WR-07: a promo at a book the member doesn't have stays visible but uses
+  // the same muted styling as UnprofitablePromoRow, with a short hint.
   return (
-    <Collapsible className="group rounded-lg border border-border bg-secondary">
+    <Collapsible
+      className={cn(
+        "group rounded-lg border border-border",
+        row.hasPromoBook ? "bg-secondary" : "bg-secondary/40 opacity-60",
+      )}
+    >
       <div className="relative">
         <CollapsibleTrigger
-          aria-label={`Show stakes for ${row.awayTeam} @ ${row.homeTeam}`}
+          aria-label={
+            row.hasPromoBook
+              ? `Show stakes for ${row.awayTeam} @ ${row.homeTeam}`
+              : `Show stakes for ${row.awayTeam} @ ${row.homeTeam} (${NO_PROMO_BOOK_HINT}: ${row.promo.bookName})`
+          }
           className="absolute inset-0 w-full rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
         <div className="pointer-events-none relative grid min-h-11 w-full grid-cols-1 items-center gap-3 p-4 text-left md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_120px_96px_20px] md:gap-4">
@@ -78,6 +93,7 @@ export function PromoRow({ row, onChanged }: PromoRowProps) {
               {row.promo.selectionLabel} <span className="num">{formatAmerican(row.promo.oddsAmerican)}</span>
             </span>
             <span className="text-sm text-muted-foreground">{row.promo.bookName}</span>
+            {row.hasPromoBook ? null : <span className="text-sm text-muted-foreground">{NO_PROMO_BOOK_HINT}</span>}
           </div>
 
           <div className="flex min-w-0 flex-col text-base">
