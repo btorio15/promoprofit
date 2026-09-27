@@ -395,3 +395,140 @@ export async function applyCapEntry(args: {
 
   return rows.length === 1;
 }
+
+interface ActivePromoScopeRow {
+  id: number;
+  autoMatched: boolean;
+  scopeKind: string | null;
+  eventId: string | null;
+  sportKey: string | null;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  eventCommenceTime: Date | null;
+  windowStart: Date | null;
+  windowEnd: Date | null;
+}
+
+/**
+ * Builds a ScopeGuess from an active row's current scope columns, validated
+ * with ScopeGuessSchema (Plan 04) -- unlike scopeGuessFromColumns above
+ * (which trusts columns already written by a validated code path), this is
+ * the flag flow's own defense-in-depth check: a flagged row's best_guess
+ * (D-11) must itself be a well-formed ScopeGuess, since it becomes the
+ * review queue's presentational "best guess" line. Returns null when the
+ * scope is incomplete or fails validation.
+ */
+function activeScopeGuessFromRow(row: ActivePromoScopeRow): ScopeGuess | null {
+  let candidate: unknown;
+
+  if (row.scopeKind === "event") {
+    if (!row.eventId || !row.sportKey || !row.homeTeam || !row.awayTeam || !row.eventCommenceTime) return null;
+    candidate = {
+      kind: "event",
+      eventId: row.eventId,
+      sportKey: row.sportKey,
+      homeTeam: row.homeTeam,
+      awayTeam: row.awayTeam,
+      commenceTime: row.eventCommenceTime.toISOString(),
+    };
+  } else if (row.scopeKind === "sport_window") {
+    if (!row.sportKey || !row.windowStart || !row.windowEnd) return null;
+    candidate = {
+      kind: "sport_window",
+      sportKey: row.sportKey,
+      windowStart: row.windowStart.toISOString(),
+      windowEnd: row.windowEnd.toISOString(),
+    };
+  } else {
+    return null;
+  }
+
+  const result = ScopeGuessSchema.safeParse(candidate);
+  return result.success ? result.data : null;
+}
+
+/**
+ * One active promo's id/autoMatched/current-scope-as-guess, for the flag
+ * action (D-11, T-03-10-01). Null when the row isn't active or its scope
+ * can't be built into a valid ScopeGuess -- flagPromoMatch treats either as
+ * "someone else already handled this promo" (the row moved on, or its data
+ * is unexpectedly inconsistent, either way there's nothing safe to flag).
+ */
+export async function getActivePromoForFlag(
+  id: number,
+): Promise<{ id: number; autoMatched: boolean; guess: ScopeGuess } | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: promos.id,
+      autoMatched: promos.autoMatched,
+      scopeKind: promos.scopeKind,
+      eventId: promos.eventId,
+      sportKey: promos.sportKey,
+      homeTeam: promos.homeTeam,
+      awayTeam: promos.awayTeam,
+      eventCommenceTime: promos.eventCommenceTime,
+      windowStart: promos.windowStart,
+      windowEnd: promos.windowEnd,
+    })
+    .from(promos)
+    .where(and(eq(promos.id, id), eq(promos.status, "active")))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  const guess = activeScopeGuessFromRow(row);
+  if (!guess) return null;
+
+  return { id: row.id, autoMatched: row.autoMatched, guess };
+}
+
+/**
+ * Flags an auto-matched active promo back into the review queue (D-11,
+ * D-12, ARCHITECTURE.md Anti-Pattern 2): a single conditional UPDATE gated
+ * on status = 'active' AND auto_matched = true (T-03-10-02) so a concurrent
+ * flag/confirm/dismiss on the same row can affect at most one caller. Sets
+ * auto_match_blocked true (decideScrapedWrite, Plan 08, permanently refuses
+ * to auto-reactivate this row on any later scrape until a human
+ * Confirms/Corrects/Dismisses it), records who flagged it and when (D-12),
+ * stores the row's own current scope as best_guess (presentational only,
+ * D-10 anti-pattern guard), and nulls every scope/pin column so no stale
+ * scope lingers on a row that's no longer active.
+ */
+export async function applyFlag(args: {
+  promoId: number;
+  userId: number;
+  guess: ScopeGuess;
+  now: Date;
+}): Promise<boolean> {
+  const { promoId, userId, guess, now } = args;
+  const db = getDb();
+
+  const rows = await db
+    .update(promos)
+    .set({
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatchBlocked: true,
+      autoMatched: false,
+      bestGuess: guess,
+      flaggedByUserId: userId,
+      reviewedAt: now,
+      scopeKind: null,
+      eventId: null,
+      sportKey: null,
+      eventCommenceTime: null,
+      homeTeam: null,
+      awayTeam: null,
+      windowStart: null,
+      windowEnd: null,
+      marketType: null,
+      line: null,
+      side: null,
+    })
+    .where(and(eq(promos.id, promoId), eq(promos.status, "active"), eq(promos.autoMatched, true)))
+    .returning({ id: promos.id });
+
+  return rows.length === 1;
+}
