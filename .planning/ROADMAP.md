@@ -160,7 +160,7 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 3/15 plans executed
+**Plans:** 5/15 plans executed
 
 Plans:
 **Wave 1**
@@ -171,8 +171,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-04-PLAN.md — Promo scope model (migration 0005 [BLOCKING]) + app picks the best event/market/side inside each promo's scope under caps and min odds
-- [ ] 03-05-PLAN.md — Scope-based ScrapedPromo + http BookScraper contract, fine-print caps, D-15 exclusions, sport hints, ET dates, dedupe key, status-after-match rule
+- [x] 03-04-PLAN.md — Promo scope model (migration 0005 [BLOCKING]) + app picks the best event/market/side inside each promo's scope under caps and min odds
+- [x] 03-05-PLAN.md — Scope-based ScrapedPromo + http BookScraper contract, fine-print caps, D-15 exclusions, sport hints, ET dates, dedupe key, status-after-match rule
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -244,6 +244,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
-| 3. Promo Scraping & Review | 3/11 | In Progress|  |
+| 3. Promo Scraping & Review | 5/15 | In Progress|  |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
