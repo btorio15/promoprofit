@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 1 of 11
 Status: Executing Phase 3
-Last activity: 2026-09-27 -- Phase 3 execution started
+Last activity: 2026-09-27 - Completed quick task 260927-edt: show unprofitable promos greyed out
 
 Progress: [██████████] 100%
 
@@ -147,6 +147,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260925-wy0 | revert CR-02: apply hedge cap after picking best orientation | 2026-09-26 | 5aef9e1 | [260925-wy0-revert-cr-02-apply-hedge-cap-after-picki](./quick/260925-wy0-revert-cr-02-apply-hedge-cap-after-picki/) |
+| 260927-edt | show unprofitable promos greyed out on Promos tab | 2026-09-27 | b86f24e | [260927-edt-show-unprofitable-promos-greyed-out](./quick/260927-edt-show-unprofitable-promos-greyed-out/) |
 
 ## Deferred Items
 
