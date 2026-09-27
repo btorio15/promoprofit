@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import {
   calculateProfitBoostHedge,
+  calculateProfitBoostHedgeUnfiltered,
   decimalToAmericanDisplay,
   effectiveBoostedDecimal,
   type ProfitBoostInput,
@@ -384,5 +385,46 @@ describe("decimalToAmericanDisplay", () => {
 
   it("1.47 -> -213 (negative side: -ceil(100/0.47))", () => {
     expect(decimalToAmericanDisplay(new Decimal("1.47"))).toBe(-213);
+  });
+});
+
+// quick-260927-edt: unfiltered variant used to report "best available"
+// figures for greyed-out unprofitable-promo rows -- never for stakes.
+describe("calculateProfitBoostHedgeUnfiltered", () => {
+  const workedExample: ProfitBoostInput = {
+    boostedOddsAmerican: null,
+    baseOddsAmerican: 107,
+    boostPercent: new Decimal("10.00"),
+    hedgeOddsAmerican: -125,
+    maxStake: new Decimal("20.00"),
+    winningsCap: null,
+    minOddsAmerican: 100,
+    precision: "cents",
+  };
+
+  it("worked example (Bally Bet 10% boost, +107 base, -125 hedge, $20 max): returns guaranteedProfit exactly -0.65", () => {
+    const result = calculateProfitBoostHedgeUnfiltered(workedExample);
+    expect(result).not.toBeNull();
+    expect(result?.guaranteedProfit.equals(new Decimal("-0.65"))).toBe(true);
+  });
+
+  it("worked example: calculateProfitBoostHedge on the same inputs still returns null", () => {
+    expect(calculateProfitBoostHedge(workedExample)).toBeNull();
+  });
+
+  it("still returns null when boosted odds are below minOddsAmerican (D-17 eligibility, not a profit filter)", () => {
+    const belowMinOdds: ProfitBoostInput = {
+      boostedOddsAmerican: null,
+      baseOddsAmerican: -200,
+      boostPercent: new Decimal("5.00"),
+      hedgeOddsAmerican: -110,
+      maxStake: new Decimal("20.00"),
+      winningsCap: null,
+      minOddsAmerican: 100,
+      precision: "cents",
+    };
+
+    expect(calculateProfitBoostHedgeUnfiltered(belowMinOdds)).toBeNull();
+    expect(calculateProfitBoostHedge(belowMinOdds)).toBeNull();
   });
 });
