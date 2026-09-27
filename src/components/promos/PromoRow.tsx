@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { FlagMatchButton } from "./FlagMatchButton";
+import { MarkUsedButton } from "./MarkUsedButton";
 import { PromoDetails } from "./PromoDetails";
 
 /** WR-07: shown on rows whose promo is at a book the member hasn't saved. */
@@ -37,19 +38,25 @@ interface PromoRowProps {
 export function PromoRow({ row, onChanged }: PromoRowProps) {
   // WR-07: a promo at a book the member doesn't have stays visible but uses
   // the same muted styling as UnprofitablePromoRow, with a short hint.
+  // quick-260927-n12 (scope change A): a used row overrides both of those
+  // with its own green-gradient background -- "already handled" wins over
+  // "you don't have this book" visually, since the member acted on it
+  // regardless.
   return (
     <Collapsible
       className={cn(
         "group rounded-lg border border-border",
-        row.hasPromoBook ? "bg-secondary" : "bg-secondary/40 opacity-60",
+        row.used ? "used-row-bg" : row.hasPromoBook ? "bg-secondary" : "bg-secondary/40 opacity-60",
       )}
     >
       <div className="relative">
         <CollapsibleTrigger
           aria-label={
-            row.hasPromoBook
-              ? `Show stakes for ${row.awayTeam} @ ${row.homeTeam}`
-              : `Show stakes for ${row.awayTeam} @ ${row.homeTeam} (${NO_PROMO_BOOK_HINT}: ${row.promo.bookName})`
+            row.used
+              ? `Show stakes for ${row.awayTeam} @ ${row.homeTeam} (Marked used)`
+              : row.hasPromoBook
+                ? `Show stakes for ${row.awayTeam} @ ${row.homeTeam}`
+                : `Show stakes for ${row.awayTeam} @ ${row.homeTeam} (${NO_PROMO_BOOK_HINT}: ${row.promo.bookName})`
           }
           className="absolute inset-0 w-full rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         />
@@ -69,6 +76,8 @@ export function PromoRow({ row, onChanged }: PromoRowProps) {
                   <FlagMatchButton promoId={row.promoId} onChanged={onChanged} />
                 </>
               ) : null}
+              {row.used ? <Badge variant="outline">Marked used</Badge> : null}
+              <MarkUsedButton promoId={row.promoId} used={row.used} onChanged={onChanged} />
             </span>
             <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
             {row.claimHint ? <span className="text-sm text-muted-foreground">{row.claimHint}</span> : null}

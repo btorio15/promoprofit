@@ -92,6 +92,12 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* quick-260927-n12: subtle "marked used" row background -- a gentle
+     green gradient, distinct from --primary (reserved for the profit
+     figure/CTA per UI-SPEC "Accent 10%") and from --warning/--destructive,
+     since "used" signals a neutral, already-handled state, not an alert. */
+  --used-gradient-from: oklch(0.94 0.05 155);
+  --used-gradient-to: oklch(0.98 0.02 155);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -129,6 +135,10 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+    /* quick-260927-n12: dark-mode "marked used" gradient -- darker, lower-
+       chroma green so it stays subtle against the dark card background. */
+    --used-gradient-from: oklch(0.28 0.05 155);
+    --used-gradient-to: oklch(0.22 0.03 155);
   }
 }
 
@@ -149,4 +159,12 @@
 @utility num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* quick-260927-n12: a promo row the member has marked used -- a subtle
+   green gradient overlay (light/dark variants above) instead of the
+   default card background, so a used row reads as "handled" at a glance
+   without leaving the feed or losing its place. */
+@utility used-row-bg {
+  background-image: linear-gradient(to right, var(--used-gradient-from), var(--used-gradient-to));
 }
