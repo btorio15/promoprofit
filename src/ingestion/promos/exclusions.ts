@@ -11,6 +11,8 @@ import type { SkipReason } from "@/domain/promos/scraped";
  */
 
 const NEW_CUSTOMER_CATEGORY_RE = /^new customers?$/i;
+// "sign up" stays a full-text check: the real DraftKings/Bally fixtures'
+// acquisition offers only reveal themselves through it in their body copy.
 const NEW_CUSTOMER_TEXT_RE = /\bnew (?:customers?|users?)\b|\bfirst[- ]bet\b|\bsign[- ]up\b/i;
 const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 
@@ -37,9 +39,16 @@ const LIVE_ONLY_RE = /\blive[- ]wagers?\b|\blive[- ]only\b/i;
 // singular adjective ("future Promotions", "future periods"). Matching the
 // singular form false-positived every DraftKings promo whose full T&Cs
 // include that standard abuse-prevention clause (real fixture finding).
-const FUTURES_RE = /\bfutures\b|\bchampion\b|\bto win the\b/i;
+//
+// WR-05: the full description/terms are long marketing copy, so only
+// unambiguous bet-type words are checked against them. Generic phrases that
+// ordinary single-game copy uses ("Bet on the Broncos to win the game",
+// "offer open to Colorado customers") are checked against the title only,
+// and a bare "open" never matches -- only a named tournament does.
+const FUTURES_RE = /\bfutures\b/i;
+const FUTURES_TITLE_RE = /\bchampion\b|\bto win the\b/i;
 const OUTRIGHT_RE =
-  /\bpresidents cup\b|\bmasters\b|\b(?:the\s+)?open\b|\btournament winner\b|\boutright\b/i;
+  /\bpresidents cup\b|\bmasters\b|\b(?:u\.?s\.?|british|french|australian) open\b|\bthe open championship\b|\btournament winner\b|\boutright\b/i;
 
 const PROP_RE = /\bscorer\b|\bplayer prop\b|\banytime touchdown\b/i;
 
@@ -75,6 +84,7 @@ export function classifyExclusion(input: {
 
   if (OUTRIGHT_RE.test(combined)) return "outright";
   if (FUTURES_RE.test(combined)) return "futures";
+  if (FUTURES_TITLE_RE.test(title)) return "futures";
 
   if (PROP_RE.test(combined)) return "prop";
 

@@ -86,4 +86,19 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     });
     expect(result).toBeNull();
   });
+
+  it("WR-05: keeps a single-game boost whose copy says 'open', 'to win the game' or 'Championship Sunday'", () => {
+    expect(
+      classifyExclusion({
+        title: "25% NFL Profit Boost",
+        text: "Offer open to Colorado customers. Bet on the Broncos to win the game on Championship Sunday. Any Wager.",
+      }),
+    ).toBeNull();
+  });
+
+  it("WR-05: still excludes named tournaments and futures wording", () => {
+    expect(classifyExclusion({ title: "Golf Boost", text: "Any wager on the US Open winner" })).toBe("outright");
+    expect(classifyExclusion({ title: "Boost: Chiefs to win the Super Bowl", text: "Any Wager" })).toBe("futures");
+    expect(classifyExclusion({ title: "NHL Boost", text: "Valid for all NHL Futures" })).toBe("futures");
+  });
 });
