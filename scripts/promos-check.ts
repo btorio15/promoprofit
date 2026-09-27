@@ -9,7 +9,7 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "../src/db/client";
 import { promos, scrapeRuns } from "../src/db/schema";
-import { getScrapeStatus, countLivePromos } from "../src/db/promos";
+import { getActivePromos, getScrapeStatus } from "../src/db/promos";
 import { SCRAPE_TARGET_BOOK_KEYS } from "../src/config/scrapeTargets";
 
 async function main() {
@@ -39,8 +39,8 @@ async function main() {
     );
   }
 
-  const liveCount = await countLivePromos(new Date());
-  console.log(`Live (hedgeable) promos: ${liveCount}`);
+  const activePromos = await getActivePromos(new Date());
+  console.log(`Active (hedgeable) promos: ${activePromos.length}`);
 
   const statusCounts = await db
     .select({

@@ -1,6 +1,23 @@
 import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "./client";
-import { promos, scrapeRuns } from "./schema";
+import { promos, scrapeRuns, users } from "./schema";
+import { ScrapedPromoSchema } from "@/domain/promos/scraped";
+import {
+  PROMO_MARKET_TYPES,
+  PROMO_SIDES,
+  PROMO_TYPES,
+  WINNINGS_CAP_KINDS,
+  type PromoMarketType,
+  type PromoSelection,
+  type PromoSide,
+  type PromoType,
+  type WinningsCapKind,
+} from "@/domain/promos/types";
+import type { PromoScope } from "@/domain/promos/scope";
+import type { RankablePromo } from "@/domain/promos/rankPromoHedges";
+import { getSportLabel } from "@/config/sports";
+import { etDayLabel } from "@/domain/promos/etTime";
 
 export interface ScrapeStatusRow {
   lastOkAt: Date | null;
@@ -47,22 +64,248 @@ export async function getScrapeStatus(
 }
 
 /**
- * Count of promos currently hedgeable: status active, not past its own
- * expires_at (when set), and not past its matched event's commence_time
- * (when set). Drives getPromos's "none-scraped" vs "no-active" empty-state
- * split.
+ * A promo whose scope is resolved and which reaches hedge math (D-01, D-16,
+ * PROMO-04) -- the getPromos server action's rankPromoHedges input.
+ * finePrintNote/claimHint/scopeLabel/autoMatched are presentational fields
+ * the ranker itself never touches; attribution is empty for auto-matched
+ * promos (no human to attribute, 03-UI-SPEC.md).
  */
-export async function countLivePromos(now: Date): Promise<number> {
+export interface ActivePromo extends RankablePromo {
+  finePrintNote: string | null;
+  claimHint: string | null;
+  scopeLabel: string;
+  autoMatched: boolean;
+  attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
+}
+
+const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+const ET_MONTH_DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  month: "short",
+  day: "numeric",
+});
+
+const ET_DAY_NUMBER_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  day: "numeric",
+});
+
+/**
+ * "Any {sport} game · Sun, Sep 27" when the window sits inside a single ET
+ * calendar day, or "Any {sport} game · Sep 25–27" when it spans more than
+ * one (03-UI-SPEC.md "Promo row" Col 1, this plan's scopeLabel behavior).
+ */
+function sportWindowScopeLabel(sportKey: string, windowStart: Date, windowEnd: Date): string {
+  const sportLabel = getSportLabel(sportKey);
+  const startKey = ET_DAY_KEY_FORMATTER.format(windowStart);
+  const endKey = ET_DAY_KEY_FORMATTER.format(windowEnd);
+
+  if (startKey === endKey) {
+    return `Any ${sportLabel} game · ${etDayLabel(windowStart.toISOString())}`;
+  }
+
+  return `Any ${sportLabel} game · ${ET_MONTH_DAY_FORMATTER.format(windowStart)}–${ET_DAY_NUMBER_FORMATTER.format(windowEnd)}`;
+}
+
+interface ActivePromoRow {
+  id: number;
+  bookKey: string;
+  promoType: string;
+  scopeKind: string | null;
+  eventId: string | null;
+  sportKey: string | null;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  windowStart: Date | null;
+  windowEnd: Date | null;
+  marketType: string | null;
+  line: number | null;
+  side: string | null;
+  parsed: unknown;
+  boostPercent: string | null;
+  boostedOddsAmerican: number | null;
+  baseOddsAmerican: number | null;
+  bonusAmount: string | null;
+  maxStake: string | null;
+  maxWinnings: string | null;
+  maxWinningsKind: string | null;
+  minOddsAmerican: number | null;
+  finePrintNote: string | null;
+  autoMatched: boolean;
+  confirmedByName: string | null;
+  correctedByName: string | null;
+  capEnteredByName: string | null;
+}
+
+/**
+ * Validates and shapes one promos row into an ActivePromo, or drops it with
+ * a console.warn when its stored data is inconsistent with the schemas that
+ * govern it (T-03-15-01) -- this must never throw into the caller, since a
+ * single malformed row must not take down the whole Promos tab.
+ */
+function mapActivePromoRow(row: ActivePromoRow): ActivePromo | null {
+  if (!(PROMO_TYPES as readonly string[]).includes(row.promoType)) {
+    console.warn(`getActivePromos: dropping promo ${row.id}, unknown promo_type=${row.promoType}`);
+    return null;
+  }
+  const promoType = row.promoType as PromoType;
+
+  let scope: PromoScope;
+  let scopeLabel: string;
+
+  if (row.scopeKind === "event") {
+    if (!row.eventId || !row.sportKey || !row.homeTeam || !row.awayTeam) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, incomplete event scope`);
+      return null;
+    }
+    scope = { kind: "event", eventId: row.eventId, sportKey: row.sportKey };
+    scopeLabel = `${row.awayTeam} @ ${row.homeTeam}`;
+  } else if (row.scopeKind === "sport_window") {
+    if (!row.sportKey || !row.windowStart || !row.windowEnd) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, incomplete sport_window scope`);
+      return null;
+    }
+    scope = { kind: "sport_window", sportKey: row.sportKey, windowStart: row.windowStart, windowEnd: row.windowEnd };
+    scopeLabel = sportWindowScopeLabel(row.sportKey, row.windowStart, row.windowEnd);
+  } else {
+    console.warn(`getActivePromos: dropping promo ${row.id}, unknown scope_kind=${row.scopeKind}`);
+    return null;
+  }
+
+  let pinned: PromoSelection | null = null;
+  if (row.marketType !== null || row.side !== null || row.line !== null) {
+    if (row.marketType === null || row.side === null || scope.kind !== "event") {
+      console.warn(`getActivePromos: dropping promo ${row.id}, incomplete pinned selection`);
+      return null;
+    }
+    if (!(PROMO_MARKET_TYPES as readonly string[]).includes(row.marketType)) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, unknown market_type=${row.marketType}`);
+      return null;
+    }
+    if (!(PROMO_SIDES as readonly string[]).includes(row.side)) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, unknown side=${row.side}`);
+      return null;
+    }
+    pinned = {
+      eventId: scope.eventId,
+      marketType: row.marketType as PromoMarketType,
+      line: row.line,
+      side: row.side as PromoSide,
+    };
+  }
+
+  const parsedResult = ScrapedPromoSchema.safeParse(row.parsed);
+  if (!parsedResult.success) {
+    console.warn(`getActivePromos: dropping promo ${row.id}, invalid parsed payload`);
+    return null;
+  }
+  const { eligibleMarketTypes, claimRequired } = parsedResult.data;
+
+  let winningsCap: { kind: WinningsCapKind; amount: string } | null = null;
+  if (row.maxWinnings !== null) {
+    if (row.maxWinningsKind === null || !(WINNINGS_CAP_KINDS as readonly string[]).includes(row.maxWinningsKind)) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, max_winnings set without a valid kind`);
+      return null;
+    }
+    winningsCap = { kind: row.maxWinningsKind as WinningsCapKind, amount: row.maxWinnings };
+  }
+
+  const attribution: ActivePromo["attribution"] = [];
+  if (row.confirmedByName) attribution.push({ verb: "Confirmed by", displayName: row.confirmedByName });
+  if (row.correctedByName) attribution.push({ verb: "Corrected by", displayName: row.correctedByName });
+  if (row.capEnteredByName) attribution.push({ verb: "Cap entered by", displayName: row.capEnteredByName });
+
+  return {
+    id: row.id,
+    bookKey: row.bookKey,
+    promoType,
+    scope,
+    pinned,
+    eligibleMarketTypes,
+    boostPercent: row.boostPercent,
+    boostedOddsAmerican: row.boostedOddsAmerican,
+    baseOddsAmerican: row.baseOddsAmerican,
+    bonusAmount: row.bonusAmount,
+    maxStake: row.maxStake,
+    winningsCap,
+    minOddsAmerican: row.minOddsAmerican,
+    finePrintNote: row.finePrintNote,
+    claimHint: claimRequired !== null ? "Opt in / claim in the app first" : null,
+    scopeLabel,
+    autoMatched: row.autoMatched,
+    attribution,
+  };
+}
+
+/**
+ * Every promo currently hedgeable (D-01, D-16, PROMO-04): status='active',
+ * a resolved scope, and not past its own expiry, its matched event's
+ * commence_time (event scope) or its window's end (sport_window scope,
+ * D-16). pending_review promos never reach this query -- they have no
+ * resolved scope_kind until a reviewer or the auto-matcher sets one.
+ */
+export async function getActivePromos(now: Date): Promise<ActivePromo[]> {
+  const confirmedByUsers = alias(users, "confirmed_by_users");
+  const correctedByUsers = alias(users, "corrected_by_users");
+  const capEnteredByUsers = alias(users, "cap_entered_by_users");
+
   const db = getDb();
   const rows = await db
-    .select({ count: sql<string>`count(*)` })
+    .select({
+      id: promos.id,
+      bookKey: promos.bookKey,
+      promoType: promos.promoType,
+      scopeKind: promos.scopeKind,
+      eventId: promos.eventId,
+      sportKey: promos.sportKey,
+      homeTeam: promos.homeTeam,
+      awayTeam: promos.awayTeam,
+      windowStart: promos.windowStart,
+      windowEnd: promos.windowEnd,
+      marketType: promos.marketType,
+      line: promos.line,
+      side: promos.side,
+      parsed: promos.parsed,
+      boostPercent: promos.boostPercent,
+      boostedOddsAmerican: promos.boostedOddsAmerican,
+      baseOddsAmerican: promos.baseOddsAmerican,
+      bonusAmount: promos.bonusAmount,
+      maxStake: promos.maxStake,
+      maxWinnings: promos.maxWinnings,
+      maxWinningsKind: promos.maxWinningsKind,
+      minOddsAmerican: promos.minOddsAmerican,
+      finePrintNote: promos.finePrintNote,
+      autoMatched: promos.autoMatched,
+      confirmedByName: confirmedByUsers.displayName,
+      correctedByName: correctedByUsers.displayName,
+      capEnteredByName: capEnteredByUsers.displayName,
+    })
     .from(promos)
+    .leftJoin(confirmedByUsers, eq(promos.confirmedByUserId, confirmedByUsers.id))
+    .leftJoin(correctedByUsers, eq(promos.correctedByUserId, correctedByUsers.id))
+    .leftJoin(capEnteredByUsers, eq(promos.capEnteredByUserId, capEnteredByUsers.id))
     .where(
       and(
         eq(promos.status, "active"),
+        sql`${promos.scopeKind} is not null`,
         or(isNull(promos.expiresAt), gt(promos.expiresAt, now)),
-        or(isNull(promos.eventCommenceTime), gt(promos.eventCommenceTime, now)),
+        or(
+          and(eq(promos.scopeKind, "event"), sql`${promos.eventId} is not null`, gt(promos.eventCommenceTime, now)),
+          and(eq(promos.scopeKind, "sport_window"), gt(promos.windowEnd, now)),
+        ),
       ),
     );
-  return Number(rows[0]?.count ?? 0);
+
+  const activePromos: ActivePromo[] = [];
+  for (const row of rows) {
+    const mapped = mapActivePromoRow(row);
+    if (mapped) activePromos.push(mapped);
+  }
+  return activePromos;
 }
