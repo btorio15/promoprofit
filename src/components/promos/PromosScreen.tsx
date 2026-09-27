@@ -5,6 +5,8 @@ import { getPromos } from "@/app/actions/get-promos";
 import type { GetPromosResponse } from "@/domain/promos/dto";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
 import { ReviewQueueSection } from "./ReviewQueueSection";
@@ -31,6 +33,7 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
   const precision: "whole" | "cents" = precisionStored === "cents" ? "cents" : "whole";
 
   const [response, setResponse] = useState<GetPromosResponse | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
@@ -38,8 +41,21 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
   function runGetPromos() {
     const requestId = ++requestIdRef.current;
     startTransition(async () => {
-      const result = await getPromos({ precision });
+      // WR-10: a thrown getPromos (DB/network error) must never leave a
+      // blank tab or silently keep stale rows the member might act on --
+      // clear them and show an inline error with a retry.
+      let result: GetPromosResponse;
+      try {
+        result = await getPromos({ precision });
+      } catch (err) {
+        if (requestId !== requestIdRef.current) return;
+        console.error("getPromos failed:", err);
+        setResponse(null);
+        setLoadFailed(true);
+        return;
+      }
       if (requestId !== requestIdRef.current) return; // stale response, out of order
+      setLoadFailed(false);
       setResponse(result);
     });
   }
@@ -91,6 +107,15 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
+      ) : loadFailed && !isPending ? (
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>Couldn&apos;t load promos. Try again in a moment.</span>
+            <Button type="button" variant="secondary" size="sm" onClick={runGetPromos}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
       ) : response?.status === "ok" && response.emptyVariant !== null ? (
         <PromosEmptyState variant={response.emptyVariant} />
       ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
