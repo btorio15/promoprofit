@@ -35,7 +35,7 @@ export function PromosEmptyState({ variant }: PromosEmptyStateProps) {
           more books to see more opportunities.
         </p>
         <div>
-          <Button variant="outline" render={<Link href="/settings" />}>
+          <Button variant="outline" nativeButton={false} render={<Link href="/settings" />}>
             Manage your books
           </Button>
         </div>

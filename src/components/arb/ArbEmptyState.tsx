@@ -49,7 +49,7 @@ export function ArbEmptyState({ variant, sportLabel }: ArbEmptyStateProps) {
           None of the upcoming games are offered at the sportsbooks you&apos;ve selected. Add more books to see more opportunities.
         </p>
         <div>
-          <Button variant="outline" render={<Link href="/settings" />}>
+          <Button variant="outline" nativeButton={false} render={<Link href="/settings" />}>
             Manage your books
           </Button>
         </div>

@@ -21,6 +21,7 @@ export function MultipleBooksPopover({ bookNames }: MultipleBooksPopoverProps) {
   return (
     <Popover>
       <PopoverTrigger
+        nativeButton={false}
         render={
           <Badge
             variant="outline"
