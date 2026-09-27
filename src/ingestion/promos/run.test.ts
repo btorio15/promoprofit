@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runPromoScrape } from "./run";
+import { runPromoScrape, type LoadPromoMatchEvents } from "./run";
 import type { PromoStore, PromoWrite, UpsertOutcome } from "./store";
 import type { FetchRequest, FetchResult } from "./fetchPage";
 import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo } from "@/domain/promos/scraped";
+
+/** Every run.test.ts scenario is offline: never touch the real cached-odds tables. */
+const EMPTY_MATCH_EVENTS: LoadPromoMatchEvents = async () => ({ moneyline: [], extended: [] });
 
 function req(url: string, method: "GET" | "POST" = "GET"): HttpRequestSpec {
   return { method, url, headers: {}, body: null };
@@ -104,6 +107,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store,
       sleep,
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(fetchFn).toHaveBeenCalledTimes(3);
@@ -173,6 +177,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(parseFn.mock.calls[0][0].detailBodies).toEqual({ d1: "{}" });
@@ -200,6 +205,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store: makeStore(),
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     // 1 list + 3 detail (capped from 10) = 4 total fetches.
@@ -220,6 +226,7 @@ describe("runPromoScrape", () => {
       fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(outcomes[0]).toMatchObject({ status: "ok", promosFound: 3, promosKept: 0 });
@@ -238,6 +245,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(fetchFn).toHaveBeenCalledTimes(1);
@@ -274,6 +282,7 @@ describe("runPromoScrape", () => {
       fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(outcomes[0].status).toBe("failed");
@@ -298,6 +307,7 @@ describe("runPromoScrape", () => {
       fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(outcomes[0].status).toBe("failed");
@@ -329,6 +339,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store,
       sleep,
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(outcomes).toHaveLength(3);
@@ -351,6 +362,7 @@ describe("runPromoScrape", () => {
       fetch: fetchFn,
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(fetchFn).not.toHaveBeenCalled();
@@ -389,6 +401,7 @@ describe("runPromoScrape", () => {
       fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     const [, writesArg] = store.upsertScrapedPromos.mock.calls[0];
@@ -408,9 +421,68 @@ describe("runPromoScrape", () => {
       fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
       store,
       sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
     });
 
     expect(outcomes[0]).toMatchObject({ status: "ok", promosFound: 1, promosKept: 0 });
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  it("loadEvents is called once per run (not per book), only when at least one book fetched ok", async () => {
+    const scraperA = makeScraper({ bookKey: "book-a", parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const scraperB = makeScraper({ bookKey: "book-b", parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const store = makeStore();
+    const loadEvents = vi.fn(async () => ({ moneyline: [], extended: [] }));
+
+    await runPromoScrape({
+      now: NOW,
+      targets: ["book-a", "book-b"],
+      scrapers: { "book-a": scraperA, "book-b": scraperB },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents,
+    });
+
+    expect(loadEvents).toHaveBeenCalledTimes(1);
+  });
+
+  it("never calls loadEvents when every book fails", async () => {
+    const scraper = makeScraper({ parse: () => ({ found: 0, candidates: [], skipped: [] }) });
+    const store = makeStore();
+    const loadEvents = vi.fn(async () => ({ moneyline: [], extended: [] }));
+
+    await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents,
+    });
+
+    expect(loadEvents).not.toHaveBeenCalled();
+  });
+
+  it("each PromoWrite carries the MatchResult from matchPromo", async () => {
+    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const store = makeStore();
+
+    await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+    });
+
+    const [, writesArg] = store.upsertScrapedPromos.mock.calls[0];
+    expect(writesArg).toHaveLength(1);
+    const write: PromoWrite = writesArg[0];
+    expect(write.match).toBeDefined();
+    expect(["matched", "unmatched"]).toContain(write.match.status);
   });
 });

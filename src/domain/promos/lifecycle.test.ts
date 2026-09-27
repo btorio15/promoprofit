@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { statusAfterMatch } from "./lifecycle";
+import { decideScrapedWrite, statusAfterMatch, type ExistingPromoState } from "./lifecycle";
+import type { MatchResult } from "./matcher";
+import type { ScrapedPromo } from "./scraped";
+import type { ScopeGuess } from "./scope";
 
 describe("statusAfterMatch", () => {
   it("boost with a parsed maxStake and no unparsed fields is active", () => {
@@ -55,5 +58,191 @@ describe("statusAfterMatch", () => {
         unparsedCapFields: ["minOdds"],
       }),
     ).toEqual({ status: "pending_review", reviewReason: "caps", unparsedCapFields: ["minOdds"] });
+  });
+});
+
+function baseParsed(overrides: Partial<ScrapedPromo> = {}): ScrapedPromo {
+  return {
+    bookKey: "ballybet",
+    externalId: "ext-1",
+    promoType: "profit_boost",
+    title: "Test Promo",
+    rawText: "Test Promo raw text",
+    sourceUrl: "https://example.com/promo",
+    sportKeyHint: "americanfootball_nfl",
+    scopeText: "",
+    teamsText: [],
+    windowStart: null,
+    windowEnd: null,
+    expiresAt: null,
+    eligibleMarketTypes: ["moneyline", "spread", "total"],
+    pinned: null,
+    boostPercent: "10.00",
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: null,
+    maxStake: "20.00",
+    maxWinnings: null,
+    minOddsAmerican: null,
+    unparsedCapFields: [],
+    claimRequired: null,
+    finePrintNote: null,
+    ...overrides,
+  };
+}
+
+const MATCHED_SCOPE: ScopeGuess = {
+  kind: "event",
+  eventId: "evt-1",
+  sportKey: "americanfootball_nfl",
+  homeTeam: "Denver Broncos",
+  awayTeam: "Los Angeles Rams",
+  commenceTime: "2026-09-27T17:00:00-04:00",
+};
+
+const MATCHED_RESULT: MatchResult = {
+  status: "matched",
+  scope: MATCHED_SCOPE,
+  pinned: null,
+  signals: { sportMatch: true, windowMatch: true, teamMatch: true, marketMatch: true },
+};
+
+const UNMATCHED_RESULT: MatchResult = {
+  status: "unmatched",
+  signals: { sportMatch: true, windowMatch: false, teamMatch: true, marketMatch: true },
+  guess: MATCHED_SCOPE,
+  unresolvedTeamTexts: [],
+};
+
+function baseExisting(overrides: Partial<ExistingPromoState> = {}): ExistingPromoState {
+  return {
+    status: "pending_review",
+    reviewReason: "match",
+    autoMatchBlocked: false,
+    humanScope: null,
+    humanPinned: null,
+    promoType: "profit_boost",
+    maxStake: "20.00",
+    bonusAmount: null,
+    unparsedCapFields: [],
+    ...overrides,
+  };
+}
+
+describe("decideScrapedWrite", () => {
+  it("new + matched, boost with maxStake -> write active, autoMatched true, scope/pinned from match", () => {
+    const decision = decideScrapedWrite(null, baseParsed(), MATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "active",
+      reviewReason: null,
+      autoMatched: true,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+    });
+  });
+
+  it("new + matched, boost with maxStake null -> write pending_review/caps [maxStake], autoMatched true, scope set", () => {
+    const decision = decideScrapedWrite(null, baseParsed({ maxStake: null }), MATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "caps",
+      autoMatched: true,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: ["maxStake"],
+    });
+  });
+
+  it("new + unmatched -> write pending_review/match, autoMatched false, scope null, bestGuess from match", () => {
+    const decision = decideScrapedWrite(null, baseParsed(), UNMATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: MATCHED_SCOPE,
+      unparsedCapFields: [],
+    });
+  });
+
+  it("existing dismissed -> skip (D-14)", () => {
+    const existing = baseExisting({ status: "dismissed", reviewReason: null });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "skip" });
+  });
+
+  it("existing active -> touch", () => {
+    const existing = baseExisting({ status: "active", reviewReason: null });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+  });
+
+  it("existing pending_review/caps -> touch", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "caps" });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+  });
+
+  it("existing pending_review/match with autoMatchBlocked true -> touch, even if matched now (D-11)", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "match", autoMatchBlocked: true });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+  });
+
+  it("existing pending_review/match, not blocked, now matched -> write as new-matched (re-match, D-19)", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "match", autoMatchBlocked: false });
+    const decision = decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT);
+    expect(decision).toMatchObject({ kind: "write", status: "active", autoMatched: true, scope: MATCHED_SCOPE });
+  });
+
+  it("existing pending_review/match, not blocked, still unmatched -> write pending_review/match with refreshed bestGuess", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "match", autoMatchBlocked: false });
+    const decision = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: MATCHED_SCOPE,
+      unparsedCapFields: [],
+    });
+  });
+
+  it("existing expired with humanScope -> write statusAfterMatch(existing), scope/pinned from existing human fields, autoMatched false", () => {
+    const existing = baseExisting({
+      status: "expired",
+      reviewReason: null,
+      humanScope: MATCHED_SCOPE,
+      humanPinned: null,
+      maxStake: "20.00",
+    });
+    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), UNMATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "active",
+      reviewReason: null,
+      autoMatched: false,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+    });
+  });
+
+  it("existing expired without humanScope -> same as new (matched)", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: null });
+    const decision = decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT);
+    expect(decision).toMatchObject({ kind: "write", status: "active", autoMatched: true, scope: MATCHED_SCOPE });
+  });
+
+  it("existing expired without humanScope, still unmatched -> pending_review/match like new", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: null });
+    const decision = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT);
+    expect(decision).toMatchObject({ kind: "write", status: "pending_review", reviewReason: "match", autoMatched: false });
   });
 });
