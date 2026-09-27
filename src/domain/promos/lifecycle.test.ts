@@ -297,6 +297,20 @@ describe("decideScrapedWrite", () => {
     expect(decision).toMatchObject({ kind: "write", status: "active", autoMatched: true, scope: MATCHED_SCOPE });
   });
 
+  it("CR-02: existing expired + autoMatchBlocked, re-matched -> pending_review/match, never auto-reactivated", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: "match", autoMatchBlocked: true, humanScope: null });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: MATCHED_SCOPE,
+      unparsedCapFields: [],
+    });
+  });
+
   it("existing expired without humanScope, still unmatched -> pending_review/match like new", () => {
     const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: null });
     const decision = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT);

@@ -195,6 +195,21 @@ export function decideScrapedWrite(
         unparsedCapFields: after.unparsedCapFields,
       };
     }
+    // CR-02 (D-11): a flagged row is never auto-reactivated, even after it
+    // expired and reappeared -- it goes back to match review, with the fresh
+    // matcher result only as a presentational best guess.
+    if (existing.autoMatchBlocked) {
+      return {
+        kind: "write",
+        status: "pending_review",
+        reviewReason: "match",
+        autoMatched: false,
+        scope: null,
+        pinned: null,
+        bestGuess: match.status === "matched" ? match.scope : match.guess,
+        unparsedCapFields: [...parsed.unparsedCapFields],
+      };
+    }
     return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
   }
 
