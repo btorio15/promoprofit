@@ -177,6 +177,21 @@ export const refreshLock = pgTable("refresh_lock", {
  * mirrors credit_usage.triggered_by_user_id's nullable
  * `references(() => users.id, { onDelete: "set null" })` shape (D-12) so a
  * later user deletion can never break an existing promo row.
+ *
+ * scope_kind / window_start / window_end (migration 0005, PROMO-03-04
+ * 03-RECON.md Design Implication 1) model the real promo shapes: most
+ * promos are game-wide or sport+date-wide, not tied to one pre-specified
+ * market/side. scope_kind "event" uses event_id/sport_key/
+ * event_commence_time/home_team/away_team (the single named game);
+ * scope_kind "sport_window" uses sport_key/window_start/window_end instead,
+ * with event_id null (any event of that sport whose commence_time falls in
+ * the window). market_type/line/side are now the OPTIONAL pinned selection
+ * (D-02) -- null means the app itself picks the best market/side inside the
+ * promo's scope (src/domain/promos/selection.ts,
+ * src/domain/promos/rankPromoHedges.ts), the same way the bonus-bet finder
+ * searches across markets. All scope columns (scope_kind, event_id,
+ * sport_key, window_start, window_end) are null while a promo is
+ * unmatched/pending_review.
  */
 export const promos = pgTable(
   "promos",
@@ -199,6 +214,9 @@ export const promos = pgTable(
     marketType: text("market_type"),
     line: doublePrecision("line"),
     side: text("side"),
+    scopeKind: text("scope_kind"),
+    windowStart: timestamp("window_start", { withTimezone: true }),
+    windowEnd: timestamp("window_end", { withTimezone: true }),
     bestGuess: jsonb("best_guess"),
     parsed: jsonb("parsed").notNull(),
     boostPercent: numeric("boost_percent", { precision: 7, scale: 2 }),
