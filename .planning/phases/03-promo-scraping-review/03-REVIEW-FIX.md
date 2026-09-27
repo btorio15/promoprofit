@@ -18,7 +18,7 @@ status: partial
 **Summary:**
 - Findings in scope: 17 (5 critical, 12 warning; info findings out of scope)
 - Fixed: 16
-- Skipped: 1 (WR-11, needs an owner decision)
+- Skipped: 1 (WR-11, accepted by the owner: leave the scraper headers as they are)
 
 **Verification:** `vitest run` passes 52 files and 676 tests (the baseline was 652; 24 tests were added). `tsc --noEmit` is clean in the main checkout. The isolated worktree shows one error, `LayoutProps`, which is a Next-generated type from `.next/` and exists only because the worktree has no `.next` folder. ESLint is clean on every touched file. The hedge and stake math still uses decimal.js throughout, and no float math was introduced.
 
@@ -143,7 +143,8 @@ status: partial
 ### WR-11: Scrapers send spoofed desktop-Chrome User-Agent and Referer headers
 
 **File:** `src/ingestion/promos/books/ballybet.ts:41-43, 56`, `draftkings.ts:61-63`, `fanduel.ts:51-53`
-**Reason:** Needs an owner decision. The recon Scraper Contract in 03-RECON.md lists "a real desktop Chrome User-Agent" and the book's `referer` as required headers for all three endpoints, and the owner signed off on that contract with D-09 = http for each book. D-09's "never forge anti-bot headers" is written about bot-detection tokens such as PerimeterX `x-px-context`. Switching to an honest UA could break all three scrapers, and I can't verify that without calling the live endpoints. The owner should either accept the browser UA/referer explicitly in 03-RECON.md or CONTEXT, or approve a test run with an honest UA.
+**Owner decision (2026-09-27):** Accepted as-is. The owner chose to leave the scrapers unchanged, keeping the browser User-Agent and referer headers from the approved recon contract. No code change.
+**Original reason for escalation:** The recon Scraper Contract in 03-RECON.md lists "a real desktop Chrome User-Agent" and the book's `referer` as required headers for all three endpoints, and the owner signed off on that contract with D-09 = http for each book. D-09's "never forge anti-bot headers" is written about bot-detection tokens such as PerimeterX `x-px-context`. Switching to an honest UA could break all three scrapers, and I can't verify that without calling the live endpoints. The owner should either accept the browser UA/referer explicitly in 03-RECON.md or CONTEXT, or approve a test run with an honest UA.
 **Original issue:** Each request impersonates a desktop Chrome browser coming from the book's own site. This is a form of bot-evasion header forging that D-09 and the phase priorities rule out.
 
 ---
