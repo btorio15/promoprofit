@@ -160,7 +160,7 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 3/11 plans executed
+**Plans:** 3/15 plans executed
 
 Plans:
 **Wave 1**
@@ -171,26 +171,33 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-04-PLAN.md — Active promos show exact hedges: selection resolver, promo ranking at the member's books, promo rows
-- [ ] 03-05-PLAN.md — Parse the target book's real page: ScrapedPromo contract, fine-print caps, dedupe key, status-after-match rule
+- [ ] 03-04-PLAN.md — Promo scope model (migration 0005 [BLOCKING]) + app picks the best event/market/side inside each promo's scope under caps and min odds
+- [ ] 03-05-PLAN.md — Scope-based ScrapedPromo + http BookScraper contract, fine-print caps, D-15 exclusions, sport hints, ET dates, dedupe key, status-after-match rule
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-06-PLAN.md — Scrape pipeline (fetch, dedupe/expiry lifecycle, run status), CLI, GitHub Actions workflow, first live scrape
-- [ ] 03-07-PLAN.md — "Needs review (N)" queue with Confirm and Dismiss (attributed, race-safe)
+- [ ] 03-12-PLAN.md — Bally Bet parser (list + detail JSON) against real fixtures
+- [ ] 03-13-PLAN.md — DraftKings parser (single POST JSON) against the real fixture
+- [ ] 03-14-PLAN.md — FanDuel parser (list + detail JSON), hidden max wager routed to cap review
+- [ ] 03-15-PLAN.md — Active promos show exact hedges: getActivePromos, promo rows with scope, "best of N" and opt-in/claim hint
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-08-PLAN.md — Deterministic 3-signal matcher, auto-accept + re-match wired into scrape, tuned on real samples
-- [ ] 03-09-PLAN.md — Correct (cached-odds dropdowns) and Enter cap details reviewer flows
+- [ ] 03-06-PLAN.md — Scrape pipeline for all three books (polite http fetch, dedupe/expiry lifecycle, run status), registry, CLI, GitHub Actions workflow, first live scrape
+- [ ] 03-07-PLAN.md — "Needs review (N)" queue with Confirm (scope guess) and Dismiss (attributed, race-safe)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 03-10-PLAN.md — Flag-back on auto-matched rows (D-11 safety net)
+- [ ] 03-08-PLAN.md — Deterministic scope matcher (sport + window + named-game teams), auto-accept + re-match wired into scrape, tuned on real samples from three books
+- [ ] 03-09-PLAN.md — Correct (game or sport-day, optional market pin) and Enter cap details (FanDuel hidden cap) reviewer flows
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified, owner end-to-end walkthrough
+- [ ] 03-10-PLAN.md — Flag-back on auto-matched rows (D-11 safety net)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified for three books, owner end-to-end walkthrough
 
 **UI hint**: yes
 
