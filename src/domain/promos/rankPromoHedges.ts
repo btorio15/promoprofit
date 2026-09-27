@@ -120,10 +120,21 @@ function getPinnedCandidates(
   return resolved ? [resolved] : [];
 }
 
-/** D-17: books apply the minimum-odds rule to the bet's own (base) odds, before the boost. */
-function passesBaseMinOdds(promoBookQuote: SelectionQuote | null, minOddsAmerican: number | null): boolean {
-  if (!promoBookQuote || minOddsAmerican === null) return true;
-  return americanToDecimal(promoBookQuote.oddsAmerican).gte(americanToDecimal(minOddsAmerican));
+/**
+ * D-17: books apply the minimum-odds rule to the bet's own (base) odds,
+ * before the boost. WR-06: the base price is the live promo-book quote, or
+ * -- for a pinned promo with no live quote -- the published base price the
+ * solver itself falls back on, so the rule is never skipped for a price the
+ * solver actually uses.
+ */
+function passesBaseMinOdds(
+  promo: RankablePromo,
+  promoBookQuote: SelectionQuote | null,
+): boolean {
+  if (promo.minOddsAmerican === null) return true;
+  const baseOddsAmerican = promoBookQuote?.oddsAmerican ?? (promo.pinned !== null ? promo.baseOddsAmerican : null);
+  if (baseOddsAmerican === null) return true;
+  return americanToDecimal(baseOddsAmerican).gte(americanToDecimal(promo.minOddsAmerican));
 }
 
 function evaluateBoostCandidate(
@@ -225,7 +236,7 @@ function evaluateCandidate(
 ): EvaluatedCandidate | null {
   const promoBookQuote = selection.promoSideQuotes.find((q) => q.bookKey === promo.bookKey) ?? null;
 
-  if (!passesBaseMinOdds(promoBookQuote, promo.minOddsAmerican)) return null;
+  if (!passesBaseMinOdds(promo, promoBookQuote)) return null;
 
   const hedge = bestHedgeQuote(selection.oppositeSideQuotes, opts.hedgeBookKeys);
   if (!hedge) return null;

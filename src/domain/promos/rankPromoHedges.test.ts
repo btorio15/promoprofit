@@ -274,6 +274,41 @@ describe("rankPromoHedges", () => {
     expect(opportunities).toHaveLength(0);
   });
 
+  it("WR-06: pinned boost with no live promo-book quote applies min odds to its published base price", () => {
+    const event = moneylineEvent({
+      id: "nfl-minodds-published",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      // No draftkings (promo book) quote at all -- only the hedge book.
+      quotes: [{ bookKey: "fanduel", homePrice: 180, awayPrice: 200 }],
+    });
+
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      scope: eventScope("nfl-minodds-published"),
+      pinned: { eventId: "nfl-minodds-published", marketType: "moneyline", line: null, side: "home" },
+      bookKey: "draftkings",
+      baseOddsAmerican: -250,
+      boostedOddsAmerican: -150,
+      maxStake: "25",
+      minOddsAmerican: -200,
+    };
+    const opts = {
+      moneylineEvents: [event],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["fanduel"]),
+      precision: "cents" as const,
+      now: NOW,
+    };
+
+    // Control: without the min-odds rule the published boost IS profitable...
+    expect(rankPromoHedges([{ ...promo, minOddsAmerican: null }], opts)).toHaveLength(1);
+    // ...but its -250 base is below the -200 minimum, so it's excluded.
+    expect(rankPromoHedges([promo], opts)).toHaveLength(0);
+    // A published base at the minimum is allowed.
+    expect(rankPromoHedges([{ ...promo, baseOddsAmerican: -200 }], opts)).toHaveLength(1);
+  });
+
   it("minOddsAmerican -200: promo-book quote exactly -200 is allowed", () => {
     const event = moneylineEvent({
       id: "nfl-minodds-allow",
