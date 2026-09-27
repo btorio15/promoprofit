@@ -71,6 +71,7 @@ Plans:
   1. An Arbitrage tab lists two-way moneyline arbs across different Colorado books from the odds the existing refresh already fetches (no extra credits), ranked by return %, each with both books, odds, stakes for a user-chosen total stake, and guaranteed profit correct to the cent (decimal.js, reusing the Phase 1 hedge math)
   2. Spreads and totals are fetched only when the user presses a separate "Search spreads & totals" button with its own credit estimate and confirm (~3x credits), guarded by the existing credit gate and refresh lock; only half-point (no-push) lines matched exactly across books are considered
   3. Odds age is shown prominently on the tab (stale cached odds produce phantom arbs), and an account-limiting risk advisory is visible
+
 **Plans:** 8/8 plans complete
 **UI hint**: yes
 
@@ -162,16 +163,33 @@ Plans:
 **Plans:** 11 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 03-01-PLAN.md — Wave 0 recon: find the real logged-out single-game promo source (Bally Bet / BetRivers), capture fixture, owner's D-09 per-book call, Bluesky/X findings
 - [ ] 03-02-PLAN.md — Profit-boost engine (published vs derived price, cap-optimal stake, ROI) + whole-dollar bonus-bet precision, known-answer TDD
 - [ ] 03-03-PLAN.md — Promos tab + promos/scrape_runs schema and migration [BLOCKING], per-book scrape status, empty states
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 03-04-PLAN.md — Active promos show exact hedges: selection resolver, promo ranking at the member's books, promo rows
 - [ ] 03-05-PLAN.md — Parse the target book's real page: ScrapedPromo contract, fine-print caps, dedupe key, status-after-match rule
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 03-06-PLAN.md — Scrape pipeline (fetch, dedupe/expiry lifecycle, run status), CLI, GitHub Actions workflow, first live scrape
 - [ ] 03-07-PLAN.md — "Needs review (N)" queue with Confirm and Dismiss (attributed, race-safe)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 03-08-PLAN.md — Deterministic 3-signal matcher, auto-accept + re-match wired into scrape, tuned on real samples
 - [ ] 03-09-PLAN.md — Correct (cached-odds dropdowns) and Enter cap details reviewer flows
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 03-10-PLAN.md — Flag-back on auto-matched rows (D-11 safety net)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified, owner end-to-end walkthrough
 
 **UI hint**: yes
