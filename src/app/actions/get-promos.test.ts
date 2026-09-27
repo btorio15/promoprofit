@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import type { ActivePromo } from "@/db/promos";
+import type { QueueRow } from "@/db/promoReview";
+import type { ScrapedPromo } from "@/domain/promos/scraped";
+import { formatKickoff } from "@/lib/format";
 
 const {
   mockRequireUser,
   mockGetScrapeStatus,
   mockGetActivePromos,
+  mockGetReviewQueue,
   mockGetBonusBooks,
   mockGetCachedEvents,
   mockGetCachedExtendedEvents,
@@ -15,6 +19,7 @@ const {
   mockRequireUser: vi.fn(),
   mockGetScrapeStatus: vi.fn(),
   mockGetActivePromos: vi.fn(),
+  mockGetReviewQueue: vi.fn(),
   mockGetBonusBooks: vi.fn(),
   mockGetCachedEvents: vi.fn(),
   mockGetCachedExtendedEvents: vi.fn(),
@@ -26,6 +31,9 @@ vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
 vi.mock("@/db/promos", () => ({
   getScrapeStatus: mockGetScrapeStatus,
   getActivePromos: mockGetActivePromos,
+}));
+vi.mock("@/db/promoReview", () => ({
+  getReviewQueue: mockGetReviewQueue,
 }));
 vi.mock("@/db/queries", () => ({
   getBonusBooks: mockGetBonusBooks,
@@ -131,11 +139,94 @@ function activeBonusPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
   };
 }
 
+function baseParsed(overrides: Partial<ScrapedPromo> = {}): ScrapedPromo {
+  return {
+    bookKey: "draftkings",
+    externalId: null,
+    promoType: "profit_boost",
+    title: "50% Profit Boost",
+    rawText: "50% Profit Boost",
+    sourceUrl: "https://draftkings.com/promo",
+    sportKeyHint: "americanfootball_nfl",
+    scopeText: "all NFL games on 9/27/2026",
+    teamsText: [],
+    windowStart: null,
+    windowEnd: null,
+    expiresAt: null,
+    eligibleMarketTypes: ["moneyline"],
+    pinned: null,
+    boostPercent: "50.00",
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: null,
+    maxStake: "25.00",
+    maxWinnings: null,
+    minOddsAmerican: null,
+    unparsedCapFields: [],
+    claimRequired: null,
+    finePrintNote: null,
+    ...overrides,
+  };
+}
+
+function matchQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
+  return {
+    id: 10,
+    bookKey: "draftkings",
+    promoType: "profit_boost",
+    reviewReason: "match",
+    parsed: baseParsed(),
+    bestGuess: {
+      kind: "event",
+      eventId: "nfl-9",
+      sportKey: "americanfootball_nfl",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+    },
+    flagged: false,
+    scope: null,
+    maxStake: "25.00",
+    maxWinnings: null,
+    minOddsAmerican: null,
+    bonusAmount: null,
+    unparsedCapFields: [],
+    ...overrides,
+  };
+}
+
+function capsQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
+  return {
+    id: 11,
+    bookKey: "fanduel",
+    promoType: "profit_boost",
+    reviewReason: "caps",
+    parsed: baseParsed({ bookKey: "fanduel" }),
+    bestGuess: null,
+    flagged: false,
+    scope: {
+      kind: "event",
+      eventId: "nfl-9",
+      sportKey: "americanfootball_nfl",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+    },
+    maxStake: null,
+    maxWinnings: "500.00",
+    minOddsAmerican: null,
+    bonusAmount: null,
+    unparsedCapFields: ["maxStake", "minOdds"],
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireUser.mockResolvedValue({ userId: 1, email: "friend@example.com", displayName: "Friend" });
   mockGetScrapeStatus.mockResolvedValue(new Map());
   mockGetActivePromos.mockResolvedValue([]);
+  mockGetReviewQueue.mockResolvedValue([]);
   mockGetBonusBooks.mockResolvedValue([
     { key: "draftkings", displayName: "DraftKings" },
     { key: "fanduel", displayName: "FanDuel" },
@@ -367,5 +458,92 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-active");
     expect(result.rows).toEqual([]);
+  });
+});
+
+describe("getPromos review queue mapping (PROMO-04, D-13)", () => {
+  it("includes queue items in first-seen order for both kinds", async () => {
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow(), capsQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue.map((q) => q.promoId)).toEqual([10, 11]);
+  });
+
+  it("maps a match-kind item's bookName, description, and bestGuessLabel", async () => {
+    const row = matchQueueRow();
+    mockGetReviewQueue.mockResolvedValue([row]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue).toHaveLength(1);
+    const item = result.queue[0];
+    expect(item.promoId).toBe(10);
+    expect(item.kind).toBe("match");
+    expect(item.bookName).toBe("DraftKings");
+    expect(item.promoTypeLabel).toBe("Boost");
+    expect(item.description).toBe("50% profit boost · all NFL games on 9/27/2026");
+    if (row.bestGuess === null || row.bestGuess.kind !== "event") throw new Error("unreachable");
+    expect(item.bestGuessLabel).toBe(
+      `Best guess: Los Angeles Rams @ Denver Broncos, ${formatKickoff(row.bestGuess.commenceTime)}.`,
+    );
+    expect(item.matchedLabel).toBeNull();
+    expect(item.capRecap).toBeNull();
+  });
+
+  it("returns bestGuessLabel null for a match-kind item with no guess", async () => {
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow({ bestGuess: null })]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue[0].bestGuessLabel).toBeNull();
+  });
+
+  it("maps a caps-kind item's matchedLabel, capRecap, and unparsedCapFields (null fields stay null)", async () => {
+    const row = capsQueueRow();
+    mockGetReviewQueue.mockResolvedValue([row]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    const item = result.queue[0];
+    expect(item.kind).toBe("caps");
+    expect(item.bestGuessLabel).toBeNull();
+    if (row.scope === null || row.scope.kind !== "event") throw new Error("unreachable");
+    expect(item.matchedLabel).toBe(`Los Angeles Rams @ Denver Broncos, ${formatKickoff(row.scope.commenceTime)}`);
+    expect(item.capRecap).toEqual({ maxStake: null, maxWinnings: "500.00", minOdds: null });
+    expect(item.unparsedCapFields).toEqual(["maxStake", "minOdds"]);
+  });
+
+  it("returns the queue even when emptyVariant is 'none-scraped'", async () => {
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("none-scraped");
+    expect(result.queue).toHaveLength(1);
+  });
+
+  it("returns the queue even when emptyVariant is 'no-odds'", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.queue).toHaveLength(1);
   });
 });
