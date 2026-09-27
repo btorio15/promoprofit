@@ -11,7 +11,7 @@
  * existing row's state, calling it, and translating its decision into SQL.
  * It never applies its own status/scope rules inline.
  */
-import { and, eq, inArray, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "@/db/client";
 import { promos, scrapeRuns } from "@/db/schema";
@@ -133,6 +133,8 @@ interface ExistingPromoRow {
   confirmedByUserId: number | null;
   correctedByUserId: number | null;
   capEnteredByUserId: number | null;
+  dismissedByUserId: number | null;
+  flaggedByUserId: number | null;
   promoType: string;
   maxStake: string | null;
   bonusAmount: string | null;
@@ -174,6 +176,33 @@ function humanPinnedFrom(row: ExistingPromoRow): PromoSelection | null {
   };
 }
 
+/** `column = value`, or `column IS NULL` when value is null. */
+function eqOrNull<T>(column: Parameters<typeof eq>[0], value: T | null): SQL {
+  return value === null ? isNull(column) : eq(column, value);
+}
+
+/**
+ * CR-05: optimistic-concurrency WHERE for every scraper UPDATE. The decision
+ * was computed from `row` as read at the start of the run; if a member
+ * action (dismiss/confirm/correct/cap entry/flag -- every one of which
+ * changes at least one of these columns) landed in between, the UPDATE
+ * matches zero rows and the member's decision stands. The row is simply
+ * re-evaluated on the next scrape.
+ */
+function unchangedSinceRead(row: ExistingPromoRow): SQL {
+  return and(
+    eq(promos.id, row.id),
+    eq(promos.status, row.status),
+    eqOrNull(promos.reviewReason, row.reviewReason),
+    eq(promos.autoMatchBlocked, row.autoMatchBlocked),
+    eqOrNull(promos.confirmedByUserId, row.confirmedByUserId),
+    eqOrNull(promos.correctedByUserId, row.correctedByUserId),
+    eqOrNull(promos.capEnteredByUserId, row.capEnteredByUserId),
+    eqOrNull(promos.dismissedByUserId, row.dismissedByUserId),
+    eqOrNull(promos.flaggedByUserId, row.flaggedByUserId),
+  )!;
+}
+
 function existingStateFrom(row: ExistingPromoRow): ExistingPromoState {
   const isHuman = row.confirmedByUserId !== null || row.correctedByUserId !== null;
   return {
@@ -206,7 +235,9 @@ export async function recordScrapeRun(row: ScrapeRunRow): Promise<void> {
 /**
  * Applies decideScrapedWrite's decision to every write from one book's
  * scrape, in a single transaction (all-or-nothing, mirroring
- * odds/store.ts's commitOddsRefresh).
+ * odds/store.ts's commitOddsRefresh). Every UPDATE is conditional on the
+ * row being unchanged since it was read (CR-05), so the outcome counts are
+ * attempted writes -- a row a member acted on mid-run is skipped silently.
  */
 export async function upsertScrapedPromos(
   bookKey: string,
@@ -238,6 +269,8 @@ export async function upsertScrapedPromos(
       confirmedByUserId: promos.confirmedByUserId,
       correctedByUserId: promos.correctedByUserId,
       capEnteredByUserId: promos.capEnteredByUserId,
+      dismissedByUserId: promos.dismissedByUserId,
+      flaggedByUserId: promos.flaggedByUserId,
       promoType: promos.promoType,
       maxStake: promos.maxStake,
       bonusAmount: promos.bonusAmount,
@@ -271,7 +304,7 @@ export async function upsertScrapedPromos(
         db
           .update(promos)
           .set({ lastSeenAt: now, expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null })
-          .where(eq(promos.id, existingRow.id)),
+          .where(unchangedSinceRead(existingRow)),
       );
       outcome.refreshed++;
       continue;
@@ -292,7 +325,7 @@ export async function upsertScrapedPromos(
             reviewReason: decision.reviewReason,
             unparsedCapFields: decision.unparsedCapFields,
           })
-          .where(eq(promos.id, existingRow.id)),
+          .where(unchangedSinceRead(existingRow)),
       );
       outcome.refreshed++;
       continue;
@@ -342,7 +375,7 @@ export async function upsertScrapedPromos(
             unparsedCapFields: decision.unparsedCapFields,
             lastSeenAt: now,
           })
-          .where(eq(promos.id, existingRow.id)),
+          .where(unchangedSinceRead(existingRow)),
       );
       outcome.revived++;
       continue;
@@ -368,7 +401,7 @@ export async function upsertScrapedPromos(
           unparsedCapFields: decision.unparsedCapFields,
           lastSeenAt: now,
         })
-        .where(eq(promos.id, existingRow.id)),
+        .where(unchangedSinceRead(existingRow)),
     );
     if (wasExpired) {
       outcome.revived++;
