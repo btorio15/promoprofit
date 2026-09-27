@@ -97,7 +97,7 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
           <RiskAdvisory />
           <div className="flex flex-col gap-2">
             {response.rows.map((row) => (
-              <PromoRow key={row.rowKey} row={row} />
+              <PromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
             ))}
           </div>
         </>
