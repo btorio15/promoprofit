@@ -4,12 +4,20 @@ import { requireUser } from "@/lib/session";
 import { COLORADO_BOOKS } from "@/config/books";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { PromosInputSchema } from "@/domain/promos/promosInput";
-import type { GetPromosResponse, PromoRowDTO, PromosEmptyVariant, ScrapeStatusLineDTO } from "@/domain/promos/dto";
+import type {
+  GetPromosResponse,
+  PromoRowDTO,
+  PromosEmptyVariant,
+  QueueItemDTO,
+  ScrapeStatusLineDTO,
+} from "@/domain/promos/dto";
 import { getActivePromos, getScrapeStatus, type ActivePromo } from "@/db/promos";
+import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
+import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
 import { rankPromoHedges, type PromoOpportunity } from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 
@@ -51,11 +59,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const hasAnyOkRun = scrapeStatus.some((line) => line.lastOkAt !== null);
 
   const now = new Date();
-  const activePromos = await getActivePromos(now);
+  const [activePromos, queueRows] = await Promise.all([getActivePromos(now), getReviewQueue(now)]);
+  const queue = queueRows.map(toQueueItemDTO);
 
   if (activePromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [] };
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue };
   }
 
   const userBookSet = new Set(await getUserBookKeys(user.userId));
@@ -69,7 +78,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     ]);
 
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
-    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [] };
+    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], queue };
   }
 
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -103,12 +112,40 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       }
     }
 
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [] };
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue };
   }
 
   const rows = opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames));
 
-  return { status: "ok", scrapeStatus, emptyVariant: null, rows };
+  return { status: "ok", scrapeStatus, emptyVariant: null, rows, queue };
+}
+
+/**
+ * Maps one pending_review row to its queue-card DTO (03-UI-SPEC.md "Queue
+ * item card"). kind mirrors review_reason: "match" rows only get a
+ * bestGuessLabel (when a guess exists, D-10 -- presentational only, never
+ * auto-activated); "caps" rows only get matchedLabel (the already-confirmed
+ * scope) and capRecap (D-18 -- null fields render as "not found" in the UI).
+ */
+function toQueueItemDTO(row: QueueRow): QueueItemDTO {
+  const bookName = COLORADO_BOOKS.find((b) => b.key === row.bookKey)?.displayName ?? row.bookKey;
+  const promoTypeLabel: "Boost" | "Bonus bet" = row.promoType === "profit_boost" ? "Boost" : "Bonus bet";
+
+  return {
+    promoId: row.id,
+    kind: row.reviewReason,
+    bookName,
+    promoTypeLabel,
+    description: describePromo(row.parsed),
+    bestGuessLabel:
+      row.reviewReason === "match" && row.bestGuess ? `Best guess: ${scopeGuessLabel(row.bestGuess)}.` : null,
+    matchedLabel: row.reviewReason === "caps" && row.scope ? scopeGuessLabel(row.scope) : null,
+    capRecap:
+      row.reviewReason === "caps"
+        ? { maxStake: row.maxStake, maxWinnings: row.maxWinnings, minOdds: row.minOddsAmerican }
+        : null,
+    unparsedCapFields: row.unparsedCapFields,
+  };
 }
 
 function capNoteFor(promo: ActivePromo, capBound: "max_stake" | "max_winnings", bookNames: Map<string, string>): string | null {
