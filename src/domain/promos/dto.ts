@@ -1,4 +1,4 @@
-import type { PromoType } from "./types";
+import type { CapField, PromoType, ReviewReason } from "./types";
 
 /**
  * Serializable DTOs returned by the getPromos server action (D-08). This is
@@ -70,6 +70,33 @@ export interface PromoRowDTO {
   worstCase: boolean;
 }
 
+/**
+ * One review-queue card (D-13, D-14, PROMO-04) -- a scraped promo that
+ * can't yet feed hedge math, never used in hedge math until a member
+ * confirms/corrects it. kind mirrors promos.review_reason: "match" =
+ * event/market confidence too low (bestGuessLabel, when a guess exists);
+ * "caps" = the event/market matched but a stake/winnings/odds cap couldn't
+ * be parsed (matchedLabel + capRecap, unparsedCapFields names which of the
+ * three recap fields still need a human-entered value).
+ */
+export interface QueueItemDTO {
+  promoId: number;
+  kind: ReviewReason;
+  bookName: string;
+  promoTypeLabel: "Boost" | "Bonus bet";
+  description: string;
+  bestGuessLabel: string | null;
+  matchedLabel: string | null;
+  capRecap: { maxStake: string | null; maxWinnings: string | null; minOdds: number | null } | null;
+  unparsedCapFields: CapField[];
+}
+
 export type GetPromosResponse =
-  | { status: "ok"; scrapeStatus: ScrapeStatusLineDTO[]; emptyVariant: PromosEmptyVariant | null; rows: PromoRowDTO[] }
+  | {
+      status: "ok";
+      scrapeStatus: ScrapeStatusLineDTO[];
+      emptyVariant: PromosEmptyVariant | null;
+      rows: PromoRowDTO[];
+      queue: QueueItemDTO[];
+    }
   | { status: "invalid" };
