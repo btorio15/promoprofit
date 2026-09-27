@@ -31,7 +31,15 @@ function isMaxStakeMention(line: string): boolean {
 }
 
 function isMaxWinningsMention(line: string): boolean {
-  return HAS_MAX_RE.test(line) && HAS_WINNINGS_PAYOUT_PROFIT_RE.test(line);
+  // A "maximum wager/bet/stake" statement always wins over an incidental
+  // winnings/payout/profit word elsewhere in the same sentence (e.g.
+  // FanDuel's "Profit Boost Token is valid ... up to a maximum wager" --
+  // "Profit" there names the token, not a winnings cap). No observed book
+  // states a max-winnings cap sharing a sentence with a real stake cap, so
+  // this ordering never drops a genuine winnings-cap statement.
+  return (
+    HAS_MAX_RE.test(line) && HAS_WINNINGS_PAYOUT_PROFIT_RE.test(line) && !isMaxStakeMention(line)
+  );
 }
 
 const MAX_STAKE_AMOUNT_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/;

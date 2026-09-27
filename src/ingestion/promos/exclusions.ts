@@ -15,7 +15,7 @@ const NEW_CUSTOMER_TEXT_RE = /\bnew (?:customers?|users?)\b|\bfirst[- ]bet\b|\bs
 const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 
 const NOT_A_PROMO_RE =
-  /\bpick\s*'?em\b|\bsweepstakes?\b|\bgiveaway\b|\brefer[- ]a[- ]friend\b|\bbet protect\b|\blink your account\b|\baccount linking\b/i;
+  /\bpick\s*['’]?em\b|\bsweepstakes?\b|\bgiveaway\b|\brefer[- ]a[- ]friend\b|\bbet protect\b|\blink your account\b|\baccount linking\b/i;
 
 const LIVE_ONLY_RE = /\blive wagers? only\b|\blive[- ]only\b/i;
 
