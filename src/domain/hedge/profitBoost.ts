@@ -19,7 +19,12 @@ import type { StakePrecision } from "./arbMath";
  *   price exists; a published price is never re-derived from boost %.
  * - D-17: a boost below its stated minimum odds, or whose best hedge
  *   yields zero/negative guaranteed profit, is not shown (returns null)
- *   instead of a $0-or-negative row.
+ *   instead of a $0-or-negative row. This "not shown" rule is enforced by
+ *   calculateProfitBoostHedge specifically -- the min-odds eligibility
+ *   half of D-17 (boostedDecimalOdds < minOdds -> null) is a genuine
+ *   eligibility gate and lives in calculateProfitBoostHedgeUnfiltered too,
+ *   but the guaranteedProfit <= 0 half is only a display filter applied by
+ *   calculateProfitBoostHedge.
  * - D-18: maxStake is required and this solver is never invoked without
  *   one. The max-winnings cap's wording convention (net_winnings vs.
  *   total_payout vs. boost_extra) comes from the book's own promo text,
@@ -210,7 +215,17 @@ function kinkStake(
   return winningsCap.amount.dividedBy(obEff.minus(baseOdds));
 }
 
-export function calculateProfitBoostHedge(input: ProfitBoostInput): ProfitBoostResult | null {
+/**
+ * Unfiltered variant of calculateProfitBoostHedge: runs the identical
+ * cap-aware stake solver and the identical D-17 minimum-odds eligibility
+ * gate, but returns the best candidate found even when its guaranteedProfit
+ * is zero or negative. Exists only so callers can report a "best available"
+ * figure for display (findUnprofitablePromos) -- never to derive stakes or
+ * hedge instructions, since a non-positive result is not a real
+ * opportunity. calculateProfitBoostHedge remains the sole entry point for
+ * anything that shows stakes.
+ */
+export function calculateProfitBoostHedgeUnfiltered(input: ProfitBoostInput): ProfitBoostResult | null {
   const maxStake = new LocalDecimal(input.maxStake);
   if (maxStake.lte(0)) {
     throw new RangeError(`maxStake must be greater than 0, got ${maxStake.toString()}`);
@@ -318,10 +333,14 @@ export function calculateProfitBoostHedge(input: ProfitBoostInput): ProfitBoostR
     }
   }
 
-  if (best === null || best.guaranteedProfit.lte(0)) {
+  if (best === null) {
     return null;
   }
 
+  // roiPct is well-defined for non-positive profit too (totalStaked > 0 for
+  // every candidate), so it is computed unconditionally here -- the
+  // filtered wrapper below discards the whole result anyway when profit is
+  // non-positive.
   const roiPct = best.guaranteedProfit
     .dividedBy(best.totalStaked)
     .times(100)
@@ -341,4 +360,19 @@ export function calculateProfitBoostHedge(input: ProfitBoostInput): ProfitBoostR
     roiPct,
     capBound,
   };
+}
+
+/**
+ * D-17: a boost below its stated minimum odds, or whose best hedge yields
+ * zero/negative guaranteed profit, is not shown -- this is the sole entry
+ * point that enforces the guaranteedProfit > 0 display filter. See
+ * calculateProfitBoostHedgeUnfiltered for the "best available" variant used
+ * only for informational (non-actionable) display.
+ */
+export function calculateProfitBoostHedge(input: ProfitBoostInput): ProfitBoostResult | null {
+  const result = calculateProfitBoostHedgeUnfiltered(input);
+  if (result === null || result.guaranteedProfit.lte(0)) {
+    return null;
+  }
+  return result;
 }

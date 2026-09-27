@@ -10,6 +10,7 @@ import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
 import { ReviewQueueSection } from "./ReviewQueueSection";
 import { PromosEmptyState } from "./PromosEmptyState";
 import { PromoRow } from "./PromoRow";
+import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
 
 export interface PromosScreenProps {
   /** Reserved for Plan 04's "no-odds" empty-state gating; unused until that plan wires odds-dependent hedge math. */
@@ -92,12 +93,15 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
         </div>
       ) : response?.status === "ok" && response.emptyVariant !== null ? (
         <PromosEmptyState variant={response.emptyVariant} />
-      ) : response?.status === "ok" && response.rows.length > 0 ? (
+      ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
         <>
           <RiskAdvisory />
           <div className="flex flex-col gap-2">
             {response.rows.map((row) => (
               <PromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
+            ))}
+            {response.unprofitableRows.map((row) => (
+              <UnprofitablePromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
             ))}
           </div>
         </>

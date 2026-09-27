@@ -79,6 +79,30 @@ export interface PromoRowDTO {
 }
 
 /**
+ * quick-260927-edt: one active promo whose best hedge is not strictly
+ * profitable, shown as a muted/greyed row after the profitable rows so
+ * members can see the promo was evaluated (and flag a wrong auto-match)
+ * without ever being told to place a losing bet. By design this NEVER
+ * carries stakes, hedge book, or selection fields -- only enough to render
+ * the row and its "best" (or "nothing eligible") note.
+ */
+export interface UnprofitablePromoRowDTO {
+  rowKey: string;
+  promoId: number;
+  promoType: PromoType;
+  promoTypeLabel: "Boost" | "Bonus bet";
+  bookKey: string;
+  bookName: string;
+  title: string;
+  scopeLabel: string;
+  autoMatched: boolean;
+  /** Fixed 2-dp string (e.g. "-0.65"), or null when no candidate could be evaluated at all. */
+  bestGuaranteedProfit: string | null;
+  /** Display-ready: "No profitable hedge right now (best: −$0.65)" or "No eligible bets right now". */
+  note: string;
+}
+
+/**
  * One review-queue card (D-13, D-14, PROMO-04) -- a scraped promo that
  * can't yet feed hedge math, never used in hedge math until a member
  * confirms/corrects it. kind mirrors promos.review_reason: "match" =
@@ -105,6 +129,7 @@ export type GetPromosResponse =
       scrapeStatus: ScrapeStatusLineDTO[];
       emptyVariant: PromosEmptyVariant | null;
       rows: PromoRowDTO[];
+      unprofitableRows: UnprofitablePromoRowDTO[];
       queue: QueueItemDTO[];
       /** Correct sub-panel dropdown data (Plan 09, T-03-09-06) -- empty lists unless the queue has at least one match-kind item. */
       correctionOptions: CorrectionOptions;

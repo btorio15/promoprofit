@@ -13,7 +13,7 @@ import { formatAmerican, formatKickoff, formatUsd } from "@/lib/format";
  */
 
 /** "50.00" -> "50%" (drop a trailing ".00"); "12.50" -> "12.50%" (keep 2dp otherwise). */
-function formatBoostPercent(value: string): string {
+export function formatBoostPercent(value: string): string {
   const trimmed = value.endsWith(".00") ? value.slice(0, -3) : value;
   return `${trimmed}%`;
 }

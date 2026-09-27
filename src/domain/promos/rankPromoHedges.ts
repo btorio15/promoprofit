@@ -3,6 +3,7 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 import { americanToDecimal } from "@/domain/hedge/americanOdds";
 import {
   calculateProfitBoostHedge,
+  calculateProfitBoostHedgeUnfiltered,
   decimalToAmericanDisplay,
   type ProfitBoostResult,
 } from "@/domain/hedge/profitBoost";
@@ -49,7 +50,7 @@ export interface PromoOpportunity<P extends RankablePromo = RankablePromo> {
   result: { kind: "boost"; boost: ProfitBoostResult } | { kind: "bonus"; bonus: BonusBetHedgeResult };
 }
 
-interface RankOptions {
+export interface RankOptions {
   moneylineEvents: OddsEvent[];
   extendedEvents: OddsEvent[];
   hedgeBookKeys: ReadonlySet<string>;
@@ -132,6 +133,7 @@ function evaluateBoostCandidate(
   hedge: SelectionQuote,
   sameBook: boolean,
   opts: RankOptions,
+  allowNonPositive: boolean,
 ): EvaluatedCandidate | null {
   if (promo.maxStake === null) return null; // D-18, defensive re-check
 
@@ -151,7 +153,8 @@ function evaluateBoostCandidate(
 
   let result: ProfitBoostResult | null;
   try {
-    result = calculateProfitBoostHedge({
+    const solve = allowNonPositive ? calculateProfitBoostHedgeUnfiltered : calculateProfitBoostHedge;
+    result = solve({
       boostedOddsAmerican,
       baseOddsAmerican,
       boostPercent,
@@ -191,6 +194,7 @@ function evaluateBonusCandidate(
   hedge: SelectionQuote,
   sameBook: boolean,
   opts: RankOptions,
+  allowNonPositive: boolean,
 ): EvaluatedCandidate | null {
   if (!promoBookQuote || promo.bonusAmount === null) return null;
 
@@ -201,7 +205,7 @@ function evaluateBonusCandidate(
     precision: opts.precision,
   });
 
-  if (bonus.guaranteedProfit.lte(0)) return null;
+  if (!allowNonPositive && bonus.guaranteedProfit.lte(0)) return null;
 
   return {
     selection,
@@ -217,6 +221,7 @@ function evaluateCandidate(
   promo: RankablePromo,
   selection: ResolvedSelection,
   opts: RankOptions,
+  allowNonPositive: boolean = false,
 ): EvaluatedCandidate | null {
   const promoBookQuote = selection.promoSideQuotes.find((q) => q.bookKey === promo.bookKey) ?? null;
 
@@ -228,8 +233,8 @@ function evaluateCandidate(
   const sameBook = hedge.bookKey === promo.bookKey;
 
   return promo.promoType === "profit_boost"
-    ? evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts)
-    : evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts);
+    ? evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive)
+    : evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
 }
 
 function guaranteedProfitOf(candidate: EvaluatedCandidate): Decimal {
@@ -266,22 +271,27 @@ function isBetterCandidate(a: EvaluatedCandidate, b: EvaluatedCandidate | null):
   return SIDE_ORDER[a.selection.side] - SIDE_ORDER[b.selection.side] < 0;
 }
 
-function evaluatePromo<P extends RankablePromo>(promo: P, opts: RankOptions): PromoOpportunity<P> | null {
-  if (promo.promoType === "profit_boost" && promo.maxStake === null) return null; // D-18
-
-  const candidates = promo.pinned
+/** Candidate selections for a promo: its single pinned selection, or every 2-way selection inside its scope. */
+function candidatesFor(promo: RankablePromo, opts: RankOptions): ResolvedSelection[] {
+  return promo.pinned
     ? getPinnedCandidates(promo, opts.moneylineEvents, opts.extendedEvents)
     : enumerateScopeSelections(
         { moneyline: opts.moneylineEvents, extended: opts.extendedEvents },
         promo.scope,
         { now: opts.now, eligibleMarketTypes: promo.eligibleMarketTypes },
       );
+}
+
+function evaluatePromo<P extends RankablePromo>(promo: P, opts: RankOptions): PromoOpportunity<P> | null {
+  if (promo.promoType === "profit_boost" && promo.maxStake === null) return null; // D-18
+
+  const candidates = candidatesFor(promo, opts);
 
   let best: EvaluatedCandidate | null = null;
   let candidatesEvaluated = 0;
 
   for (const selection of candidates) {
-    const evaluated = evaluateCandidate(promo, selection, opts);
+    const evaluated = evaluateCandidate(promo, selection, opts, false);
     if (!evaluated) continue;
     candidatesEvaluated++;
     if (isBetterCandidate(evaluated, best)) best = evaluated;
@@ -330,4 +340,72 @@ export function rankPromoHedges<P extends RankablePromo>(promos: P[], opts: Rank
   });
 
   return opportunities;
+}
+
+export interface UnprofitablePromo<P extends RankablePromo = RankablePromo> {
+  promo: P;
+  bestGuaranteedProfit: Decimal | null;
+  candidatesEvaluated: number;
+}
+
+/**
+ * quick-260927-edt: purely informational companion to rankPromoHedges.
+ * For every active promo that rankPromoHedges excludes (its best hedge is
+ * not strictly profitable, or nothing could be evaluated at all), reports
+ * the single best (maximum) guaranteed profit found across every candidate
+ * -- including zero/negative ones -- or null when no candidate could be
+ * evaluated. Callers must never derive stakes or hedge instructions from
+ * this: "opportunity" continues to mean strictly-profitable only, and
+ * rankPromoHedges' own output is completely unaffected by this function.
+ */
+export function findUnprofitablePromos<P extends RankablePromo>(
+  promos: P[],
+  opts: RankOptions,
+): UnprofitablePromo<P>[] {
+  const profitableIds = new Set(rankPromoHedges(promos, opts).map((opp) => opp.promo.id));
+
+  const results: UnprofitablePromo<P>[] = [];
+
+  for (const promo of promos) {
+    if (profitableIds.has(promo.id)) continue;
+
+    if (promo.promoType === "profit_boost" && promo.maxStake === null) {
+      // D-18: never evaluated by evaluatePromo either -- nothing to solve.
+      results.push({ promo, bestGuaranteedProfit: null, candidatesEvaluated: 0 });
+      continue;
+    }
+
+    const candidates = candidatesFor(promo, opts);
+
+    let bestGuaranteedProfit: Decimal | null = null;
+    let candidatesEvaluated = 0;
+
+    for (const selection of candidates) {
+      const evaluated = evaluateCandidate(promo, selection, opts, true);
+      if (!evaluated) continue;
+      candidatesEvaluated++;
+
+      const profit = guaranteedProfitOf(evaluated);
+      if (bestGuaranteedProfit === null || profit.comparedTo(bestGuaranteedProfit) > 0) {
+        bestGuaranteedProfit = profit;
+      }
+    }
+
+    results.push({ promo, bestGuaranteedProfit, candidatesEvaluated });
+  }
+
+  results.sort((a, b) => {
+    if (a.bestGuaranteedProfit === null && b.bestGuaranteedProfit === null) {
+      return a.promo.id - b.promo.id;
+    }
+    if (a.bestGuaranteedProfit === null) return 1;
+    if (b.bestGuaranteedProfit === null) return -1;
+
+    const profitDiff = b.bestGuaranteedProfit.comparedTo(a.bestGuaranteedProfit);
+    if (profitDiff !== 0) return profitDiff;
+
+    return a.promo.id - b.promo.id;
+  });
+
+  return results;
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { calculateProfitBoostHedge } from "@/domain/hedge/profitBoost";
-import { rankPromoHedges, type RankablePromo } from "./rankPromoHedges";
+import { findUnprofitablePromos, rankPromoHedges, type RankablePromo } from "./rankPromoHedges";
 import type { PromoScope } from "./scope";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
@@ -698,5 +698,194 @@ describe("rankPromoHedges", () => {
     expect(opportunities).toHaveLength(2);
     expect(opportunities[0].promo.id).toBe(2); // bigger profit first
     expect(opportunities[1].promo.id).toBe(1);
+  });
+});
+
+// quick-260927-edt: findUnprofitablePromos is purely informational -- it
+// must never affect rankPromoHedges' own output, and its entries must
+// never carry stakes/hedge fields (see UnprofitablePromo's shape).
+describe("findUnprofitablePromos", () => {
+  const workedExampleEvent = moneylineEvent({
+    id: "nfl-worked",
+    homeTeam: "Denver Broncos",
+    awayTeam: "Los Angeles Rams",
+    quotes: [
+      { bookKey: "ballybet", homePrice: 107, awayPrice: -135 },
+      { bookKey: "betmgm", homePrice: 105, awayPrice: -125 },
+    ],
+  });
+
+  const workedExamplePromo: RankablePromo = {
+    ...defaultPromo,
+    id: 2,
+    bookKey: "ballybet",
+    promoType: "profit_boost",
+    scope: eventScope("nfl-worked"),
+    pinned: null,
+    eligibleMarketTypes: ["moneyline"],
+    boostPercent: "10.00",
+    maxStake: "20.00",
+    minOddsAmerican: 100,
+    winningsCap: null,
+  };
+
+  it("worked example, cents: rankPromoHedges returns [], findUnprofitablePromos returns one entry at exactly -0.65", () => {
+    const opts = {
+      moneylineEvents: [workedExampleEvent],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["betmgm"]),
+      precision: "cents" as const,
+      now: NOW,
+    };
+
+    expect(rankPromoHedges([workedExamplePromo], opts)).toEqual([]);
+
+    const [entry] = findUnprofitablePromos([workedExamplePromo], opts);
+    expect(entry).toBeDefined();
+    expect(entry.promo.id).toBe(workedExamplePromo.id);
+    expect(entry.bestGuaranteedProfit?.equals(new Decimal("-0.65"))).toBe(true);
+    expect(entry.candidatesEvaluated).toBe(1);
+  });
+
+  it("worked example, whole: bestGuaranteedProfit equals -0.80", () => {
+    const opts = {
+      moneylineEvents: [workedExampleEvent],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["betmgm"]),
+      precision: "whole" as const,
+      now: NOW,
+    };
+
+    const [entry] = findUnprofitablePromos([workedExamplePromo], opts);
+    expect(entry.bestGuaranteedProfit?.equals(new Decimal("-0.80"))).toBe(true);
+  });
+
+  it("promo with no evaluable candidate (no hedge book quotes the opposite side) -> bestGuaranteedProfit null, candidatesEvaluated 0", () => {
+    const noHedgeEvent = moneylineEvent({
+      id: "nfl-no-hedge-unprofitable",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      quotes: [{ bookKey: "ballybet", homePrice: 110, awayPrice: -140 }],
+    });
+
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      id: 3,
+      bookKey: "ballybet",
+      promoType: "profit_boost",
+      scope: eventScope("nfl-no-hedge-unprofitable"),
+      pinned: null,
+      eligibleMarketTypes: ["moneyline"],
+      boostPercent: "10.00",
+      maxStake: "20.00",
+      minOddsAmerican: null,
+      winningsCap: null,
+    };
+
+    const [entry] = findUnprofitablePromos([promo], {
+      moneylineEvents: [noHedgeEvent],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["betmgm"]), // no quote from betmgm on this event
+      precision: "cents",
+      now: NOW,
+    });
+
+    expect(entry.bestGuaranteedProfit).toBeNull();
+    expect(entry.candidatesEvaluated).toBe(0);
+  });
+
+  it("boost with maxStake null (D-18) -> entry with bestGuaranteedProfit null, candidatesEvaluated 0", () => {
+    const event = moneylineEvent({
+      id: "nfl-maxstake-null",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      quotes: [{ bookKey: "ballybet", homePrice: 110, awayPrice: -140 }],
+    });
+
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      id: 4,
+      bookKey: "ballybet",
+      promoType: "profit_boost",
+      scope: eventScope("nfl-maxstake-null"),
+      pinned: null,
+      eligibleMarketTypes: ["moneyline"],
+      boostPercent: "10.00",
+      maxStake: null,
+      minOddsAmerican: null,
+      winningsCap: null,
+    };
+
+    const [entry] = findUnprofitablePromos([promo], {
+      moneylineEvents: [event],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["ballybet"]),
+      precision: "cents",
+      now: NOW,
+    });
+
+    expect(entry.bestGuaranteedProfit).toBeNull();
+    expect(entry.candidatesEvaluated).toBe(0);
+  });
+
+  it("a profitable promo is excluded; mixed [profitable, negative, null] returns only [negative, null] in that order (profit desc, nulls last, then promo id asc)", () => {
+    const pinnedEvent = moneylineEvent({
+      id: "nfl-pinned-mix",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      quotes: [
+        { bookKey: "fanduel", homePrice: -275, awayPrice: 220 },
+        { bookKey: "betmgm", homePrice: -300, awayPrice: 250 },
+      ],
+    });
+
+    const noHedgeEvent = moneylineEvent({
+      id: "nfl-no-hedge-mix",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      quotes: [{ bookKey: "ballybet", homePrice: 110, awayPrice: -140 }],
+    });
+
+    const profitablePromo: RankablePromo = {
+      ...defaultPromo,
+      id: 10,
+      scope: eventScope("nfl-pinned-mix"),
+      pinned: { eventId: "nfl-pinned-mix", marketType: "moneyline", line: null, side: "away" },
+      boostedOddsAmerican: 300,
+      maxStake: "50",
+    };
+
+    const negativePromo: RankablePromo = {
+      ...workedExamplePromo,
+      id: 20,
+    };
+
+    const nullPromo: RankablePromo = {
+      ...defaultPromo,
+      id: 30,
+      bookKey: "ballybet",
+      pinned: null,
+      scope: eventScope("nfl-no-hedge-mix"),
+      eligibleMarketTypes: ["moneyline"],
+      boostPercent: "10.00",
+      maxStake: "20.00",
+      minOddsAmerican: null,
+    };
+
+    const opts = {
+      moneylineEvents: [pinnedEvent, workedExampleEvent, noHedgeEvent],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["fanduel", "betmgm"]),
+      precision: "cents" as const,
+      now: NOW,
+    };
+
+    const opportunities = rankPromoHedges([profitablePromo, negativePromo, nullPromo], opts);
+    expect(opportunities.map((o) => o.promo.id)).toEqual([10]);
+
+    const unprofitable = findUnprofitablePromos([profitablePromo, negativePromo, nullPromo], opts);
+    expect(unprofitable.map((e) => e.promo.id)).toEqual([20, 30]);
+    expect(unprofitable[0].bestGuaranteedProfit?.equals(new Decimal("-0.65"))).toBe(true);
+    expect(unprofitable[1].bestGuaranteedProfit).toBeNull();
   });
 });
