@@ -159,7 +159,21 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans**: TBD
+**Plans:** 11 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Wave 0 recon: find the real logged-out single-game promo source (Bally Bet / BetRivers), capture fixture, owner's D-09 per-book call, Bluesky/X findings
+- [ ] 03-02-PLAN.md — Profit-boost engine (published vs derived price, cap-optimal stake, ROI) + whole-dollar bonus-bet precision, known-answer TDD
+- [ ] 03-03-PLAN.md — Promos tab + promos/scrape_runs schema and migration [BLOCKING], per-book scrape status, empty states
+- [ ] 03-04-PLAN.md — Active promos show exact hedges: selection resolver, promo ranking at the member's books, promo rows
+- [ ] 03-05-PLAN.md — Parse the target book's real page: ScrapedPromo contract, fine-print caps, dedupe key, status-after-match rule
+- [ ] 03-06-PLAN.md — Scrape pipeline (fetch, dedupe/expiry lifecycle, run status), CLI, GitHub Actions workflow, first live scrape
+- [ ] 03-07-PLAN.md — "Needs review (N)" queue with Confirm and Dismiss (attributed, race-safe)
+- [ ] 03-08-PLAN.md — Deterministic 3-signal matcher, auto-accept + re-match wired into scrape, tuned on real samples
+- [ ] 03-09-PLAN.md — Correct (cached-odds dropdowns) and Enter cap details reviewer flows
+- [ ] 03-10-PLAN.md — Flag-back on auto-matched rows (D-11 safety net)
+- [ ] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified, owner end-to-end walkthrough
+
 **UI hint**: yes
 
 *Research flag: scraping feasibility varies per book (anti-bot posture) and the event/market matching approach has no single reference architecture — spike both before committing to an implementation (see research/SUMMARY.md Research Flags).*
