@@ -124,6 +124,12 @@ function capSourceFor(existing: ExistingPromoState, parsed: ScrapedPromo): CapSo
   };
 }
 
+/** True when an event scope's game has started, or a sport_window scope's window has closed. */
+function isScopeOver(scope: ScopeGuess, now: Date): boolean {
+  const end = scope.kind === "event" ? scope.commenceTime : scope.windowEnd;
+  return new Date(end).getTime() <= now.getTime();
+}
+
 /** Builds the "write" decision for a fresh match attempt (new/re-matched/revived-without-human-scope row). */
 function writeForMatch(caps: CapSource, match: MatchResult): ScrapedWriteDecision {
   const { promoType, maxStake, bonusAmount, unparsedCapFields, capsFrom } = caps;
@@ -165,6 +171,7 @@ export function decideScrapedWrite(
   existing: ExistingPromoState | null,
   parsed: ScrapedPromo,
   match: MatchResult,
+  now: Date,
 ): ScrapedWriteDecision {
   if (existing === null) {
     return writeForMatch(capsFromParsed(parsed), match);
@@ -214,6 +221,23 @@ export function decideScrapedWrite(
   }
 
   if (existing.status === "expired") {
+    // WR-02: a human scope whose game already started (or whose window
+    // already closed) can't be revived -- the promo would be "active" but
+    // invisible. Send it back to match review instead.
+    if (existing.humanScope !== null && isScopeOver(existing.humanScope, now)) {
+      const caps = capSourceFor(existing, parsed);
+      return {
+        kind: "write",
+        status: "pending_review",
+        reviewReason: "match",
+        autoMatched: false,
+        scope: null,
+        pinned: null,
+        bestGuess: match.status === "matched" ? match.scope : match.guess,
+        unparsedCapFields: [...caps.unparsedCapFields],
+        capsFrom: caps.capsFrom,
+      };
+    }
     if (existing.humanScope !== null) {
       const after = statusAfterMatch({
         promoType: existing.promoType,

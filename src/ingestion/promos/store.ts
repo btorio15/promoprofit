@@ -290,7 +290,7 @@ export async function upsertScrapedPromos(
     const existingRow = existingByKey.get(write.dedupeKey) ?? null;
     const parsed = write.parsed;
     const existingState = existingRow ? existingStateFrom(existingRow) : null;
-    const decision = decideScrapedWrite(existingState, parsed, write.match);
+    const decision = decideScrapedWrite(existingState, parsed, write.match, now);
 
     if (decision.kind === "skip") {
       outcome.skippedDismissed++;
@@ -333,8 +333,6 @@ export async function upsertScrapedPromos(
     }
 
     // decision.kind === "write"
-    const isExpiredHumanRevival = existingRow !== null && existingRow.status === "expired" && existingState!.humanScope !== null;
-
     if (existingRow === null) {
       statements.push(
         db.insert(promos).values({
@@ -359,35 +357,15 @@ export async function upsertScrapedPromos(
       continue;
     }
 
-    if (isExpiredHumanRevival) {
-      // D-19: revival keeps the human-confirmed/corrected scope and the
-      // row's own prior known caps -- it never re-trusts a fresh re-scrape
-      // of the same identity for those fields.
-      statements.push(
-        db
-          .update(promos)
-          .set({
-            status: decision.status,
-            reviewReason: decision.reviewReason,
-            autoMatched: decision.autoMatched,
-            ...scopeColumnsFrom(decision.scope),
-            ...pinColumnsFrom(decision.pinned),
-            bestGuess: decision.bestGuess,
-            unparsedCapFields: decision.unparsedCapFields,
-            lastSeenAt: now,
-          })
-          .where(unchangedSinceRead(existingRow)),
-      );
-      outcome.revived++;
-      continue;
-    }
-
     const wasExpired = existingRow.status === "expired";
-    // CR-03: member-entered caps (capsFrom "existing") are never overwritten.
+    // CR-03 / D-19: capsFrom "existing" (member-entered caps, or a human-
+    // scope revival) never overwrites the row's cap columns. WR-02: the
+    // scrape payload and the promo's own expiry are always refreshed, so a
+    // revived promo the book extended isn't hidden by a stale expires_at.
     const capColumns =
       decision.capsFrom === "parsed"
         ? { parsed, ...structuredCapColumns(parsed) }
-        : { expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null };
+        : { parsed, expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null };
     statements.push(
       db
         .update(promos)
