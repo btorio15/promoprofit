@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, ne, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
 import { ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
 import { ScopeGuessSchema, type ScopeGuess } from "@/domain/promos/scope";
-import type { statusAfterMatch } from "@/domain/promos/lifecycle";
+import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import {
   CAP_FIELDS,
   PROMO_TYPES,
@@ -179,7 +179,18 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
   const bestGuess = bestGuessResult.success ? bestGuessResult.data : null;
 
   const unparsedCapFieldsResult = CapFieldArraySchema.safeParse(row.unparsedCapFields);
-  const unparsedCapFields = unparsedCapFieldsResult.success ? unparsedCapFieldsResult.data : [];
+  const storedUnparsedCapFields = unparsedCapFieldsResult.success ? unparsedCapFieldsResult.data : [];
+  // CR-04: a caps-review card must always ask for every field the row still
+  // needs (e.g. a boost's missing max stake), even if the stored list is empty.
+  const unparsedCapFields =
+    row.reviewReason === "caps"
+      ? statusAfterMatch({
+          promoType: row.promoType as PromoType,
+          maxStake: row.maxStake,
+          bonusAmount: row.bonusAmount,
+          unparsedCapFields: storedUnparsedCapFields,
+        }).unparsedCapFields
+      : storedUnparsedCapFields;
 
   const maxWinningsKind: WinningsCapKind | null =
     row.maxWinningsKind !== null && (WINNINGS_CAP_KINDS as readonly string[]).includes(row.maxWinningsKind)
@@ -390,7 +401,15 @@ export async function applyCapEntry(args: {
       capEnteredByUserId: userId,
       reviewedAt: now,
     })
-    .where(and(eq(promos.id, promoId), eq(promos.status, "pending_review"), eq(promos.reviewReason, "caps")))
+    .where(
+      and(
+        eq(promos.id, promoId),
+        eq(promos.status, "pending_review"),
+        eq(promos.reviewReason, "caps"),
+        // CR-04: never activate a profit boost without a max stake.
+        maxStake === null ? ne(promos.promoType, "profit_boost") : undefined,
+      ),
+    )
     .returning({ id: promos.id });
 
   return rows.length === 1;

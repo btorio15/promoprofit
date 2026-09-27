@@ -751,7 +751,7 @@ describe("enterPromoCaps server action (D-18, T-03-09-01/03)", () => {
   });
 
   it("refuses to guess a winnings-cap kind the row doesn't know (D-18)", async () => {
-    const row = capsQueueRow({ unparsedCapFields: ["maxWinnings"], maxWinningsKind: null });
+    const row = capsQueueRow({ unparsedCapFields: ["maxWinnings"], maxStake: "25.00", maxWinningsKind: null });
     mockGetPendingPromo.mockResolvedValue(row);
 
     const result = await enterPromoCaps({ promoId: 8, maxWinnings: "500.00" });
@@ -795,6 +795,27 @@ describe("enterPromoCaps server action (D-18, T-03-09-01/03)", () => {
     const result = await enterPromoCaps({ promoId: 8, maxStake: "25.00" });
 
     expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
+  });
+
+  it("CR-04: requires a max stake for a boost with none, even when the stored unparsedCapFields is empty", async () => {
+    const row = capsQueueRow({ unparsedCapFields: [], maxStake: null });
+    mockGetPendingPromo.mockResolvedValue(row);
+
+    const result = await enterPromoCaps({ promoId: 8 });
+
+    expect(result).toEqual({ status: "invalid", fieldErrors: { maxStake: ["Enter the max stake."] } });
+    expect(mockApplyCapEntry).not.toHaveBeenCalled();
+  });
+
+  it("CR-04: an empty stored field list still accepts and normalizes the boost's missing max stake", async () => {
+    const row = capsQueueRow({ unparsedCapFields: [], maxStake: null });
+    mockGetPendingPromo.mockResolvedValue(row);
+    mockApplyCapEntry.mockResolvedValue(true);
+
+    const result = await enterPromoCaps({ promoId: 8, maxStake: "30" });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyCapEntry).toHaveBeenCalledWith(expect.objectContaining({ maxStake: "30.00" }));
   });
 
   it("passes through the row's own already-known values for fields not being entered", async () => {

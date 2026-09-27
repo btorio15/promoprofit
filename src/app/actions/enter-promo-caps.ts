@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { EnterCapsInputSchema } from "@/domain/promos/reviewInput";
 import { getPendingPromo, applyCapEntry } from "@/db/promoReview";
+import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import type { CapField } from "@/domain/promos/types";
 import type { PromoReviewResponse } from "./confirm-promo-match";
 
@@ -61,8 +62,21 @@ export async function enterPromoCaps(input: unknown): Promise<PromoReviewRespons
     minOdds: minOddsAmerican !== undefined,
   };
 
+  // CR-04: the fields a member must supply are every field the row still
+  // needs per D-18 (statusAfterMatch), not just the stored unparsedCapFields
+  // -- a boost with no max stake always needs one, even if the stored list
+  // is empty.
+  const required = new Set<CapField>(
+    statusAfterMatch({
+      promoType: row.promoType,
+      maxStake: row.maxStake,
+      bonusAmount: row.bonusAmount,
+      unparsedCapFields: row.unparsedCapFields,
+    }).unparsedCapFields,
+  );
+
   const missingFieldErrors: CapFieldErrors = {};
-  for (const field of row.unparsedCapFields) {
+  for (const field of required) {
     if (!provided[field]) {
       missingFieldErrors[field] = [REQUIRED_FIELD_MESSAGES[field]];
     }
@@ -78,13 +92,18 @@ export async function enterPromoCaps(input: unknown): Promise<PromoReviewRespons
     };
   }
 
-  const normalizedMaxStake = row.unparsedCapFields.includes("maxStake")
+  const normalizedMaxStake = required.has("maxStake")
     ? new Decimal(maxStake!).toFixed(2)
     : row.maxStake;
-  const normalizedMaxWinnings = row.unparsedCapFields.includes("maxWinnings")
+  const normalizedMaxWinnings = required.has("maxWinnings")
     ? new Decimal(maxWinnings!).toFixed(2)
     : row.maxWinnings;
-  const normalizedMinOdds = row.unparsedCapFields.includes("minOdds") ? minOddsAmerican! : row.minOddsAmerican;
+  const normalizedMinOdds = required.has("minOdds") ? minOddsAmerican! : row.minOddsAmerican;
+
+  // Defense in depth (CR-04): a profit boost is never activated without a max stake.
+  if (row.promoType === "profit_boost" && normalizedMaxStake === null) {
+    return { status: "invalid", fieldErrors: { maxStake: [REQUIRED_FIELD_MESSAGES.maxStake] } };
+  }
 
   const ok = await applyCapEntry({
     promoId,
