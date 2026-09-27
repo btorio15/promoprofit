@@ -1,15 +1,12 @@
 "use client";
 
-import type { MouseEvent } from "react";
-import { useState, useTransition } from "react";
-import { ChevronDown, Flag } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { PromoRowDTO } from "@/domain/promos/dto";
-import { flagPromoMatch } from "@/app/actions/flag-promo-match";
 import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { FlagMatchButton } from "./FlagMatchButton";
 import { PromoDetails } from "./PromoDetails";
 
 interface PromoRowProps {
@@ -34,22 +31,6 @@ interface PromoRowProps {
  * also toggles the row.
  */
 export function PromoRow({ row, onChanged }: PromoRowProps) {
-  const [isFlagPending, startFlagTransition] = useTransition();
-  const [flagMessage, setFlagMessage] = useState<string | null>(null);
-
-  function flagMatch(event: MouseEvent) {
-    event.stopPropagation();
-    startFlagTransition(async () => {
-      const outcome = await flagPromoMatch({ promoId: row.promoId });
-      if (outcome.status === "ok") {
-        setFlagMessage(null);
-        onChanged();
-        return;
-      }
-      setFlagMessage("message" in outcome ? outcome.message : "Couldn't flag this promo.");
-    });
-  }
-
   return (
     <Collapsible className="group rounded-lg border border-border bg-secondary">
       <div className="relative">
@@ -70,31 +51,10 @@ export function PromoRow({ row, onChanged }: PromoRowProps) {
               {row.autoMatched ? (
                 <>
                   <Badge variant="outline">Auto-matched</Badge>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="pointer-events-auto h-10 w-10"
-                          aria-label="Flag this match as wrong"
-                          disabled={isFlagPending}
-                          onClick={flagMatch}
-                        >
-                          <Flag className="size-4" aria-hidden="true" />
-                        </Button>
-                      }
-                    />
-                    <TooltipContent>Flag this match as wrong — sends it back for review.</TooltipContent>
-                  </Tooltip>
+                  <FlagMatchButton promoId={row.promoId} onChanged={onChanged} />
                 </>
               ) : null}
             </span>
-            {flagMessage ? (
-              <p role="alert" className="text-sm text-destructive">
-                {flagMessage}
-              </p>
-            ) : null}
             <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
             {row.claimHint ? <span className="text-sm text-muted-foreground">{row.claimHint}</span> : null}
             {row.finePrintNote ? (
