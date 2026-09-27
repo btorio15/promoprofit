@@ -7,6 +7,7 @@ import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
+import { ReviewQueueSection } from "./ReviewQueueSection";
 import { PromosEmptyState } from "./PromosEmptyState";
 import { PromoRow } from "./PromoRow";
 
@@ -74,6 +75,10 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
       </header>
 
       {response?.status === "ok" ? <ScrapeStatusPanel scrapeStatus={response.scrapeStatus} /> : null}
+
+      {response?.status === "ok" ? (
+        <ReviewQueueSection queue={response.queue} onChanged={runGetPromos} />
+      ) : null}
 
       {showSkeleton ? (
         <div className="flex flex-col gap-2">
