@@ -160,7 +160,7 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 11/15 plans executed
+**Plans:** 13/15 plans executed
 
 Plans:
 **Wave 1**
@@ -188,8 +188,8 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 03-08-PLAN.md — Deterministic scope matcher (sport + window + named-game teams), auto-accept + re-match wired into scrape, tuned on real samples from three books
-- [ ] 03-09-PLAN.md — Correct (game or sport-day, optional market pin) and Enter cap details (FanDuel hidden cap) reviewer flows
+- [x] 03-08-PLAN.md — Deterministic scope matcher (sport + window + named-game teams), auto-accept + re-match wired into scrape, tuned on real samples from three books
+- [x] 03-09-PLAN.md — Correct (game or sport-day, optional market pin) and Enter cap details (FanDuel hidden cap) reviewer flows
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -244,6 +244,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
-| 3. Promo Scraping & Review | 11/15 | In Progress|  |
+| 3. Promo Scraping & Review | 13/15 | In Progress|  |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
