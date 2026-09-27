@@ -500,4 +500,27 @@ describe("runPromoScrape", () => {
     expect(write.match).toBeDefined();
     expect(["matched", "unmatched"]).toContain(write.match.status);
   });
+
+  it("WR-09: a failed odds-cache read fails only that book; the next book retries the load", async () => {
+    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const store = makeStore();
+    const loadEvents = vi
+      .fn<LoadPromoMatchEvents>()
+      .mockRejectedValueOnce(new Error("neon blip"))
+      .mockResolvedValue({ moneyline: [], extended: [] });
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["book1", "book2"],
+      scrapers: { book1: scraper, book2: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents,
+    });
+
+    expect(outcomes.map((o) => o.status)).toEqual(["failed", "ok"]);
+    expect(outcomes[0].errorMessage).toBe("neon blip");
+    expect(loadEvents).toHaveBeenCalledTimes(2);
+  });
 });

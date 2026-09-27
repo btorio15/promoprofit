@@ -99,7 +99,12 @@ export async function runPromoScrape(opts?: {
   let eventsPromise: ReturnType<LoadPromoMatchEvents> | null = null;
   function getMatchEventsOnce(): ReturnType<LoadPromoMatchEvents> {
     if (eventsPromise === null) {
-      eventsPromise = loadEventsFn();
+      // WR-09: never memoize a rejection -- one transient cache-read failure
+      // must fail only the current book, and the next book retries.
+      eventsPromise = loadEventsFn().catch((err: unknown) => {
+        eventsPromise = null;
+        throw err;
+      });
     }
     return eventsPromise;
   }
