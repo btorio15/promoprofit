@@ -349,6 +349,11 @@ export async function upsertScrapedPromos(
     }
 
     const wasExpired = existingRow.status === "expired";
+    // CR-03: member-entered caps (capsFrom "existing") are never overwritten.
+    const capColumns =
+      decision.capsFrom === "parsed"
+        ? { parsed, ...structuredCapColumns(parsed) }
+        : { expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null };
     statements.push(
       db
         .update(promos)
@@ -359,8 +364,7 @@ export async function upsertScrapedPromos(
           ...scopeColumnsFrom(decision.scope),
           ...pinColumnsFrom(decision.pinned),
           bestGuess: decision.bestGuess,
-          parsed,
-          ...structuredCapColumns(parsed),
+          ...capColumns,
           unparsedCapFields: decision.unparsedCapFields,
           lastSeenAt: now,
         })

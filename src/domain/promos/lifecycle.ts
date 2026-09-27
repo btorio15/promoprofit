@@ -82,16 +82,51 @@ export type ScrapedWriteDecision =
       pinned: PromoSelection | null;
       bestGuess: ScopeGuess | null;
       unparsedCapFields: CapField[];
+      /**
+       * Where the row's cap columns come from after this write: "parsed" =
+       * overwrite them from the fresh scrape; "existing" = keep the row's own
+       * caps (D-19 human revival, or member-entered caps -- CR-03).
+       */
+      capsFrom: "parsed" | "existing";
     };
 
+interface CapSource {
+  promoType: PromoType;
+  maxStake: string | null;
+  bonusAmount: string | null;
+  unparsedCapFields: readonly CapField[];
+  capsFrom: "parsed" | "existing";
+}
+
+function capsFromParsed(parsed: ScrapedPromo): CapSource {
+  return {
+    promoType: parsed.promoType,
+    maxStake: parsed.maxStake,
+    bonusAmount: parsed.bonusAmount,
+    unparsedCapFields: parsed.unparsedCapFields,
+    capsFrom: "parsed",
+  };
+}
+
+/**
+ * CR-03: a row whose caps a member entered keeps them on every scrape write
+ * (and its status is derived from those caps); otherwise the fresh parse's
+ * caps are used.
+ */
+function capSourceFor(existing: ExistingPromoState, parsed: ScrapedPromo): CapSource {
+  if (!existing.capsEnteredByMember) return capsFromParsed(parsed);
+  return {
+    promoType: existing.promoType,
+    maxStake: existing.maxStake,
+    bonusAmount: existing.bonusAmount,
+    unparsedCapFields: existing.unparsedCapFields,
+    capsFrom: "existing",
+  };
+}
+
 /** Builds the "write" decision for a fresh match attempt (new/re-matched/revived-without-human-scope row). */
-function writeForMatch(
-  promoType: PromoType,
-  maxStake: string | null,
-  bonusAmount: string | null,
-  unparsedCapFields: readonly CapField[],
-  match: MatchResult,
-): ScrapedWriteDecision {
+function writeForMatch(caps: CapSource, match: MatchResult): ScrapedWriteDecision {
+  const { promoType, maxStake, bonusAmount, unparsedCapFields, capsFrom } = caps;
   if (match.status === "unmatched") {
     return {
       kind: "write",
@@ -102,6 +137,7 @@ function writeForMatch(
       pinned: null,
       bestGuess: match.guess,
       unparsedCapFields: [...unparsedCapFields],
+      capsFrom,
     };
   }
 
@@ -115,6 +151,7 @@ function writeForMatch(
     pinned: match.pinned,
     bestGuess: null,
     unparsedCapFields: after.unparsedCapFields,
+    capsFrom,
   };
 }
 
@@ -130,7 +167,7 @@ export function decideScrapedWrite(
   match: MatchResult,
 ): ScrapedWriteDecision {
   if (existing === null) {
-    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+    return writeForMatch(capsFromParsed(parsed), match);
   }
 
   if (existing.status === "dismissed") {
@@ -173,7 +210,7 @@ export function decideScrapedWrite(
         unparsedCapFields: [...parsed.unparsedCapFields],
       };
     }
-    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+    return writeForMatch(capSourceFor(existing, parsed), match);
   }
 
   if (existing.status === "expired") {
@@ -193,11 +230,13 @@ export function decideScrapedWrite(
         pinned: existing.humanPinned,
         bestGuess: null,
         unparsedCapFields: after.unparsedCapFields,
+        capsFrom: "existing",
       };
     }
     // CR-02 (D-11): a flagged row is never auto-reactivated, even after it
     // expired and reappeared -- it goes back to match review, with the fresh
     // matcher result only as a presentational best guess.
+    const caps = capSourceFor(existing, parsed);
     if (existing.autoMatchBlocked) {
       return {
         kind: "write",
@@ -207,10 +246,11 @@ export function decideScrapedWrite(
         scope: null,
         pinned: null,
         bestGuess: match.status === "matched" ? match.scope : match.guess,
-        unparsedCapFields: [...parsed.unparsedCapFields],
+        unparsedCapFields: [...caps.unparsedCapFields],
+        capsFrom: caps.capsFrom,
       };
     }
-    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+    return writeForMatch(caps, match);
   }
 
   // Defensive fallback for an unrecognized pending_review reviewReason: never write.

@@ -142,6 +142,7 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: null,
       unparsedCapFields: [],
+      capsFrom: "parsed",
     });
   });
 
@@ -156,6 +157,7 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: null,
       unparsedCapFields: ["maxStake"],
+      capsFrom: "parsed",
     });
   });
 
@@ -170,6 +172,7 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: MATCHED_SCOPE,
       unparsedCapFields: [],
+      capsFrom: "parsed",
     });
   });
 
@@ -267,6 +270,7 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: MATCHED_SCOPE,
       unparsedCapFields: [],
+      capsFrom: "parsed",
     });
   });
 
@@ -288,6 +292,7 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: null,
       unparsedCapFields: [],
+      capsFrom: "existing",
     });
   });
 
@@ -308,7 +313,36 @@ describe("decideScrapedWrite", () => {
       pinned: null,
       bestGuess: MATCHED_SCOPE,
       unparsedCapFields: [],
+      capsFrom: "parsed",
     });
+  });
+
+  it("CR-03: existing expired with member-entered caps, re-matched -> active from the member's caps, caps kept", () => {
+    const existing = baseExisting({
+      status: "expired",
+      reviewReason: null,
+      maxStake: "25.00",
+      unparsedCapFields: [],
+      capsEnteredByMember: true,
+    });
+    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "active",
+      reviewReason: null,
+      autoMatched: true,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "existing",
+    });
+  });
+
+  it("CR-03: existing expired without member caps, re-matched with maxStake absent -> pending_review/caps from the fresh parse", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: null, maxStake: "25.00" });
+    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT);
+    expect(decision).toMatchObject({ kind: "write", status: "pending_review", reviewReason: "caps", capsFrom: "parsed" });
   });
 
   it("existing expired without humanScope, still unmatched -> pending_review/match like new", () => {
