@@ -1,10 +1,11 @@
 ---
 phase: 3
 slug: promo-scraping-review
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "base-nova / neutral / css-variables (components.json unchanged since Phase 1/01.1/2 — no re-init, no new tokens, no new shadcn blocks: every component this phase needs already exists in src/components/ui/)"
 created: 2026-09-27
+reviewed_at: 2026-09-27
 ---
 
 # Phase 3 — UI Design Contract
@@ -81,9 +82,9 @@ Unchanged from Phase 1/01.1/2 — confirmed against the live repo, not re-decide
 
 **Dismiss confirmation** (shared `AlertDialog`, both kinds — reuses the exact `RefreshConfirmDialog`/`Search spreads & totals` confirm-dialog component, new copy only):
 - Heading: "Dismiss this promo?"
-- Body: "It won't be suggested again from later scrapes of this book (D-19). This can't be undone from here."
+- Body: "It won't be suggested again from later scrapes of this book (D-14). This can't be undone from here."
 - Buttons: **Dismiss** (destructive-styled confirm button) / **Cancel** (ghost).
-- Claude's discretion — defaulted: this is the one meaningfully irreversible action in this phase (D-19: a dismissal is never re-queued), which is exactly the bar Phase 2's Color section set for reserving red/a confirm dialog — Confirm and Correct are not gated behind a dialog because both remain correctable later (D-11's flag-back safety net), but nothing undoes a Dismiss in this UI.
+- Claude's discretion — defaulted: this is the one meaningfully irreversible action in this phase (D-14: a dismissal is never re-queued), which is exactly the bar Phase 2's Color section set for reserving red/a confirm dialog — Confirm and Correct are not gated behind a dialog because both remain correctable later (D-11's flag-back safety net), but nothing undoes a Dismiss in this UI.
 
 **Attribution (D-12, "Refreshed by" pattern reuse):** once a queue item is acted on, it leaves the queue entirely (no persistent queue history view this phase). The resulting **active** promo row carries the attribution instead, in its expanded panel only (not the collapsed row, to avoid clutter): "Confirmed by {displayName}" / "Corrected by {displayName}" / "Cap entered by {displayName}" — same muted Label styling and `·`-suffix convention as `OddsStatusBar`'s "Refreshed by {displayName}". Auto-matched promos (above the threshold, D-10) show no attribution line at all — there's no human to attribute.
 
@@ -177,7 +178,7 @@ Unchanged palette from Phase 1/01.1/2 — same hex/oklch values, same light/dark
 1. Inline field validation errors (unchanged, all forms)
 2. Refresh/search blocked and failure alerts (unchanged, `OddsStatusBar`/arb)
 3. **(new)** The **Dismiss** button's text/icon in a queue-item card (`variant="outline"`, `text-destructive` — outline, not filled, since the click itself doesn't destroy anything; the dialog is where the irreversible step happens)
-4. **(new)** The **Dismiss** confirm button inside the dismiss `AlertDialog` — the one truly irreversible action in this phase (D-19)
+4. **(new)** The **Dismiss** confirm button inside the dismiss `AlertDialog` — the one truly irreversible action in this phase (D-14)
 
 **Explicitly NOT accent or destructive (Claude's discretion — defaulted):**
 - **Correct** and **Enter cap details** are `variant="outline"` — they open a form, they don't commit anything by themselves; only the form's own Save button (accent) or Cancel (ghost) commits or discards.
@@ -233,7 +234,7 @@ Unchanged palette from Phase 1/01.1/2 — same hex/oklch values, same light/dark
 | Empty state — no cached odds (heading) | **No odds cached yet** (reused verbatim) |
 | Empty state — no cached odds (body) | "Press Refresh odds to pull current Colorado odds before these promos can show a hedge." |
 | Risk advisory | Reused verbatim from Phase 1/01.1/2 (CALC-06): "Placing exact, identically-sized stakes across several books is a known pattern sportsbooks use to detect and limit arbing accounts. That risk exists for every row below — it's not a reason to skip a profitable one, just something to weigh." |
-| Destructive actions this phase | **One: Dismiss.** It is the only action in the app so far that cannot be undone from the UI (D-19 — a dismissed promo is never re-queued by later scrapes of the same promo). Gated behind the `AlertDialog` above, following the same two-button confirm-dialog pattern as "Search spreads & totals" (01.1) — never a "type to confirm" pattern, since the group is small and trusted. Confirm, Correct, and the flag-back action are all left un-gated because each remains correctable afterward (D-11's flag-back safety net covers auto-matched promos; a wrongly-Confirmed match can be flagged back into the queue). |
+| Destructive actions this phase | **One: Dismiss.** It is the only action in the app so far that cannot be undone from the UI (D-14 — a dismissed promo is never re-queued by later scrapes of the same promo). Gated behind the `AlertDialog` above, following the same two-button confirm-dialog pattern as "Search spreads & totals" (01.1) — never a "type to confirm" pattern, since the group is small and trusted. Confirm, Correct, and the flag-back action are all left un-gated because each remains correctable afterward (D-11's flag-back safety net covers auto-matched promos; a wrongly-Confirmed match can be flagged back into the queue). |
 
 ---
 
@@ -272,11 +273,11 @@ No new shadcn blocks required this phase.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: FLAG (non-blocking — single-word queue actions; consider aria-labels like "Confirm this match")
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-27
