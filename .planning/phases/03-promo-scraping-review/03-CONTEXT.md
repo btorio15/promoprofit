@@ -136,7 +136,8 @@ Not in this phase:
 <deferred>
 ## Deferred Ideas
 
-None — the discussion stayed within the phase's scope. The feed, tandem hedges and manual promos are already in Phases 4 and 5 on the roadmap.
+- The feed, tandem hedges and manual promos are already in Phases 4 and 5 on the roadmap.
+- **Official social-media accounts as a promo source** (added during plan-phase, 2026-09-26): not built this phase. The Wave 0 manual reconnaissance step must also check whether the candidate books' official accounts (Bluesky first, since its public API needs no login; then X) post Colorado-applicable single-game boosts as text vs. images, and record the findings so a later phase can decide whether to add it as a source. D-06/D-09 unchanged.
 
 </deferred>
 
