@@ -14,8 +14,16 @@ const NEW_CUSTOMER_CATEGORY_RE = /^new customers?$/i;
 const NEW_CUSTOMER_TEXT_RE = /\bnew (?:customers?|users?)\b|\bfirst[- ]bet\b|\bsign[- ]up\b/i;
 const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 
+// The negative lookahead on refer-a-friend excludes DraftKings' generic
+// promotion-abuse boilerplate ("...or any bonuses, the refer-a-friend
+// program, or any other offers...") that appears verbatim in nearly every
+// promo's full T&Cs (boost or not) -- without it, that legal clause alone
+// would false-positive every DK profit-boost promo with substantial terms
+// as a refer-a-friend promo. A genuine refer-a-friend promo's own title/
+// description ("Refer a Friend!") is never itself followed by the word
+// "program", so this stays precise for the real case.
 const NOT_A_PROMO_RE =
-  /\bpick\s*['’]?em\b|\bsweepstakes?\b|\bgiveaway\b|\brefer[- ]a[- ]friend\b|\bbet protect\b|\blink your account\b|\baccount linking\b/i;
+  /\bpick\s*['’]?em\b|\bsweepstakes?\b|\bgiveaway\b|\brefer[- ]a[- ]friend\b(?!\s+program)|\bbet protect\b|\blink your account\b|\baccount linking\b/i;
 
 // Bally Bet's own title wording is just "Live Wager Profit Boost" (no
 // trailing "Only") while its detail bullet says "Live Wagers Only" -- both
@@ -23,7 +31,13 @@ const NOT_A_PROMO_RE =
 // matches bare "live wager(s)" as well as the "... only" phrasing.
 const LIVE_ONLY_RE = /\blive[- ]wagers?\b|\blive[- ]only\b/i;
 
-const FUTURES_RE = /\bfutures?\b|\bchampion\b|\bto win the\b/i;
+// Plural "futures" only, never singular "future" -- a real futures-market
+// promo always names the bet type as a plural noun ("NHL Futures", "for all
+// NHL Futures"), while generic legal boilerplate uses "future" only as a
+// singular adjective ("future Promotions", "future periods"). Matching the
+// singular form false-positived every DraftKings promo whose full T&Cs
+// include that standard abuse-prevention clause (real fixture finding).
+const FUTURES_RE = /\bfutures\b|\bchampion\b|\bto win the\b/i;
 const OUTRIGHT_RE =
   /\bpresidents cup\b|\bmasters\b|\b(?:the\s+)?open\b|\btournament winner\b|\boutright\b/i;
 
