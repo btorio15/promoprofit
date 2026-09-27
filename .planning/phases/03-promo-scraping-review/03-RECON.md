@@ -205,3 +205,40 @@ The boost percentage in all three applies to **winnings/profit only**, never to 
 | 6 | Profit boost token | College Football | "College Football Profit Boost" (promoCode `LOCFB50PBT0926`) | any CFB game on 9/26 | sport+date-wide | n/a | n/a | 50% | n/a | **hidden logged out** ("Log in for more details") → review queue, caps unknown (D-18) | none stated | "-200 or Longer" | "expires 2:00 AM ET 9/27" (`combinedEndDate` 2026-09-27T06:00:00Z) | "ANY wager"; token claimed via login | Yes — `fanduel-promos.json` (list) and `fanduel-promo-detail-cfb-boost.json` (detail) |
 | 7 | Profit boost token | Soccer | "30% Soccer Profit Boost Token" | any soccer match 9/25–9/27 | sport+date-wide | n/a | n/a | 30% | n/a | not captured in list fixture (no detail fixture pulled for this one) | none stated | not captured | 9/25–9/27 window | "ANY wager" | Yes (list only) — `fanduel-promos.json`; no matching detail fixture, so max-stake/min-odds text for this specific promo is not independently verified |
 | 8 | Profit boost token (**EXCLUDE — outright/futures-shaped**) | Golf | "Golf 25% PBT - Presidents Cup" | Presidents Cup (tournament outright) | tournament-wide, not a 2-way game market | n/a | n/a | 25% | n/a | not captured | none stated | not captured | 9/24–9/27 window | Not a 2-way hedgeable market — excluded by filter | Yes (list only) — `fanduel-promos.json` |
+
+## Matcher Tuning (D-10)
+
+**Tuned:** 2026-09-27, Plan 08 Task 3, against the real promos Plan 06 scraped live from all three target books plus a fresh re-scrape run in this session.
+
+**Odds cache credit spend:** $0 / 0 credits. `npm run db:check` showed the moneyline cache fetched at `2026-09-27T00:46:59.150Z`, ~6h25m before this session's check (`2026-09-27T07:12:18Z`) — under the plan's 12-hour refresh threshold, so `npm run odds:refresh` was correctly skipped per the plan's rule. `matchPromo` itself makes zero network calls (pure, reads only the already-cached tables) and no scraper request touches the Odds API.
+
+**Dry-run report (`npm run promos:match-report`), before the live re-scrape:**
+
+| Book | Live promos checked | Matched | Unmatched | Failing signals |
+|---|---|---|---|---|
+| Bally Bet | 1 | 1 | 0 | none |
+| DraftKings | 1 | 1 | 0 | none |
+| FanDuel | 0 | — | — | no live promo currently kept (see below) |
+
+Both of the two real promos live in the database at the start of this task matched on the **first** dry run, with zero alias-table changes needed:
+
+- Bally Bet's `"10% LA Rams vs. DEN Broncos Profit Boost"` — `teamsText: ["LA Rams", "DEN Broncos"]` resolved via the abbreviation+nickname split rule (`aliases.ts`) to the single cached "Los Angeles Rams @ Denver Broncos" event; all four signals true.
+- DraftKings' `"NFL 50% Profit Boost"` — sport-wide (`teamsText: []`, `sportKeyHint: "americanfootball_nfl"`), matched as a `sport_window` scope purely from the sport hint and the parsed window (no event lookup needed at all, per Design Implication 1).
+
+**FanDuel** has kept 0 promos in every scrape so far this phase (both Plan 06's original run and this session's re-scrape) — 03-06-SUMMARY.md traced this to the observed CFB boost token's `combinedEndDate` having already passed at scrape time, not a parser or matcher bug. There is nothing for the matcher to tune against for FanDuel yet; the alias table and window logic are believed correct for FanDuel's promo shapes (sport+date-wide CFB/soccer boosts, same shape as DraftKings' sport-wide promos, which already match cleanly) but this is unverified against a real live FanDuel sample this session.
+
+**Aliases added this session:** none — both real samples matched on the first pass, so there were no false negatives to fix. `TEAM_ALIASES` was built from the committed fixtures (`src/test/fixtures/oddsEvents.ts`, `arbEvents.ts`) plus a live `select distinct sport_key, raw_response->>'home_team'/'away_team'` query against `cached_odds`/`cached_extended_odds` (via a throwaway `tsx` script, not committed) for the three curated leagues before this task began (Task 1): confirmed live this session — 30/32 NFL teams (all but Atlanta Falcons and Green Bay Packers, both absent from this week's cached slate; Green Bay Packers is separately fixture-confirmed in `oddsEvents.ts`) and 21/30 MLB teams (in-season roster narrowing as the 2026 season nears its end); the remaining NFL team (Atlanta Falcons) and all 30 NBA teams (the NBA season had no cached games this session) were sourced from well-established official franchise names rather than live-verified.
+
+**Live re-scrape and re-match applied (`npm run scrape:promos` once, then `npm run promos:check`):**
+
+| Book | Before (status) | After (status) |
+|---|---|---|
+| Bally Bet | 1 `pending_review/match` | 1 `active`, `auto_matched=true`, `scope_kind=event`, resolved to Denver Broncos vs. Los Angeles Rams |
+| DraftKings | 1 `pending_review/match` | 1 `active`, `auto_matched=true`, `scope_kind=sport_window` (NFL, the promo's own claim window) |
+| FanDuel | 0 kept | 0 kept (same timing reason as Plan 06 — no live promo to re-match) |
+
+`promos:check` after the live re-scrape: **2 active auto-matched promos, 0 pending_review, 0 cap-review.** Both promos that existed before this task's matcher/lifecycle wiring landed are now live and hedgeable without a human touching them, exactly as D-10 intends.
+
+**Remaining unmatched promos and why:** none currently pending_review at the end of this session. The only book with zero live promos (FanDuel) is a scrape-timing gap already documented in 03-06-SUMMARY.md, not a matcher gap — no action item for Plan 08.
+
+**Auto-accept threshold:** all applicable signals true (sport, window, named-game teams, pinned market). This is deterministic, not a slidable score — matchPromo returns `"matched"` if and only if every signal that applies to that promo's shape (sport-wide vs. named-game, pinned vs. unpinned) is true; tuning this session meant checking real scraped samples against that fixed threshold, not loosening it. No fuzzy/edit-distance matching was added or considered.

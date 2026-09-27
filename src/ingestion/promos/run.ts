@@ -7,12 +7,23 @@
  * every book) is spaced at least `minGapMs` apart -- polite cadence, not
  * just "polite per book" (Design Implication 7, PITFALLS Pitfall 8).
  */
+import type { OddsEvent } from "@/domain/odds/schemas";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
+import { matchPromo } from "@/domain/promos/matcher";
 import type { BookScraper, HttpRequestSpec } from "@/domain/promos/scraped";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
+import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { fetchRequest, type FetchRequest } from "./fetchPage";
 import { promoStore, type PromoStore, type PromoWrite, type ScrapeRunRow } from "./store";
 import { BOOK_SCRAPERS } from "./books";
+
+export type LoadPromoMatchEvents = () => Promise<{ moneyline: OddsEvent[]; extended: OddsEvent[] }>;
+
+/** Default loadEvents: the same live cache Plan 04's ranker reads, in parallel, zero Odds API credits (D-07). */
+async function defaultLoadEvents(): Promise<{ moneyline: OddsEvent[]; extended: OddsEvent[] }> {
+  const [moneyline, extended] = await Promise.all([getCachedEvents(), getCachedExtendedEvents()]);
+  return { moneyline: moneyline.events, extended: extended.events };
+}
 
 export interface BookRunOutcome {
   bookKey: string;
@@ -69,6 +80,7 @@ export async function runPromoScrape(opts?: {
   scrapers?: Readonly<Record<string, BookScraper>>;
   sleep?: (ms: number) => Promise<void>;
   minGapMs?: number;
+  loadEvents?: LoadPromoMatchEvents;
 }): Promise<BookRunOutcome[]> {
   const now = opts?.now ?? new Date();
   const targets = opts?.targets ?? SCRAPE_TARGET_BOOK_KEYS;
@@ -77,8 +89,20 @@ export async function runPromoScrape(opts?: {
   const scrapers = opts?.scrapers ?? BOOK_SCRAPERS;
   const sleep = opts?.sleep ?? defaultSleep;
   const minGapMs = opts?.minGapMs ?? DEFAULT_MIN_GAP_MS;
+  const loadEventsFn = opts?.loadEvents ?? defaultLoadEvents;
 
   const outcomes: BookRunOutcome[] = [];
+
+  // Loaded lazily, once for the whole run (not per book), and only when at
+  // least one book successfully parses (found > 0) -- matchPromo spends no
+  // Odds API credits itself (D-07), it just reads whatever's already cached.
+  let eventsPromise: ReturnType<LoadPromoMatchEvents> | null = null;
+  function getMatchEventsOnce(): ReturnType<LoadPromoMatchEvents> {
+    if (eventsPromise === null) {
+      eventsPromise = loadEventsFn();
+    }
+    return eventsPromise;
+  }
 
   // Shared across every book in the run -- the gap must hold between the
   // last request of one book and the first request of the next, too.
@@ -189,11 +213,15 @@ export async function runPromoScrape(opts?: {
       }
 
       // Duplicate dedupe keys within one run (two candidates whose identity
-      // fields collide) collapse to a single write.
+      // fields collide) collapse to a single write. Every write carries its
+      // own MatchResult (Plan 08) so store.ts's decideScrapedWrite never has
+      // to re-derive it.
+      const matchEvents = await getMatchEventsOnce();
       const writesByKey = new Map<string, PromoWrite>();
       for (const candidate of parseResult.candidates) {
         const dedupeKey = promoDedupeKey(candidate);
-        writesByKey.set(dedupeKey, { dedupeKey, parsed: candidate });
+        const match = matchPromo(candidate, matchEvents, { now });
+        writesByKey.set(dedupeKey, { dedupeKey, parsed: candidate, match });
       }
       const writes = [...writesByKey.values()];
 
