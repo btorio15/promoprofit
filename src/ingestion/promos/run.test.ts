@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runPromoScrape, type LoadPromoMatchEvents } from "./run";
-import type { PromoStore, PromoWrite, UpsertOutcome } from "./store";
+import type { CommitOutcome, PromoStore, PromoWrite } from "./store";
 import type { FetchRequest, FetchResult } from "./fetchPage";
 import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo } from "@/domain/promos/scraped";
 
@@ -55,17 +55,15 @@ function makePromo(overrides: Partial<ScrapedPromo> = {}): ScrapedPromo {
   };
 }
 
-const UPSERT_RESOLVED: UpsertOutcome = { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0 };
+const COMMIT_RESOLVED: CommitOutcome = { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0, expired: 0 };
 
 function makeStore(): PromoStore & {
   recordScrapeRun: ReturnType<typeof vi.fn>;
-  upsertScrapedPromos: ReturnType<typeof vi.fn>;
-  expireMissingPromos: ReturnType<typeof vi.fn>;
+  commitScrapedPromos: ReturnType<typeof vi.fn>;
 } {
   return {
     recordScrapeRun: vi.fn().mockResolvedValue(undefined),
-    upsertScrapedPromos: vi.fn().mockResolvedValue(UPSERT_RESOLVED),
-    expireMissingPromos: vi.fn().mockResolvedValue(0),
+    commitScrapedPromos: vi.fn().mockResolvedValue(COMMIT_RESOLVED),
   };
 }
 
@@ -123,15 +121,13 @@ describe("runPromoScrape", () => {
     expect(parseFn).toHaveBeenCalledTimes(1);
     expect(parseFn.mock.calls[0][0].detailBodies).toEqual({ d1: "{}", d2: "{}" });
 
-    expect(store.upsertScrapedPromos).toHaveBeenCalledTimes(1);
-    const [bookKeyArg, writesArg] = store.upsertScrapedPromos.mock.calls[0];
+    // Upsert + expiry of unseen rows are one transactional store call (WR-03).
+    expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
+    const [bookKeyArg, writesArg, nowArg] = store.commitScrapedPromos.mock.calls[0];
     expect(bookKeyArg).toBe("testbook");
+    expect(nowArg).toBe(NOW);
     expect(writesArg).toHaveLength(2);
     expect(writesArg.every((w: PromoWrite) => typeof w.dedupeKey === "string" && w.dedupeKey.length > 0)).toBe(true);
-
-    expect(store.expireMissingPromos).toHaveBeenCalledTimes(1);
-    const [, seenKeysArg] = store.expireMissingPromos.mock.calls[0];
-    expect(seenKeysArg).toEqual(writesArg.map((w: PromoWrite) => w.dedupeKey));
 
     expect(store.recordScrapeRun).toHaveBeenCalledWith({
       bookKey: "testbook",
@@ -213,9 +209,17 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].detailRequests).toBe(3);
   });
 
-  it("found > 0 with zero kept candidates is still ok, and expires with an empty seen-key list", async () => {
+  it("WR-03: found > 0 with zero kept candidates is a failed run that writes and expires nothing", async () => {
     const scraper = makeScraper({
-      parse: () => ({ found: 3, candidates: [], skipped: [] }),
+      parse: () => ({
+        found: 3,
+        candidates: [],
+        skipped: [
+          { reason: "schema_invalid", externalId: "a", title: "A" },
+          { reason: "schema_invalid", externalId: "b", title: "B" },
+          { reason: "unrecognized", externalId: "c", title: "C" },
+        ],
+      }),
     });
     const store = makeStore();
 
@@ -229,8 +233,22 @@ describe("runPromoScrape", () => {
       loadEvents: EMPTY_MATCH_EVENTS,
     });
 
-    expect(outcomes[0]).toMatchObject({ status: "ok", promosFound: 3, promosKept: 0 });
-    expect(store.expireMissingPromos).toHaveBeenCalledWith("testbook", [], NOW);
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      promosFound: 3,
+      promosKept: 0,
+      skippedByReason: { schema_invalid: 2, unrecognized: 1 },
+      errorMessage: "3 promos found but none usable; existing promos kept",
+    });
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(store.recordScrapeRun).toHaveBeenCalledWith({
+      bookKey: "testbook",
+      ranAt: NOW,
+      status: "failed",
+      promosFound: 3,
+      promosKept: 0,
+      errorMessage: "3 promos found but none usable; existing promos kept",
+    });
   });
 
   it("a failed list fetch records failed with the reason and makes no detail/upsert/expire calls", async () => {
@@ -259,8 +277,7 @@ describe("runPromoScrape", () => {
       skippedByReason: {},
       errorMessage: "HTTP 403",
     });
-    expect(store.upsertScrapedPromos).not.toHaveBeenCalled();
-    expect(store.expireMissingPromos).not.toHaveBeenCalled();
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
     expect(store.recordScrapeRun).toHaveBeenCalledWith({
       bookKey: "testbook",
       ranAt: NOW,
@@ -287,8 +304,7 @@ describe("runPromoScrape", () => {
 
     expect(outcomes[0].status).toBe("failed");
     expect(outcomes[0].errorMessage).toBe("zero promos parsed");
-    expect(store.upsertScrapedPromos).not.toHaveBeenCalled();
-    expect(store.expireMissingPromos).not.toHaveBeenCalled();
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
   });
 
   it("parse throwing fails with the message truncated to 300 chars, no upsert/expire", async () => {
@@ -313,12 +329,11 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].status).toBe("failed");
     expect(outcomes[0].errorMessage).toHaveLength(300);
     expect(outcomes[0].errorMessage).toBe(longMessage.slice(0, 300));
-    expect(store.upsertScrapedPromos).not.toHaveBeenCalled();
-    expect(store.expireMissingPromos).not.toHaveBeenCalled();
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
   });
 
   it("isolates books: the first target throwing inside fetch does not stop the rest, and cadence still holds", async () => {
-    const scraperOk = makeScraper({ parse: () => ({ found: 1, candidates: [], skipped: [] }) });
+    const scraperOk = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
     const scraperThrows = makeScraper({ bookKey: "throwbook" });
 
     let fetchCallCount = 0;
@@ -404,12 +419,12 @@ describe("runPromoScrape", () => {
       loadEvents: EMPTY_MATCH_EVENTS,
     });
 
-    const [, writesArg] = store.upsertScrapedPromos.mock.calls[0];
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0];
     expect(writesArg).toHaveLength(1);
   });
 
   it("recordScrapeRun throwing is logged but does not change the returned outcome", async () => {
-    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [], skipped: [] }) });
+    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
     const store = makeStore();
     store.recordScrapeRun.mockRejectedValue(new Error("db down"));
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -424,7 +439,7 @@ describe("runPromoScrape", () => {
       loadEvents: EMPTY_MATCH_EVENTS,
     });
 
-    expect(outcomes[0]).toMatchObject({ status: "ok", promosFound: 1, promosKept: 0 });
+    expect(outcomes[0]).toMatchObject({ status: "ok", promosFound: 1, promosKept: 1 });
     expect(consoleError).toHaveBeenCalled();
   });
 
@@ -479,7 +494,7 @@ describe("runPromoScrape", () => {
       loadEvents: EMPTY_MATCH_EVENTS,
     });
 
-    const [, writesArg] = store.upsertScrapedPromos.mock.calls[0];
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0];
     expect(writesArg).toHaveLength(1);
     const write: PromoWrite = writesArg[0];
     expect(write.match).toBeDefined();

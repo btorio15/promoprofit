@@ -189,23 +189,34 @@ export async function runPromoScrape(opts?: {
         continue;
       }
 
-      if (parseResult.found === 0) {
+      // WR-03: zero promos found, OR promos found but none usable (every
+      // entry skipped -- e.g. a parser/schema regression), is a failed run:
+      // nothing is written and nothing is expired, so the book's live rows
+      // (including human-confirmed, cap-entered and flagged ones) survive.
+      if (parseResult.found === 0 || parseResult.candidates.length === 0) {
+        const skippedByReason: Record<string, number> = {};
+        for (const skip of parseResult.skipped) {
+          skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
+        }
         const outcome: BookRunOutcome = {
           bookKey,
           status: "failed",
-          promosFound: 0,
+          promosFound: parseResult.found,
           promosKept: 0,
           detailRequests: plans.length,
           detailFailures,
-          skippedByReason: {},
-          errorMessage: "zero promos parsed",
+          skippedByReason,
+          errorMessage:
+            parseResult.found === 0
+              ? "zero promos parsed"
+              : `${parseResult.found} promos found but none usable; existing promos kept`,
         };
         outcomes.push(outcome);
         await safeRecordScrapeRun(store, {
           bookKey,
           ranAt: now,
           status: "failed",
-          promosFound: 0,
+          promosFound: parseResult.found,
           promosKept: 0,
           errorMessage: outcome.errorMessage,
         });
@@ -225,8 +236,8 @@ export async function runPromoScrape(opts?: {
       }
       const writes = [...writesByKey.values()];
 
-      await store.upsertScrapedPromos(bookKey, writes, now);
-      await store.expireMissingPromos(bookKey, writes.map((w) => w.dedupeKey), now);
+      // Upsert + expiry of unseen rows commit in one transaction (WR-03).
+      await store.commitScrapedPromos(bookKey, writes, now);
 
       const skippedByReason: Record<string, number> = {};
       for (const skip of parseResult.skipped) {

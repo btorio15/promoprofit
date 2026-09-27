@@ -43,13 +43,22 @@ export interface UpsertOutcome {
   skippedDismissed: number;
 }
 
+export interface CommitOutcome extends UpsertOutcome {
+  expired: number;
+}
+
 export interface PromoStore {
   recordScrapeRun(row: ScrapeRunRow): Promise<void>;
-  upsertScrapedPromos(bookKey: string, writes: PromoWrite[], now: Date): Promise<UpsertOutcome>;
-  expireMissingPromos(bookKey: string, seenDedupeKeys: readonly string[], now: Date): Promise<number>;
+  /**
+   * WR-03: upserts every write AND expires the book's live rows not among
+   * them, in ONE transaction -- a failure can never leave the upserts
+   * applied without the matching expiry (or vice versa).
+   */
+  commitScrapedPromos(bookKey: string, writes: PromoWrite[], now: Date): Promise<CommitOutcome>;
 }
 
 type Statement = BatchItem<"pg">;
+type Db = ReturnType<typeof getDb>;
 
 /** One promo's structured/cap columns, derived from its validated parse. */
 function structuredCapColumns(parsed: ScrapedPromo) {
@@ -234,21 +243,20 @@ export async function recordScrapeRun(row: ScrapeRunRow): Promise<void> {
 }
 
 /**
- * Applies decideScrapedWrite's decision to every write from one book's
- * scrape, in a single transaction (all-or-nothing, mirroring
- * odds/store.ts's commitOddsRefresh). Every UPDATE is conditional on the
- * row being unchanged since it was read (CR-05), so the outcome counts are
+ * Builds the statements applying decideScrapedWrite's decision to every
+ * write from one book's scrape. Every UPDATE is conditional on the row
+ * being unchanged since it was read (CR-05), so the outcome counts are
  * attempted writes -- a row a member acted on mid-run is skipped silently.
  */
-export async function upsertScrapedPromos(
+async function buildUpsertStatements(
+  db: Db,
   bookKey: string,
   writes: PromoWrite[],
   now: Date,
-): Promise<UpsertOutcome> {
+): Promise<{ statements: Statement[]; outcome: UpsertOutcome }> {
   const outcome: UpsertOutcome = { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0 };
-  if (writes.length === 0) return outcome;
+  if (writes.length === 0) return { statements: [], outcome };
 
-  const db = getDb();
   const existingRows = await db
     .select({
       id: promos.id,
@@ -389,39 +397,52 @@ export async function upsertScrapedPromos(
     }
   }
 
-  if (statements.length > 0) {
-    const [first, ...rest] = statements;
-    await db.batch([first, ...rest]);
-  }
-
-  return outcome;
+  return { statements, outcome };
 }
 
 /**
- * Expires every live (active/pending_review) row of this book NOT in
- * `seenDedupeKeys` (all of them, when `seenDedupeKeys` is empty). A failed
- * run must never call this (D-08) -- callers only reach this after a
- * successful parse.
+ * Upserts one book's scrape and expires every live (active/pending_review)
+ * row of that book NOT among `writes`, in a single db.batch transaction
+ * (all-or-nothing, mirroring odds/store.ts's commitOddsRefresh; WR-03). A
+ * failed run must never call this (D-08). An empty `writes` list is refused
+ * outright (nothing written, nothing expired): a successful run with zero
+ * usable promos must never mass-expire the book's live rows.
  */
-export async function expireMissingPromos(
+export async function commitScrapedPromos(
   bookKey: string,
-  seenDedupeKeys: readonly string[],
+  writes: PromoWrite[],
   now: Date,
-): Promise<number> {
-  void now; // expiry is a status flip, not a timestamped column on this table.
-  const db = getDb();
-  const liveStatusFilter = inArray(promos.status, ["active", "pending_review"]);
-  const condition =
-    seenDedupeKeys.length > 0
-      ? and(eq(promos.bookKey, bookKey), liveStatusFilter, notInArray(promos.dedupeKey, [...seenDedupeKeys]))
-      : and(eq(promos.bookKey, bookKey), liveStatusFilter);
+): Promise<CommitOutcome> {
+  if (writes.length === 0) {
+    return { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0, expired: 0 };
+  }
 
-  const result = await db.update(promos).set({ status: "expired" }).where(condition).returning({ id: promos.id });
-  return result.length;
+  const db = getDb();
+  const { statements, outcome } = await buildUpsertStatements(db, bookKey, writes, now);
+
+  // Expiry is a status flip, not a timestamped column on this table. It
+  // only touches rows NOT in this run's writes, so it is independent of the
+  // upsert statements' order within the batch.
+  const expireStatement = db
+    .update(promos)
+    .set({ status: "expired" })
+    .where(
+      and(
+        eq(promos.bookKey, bookKey),
+        inArray(promos.status, ["active", "pending_review"]),
+        notInArray(
+          promos.dedupeKey,
+          writes.map((w) => w.dedupeKey),
+        ),
+      ),
+    )
+    .returning({ id: promos.id });
+
+  const [expiredRows] = await db.batch([expireStatement, ...statements]);
+  return { ...outcome, expired: expiredRows.length };
 }
 
 export const promoStore: PromoStore = {
   recordScrapeRun,
-  upsertScrapedPromos,
-  expireMissingPromos,
+  commitScrapedPromos,
 };
