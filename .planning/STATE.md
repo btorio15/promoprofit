@@ -148,6 +148,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 |---|-------------|------|--------|-----------|
 | 260925-wy0 | revert CR-02: apply hedge cap after picking best orientation | 2026-09-26 | 5aef9e1 | [260925-wy0-revert-cr-02-apply-hedge-cap-after-picki](./quick/260925-wy0-revert-cr-02-apply-hedge-cap-after-picki/) |
 | 260927-edt | show unprofitable promos greyed out on Promos tab | 2026-09-27 | b86f24e | [260927-edt-show-unprofitable-promos-greyed-out](./quick/260927-edt-show-unprofitable-promos-greyed-out/) |
+| fast | fix Base UI nativeButton console errors (empty-state links, Multiple books badge) | 2026-09-27 | 06f67f8 | — |
 
 ## Deferred Items
 
