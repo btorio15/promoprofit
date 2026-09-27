@@ -17,6 +17,7 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:check": "tsx --env-file=.env.local scripts/db-check.ts",
     "promos:check": "tsx --env-file=.env.local scripts/promos-check.ts",
+    "scrape:promos": "tsx scripts/scrape-promos.ts",
     "odds:smoke": "tsx --env-file=.env.local scripts/odds-smoke.ts",
     "odds:refresh": "tsx --env-file=.env.local scripts/refresh-odds.ts",
     "invite:create": "tsx --env-file=.env.local scripts/invite-create.ts",
