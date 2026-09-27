@@ -160,7 +160,7 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 9/15 plans executed
+**Plans:** 11/15 plans executed
 
 Plans:
 **Wave 1**
@@ -183,8 +183,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-06-PLAN.md — Scrape pipeline for all three books (polite http fetch, dedupe/expiry lifecycle, run status), registry, CLI, GitHub Actions workflow, first live scrape
-- [ ] 03-07-PLAN.md — "Needs review (N)" queue with Confirm (scope guess) and Dismiss (attributed, race-safe)
+- [x] 03-06-PLAN.md — Scrape pipeline for all three books (polite http fetch, dedupe/expiry lifecycle, run status), registry, CLI, GitHub Actions workflow, first live scrape
+- [x] 03-07-PLAN.md — "Needs review (N)" queue with Confirm (scope guess) and Dismiss (attributed, race-safe)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -244,6 +244,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
-| 3. Promo Scraping & Review | 9/15 | In Progress|  |
+| 3. Promo Scraping & Review | 11/15 | In Progress|  |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |
