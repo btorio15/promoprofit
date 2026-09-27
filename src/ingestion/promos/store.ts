@@ -186,6 +186,7 @@ function existingStateFrom(row: ExistingPromoRow): ExistingPromoState {
     maxStake: row.maxStake,
     bonusAmount: row.bonusAmount,
     unparsedCapFields: (row.unparsedCapFields as CapField[] | null) ?? [],
+    capsEnteredByMember: row.capEnteredByUserId !== null,
   };
 }
 
@@ -266,15 +267,31 @@ export async function upsertScrapedPromos(
       // existingRow is always non-null here (decideScrapedWrite only
       // returns "touch" for an existing row) -- narrow defensively.
       if (!existingRow) continue;
-      const capLocked = existingRow.capEnteredByUserId !== null;
       statements.push(
         db
           .update(promos)
-          .set(
-            capLocked
-              ? { lastSeenAt: now, expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null }
-              : { lastSeenAt: now, parsed, ...structuredCapColumns(parsed) },
-          )
+          .set({ lastSeenAt: now, expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null })
+          .where(eq(promos.id, existingRow.id)),
+      );
+      outcome.refreshed++;
+      continue;
+    }
+
+    if (decision.kind === "refresh") {
+      if (!existingRow) continue;
+      // CR-01: fresh caps AND the status re-derived from them, together --
+      // never fresh (possibly nulled) caps on a row left active.
+      statements.push(
+        db
+          .update(promos)
+          .set({
+            lastSeenAt: now,
+            parsed,
+            ...structuredCapColumns(parsed),
+            status: decision.status,
+            reviewReason: decision.reviewReason,
+            unparsedCapFields: decision.unparsedCapFields,
+          })
           .where(eq(promos.id, existingRow.id)),
       );
       outcome.refreshed++;

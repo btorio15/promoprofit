@@ -50,11 +50,29 @@ export interface ExistingPromoState {
   maxStake: string | null;
   bonusAmount: string | null;
   unparsedCapFields: CapField[];
+  /**
+   * True when a member entered this row's caps (cap_entered_by_user_id set).
+   * Member-entered caps are never overwritten by a scrape.
+   */
+  capsEnteredByMember: boolean;
 }
 
 export type ScrapedWriteDecision =
   | { kind: "skip" }
+  /** Refresh lastSeenAt/expiresAt only -- cap columns and status are left as they are. */
   | { kind: "touch" }
+  /**
+   * Re-trust the fresh parse's cap columns AND apply the status/reviewReason
+   * re-derived from them (CR-01): a scrape can never leave an active row
+   * with a required cap silently nulled -- the row moves back to
+   * pending_review/caps instead.
+   */
+  | {
+      kind: "refresh";
+      status: PromoStatus;
+      reviewReason: ReviewReason | null;
+      unparsedCapFields: CapField[];
+    }
   | {
       kind: "write";
       status: PromoStatus;
@@ -119,17 +137,41 @@ export function decideScrapedWrite(
     return { kind: "skip" };
   }
 
-  if (existing.status === "active") {
-    return { kind: "touch" };
-  }
-
-  if (existing.status === "pending_review" && existing.reviewReason === "caps") {
-    return { kind: "touch" };
+  if (existing.status === "active" || (existing.status === "pending_review" && existing.reviewReason === "caps")) {
+    // Member-entered caps are never overwritten by a scrape.
+    if (existing.capsEnteredByMember) {
+      return { kind: "touch" };
+    }
+    // CR-01: re-derive status from the fresh parse's caps. An active row
+    // whose required cap became unparsed/absent goes back to
+    // pending_review/caps (never stays active with a nulled cap); a caps row
+    // whose fresh parse now has every required cap becomes active.
+    const after = statusAfterMatch({
+      promoType: parsed.promoType,
+      maxStake: parsed.maxStake,
+      bonusAmount: parsed.bonusAmount,
+      unparsedCapFields: parsed.unparsedCapFields,
+    });
+    return {
+      kind: "refresh",
+      status: after.status,
+      reviewReason: after.reviewReason,
+      unparsedCapFields: after.unparsedCapFields,
+    };
   }
 
   if (existing.status === "pending_review" && existing.reviewReason === "match") {
     if (existing.autoMatchBlocked) {
-      return { kind: "touch" };
+      // D-11: stays in match review; only its caps are refreshed.
+      if (existing.capsEnteredByMember) {
+        return { kind: "touch" };
+      }
+      return {
+        kind: "refresh",
+        status: "pending_review",
+        reviewReason: "match",
+        unparsedCapFields: [...parsed.unparsedCapFields],
+      };
     }
     return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
   }

@@ -125,6 +125,7 @@ function baseExisting(overrides: Partial<ExistingPromoState> = {}): ExistingProm
     maxStake: "20.00",
     bonusAmount: null,
     unparsedCapFields: [],
+    capsEnteredByMember: false,
     ...overrides,
   };
 }
@@ -177,19 +178,75 @@ describe("decideScrapedWrite", () => {
     expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "skip" });
   });
 
-  it("existing active -> touch", () => {
+  it("existing active, caps still fully parsed -> refresh, stays active", () => {
     const existing = baseExisting({ status: "active", reviewReason: null });
-    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({
+      kind: "refresh",
+      status: "active",
+      reviewReason: null,
+      unparsedCapFields: [],
+    });
   });
 
-  it("existing pending_review/caps -> touch", () => {
-    const existing = baseExisting({ status: "pending_review", reviewReason: "caps" });
-    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+  it("CR-01: existing active re-scraped with minOdds now unparsed -> refresh to pending_review/caps [minOdds]", () => {
+    const existing = baseExisting({ status: "active", reviewReason: null });
+    const decision = decideScrapedWrite(
+      existing,
+      baseParsed({ minOddsAmerican: null, unparsedCapFields: ["minOdds"] }),
+      MATCHED_RESULT,
+    );
+    expect(decision).toEqual({
+      kind: "refresh",
+      status: "pending_review",
+      reviewReason: "caps",
+      unparsedCapFields: ["minOdds"],
+    });
   });
 
-  it("existing pending_review/match with autoMatchBlocked true -> touch, even if matched now (D-11)", () => {
+  it("CR-01: existing active boost re-scraped with maxStake now absent -> refresh to pending_review/caps [maxStake]", () => {
+    const existing = baseExisting({ status: "active", reviewReason: null });
+    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT);
+    expect(decision).toEqual({
+      kind: "refresh",
+      status: "pending_review",
+      reviewReason: "caps",
+      unparsedCapFields: ["maxStake"],
+    });
+  });
+
+  it("existing active with member-entered caps -> touch only (caps never overwritten)", () => {
+    const existing = baseExisting({ status: "active", reviewReason: null, capsEnteredByMember: true });
+    expect(decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT)).toEqual({ kind: "touch" });
+  });
+
+  it("CR-04: existing pending_review/caps boost still missing maxStake -> refresh keeps [maxStake] (never an empty field list)", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "caps", maxStake: null, unparsedCapFields: ["maxStake"] });
+    expect(decideScrapedWrite(existing, baseParsed({ maxStake: null, unparsedCapFields: [] }), MATCHED_RESULT)).toEqual({
+      kind: "refresh",
+      status: "pending_review",
+      reviewReason: "caps",
+      unparsedCapFields: ["maxStake"],
+    });
+  });
+
+  it("existing pending_review/caps whose fresh parse now has every cap -> refresh to active", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "caps", maxStake: null, unparsedCapFields: ["maxStake"] });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({
+      kind: "refresh",
+      status: "active",
+      reviewReason: null,
+      unparsedCapFields: [],
+    });
+  });
+
+  it("existing pending_review/match with autoMatchBlocked true -> stays pending_review/match, even if matched now (D-11)", () => {
     const existing = baseExisting({ status: "pending_review", reviewReason: "match", autoMatchBlocked: true });
-    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({ kind: "touch" });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT)).toEqual({
+      kind: "refresh",
+      status: "pending_review",
+      reviewReason: "match",
+      unparsedCapFields: [],
+    });
   });
 
   it("existing pending_review/match, not blocked, now matched -> write as new-matched (re-match, D-19)", () => {
