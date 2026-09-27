@@ -77,7 +77,11 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
       {response?.status === "ok" ? <ScrapeStatusPanel scrapeStatus={response.scrapeStatus} /> : null}
 
       {response?.status === "ok" ? (
-        <ReviewQueueSection queue={response.queue} onChanged={runGetPromos} />
+        <ReviewQueueSection
+          queue={response.queue}
+          correctionOptions={response.correctionOptions}
+          onChanged={runGetPromos}
+        />
       ) : null}
 
       {showSkeleton ? (

@@ -188,6 +188,7 @@ function matchQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     scope: null,
     maxStake: "25.00",
     maxWinnings: null,
+    maxWinningsKind: null,
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: [],
@@ -214,6 +215,7 @@ function capsQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     },
     maxStake: null,
     maxWinnings: "500.00",
+    maxWinningsKind: "total_payout",
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: ["maxStake", "minOdds"],
@@ -550,5 +552,73 @@ describe("getPromos review queue mapping (PROMO-04, D-13)", () => {
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-odds");
     expect(result.queue).toHaveLength(1);
+  });
+});
+
+describe("getPromos correction options (Plan 09, T-03-09-06)", () => {
+  it("returns empty correctionOptions and fetches no cache when the queue has no match-kind item", async () => {
+    mockGetReviewQueue.mockResolvedValue([capsQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.correctionOptions).toEqual({ events: [], sportDays: [] });
+    expect(mockGetCachedEvents).not.toHaveBeenCalled();
+    expect(mockGetCachedExtendedEvents).not.toHaveBeenCalled();
+  });
+
+  it("fetches cached events and builds correctionOptions when a match-kind item exists, even with zero active promos", async () => {
+    const event = moneylineEvent({
+      id: "nfl-9",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+      quotes: [{ bookKey: "draftkings", homePrice: -180, awayPrice: 150 }],
+    });
+    mockGetActivePromos.mockResolvedValue([]);
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(mockGetCachedEvents).toHaveBeenCalledTimes(1);
+    expect(result.correctionOptions.events.map((e) => e.eventId)).toEqual(["nfl-9"]);
+  });
+
+  it("reuses the already-fetched odds cache for correctionOptions when active promos exist (no double fetch)", async () => {
+    const event = moneylineEvent({
+      id: "nfl-a",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [{ bookKey: "draftkings", homePrice: -275, awayPrice: 220 }],
+    });
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow({ id: 99 })]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(mockGetCachedEvents).toHaveBeenCalledTimes(1);
+    expect(result.correctionOptions.events.map((e) => e.eventId)).toEqual(["nfl-a"]);
+  });
+
+  it("returns empty correctionOptions when emptyVariant is 'no-odds' even with a match-kind item, without throwing", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetReviewQueue.mockResolvedValue([matchQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.correctionOptions).toEqual({ events: [], sportDays: [] });
   });
 });

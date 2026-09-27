@@ -1,10 +1,12 @@
 "use client";
 
-import type { QueueItemDTO } from "@/domain/promos/dto";
+import type { CorrectionOptions, QueueItemDTO } from "@/domain/promos/dto";
 import { QueueItemCard } from "./QueueItemCard";
 
 interface ReviewQueueSectionProps {
   queue: QueueItemDTO[];
+  /** Correct sub-panel dropdown data (Plan 09, T-03-09-06); forwarded to every card, only used by match-kind ones. */
+  correctionOptions: CorrectionOptions;
   onChanged: () => void;
 }
 
@@ -15,7 +17,7 @@ interface ReviewQueueSectionProps {
  * follows (03-UI-SPEC.md). Rendered on the Promos tab directly after the
  * scrape-status panel and before RiskAdvisory/the active-promos rows.
  */
-export function ReviewQueueSection({ queue, onChanged }: ReviewQueueSectionProps) {
+export function ReviewQueueSection({ queue, correctionOptions, onChanged }: ReviewQueueSectionProps) {
   if (queue.length === 0) return null;
 
   return (
@@ -31,7 +33,12 @@ export function ReviewQueueSection({ queue, onChanged }: ReviewQueueSectionProps
       </header>
       <div className="flex flex-col gap-3">
         {queue.map((item) => (
-          <QueueItemCard key={item.promoId} item={item} onChanged={onChanged} />
+          <QueueItemCard
+            key={item.promoId}
+            item={item}
+            correctionOptions={correctionOptions}
+            onChanged={onChanged}
+          />
         ))}
       </div>
     </section>

@@ -11,7 +11,11 @@ import type { ScopeGuess } from "@/domain/promos/scope";
 
 export type PromoReviewResponse =
   | { status: "ok" }
-  | { status: "invalid" }
+  | {
+      status: "invalid";
+      /** Plan 09 (T-03-09-02/03): correctPromoMatch/enterPromoCaps attach field-level messages; confirmPromoMatch/dismissPromo never set this. */
+      fieldErrors?: Partial<Record<"maxStake" | "maxWinnings" | "minOdds" | "selection", string[]>>;
+    }
   | { status: "stale"; message: string }
   | { status: "conflict"; message: string };
 

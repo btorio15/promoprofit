@@ -5,6 +5,7 @@ import { COLORADO_BOOKS } from "@/config/books";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { PromosInputSchema } from "@/domain/promos/promosInput";
 import type {
+  CorrectionOptions,
   GetPromosResponse,
   PromoRowDTO,
   PromosEmptyVariant,
@@ -18,8 +19,41 @@ import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
+import { listCorrectionOptions } from "@/domain/promos/correctionOptions";
 import { rankPromoHedges, type PromoOpportunity } from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
+import type { OddsEvent } from "@/domain/odds/schemas";
+
+const EMPTY_CORRECTION_OPTIONS: CorrectionOptions = { events: [], sportDays: [] };
+
+/**
+ * Correct sub-panel dropdown data (T-03-09-06): built ONLY when the queue
+ * actually has a match-kind item -- there's no correction UI to populate
+ * otherwise, so skip the extra cache reads entirely on every other visit.
+ * Reuses an already-fetched cache when the caller has one (the
+ * activePromos-present branch below already fetched both caches for hedge
+ * math); otherwise fetches them itself (the activePromos-empty branch never
+ * would have otherwise).
+ */
+async function correctionOptionsFor(
+  hasMatchItem: boolean,
+  now: Date,
+  cached?: { moneylineEvents: OddsEvent[]; extendedEvents: OddsEvent[] },
+): Promise<CorrectionOptions> {
+  if (!hasMatchItem) return EMPTY_CORRECTION_OPTIONS;
+
+  const { moneylineEvents, extendedEvents } =
+    cached ??
+    (await (async () => {
+      const [{ events: moneylineEvents }, { events: extendedEvents }] = await Promise.all([
+        getCachedEvents(),
+        getCachedExtendedEvents(),
+      ]);
+      return { moneylineEvents, extendedEvents };
+    })());
+
+  return listCorrectionOptions({ moneyline: moneylineEvents, extended: extendedEvents }, { now });
+}
 
 /**
  * Reads active promos (D-01, D-16, PROMO-04) and, when there's at least one
@@ -61,10 +95,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const now = new Date();
   const [activePromos, queueRows] = await Promise.all([getActivePromos(now), getReviewQueue(now)]);
   const queue = queueRows.map(toQueueItemDTO);
+  const hasMatchItem = queueRows.some((row) => row.reviewReason === "match");
 
   if (activePromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue };
+    const correctionOptions = await correctionOptionsFor(hasMatchItem, now);
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue, correctionOptions };
   }
 
   const userBookSet = new Set(await getUserBookKeys(user.userId));
@@ -77,8 +113,10 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       getCachedExtendedEvents(),
     ]);
 
+  const correctionOptions = await correctionOptionsFor(hasMatchItem, now, { moneylineEvents, extendedEvents });
+
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
-    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], queue };
+    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], queue, correctionOptions };
   }
 
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -112,12 +150,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       }
     }
 
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue };
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue, correctionOptions };
   }
 
   const rows = opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames));
 
-  return { status: "ok", scrapeStatus, emptyVariant: null, rows, queue };
+  return { status: "ok", scrapeStatus, emptyVariant: null, rows, queue, correctionOptions };
 }
 
 /**
