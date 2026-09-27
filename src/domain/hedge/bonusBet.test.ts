@@ -135,6 +135,52 @@ describe("americanToDecimal", () => {
   });
 });
 
+describe("calculateBonusBetHedge precision (D-05)", () => {
+  it("precision \"whole\" rounds the hedge stake to the nearest dollar unit", () => {
+    const result = calculateBonusBetHedge({
+      bonusAmount: new Decimal(25),
+      bonusOddsAmerican: 250,
+      hedgeOddsAmerican: -300,
+      precision: "whole",
+    });
+
+    expect(result.hedgeStake.toFixed(2)).toBe("47.00");
+    expect(result.bonusPayout.toFixed(2)).toBe("62.50");
+    expect(result.hedgePayout.toFixed(2)).toBe("62.66");
+    expect(result.netIfBonusWins.toFixed(2)).toBe("15.50");
+    expect(result.netIfHedgeWins.toFixed(2)).toBe("15.66");
+    expect(result.guaranteedProfit.toFixed(2)).toBe("15.50");
+    expect(result.conversionPct.toFixed(2)).toBe("62.00");
+  });
+
+  it("precision \"cents\" (explicit) matches the existing cent-precision behavior", () => {
+    const result = calculateBonusBetHedge({
+      bonusAmount: new Decimal(25),
+      bonusOddsAmerican: 250,
+      hedgeOddsAmerican: -300,
+      precision: "cents",
+    });
+
+    expect(result.hedgeStake.toFixed(2)).toBe("46.87");
+    expect(result.hedgePayout.toFixed(2)).toBe("62.49");
+    expect(result.guaranteedProfit.toFixed(2)).toBe("15.62");
+    expect(result.conversionPct.toFixed(2)).toBe("62.48");
+  });
+
+  it("precision omitted defaults to identical cent-precision behavior (finder unchanged)", () => {
+    const result = calculateBonusBetHedge({
+      bonusAmount: new Decimal(25),
+      bonusOddsAmerican: 250,
+      hedgeOddsAmerican: -300,
+    });
+
+    expect(result.hedgeStake.toFixed(2)).toBe("46.87");
+    expect(result.hedgePayout.toFixed(2)).toBe("62.49");
+    expect(result.guaranteedProfit.toFixed(2)).toBe("15.62");
+    expect(result.conversionPct.toFixed(2)).toBe("62.48");
+  });
+});
+
 describe("calculateBonusBetHedge validation", () => {
   it("throws RangeError when bonusAmount is zero or negative", () => {
     expect(() =>
