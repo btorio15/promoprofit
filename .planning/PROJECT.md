@@ -16,6 +16,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - ✓ **Odds**: cached odds from The Odds API free tier (7 free-tier Colorado books, live-verified), user-triggered refresh with credit meter, low-credit block, 15-min confirm, and concurrency lock — Validated in Phase 1: Bonus Bet Finder
 - ✓ **Arbitrage tab**: cross-book sure bets (no promos) among the 7 API-covered Colorado books — moneyline arbs from cached odds at no extra credit, opt-in "Search spreads & totals" (~3x credits, confirm every time, half-point lines matched exactly), exact whole-dollar/cent stakes under the total-stake cap, guaranteed profit and return %, prominent odds age, account-risk advisory — Validated in Phase 01.1: Arbitrage Tab
 - ✓ **Finder hedge cap**: optional "Limit hedge amount" on the bonus-bet finder; a game whose best hedge exceeds the cap is dropped (no fallback to a worse orientation) — Validated in Phase 01.1: Arbitrage Tab
+- ✓ **Invite-only access**: owner-generated single-use invite links, email/password login with DB-backed lockout, `proxy.ts` redirect plus per-action session checks, no public signup — Validated in Phase 2: Private Access & My Books
+- ✓ **Book selection (finder + arbitrage)**: each user picks their books at onboarding and in Settings; bonus-bet finder and Arbitrage tab suggestions only use those books; account-risk advisory on both tabs — Validated in Phase 2: Private Access & My Books
 
 ### Active
 
@@ -24,8 +26,7 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - [ ] **Group-added promos**: anyone in the group can add a promo they see in their app, feeding the same opportunities feed (fallback for books that can't be scraped)
 - [ ] **Competing promos**: detect promos at different books on opposite outcomes of the same game (e.g. two 50% profit boosts) and compute the tandem hedge profit
 - [ ] **Hedge engine**: exact bonus-bet, profit-boost (with caps), and tandem math, fixture-tested to the cent (bonus-bet math done in Phase 1; boost and tandem remain)
-- [ ] **Book selection**: each user selects their sportsbooks; feed and hedge suggestions are filtered to them
-- [ ] Invite-only access for owner + friends
+- [ ] **Book selection (feed)**: the opportunities feed must also be filtered to the user's selected books (finder/arb scoping done in Phase 2)
 
 ### Out of Scope
 
@@ -96,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-26 after Phase 01.1 (Arbitrage Tab) completion*
+*Last updated: 2026-09-27 after Phase 2 (Private Access & My Books) completion*
