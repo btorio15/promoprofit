@@ -17,6 +17,8 @@ import type {
 import { getActivePromos, getScrapeStatus, type ActivePromo } from "@/db/promos";
 import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
+import { getProfitObservationsSince, getUsedPromoIds } from "@/db/promoTracking";
+import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
@@ -28,10 +30,27 @@ import {
   type PromoOpportunity,
   type UnprofitablePromo,
 } from "@/domain/promos/rankPromoHedges";
+import { periodStartDates, summarizeAvailableProfit, sumOwnBookProfit, type AvailableProfit } from "@/domain/promos/profitTotals";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 const EMPTY_CORRECTION_OPTIONS: CorrectionOptions = { events: [], sportDays: [] };
+
+/**
+ * quick-260927-n12: the member's own-book today/week/month "profit
+ * available" numbers (owner decision 3), from persisted observations --
+ * independent of the live feed, so it's computed and returned in EVERY "ok"
+ * branch below, including every empty-state variant, so the numbers never
+ * disappear just because there are zero active promos right now. Reads
+ * from the min of the week/month start (ISO date strings compare
+ * correctly) so one query covers both periods.
+ */
+async function loadAvailableProfit(now: Date, ownBookKeys: ReadonlySet<string>): Promise<AvailableProfit> {
+  const { weekStart, monthStart } = periodStartDates(now);
+  const sinceDate = weekStart < monthStart ? weekStart : monthStart;
+  const observations = await getProfitObservationsSince(sinceDate);
+  return summarizeAvailableProfit(observations, ownBookKeys, now);
+}
 
 /**
  * WR-07: promos at books the member has come first; promos at books they
@@ -109,17 +128,42 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const hasAnyOkRun = scrapeStatus.some((line) => line.lastOkAt !== null);
 
   const now = new Date();
-  const [activePromos, queueRows] = await Promise.all([getActivePromos(now), getReviewQueue(now)]);
+  const [activePromos, queueRows, usedPromoIds, userBookKeys] = await Promise.all([
+    getActivePromos(now),
+    getReviewQueue(now),
+    getUsedPromoIds(user.userId),
+    getUserBookKeys(user.userId),
+  ]);
+  const userBookSet = new Set(userBookKeys);
   const queue = queueRows.map(toQueueItemDTO);
   const hasMatchItem = queueRows.some((row) => row.reviewReason === "match");
+
+  /**
+   * quick-260927-n12: records today's GROUP-level profit observations
+   * (ranked at every usable hedge book, not this member's own -- see
+   * src/db/promoObservations.ts) from whatever odds are already cached (no
+   * new Odds API call), then loads this member's own-book today/week/month
+   * totals. Both run unconditionally, before any empty-state branch below,
+   * so the period numbers are present in every "ok" response.
+   */
+  await recordCurrentProfitObservations(now, { activePromos, precision: precision as StakePrecision });
+  const availableProfit = await loadAvailableProfit(now, userBookSet);
 
   if (activePromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
     const correctionOptions = await correctionOptionsFor(hasMatchItem, now);
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], unprofitableRows: [], queue, correctionOptions };
+    return {
+      status: "ok",
+      scrapeStatus,
+      emptyVariant,
+      rows: [],
+      unprofitableRows: [],
+      queue,
+      correctionOptions,
+      totalProfit: "0.00",
+      availableProfit,
+    };
   }
-
-  const userBookSet = new Set(await getUserBookKeys(user.userId));
 
   const [hedgeBookKeys, bonusBooks, { events: moneylineEvents, fetchedAt: oddsFetchedAt }, { events: extendedEvents, fetchedAt: extendedOddsFetchedAt }] =
     await Promise.all([
@@ -132,7 +176,17 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const correctionOptions = await correctionOptionsFor(hasMatchItem, now, { moneylineEvents, extendedEvents });
 
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
-    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], unprofitableRows: [], queue, correctionOptions };
+    return {
+      status: "ok",
+      scrapeStatus,
+      emptyVariant: "no-odds",
+      rows: [],
+      unprofitableRows: [],
+      queue,
+      correctionOptions,
+      totalProfit: "0.00",
+      availableProfit,
+    };
   }
 
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -147,7 +201,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const opportunities = rankPromoHedges(activePromos, rankOpts);
   const unprofitable = findUnprofitablePromos(activePromos, rankOpts);
   const unprofitableRows = ownBooksFirst(
-    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet)),
+    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet, usedPromoIds)),
   );
 
   if (opportunities.length === 0) {
@@ -174,15 +228,55 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     // unprofitable rows (instead of the "no-active" empty state) as long as
     // at least one is present -- "no-books" still wins over this.
     if (emptyVariant === "no-active" && unprofitableRows.length > 0) {
-      return { status: "ok", scrapeStatus, emptyVariant: null, rows: [], unprofitableRows, queue, correctionOptions };
+      return {
+        status: "ok",
+        scrapeStatus,
+        emptyVariant: null,
+        rows: [],
+        unprofitableRows,
+        queue,
+        correctionOptions,
+        totalProfit: "0.00",
+        availableProfit,
+      };
     }
 
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], unprofitableRows: [], queue, correctionOptions };
+    return {
+      status: "ok",
+      scrapeStatus,
+      emptyVariant,
+      rows: [],
+      unprofitableRows: [],
+      queue,
+      correctionOptions,
+      totalProfit: "0.00",
+      availableProfit,
+    };
   }
 
-  const rows = ownBooksFirst(opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet)));
+  const rows = ownBooksFirst(
+    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, usedPromoIds)),
+  );
+  // quick-260927-n12 (owner decision 1): own-book, not-used rows only --
+  // belt-and-braces alongside toPromoRowDTO's own `used` flag, since a used
+  // promo now stays INLINE in `rows` (owner scope change A) rather than
+  // being filtered out.
+  const totalProfit = sumOwnBookProfit(
+    rows.map((row) => ({ promoId: row.promoId, guaranteedProfit: row.guaranteedProfit, hasPromoBook: row.hasPromoBook })),
+    usedPromoIds,
+  );
 
-  return { status: "ok", scrapeStatus, emptyVariant: null, rows, unprofitableRows, queue, correctionOptions };
+  return {
+    status: "ok",
+    scrapeStatus,
+    emptyVariant: null,
+    rows,
+    unprofitableRows,
+    queue,
+    correctionOptions,
+    totalProfit,
+    availableProfit,
+  };
 }
 
 /**
@@ -236,6 +330,7 @@ function toPromoRowDTO(
   opportunity: PromoOpportunity<ActivePromo>,
   bookNames: Map<string, string>,
   userBookSet: ReadonlySet<string>,
+  usedPromoIds: ReadonlySet<number>,
 ): PromoRowDTO {
   const { promo, selection, hedge, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
 
@@ -327,6 +422,7 @@ function toPromoRowDTO(
     attribution: attributionLineFor(promo),
     worstCase: netIfPromoWins !== netIfHedgeWins,
     hasPromoBook: userBookSet.has(promo.bookKey),
+    used: usedPromoIds.has(promo.id),
   };
 }
 
@@ -364,6 +460,7 @@ function toUnprofitablePromoRowDTO(
   entry: UnprofitablePromo<ActivePromo>,
   bookNames: Map<string, string>,
   userBookSet: ReadonlySet<string>,
+  usedPromoIds: ReadonlySet<number>,
 ): UnprofitablePromoRowDTO {
   const { promo, bestGuaranteedProfit } = entry;
 
@@ -380,5 +477,6 @@ function toUnprofitablePromoRowDTO(
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),
     hasPromoBook: userBookSet.has(promo.bookKey),
+    used: usedPromoIds.has(promo.id),
   };
 }
