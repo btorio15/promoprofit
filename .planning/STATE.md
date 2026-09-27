@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-09-27T02:16:35.836Z"
-last_activity: 2026-09-27 -- Phase 3 planning complete
+last_updated: "2026-09-27T03:55:16.662Z"
+last_activity: 2026-09-27 -- Phase 3 execution started
 progress:
   total_phases: 6
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 3 — promo scraping & review
+**Current focus:** Phase 3 — promo-scraping-review
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-09-27 -- Phase 3 planning complete
+Phase: 3 (promo-scraping-review) — EXECUTING
+Plan: 1 of 11
+Status: Executing Phase 3
+Last activity: 2026-09-27 -- Phase 3 execution started
 
 Progress: [██████████] 100%
 
