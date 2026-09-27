@@ -38,6 +38,24 @@ describe("parseMaxStake", () => {
     });
   });
 
+  it("WR-04: takes the amount anchored to 'max', not the first dollar figure on the line", () => {
+    expect(parseMaxStake("Get $100 in Bonus Bets. Max wager $25.")).toEqual({ status: "parsed", value: "25.00" });
+    expect(parseMaxStake("Bet $10 on any game, maximum wager of $50.00 applies")).toEqual({
+      status: "parsed",
+      value: "50.00",
+    });
+    expect(parseMaxStake("Win up to $200 with a $20 max wager")).toEqual({ status: "parsed", value: "20.00" });
+  });
+
+  it("WR-04: is unparsed when a max mention has only an unanchored dollar figure", () => {
+    expect(parseMaxStake("Get $100 in Bonus Bets. Max betting limits apply.")).toEqual({ status: "unparsed" });
+  });
+
+  it("WR-04: is unparsed (never guessed) when two different anchored amounts qualify", () => {
+    expect(parseMaxStake("Max wager $25\nMaximum bet: $50")).toEqual({ status: "unparsed" });
+    expect(parseMaxStake("Max wager $25\nMaximum bet: $25.00")).toEqual({ status: "parsed", value: "25.00" });
+  });
+
   it("truncates input longer than 4000 chars before regex matching", () => {
     const padding = "x".repeat(4100);
     const result = parseMaxStake(`${padding}\nMaximum Bet: $20`);
@@ -83,6 +101,14 @@ describe("parseMaxWinnings", () => {
     expect(parseMaxWinnings("Maximum boosted winnings limited", "boost_extra")).toEqual({
       status: "unparsed",
     });
+  });
+
+  it("WR-04: takes the amount anchored to 'max winnings', not an earlier dollar figure", () => {
+    expect(parseMaxWinnings("Get $100 boosted. Max winnings $500.", "boost_extra")).toEqual({
+      status: "parsed",
+      value: { amount: "500.00", kind: "boost_extra" },
+    });
+    expect(parseMaxWinnings("Get $100 boosted. Maximum winnings apply.", "boost_extra")).toEqual({ status: "unparsed" });
   });
 
   it("is absent when there is no max-winnings mention (none of the recon strings have one)", () => {

@@ -42,8 +42,44 @@ function isMaxWinningsMention(line: string): boolean {
   );
 }
 
-const MAX_STAKE_AMOUNT_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/;
-const MAX_WINNINGS_AMOUNT_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/;
+/**
+ * WR-04: the dollar amount must be anchored to the "max" keyword, not just
+ * be the first `$` figure on a line that mentions max somewhere ("Get $100
+ * in Bonus Bets. Max wager $25." is a $25 cap, never $100). Three shapes,
+ * each with bounded, non-nested quantifiers (ReDoS guard):
+ *   1. "max(imum) <kw>... $X"   ("Maximum Bet: $20", "max wager of $25")
+ *   2. "max(imum) $X <kw>"      ("MAX $25 WAGER")
+ *   3. "$X max(imum) <kw>"      ("$25 max wager")
+ * The gaps exclude `$` and `.`, so an anchor never reaches across into
+ * another figure or sentence. Each regex is global; every match's amount
+ * is collected and, if more than one DISTINCT amount qualifies, the cap is
+ * reported unparsed rather than guessed.
+ */
+const AMOUNT = "\\$\\s*([\\d,]+(?:\\.\\d{1,2})?)";
+function anchoredAmountRe(keyword: string): RegExp {
+  return new RegExp(
+    [
+      `\\bmax(?:imum)?\\b[^$.]{0,30}?\\b${keyword}[a-z]*[^$.]{0,20}?${AMOUNT}`,
+      `\\bmax(?:imum)?\\b[^$.]{0,10}?${AMOUNT}\\s*(?:[a-z]+\\s+){0,2}${keyword}`,
+      `${AMOUNT}\\s*max(?:imum)?\\s+${keyword}`,
+    ].join("|"),
+    "gi",
+  );
+}
+const MAX_STAKE_AMOUNT_RE = anchoredAmountRe("(?:bet|wager|stake)");
+const MAX_WINNINGS_AMOUNT_RE = anchoredAmountRe("(?:winnings|payout|profit)");
+
+/** Every distinct normalized amount anchored to a max keyword across the given lines. */
+function anchoredAmounts(lines: readonly string[], re: RegExp): Set<string> {
+  const amounts = new Set<string>();
+  for (const line of lines) {
+    for (const match of line.matchAll(re)) {
+      const raw = match[1] ?? match[2] ?? match[3];
+      if (raw !== undefined) amounts.add(normalizeMoney(raw));
+    }
+  }
+  return amounts;
+}
 
 const MIN_ODDS_MENTION_RE = /\bmin(?:imum)?\.?\s*odds\b/i;
 // Bally's own typo ("-+100") means +100 -- both sign characters win, meaning
@@ -69,50 +105,25 @@ function normalizeOddsSign(signChars: string, digits: string): number {
 }
 
 export function parseMaxStake(text: string): CapParse<string> {
-  const truncated = truncate(text, MAX_INPUT_CHARS);
-  const lines = truncated.split("\n");
+  const lines = truncate(text, MAX_INPUT_CHARS).split("\n").filter(isMaxStakeMention);
+  if (lines.length === 0) return { status: "absent" };
 
-  for (const line of lines) {
-    if (isMaxStakeMention(line)) {
-      const amountMatch = MAX_STAKE_AMOUNT_RE.exec(line);
-      if (amountMatch) {
-        return { status: "parsed", value: normalizeMoney(amountMatch[1]) };
-      }
-    }
-  }
-
-  for (const line of lines) {
-    if (isMaxStakeMention(line)) {
-      return { status: "unparsed" };
-    }
-  }
-
-  return { status: "absent" };
+  const amounts = anchoredAmounts(lines, MAX_STAKE_AMOUNT_RE);
+  if (amounts.size === 1) return { status: "parsed", value: [...amounts][0] };
+  // No anchored amount, or two different ones: never guess (D-18).
+  return { status: "unparsed" };
 }
 
 export function parseMaxWinnings(
   text: string,
   kind: WinningsCapKind,
 ): CapParse<{ amount: string; kind: WinningsCapKind }> {
-  const truncated = truncate(text, MAX_INPUT_CHARS);
-  const lines = truncated.split("\n");
+  const lines = truncate(text, MAX_INPUT_CHARS).split("\n").filter(isMaxWinningsMention);
+  if (lines.length === 0) return { status: "absent" };
 
-  for (const line of lines) {
-    if (isMaxWinningsMention(line)) {
-      const amountMatch = MAX_WINNINGS_AMOUNT_RE.exec(line);
-      if (amountMatch) {
-        return { status: "parsed", value: { amount: normalizeMoney(amountMatch[1]), kind } };
-      }
-    }
-  }
-
-  for (const line of lines) {
-    if (isMaxWinningsMention(line)) {
-      return { status: "unparsed" };
-    }
-  }
-
-  return { status: "absent" };
+  const amounts = anchoredAmounts(lines, MAX_WINNINGS_AMOUNT_RE);
+  if (amounts.size === 1) return { status: "parsed", value: { amount: [...amounts][0], kind } };
+  return { status: "unparsed" };
 }
 
 export function parseMinOdds(text: string): CapParse<number> {
