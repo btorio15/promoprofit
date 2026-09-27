@@ -289,6 +289,10 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-active");
     expect(result.rows).toEqual([]);
+    // quick-260927-edt: zero active promos at all -> no promo to evaluate,
+    // so unprofitableRows stays empty (distinct from the zero-profitable-
+    // rows-but-some-promos-exist case below).
+    expect(result.unprofitableRows).toEqual([]);
   });
 
   it("marks lastRunFailed true when the latest run's status is 'failed'", async () => {
@@ -320,6 +324,7 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-odds");
     expect(result.rows).toEqual([]);
+    expect(result.unprofitableRows).toEqual([]);
   });
 
   it("returns a mapped row for a sport_window boost promo at the member's books", async () => {
@@ -446,11 +451,17 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-books");
     expect(result.rows).toEqual([]);
+    // quick-260927-edt: "no-books" still wins over showing greyed rows.
+    expect(result.unprofitableRows).toEqual([]);
   });
 
-  it("returns 'no-active' when no rows exist at any usable book", async () => {
+  // quick-260927-edt: zero profitable rows + at least one unprofitable
+  // active promo now shows the greyed unprofitable rows instead of the
+  // "no-active" empty state -- updated from the prior expectation.
+  it("returns emptyVariant null with a greyed unprofitable row (not 'no-active') when no profitable rows exist at any usable book", async () => {
     // No book at all quotes this event's opposite side -- rankPromoHedges
-    // finds zero candidates regardless of book scoping.
+    // finds zero candidates regardless of book scoping, so the promo can't
+    // even be evaluated (bestGuaranteedProfit null).
     mockGetActivePromos.mockResolvedValue([activeBoostPromo({ bookKey: "betmgm" })]);
     mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: new Date(NOW_ISO) });
     mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
@@ -463,8 +474,185 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
 
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("unreachable");
-    expect(result.emptyVariant).toBe("no-active");
+    expect(result.emptyVariant).toBeNull();
     expect(result.rows).toEqual([]);
+    expect(result.unprofitableRows).toHaveLength(1);
+    expect(result.unprofitableRows[0].bestGuaranteedProfit).toBeNull();
+    expect(result.unprofitableRows[0].note).toBe("No eligible bets right now");
+  });
+});
+
+// quick-260927-edt: greyed-out unprofitable-promo rows.
+describe("getPromos unprofitableRows (quick-260927-edt)", () => {
+  it("one profitable + one negative promo: rows has the profitable row only, unprofitableRows has one entry, emptyVariant null", async () => {
+    const profitableEvent = moneylineEvent({
+      id: "nfl-profitable",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+        { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+      ],
+    });
+    const negativeEvent = moneylineEvent({
+      id: "nfl-worked",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "ballybet", homePrice: 107, awayPrice: -135 },
+        { bookKey: "betmgm", homePrice: 105, awayPrice: -125 },
+      ],
+    });
+
+    const profitablePromo = activeBoostPromo({ id: 1, bookKey: "draftkings" });
+    const negativePromo = activeBoostPromo({
+      id: 2,
+      bookKey: "ballybet",
+      boostPercent: "10.00",
+      maxStake: "20.00",
+      minOddsAmerican: 100,
+      scopeLabel: "Denver Broncos @ Los Angeles Rams",
+      autoMatched: true,
+    });
+
+    mockGetActivePromos.mockResolvedValue([profitablePromo, negativePromo]);
+    mockGetCachedEvents.mockResolvedValue({
+      events: [profitableEvent, negativeEvent],
+      fetchedAt: new Date(NOW_ISO),
+    });
+    mockGetBonusBooks.mockResolvedValue([
+      { key: "draftkings", displayName: "DraftKings" },
+      { key: "fanduel", displayName: "FanDuel" },
+      { key: "ballybet", displayName: "Bally Bet" },
+      { key: "betmgm", displayName: "BetMGM" },
+    ]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel", "ballybet", "betmgm"]);
+    mockGetHedgeBookKeys.mockResolvedValue(["draftkings", "fanduel", "ballybet", "betmgm"]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].promoId).toBe(1);
+    expect(result.unprofitableRows).toHaveLength(1);
+    expect(result.unprofitableRows[0].promoId).toBe(2);
+  });
+
+  it("only the worked-example negative promo: emptyVariant null, rows [], unprofitableRows[0] matches exactly", async () => {
+    const event = moneylineEvent({
+      id: "nfl-worked",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "ballybet", homePrice: 107, awayPrice: -135 },
+        { bookKey: "betmgm", homePrice: 105, awayPrice: -125 },
+      ],
+    });
+
+    const negativePromo = activeBoostPromo({
+      id: 3,
+      bookKey: "ballybet",
+      boostPercent: "10.00",
+      maxStake: "20.00",
+      minOddsAmerican: 100,
+      scopeLabel: "Denver Broncos @ Los Angeles Rams",
+      autoMatched: true,
+    });
+
+    mockGetActivePromos.mockResolvedValue([negativePromo]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetBonusBooks.mockResolvedValue([
+      { key: "ballybet", displayName: "Bally Bet" },
+      { key: "betmgm", displayName: "BetMGM" },
+    ]);
+    mockGetUserBookKeys.mockResolvedValue(["betmgm"]);
+    mockGetHedgeBookKeys.mockResolvedValue(["betmgm"]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+    expect(result.rows).toEqual([]);
+    expect(result.unprofitableRows).toEqual([
+      {
+        rowKey: "unprofitable-promo-3",
+        promoId: 3,
+        promoType: "profit_boost",
+        promoTypeLabel: "Boost",
+        bookKey: "ballybet",
+        bookName: "Bally Bet",
+        title: "10% profit boost",
+        scopeLabel: "Denver Broncos @ Los Angeles Rams",
+        autoMatched: true,
+        bestGuaranteedProfit: "-0.65",
+        note: "No profitable hedge right now (best: −$0.65)",
+      },
+    ]);
+  });
+
+  it("bonus-bet title is '$25.00 bonus bet'", async () => {
+    const event = moneylineEvent({
+      id: "nfl-bonus-title",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      commenceTime: plusHours(6),
+      quotes: [{ bookKey: "fanduel", homePrice: -400, awayPrice: 320 }],
+    });
+
+    const promo = activeBonusPromo({
+      id: 4,
+      bookKey: "fanduel",
+      bonusAmount: "25.00",
+      pinned: { eventId: "nfl-bonus-title", marketType: "moneyline", line: null, side: "home" },
+    });
+
+    mockGetActivePromos.mockResolvedValue([promo]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetUserBookKeys.mockResolvedValue([]);
+    mockGetHedgeBookKeys.mockResolvedValue([]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.unprofitableRows).toHaveLength(1);
+    expect(result.unprofitableRows[0].title).toBe("$25.00 bonus bet");
+  });
+
+  it("pinned boost with boostedOddsAmerican 150 has title 'Boosted to +150'", async () => {
+    const event = moneylineEvent({
+      id: "nfl-boosted-title",
+      homeTeam: "Team H",
+      awayTeam: "Team A",
+      commenceTime: plusHours(6),
+      quotes: [{ bookKey: "draftkings", homePrice: -400, awayPrice: 320 }],
+    });
+
+    const promo = activeBoostPromo({
+      id: 5,
+      bookKey: "draftkings",
+      boostPercent: null,
+      boostedOddsAmerican: 150,
+      pinned: { eventId: "nfl-boosted-title", marketType: "moneyline", line: null, side: "home" },
+    });
+
+    mockGetActivePromos.mockResolvedValue([promo]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetUserBookKeys.mockResolvedValue([]);
+    mockGetHedgeBookKeys.mockResolvedValue([]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.unprofitableRows).toHaveLength(1);
+    expect(result.unprofitableRows[0].title).toBe("Boosted to +150");
   });
 });
 

@@ -1,5 +1,6 @@
 "use server";
 
+import Decimal from "decimal.js";
 import { requireUser } from "@/lib/session";
 import { COLORADO_BOOKS } from "@/config/books";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
@@ -11,16 +12,22 @@ import type {
   PromosEmptyVariant,
   QueueItemDTO,
   ScrapeStatusLineDTO,
+  UnprofitablePromoRowDTO,
 } from "@/domain/promos/dto";
 import { getActivePromos, getScrapeStatus, type ActivePromo } from "@/db/promos";
 import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
-import { formatUsd } from "@/lib/format";
+import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
-import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
+import { describePromo, formatBoostPercent, scopeGuessLabel } from "@/domain/promos/describe";
 import { listCorrectionOptions } from "@/domain/promos/correctionOptions";
-import { rankPromoHedges, type PromoOpportunity } from "@/domain/promos/rankPromoHedges";
+import {
+  findUnprofitablePromos,
+  rankPromoHedges,
+  type PromoOpportunity,
+  type UnprofitablePromo,
+} from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
@@ -100,7 +107,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   if (activePromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
     const correctionOptions = await correctionOptionsFor(hasMatchItem, now);
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue, correctionOptions };
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], unprofitableRows: [], queue, correctionOptions };
   }
 
   const userBookSet = new Set(await getUserBookKeys(user.userId));
@@ -116,7 +123,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const correctionOptions = await correctionOptionsFor(hasMatchItem, now, { moneylineEvents, extendedEvents });
 
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
-    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], queue, correctionOptions };
+    return { status: "ok", scrapeStatus, emptyVariant: "no-odds", rows: [], unprofitableRows: [], queue, correctionOptions };
   }
 
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
@@ -129,6 +136,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   };
 
   const opportunities = rankPromoHedges(activePromos, rankOpts);
+  const unprofitable = findUnprofitablePromos(activePromos, rankOpts);
+  const unprofitableRows = unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames));
 
   if (opportunities.length === 0) {
     /**
@@ -150,12 +159,19 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       }
     }
 
-    return { status: "ok", scrapeStatus, emptyVariant, rows: [], queue, correctionOptions };
+    // quick-260927-edt: zero profitable rows still shows the greyed
+    // unprofitable rows (instead of the "no-active" empty state) as long as
+    // at least one is present -- "no-books" still wins over this.
+    if (emptyVariant === "no-active" && unprofitableRows.length > 0) {
+      return { status: "ok", scrapeStatus, emptyVariant: null, rows: [], unprofitableRows, queue, correctionOptions };
+    }
+
+    return { status: "ok", scrapeStatus, emptyVariant, rows: [], unprofitableRows: [], queue, correctionOptions };
   }
 
   const rows = opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames));
 
-  return { status: "ok", scrapeStatus, emptyVariant: null, rows, queue, correctionOptions };
+  return { status: "ok", scrapeStatus, emptyVariant: null, rows, unprofitableRows, queue, correctionOptions };
 }
 
 /**
@@ -295,5 +311,56 @@ function toPromoRowDTO(opportunity: PromoOpportunity<ActivePromo>, bookNames: Ma
     capNote,
     attribution: attributionLineFor(promo),
     worstCase: netIfPromoWins !== netIfHedgeWins,
+  };
+}
+
+/** "10% profit boost" / "Boosted to +150" / "$25.00 bonus bet" (03-UI-SPEC.md-style promo title). */
+function unprofitablePromoTitle(promo: ActivePromo): string {
+  if (promo.promoType === "profit_boost") {
+    if (promo.boostedOddsAmerican !== null) {
+      return `Boosted to ${formatAmerican(promo.boostedOddsAmerican)}`;
+    }
+    return `${formatBoostPercent(promo.boostPercent ?? "0.00")} profit boost`;
+  }
+  return `${formatUsd(promo.bonusAmount ?? "0.00")} bonus bet`;
+}
+
+/**
+ * "No eligible bets right now" when nothing could be evaluated at all, else
+ * "No profitable hedge right now (best: X)" where X is the exact best
+ * guaranteed profit found -- the sign is built from Decimal's own
+ * isNegative()/abs() (never string slicing of a float) so the U+2212 minus
+ * used elsewhere in this app (formatAmerican) stays consistent here too.
+ */
+function unprofitablePromoNote(bestGuaranteedProfit: Decimal | null): string {
+  if (bestGuaranteedProfit === null) {
+    return "No eligible bets right now";
+  }
+
+  const formatted = bestGuaranteedProfit.isNegative()
+    ? `−${formatUsd(bestGuaranteedProfit.abs().toFixed(2))}`
+    : formatUsd(bestGuaranteedProfit.toFixed(2));
+
+  return `No profitable hedge right now (best: ${formatted})`;
+}
+
+function toUnprofitablePromoRowDTO(
+  entry: UnprofitablePromo<ActivePromo>,
+  bookNames: Map<string, string>,
+): UnprofitablePromoRowDTO {
+  const { promo, bestGuaranteedProfit } = entry;
+
+  return {
+    rowKey: `unprofitable-promo-${promo.id}`,
+    promoId: promo.id,
+    promoType: promo.promoType,
+    promoTypeLabel: promo.promoType === "profit_boost" ? "Boost" : "Bonus bet",
+    bookKey: promo.bookKey,
+    bookName: bookNames.get(promo.bookKey) ?? promo.bookKey,
+    title: unprofitablePromoTitle(promo),
+    scopeLabel: promo.scopeLabel,
+    autoMatched: promo.autoMatched,
+    bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
+    note: unprofitablePromoNote(bestGuaranteedProfit),
   };
 }
