@@ -1,4 +1,16 @@
-import { pgTable, text, boolean, integer, serial, timestamp, jsonb, index, primaryKey } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  boolean,
+  integer,
+  serial,
+  timestamp,
+  jsonb,
+  index,
+  primaryKey,
+  numeric,
+  doublePrecision,
+} from "drizzle-orm/pg-core";
 
 /**
  * Colorado sportsbook configuration (ODDS-05, D-14, D-16). Seeded from
@@ -149,3 +161,94 @@ export const refreshLock = pgTable("refresh_lock", {
   holder: text("holder").notNull(),
   lockedUntil: timestamp("locked_until", { withTimezone: true }).notNull(),
 });
+
+/**
+ * Scraped/reviewed sportsbook promos (PROMO-03, PROMO-04; D-08, D-10, D-11,
+ * D-12, D-13, D-16, D-17, D-18, D-19). The ONLY code path that inserts/
+ * updates a row here from a scrape is src/ingestion/promos/store.ts
+ * (Plan 06); member review actions (confirm/correct/dismiss/flag/enter-caps,
+ * Plans 07-09) write through src/db/promoReview.ts. dedupe_key is unique so
+ * a re-scrape of the same live promo updates last_seen_at instead of
+ * inserting a duplicate row (D-19). parsed holds the full validated scrape
+ * parse (jsonb) so the matcher can re-run later without re-scraping.
+ * unparsed_cap_fields defaults to an empty jsonb array (D-18): the math
+ * never guesses a cap, so any field that couldn't be parsed is a name in
+ * this array until a human enters it. Every *_by_user_id attribution column
+ * mirrors credit_usage.triggered_by_user_id's nullable
+ * `references(() => users.id, { onDelete: "set null" })` shape (D-12) so a
+ * later user deletion can never break an existing promo row.
+ */
+export const promos = pgTable(
+  "promos",
+  {
+    id: serial("id").primaryKey(),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    promoType: text("promo_type").notNull(),
+    status: text("status").notNull(),
+    reviewReason: text("review_reason"),
+    autoMatched: boolean("auto_matched").notNull().default(false),
+    autoMatchBlocked: boolean("auto_match_blocked").notNull().default(false),
+    sportKey: text("sport_key"),
+    eventId: text("event_id"),
+    eventCommenceTime: timestamp("event_commence_time", { withTimezone: true }),
+    homeTeam: text("home_team"),
+    awayTeam: text("away_team"),
+    marketType: text("market_type"),
+    line: doublePrecision("line"),
+    side: text("side"),
+    bestGuess: jsonb("best_guess"),
+    parsed: jsonb("parsed").notNull(),
+    boostPercent: numeric("boost_percent", { precision: 7, scale: 2 }),
+    boostedOddsAmerican: integer("boosted_odds_american"),
+    baseOddsAmerican: integer("base_odds_american"),
+    bonusAmount: numeric("bonus_amount", { precision: 10, scale: 2 }),
+    maxStake: numeric("max_stake", { precision: 10, scale: 2 }),
+    maxWinnings: numeric("max_winnings", { precision: 10, scale: 2 }),
+    maxWinningsKind: text("max_winnings_kind"),
+    minOddsAmerican: integer("min_odds_american"),
+    unparsedCapFields: jsonb("unparsed_cap_fields").notNull().default([]),
+    finePrintNote: text("fine_print_note"),
+    rawText: text("raw_text").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    confirmedByUserId: integer("confirmed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    correctedByUserId: integer("corrected_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    capEnteredByUserId: integer("cap_entered_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    dismissedByUserId: integer("dismissed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    flaggedByUserId: integer("flagged_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("promos_status_idx").on(table.status),
+    index("promos_book_key_idx").on(table.bookKey),
+  ],
+);
+
+/**
+ * Append-only per-book scrape run history (D-08). One row per book per run,
+ * written only by scrapers/*.ts (Plan 05/06) after each scheduled run. The
+ * Promos tab's scrape-status panel reads the latest ok run and latest run's
+ * status per book via src/db/promos.ts's getScrapeStatus -- a failed run
+ * never deletes or alters existing promos, it only affects the freshness
+ * label shown for that book.
+ */
+export const scrapeRuns = pgTable(
+  "scrape_runs",
+  {
+    id: serial("id").primaryKey(),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    ranAt: timestamp("ran_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull(),
+    promosFound: integer("promos_found").notNull(),
+    promosKept: integer("promos_kept").notNull(),
+    errorMessage: text("error_message"),
+  },
+  (table) => [index("scrape_runs_book_key_ran_at_idx").on(table.bookKey, table.ranAt)],
+);
