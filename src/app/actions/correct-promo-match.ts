@@ -7,6 +7,7 @@ import { getPendingPromo, applyCorrectedMatch } from "@/db/promoReview";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { resolveSelection } from "@/domain/promos/selection";
 import { etDayBounds } from "@/domain/promos/etTime";
+import { DEFAULT_WINDOW_DAYS } from "@/domain/promos/correctionOptions";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import type { ScopeGuess } from "@/domain/promos/scope";
 import type { PromoSelection } from "@/domain/promos/types";
@@ -89,8 +90,16 @@ export async function correctPromoMatch(input: unknown): Promise<PromoReviewResp
     };
   } else {
     const bounds = etDayBounds(scopeInput.etDate);
-    if (!bounds || new Date(bounds.end).getTime() <= now.getTime()) {
+    // WR-12: an impossible calendar date (e.g. 2026-02-31) is rejected, never rolled over.
+    if (!bounds) {
+      return { status: "invalid" };
+    }
+    if (new Date(bounds.end).getTime() <= now.getTime()) {
       return { status: "stale", message: "That day has already passed. Pick another." };
+    }
+    // ...and a day beyond the correction window the dropdown offers is refused.
+    if (new Date(bounds.start).getTime() > now.getTime() + DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000) {
+      return { status: "invalid" };
     }
 
     scope = {

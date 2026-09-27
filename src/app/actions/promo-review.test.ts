@@ -61,6 +61,11 @@ function plusHours(hours: number): string {
   return new Date(new Date(NOW_ISO).getTime() + hours * 60 * 60 * 1000).toISOString();
 }
 
+/** An ISO instant's ET calendar day as "YYYY-MM-DD". */
+function etDateOf(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 function minusHours(hours: number): string {
   return new Date(new Date(NOW_ISO).getTime() - hours * 60 * 60 * 1000).toISOString();
 }
@@ -560,6 +565,20 @@ describe("correctPromoMatch server action (PROMO-04, D-14, T-03-09-01/02/06)", (
     expect(mockApplyCorrectedMatch).not.toHaveBeenCalled();
   });
 
+  it("WR-12: rejects an impossible sport_day date and a day beyond the 7-day correction window", async () => {
+    const row = matchQueueRow();
+    mockGetPendingPromo.mockResolvedValue(row);
+
+    for (const etDate of ["2026-02-31", "2099-01-01", etDateOf(plusHours(24 * 9))]) {
+      const result = await correctPromoMatch({
+        promoId: 5,
+        scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate },
+      });
+      expect(result).toEqual({ status: "invalid" });
+    }
+    expect(mockApplyCorrectedMatch).not.toHaveBeenCalled();
+  });
+
   it("returns stale when the chosen sport_day's ET day has already ended", async () => {
     const row = matchQueueRow();
     mockGetPendingPromo.mockResolvedValue(row);
@@ -629,7 +648,7 @@ describe("correctPromoMatch server action (PROMO-04, D-14, T-03-09-01/02/06)", (
 
     const result = await correctPromoMatch({
       promoId: 5,
-      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: "2099-01-01" },
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: etDateOf(plusHours(24)) },
     });
 
     expect(result).toEqual({ status: "ok" });

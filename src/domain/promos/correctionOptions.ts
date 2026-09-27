@@ -50,7 +50,8 @@ export interface CorrectionOptions {
   sportDays: CorrectionSportDayOption[];
 }
 
-const DEFAULT_WINDOW_DAYS = 7;
+/** How far ahead the Correct sub-panel offers games/days; correctPromoMatch enforces the same bound (WR-12). */
+export const DEFAULT_WINDOW_DAYS = 7;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 const SPORT_ORDER = new Map(SPORTS.map((sport, index) => [sport.key, index]));

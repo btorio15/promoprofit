@@ -47,6 +47,16 @@ describe("etDayBounds", () => {
   it("matches etDayWindow for the equivalent ISO date", () => {
     expect(etDayBounds("2026-09-27")).toEqual(etDayWindow("9/27/2026"));
   });
+
+  it("WR-12: rejects impossible calendar dates instead of rolling them over", () => {
+    expect(etDayBounds("2026-02-31")).toBeNull();
+    expect(etDayBounds("2026-13-01")).toBeNull();
+    expect(etDayBounds("2026-00-10")).toBeNull();
+    expect(etDayBounds("2028-02-29")).not.toBeNull(); // leap day is real
+    expect(etDayWindow("13/45/2026")).toBeNull();
+    expect(etDayWindow("2/30/2026")).toBeNull();
+    expect(parseEtDateTime("February 31, 2026 at 12:00 AM ET")).toBeNull();
+  });
 });
 
 describe("etDayLabel", () => {

@@ -63,27 +63,41 @@ interface DateComponents {
 const SLASH_DATE_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const MONTH_NAME_DATE_RE = /^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/;
 
+/**
+ * WR-12: true only for a real calendar date. Date.UTC silently rolls
+ * impossible dates over (Feb 31 -> Mar 3, month 13 -> next January), so
+ * round-trip the components and reject any that changed.
+ */
+function isRealCalendarDate(year: number, month: number, day: number): boolean {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+}
+
+function validDate(components: DateComponents): DateComponents | null {
+  return isRealCalendarDate(components.year, components.month, components.day) ? components : null;
+}
+
 function parseDateOnly(text: string): DateComponents | null {
   const trimmed = text.trim();
 
   const slashMatch = SLASH_DATE_RE.exec(trimmed);
   if (slashMatch) {
-    return {
+    return validDate({
       month: parseInt(slashMatch[1], 10),
       day: parseInt(slashMatch[2], 10),
       year: parseInt(slashMatch[3], 10),
-    };
+    });
   }
 
   const monthMatch = MONTH_NAME_DATE_RE.exec(trimmed);
   if (monthMatch) {
     const monthNum = MONTH_NAMES[monthMatch[1].toLowerCase()];
     if (monthNum === undefined) return null;
-    return {
+    return validDate({
       month: monthNum,
       day: parseInt(monthMatch[2], 10),
       year: parseInt(monthMatch[3], 10),
-    };
+    });
   }
 
   return null;
@@ -100,7 +114,11 @@ function computeEtDayBounds(year: number, month: number, day: number): { start: 
 export function etDayBounds(etDate: string): { start: string; end: string } | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(etDate.trim());
   if (!match) return null;
-  return computeEtDayBounds(parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10));
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+  if (!isRealCalendarDate(year, month, day)) return null;
+  return computeEtDayBounds(year, month, day);
 }
 
 /** "Sun, Sep 27" in America/New_York, from a UTC ISO instant. */
