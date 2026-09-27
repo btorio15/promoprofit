@@ -1,4 +1,7 @@
-import type { CapField, PromoType } from "./types";
+import type { CapField, PromoSelection, PromoStatus, PromoType, ReviewReason } from "./types";
+import type { ScopeGuess } from "./scope";
+import type { MatchResult } from "./matcher";
+import type { ScrapedPromo } from "./scraped";
 
 /**
  * Status-after-match rule (D-18): a promo becomes active only when every
@@ -28,4 +31,131 @@ export function statusAfterMatch(p: {
   }
 
   return { status: "active", reviewReason: null, unparsedCapFields: [] };
+}
+
+/**
+ * Everything decideScrapedWrite needs to know about a promo's existing row
+ * (Plan 06/07/08): D-11's flag (autoMatchBlocked), D-14's dismissal, and
+ * whichever scope/pin a human already confirmed or corrected (humanScope/
+ * humanPinned -- populated by the caller only when confirmed_by_user_id or
+ * corrected_by_user_id is set on the row).
+ */
+export interface ExistingPromoState {
+  status: PromoStatus;
+  reviewReason: ReviewReason | null;
+  autoMatchBlocked: boolean;
+  humanScope: ScopeGuess | null;
+  humanPinned: PromoSelection | null;
+  promoType: PromoType;
+  maxStake: string | null;
+  bonusAmount: string | null;
+  unparsedCapFields: CapField[];
+}
+
+export type ScrapedWriteDecision =
+  | { kind: "skip" }
+  | { kind: "touch" }
+  | {
+      kind: "write";
+      status: PromoStatus;
+      reviewReason: ReviewReason | null;
+      autoMatched: boolean;
+      scope: ScopeGuess | null;
+      pinned: PromoSelection | null;
+      bestGuess: ScopeGuess | null;
+      unparsedCapFields: CapField[];
+    };
+
+/** Builds the "write" decision for a fresh match attempt (new/re-matched/revived-without-human-scope row). */
+function writeForMatch(
+  promoType: PromoType,
+  maxStake: string | null,
+  bonusAmount: string | null,
+  unparsedCapFields: readonly CapField[],
+  match: MatchResult,
+): ScrapedWriteDecision {
+  if (match.status === "unmatched") {
+    return {
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: match.guess,
+      unparsedCapFields: [...unparsedCapFields],
+    };
+  }
+
+  const after = statusAfterMatch({ promoType, maxStake, bonusAmount, unparsedCapFields });
+  return {
+    kind: "write",
+    status: after.status,
+    reviewReason: after.reviewReason,
+    autoMatched: true,
+    scope: match.scope,
+    pinned: match.pinned,
+    bestGuess: null,
+    unparsedCapFields: after.unparsedCapFields,
+  };
+}
+
+/**
+ * Single source of truth for what a scrape write does to one promo row
+ * (D-10/D-11/D-14/D-18/D-19). Pure -- the caller (store.ts) supplies the
+ * existing row's state (or null for a dedupe key never seen before) and
+ * this function alone decides skip/touch/write, never the reverse.
+ */
+export function decideScrapedWrite(
+  existing: ExistingPromoState | null,
+  parsed: ScrapedPromo,
+  match: MatchResult,
+): ScrapedWriteDecision {
+  if (existing === null) {
+    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+  }
+
+  if (existing.status === "dismissed") {
+    return { kind: "skip" };
+  }
+
+  if (existing.status === "active") {
+    return { kind: "touch" };
+  }
+
+  if (existing.status === "pending_review" && existing.reviewReason === "caps") {
+    return { kind: "touch" };
+  }
+
+  if (existing.status === "pending_review" && existing.reviewReason === "match") {
+    if (existing.autoMatchBlocked) {
+      return { kind: "touch" };
+    }
+    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+  }
+
+  if (existing.status === "expired") {
+    if (existing.humanScope !== null) {
+      const after = statusAfterMatch({
+        promoType: existing.promoType,
+        maxStake: existing.maxStake,
+        bonusAmount: existing.bonusAmount,
+        unparsedCapFields: existing.unparsedCapFields,
+      });
+      return {
+        kind: "write",
+        status: after.status,
+        reviewReason: after.reviewReason,
+        autoMatched: false,
+        scope: existing.humanScope,
+        pinned: existing.humanPinned,
+        bestGuess: null,
+        unparsedCapFields: after.unparsedCapFields,
+      };
+    }
+    return writeForMatch(parsed.promoType, parsed.maxStake, parsed.bonusAmount, parsed.unparsedCapFields, match);
+  }
+
+  // Defensive fallback for an unrecognized pending_review reviewReason: never write.
+  return { kind: "touch" };
 }
