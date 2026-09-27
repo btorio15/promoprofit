@@ -311,8 +311,10 @@ describe("runPromoScrape", () => {
     const scraperOk = makeScraper({ parse: () => ({ found: 1, candidates: [], skipped: [] }) });
     const scraperThrows = makeScraper({ bookKey: "throwbook" });
 
+    let fetchCallCount = 0;
     const fetchFn: FetchRequest = vi.fn(async (r: HttpRequestSpec): Promise<FetchResult> => {
-      if (r.url === "https://example.com/list" && fetchFn.mock.calls.length === 1) {
+      fetchCallCount++;
+      if (r.url === "https://example.com/list" && fetchCallCount === 1) {
         throw new Error("boom");
       }
       return { ok: true, body: "{}" };
