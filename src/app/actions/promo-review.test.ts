@@ -10,6 +10,8 @@ const {
   mockApplyDismissal,
   mockApplyCorrectedMatch,
   mockApplyCapEntry,
+  mockGetActivePromoForFlag,
+  mockApplyFlag,
   mockGetCachedEvents,
   mockGetCachedExtendedEvents,
 } = vi.hoisted(() => ({
@@ -19,6 +21,8 @@ const {
   mockApplyDismissal: vi.fn(),
   mockApplyCorrectedMatch: vi.fn(),
   mockApplyCapEntry: vi.fn(),
+  mockGetActivePromoForFlag: vi.fn(),
+  mockApplyFlag: vi.fn(),
   mockGetCachedEvents: vi.fn(),
   mockGetCachedExtendedEvents: vi.fn(),
 }));
@@ -31,6 +35,8 @@ vi.mock("@/db/promoReview", () => ({
   applyDismissal: mockApplyDismissal,
   applyCorrectedMatch: mockApplyCorrectedMatch,
   applyCapEntry: mockApplyCapEntry,
+  getActivePromoForFlag: mockGetActivePromoForFlag,
+  applyFlag: mockApplyFlag,
 }));
 vi.mock("@/db/queries", () => ({
   getCachedEvents: mockGetCachedEvents,
@@ -42,6 +48,7 @@ import { confirmPromoMatch } from "./confirm-promo-match";
 import { dismissPromo } from "./dismiss-promo";
 import { correctPromoMatch } from "./correct-promo-match";
 import { enterPromoCaps } from "./enter-promo-caps";
+import { flagPromoMatch } from "./flag-promo-match";
 
 const mockRevalidatePath = vi.mocked(revalidatePath);
 
@@ -810,5 +817,124 @@ describe("enterPromoCaps server action (D-18, T-03-09-01/03)", () => {
       minOddsAmerican: -150,
       now: expect.any(Date),
     });
+  });
+});
+
+describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
+  it("rejects when logged out, before any read or write", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+
+    await expect(flagPromoMatch({ promoId: 5 })).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(mockGetActivePromoForFlag).not.toHaveBeenCalled();
+    expect(mockApplyFlag).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-numeric promoId without reading or writing", async () => {
+    const result = await flagPromoMatch({ promoId: "x" });
+
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetActivePromoForFlag).not.toHaveBeenCalled();
+  });
+
+  it("rejects an extra 'userId' field (strict schema, IDOR guard)", async () => {
+    const result = await flagPromoMatch({ promoId: 5, userId: 99 });
+
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetActivePromoForFlag).not.toHaveBeenCalled();
+  });
+
+  it("flags an active auto-matched event-scope promo: guess is its current scope, ok, revalidates '/'", async () => {
+    const guess = {
+      kind: "event" as const,
+      eventId: "nfl-1",
+      sportKey: "americanfootball_nfl",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+    };
+    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, autoMatched: true, guess });
+    mockApplyFlag.mockResolvedValue(true);
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyFlag).toHaveBeenCalledWith({
+      promoId: 5,
+      userId: 7,
+      guess,
+      now: expect.any(Date),
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("flags an active auto-matched sport_window promo (e.g. a sport-wide DraftKings boost)", async () => {
+    const guess = {
+      kind: "sport_window" as const,
+      sportKey: "americanfootball_nfl",
+      windowStart: NOW_ISO,
+      windowEnd: plusHours(48),
+    };
+    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, autoMatched: true, guess });
+    mockApplyFlag.mockResolvedValue(true);
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyFlag).toHaveBeenCalledWith({
+      promoId: 5,
+      userId: 7,
+      guess,
+      now: expect.any(Date),
+    });
+  });
+
+  it("returns conflict when the active promo was human-confirmed (autoMatched false)", async () => {
+    mockGetActivePromoForFlag.mockResolvedValue({
+      id: 5,
+      autoMatched: false,
+      guess: {
+        kind: "event" as const,
+        eventId: "nfl-1",
+        sportKey: "americanfootball_nfl",
+        homeTeam: "Denver Broncos",
+        awayTeam: "Los Angeles Rams",
+        commenceTime: plusHours(6),
+      },
+    });
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "conflict", message: "Only auto-matched promos can be flagged." });
+    expect(mockApplyFlag).not.toHaveBeenCalled();
+  });
+
+  it("returns conflict when the promo is no longer active (already flagged/dismissed/expired)", async () => {
+    mockGetActivePromoForFlag.mockResolvedValue(null);
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
+    expect(mockApplyFlag).not.toHaveBeenCalled();
+  });
+
+  it("returns conflict when the conditional write affects zero rows (concurrent reviewers)", async () => {
+    mockGetActivePromoForFlag.mockResolvedValue({
+      id: 5,
+      autoMatched: true,
+      guess: {
+        kind: "event" as const,
+        eventId: "nfl-1",
+        sportKey: "americanfootball_nfl",
+        homeTeam: "Denver Broncos",
+        awayTeam: "Los Angeles Rams",
+        commenceTime: plusHours(6),
+      },
+    });
+    mockApplyFlag.mockResolvedValue(false);
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
   });
 });
