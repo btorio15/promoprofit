@@ -1,4 +1,12 @@
 import type { CapField, PromoType, ReviewReason } from "./types";
+import type { CorrectionOptions } from "./correctionOptions";
+
+export type {
+  CorrectionEventOption,
+  CorrectionMarketOption,
+  CorrectionOptions,
+  CorrectionSportDayOption,
+} from "./correctionOptions";
 
 /**
  * Serializable DTOs returned by the getPromos server action (D-08). This is
@@ -98,5 +106,7 @@ export type GetPromosResponse =
       emptyVariant: PromosEmptyVariant | null;
       rows: PromoRowDTO[];
       queue: QueueItemDTO[];
+      /** Correct sub-panel dropdown data (Plan 09, T-03-09-06) -- empty lists unless the queue has at least one match-kind item. */
+      correctionOptions: CorrectionOptions;
     }
   | { status: "invalid" };

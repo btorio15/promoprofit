@@ -1,32 +1,110 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { QueueItemDTO } from "@/domain/promos/dto";
+import type { CorrectionOptions, QueueItemDTO } from "@/domain/promos/dto";
 import { confirmPromoMatch, type PromoReviewResponse } from "@/app/actions/confirm-promo-match";
+import { correctPromoMatch } from "@/app/actions/correct-promo-match";
+import { enterPromoCaps } from "@/app/actions/enter-promo-caps";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { DismissPromoDialog } from "./DismissPromoDialog";
 
 interface QueueItemCardProps {
   item: QueueItemDTO;
+  /** Correct sub-panel dropdown data (Plan 09, T-03-09-06) -- only meaningful for match-kind items; ignored by caps-kind cards. */
+  correctionOptions: CorrectionOptions;
   onChanged: () => void;
 }
 
 const INVALID_MESSAGE = "Something went wrong with that request. Try refreshing the page.";
 
+type CapKey = "maxStake" | "maxWinnings" | "minOdds";
+
+const CAP_FIELD_LABELS: Record<CapKey, string> = {
+  maxStake: "Max stake",
+  maxWinnings: "Max winnings",
+  minOdds: "Min odds",
+};
+
+const EVENT_PREFIX = "event:";
+const DAY_PREFIX = "day:";
+
+interface SportGroup {
+  sportKey: string;
+  sportLabel: string;
+  sportDays: CorrectionOptions["sportDays"];
+  events: CorrectionOptions["events"];
+}
+
 /**
- * One review-queue card, match or caps kind (D-13, D-14, PROMO-04;
- * 03-UI-SPEC.md "Queue item card"). Confirm/Dismiss both run in
- * useTransition; an "ok" outcome calls onChanged() (the parent re-fetches
- * getPromos and the card disappears from the queue); a stale/conflict/
- * invalid outcome renders inline instead -- another member may have
- * already acted on this exact card.
+ * Groups correctionOptions' two flat lists into one Select's sport-labelled
+ * groups, sport-day choices listed before that sport's games within each
+ * group (03-UI-SPEC.md "Correct sub-panel"). Both source lists already come
+ * pre-sorted by SPORTS order (correctionOptions.ts), so insertion order here
+ * is preserved as-is, never re-sorted.
  */
-export function QueueItemCard({ item, onChanged }: QueueItemCardProps) {
+function groupCorrectionOptions(options: CorrectionOptions): SportGroup[] {
+  const order: string[] = [];
+  const groups = new Map<string, SportGroup>();
+
+  function groupFor(sportKey: string, sportLabel: string): SportGroup {
+    let group = groups.get(sportKey);
+    if (!group) {
+      group = { sportKey, sportLabel, sportDays: [], events: [] };
+      groups.set(sportKey, group);
+      order.push(sportKey);
+    }
+    return group;
+  }
+
+  for (const day of options.sportDays) {
+    groupFor(day.sportKey, day.sportLabel).sportDays.push(day);
+  }
+  for (const event of options.events) {
+    groupFor(event.sportKey, event.sportLabel).events.push(event);
+  }
+
+  return order.map((key) => groups.get(key)!);
+}
+
+/**
+ * One review-queue card, match or caps kind (D-13, D-14, D-18, PROMO-04;
+ * 03-UI-SPEC.md "Queue item card"). Confirm/Dismiss/Correct/Enter-cap-
+ * details each run in their own useTransition; an "ok" outcome calls
+ * onChanged() (the parent re-fetches getPromos and the card disappears from
+ * the queue); a stale/conflict/invalid outcome renders inline instead --
+ * another member may have already acted on this exact card. The Correct
+ * sub-panel's "selection" field error (a pin that no longer resolves) has no
+ * dedicated input to attach to, so it renders in the same shared alert line
+ * as stale/conflict; the Enter-cap-details sub-panel's field errors render
+ * under each Input instead, since each maps to a specific field.
+ */
+export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemCardProps) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
+
+  const [correctOpen, setCorrectOpen] = useState(false);
+  const [isCorrectPending, startCorrectTransition] = useTransition();
+  const [eventValue, setEventValue] = useState<string | null>(null);
+  const [marketValue, setMarketValue] = useState<string>("best");
+
+  const [capsOpen, setCapsOpen] = useState(false);
+  const [isCapsPending, startCapsTransition] = useTransition();
+  const [capValues, setCapValues] = useState<Partial<Record<CapKey, string>>>({});
+  const [capFieldErrors, setCapFieldErrors] = useState<Partial<Record<CapKey, string | undefined>>>({});
 
   function handleOutcome(outcome: PromoReviewResponse) {
     if (outcome.status === "ok") {
@@ -34,12 +112,85 @@ export function QueueItemCard({ item, onChanged }: QueueItemCardProps) {
       onChanged();
       return;
     }
-    setMessage(outcome.status === "invalid" ? INVALID_MESSAGE : outcome.message);
+    if (outcome.status === "invalid") {
+      setMessage(outcome.fieldErrors?.selection?.[0] ?? INVALID_MESSAGE);
+      return;
+    }
+    setMessage(outcome.message);
   }
 
   function confirmMatch() {
     startTransition(async () => {
       const outcome = await confirmPromoMatch({ promoId: item.promoId });
+      handleOutcome(outcome);
+    });
+  }
+
+  const sportGroups = groupCorrectionOptions(correctionOptions);
+  const selectedEvent = eventValue?.startsWith(EVENT_PREFIX)
+    ? correctionOptions.events.find((e) => e.eventId === eventValue.slice(EVENT_PREFIX.length))
+    : undefined;
+  const isSportDaySelected = eventValue?.startsWith(DAY_PREFIX) ?? false;
+
+  function saveMatch() {
+    if (!eventValue) return;
+
+    const scope = eventValue.startsWith(EVENT_PREFIX)
+      ? {
+          kind: "event" as const,
+          eventId: eventValue.slice(EVENT_PREFIX.length),
+          pinned: selectedEvent?.markets.find((m) => m.value === marketValue)?.pinned ?? null,
+        }
+      : (() => {
+          const [sportKey, etDate] = eventValue.slice(DAY_PREFIX.length).split("|");
+          return { kind: "sport_day" as const, sportKey, etDate };
+        })();
+
+    startCorrectTransition(async () => {
+      const outcome = await correctPromoMatch({ promoId: item.promoId, scope });
+      if (outcome.status === "ok") {
+        setCorrectOpen(false);
+        setEventValue(null);
+        setMarketValue("best");
+      }
+      handleOutcome(outcome);
+    });
+  }
+
+  function saveCaps() {
+    startCapsTransition(async () => {
+      const payload: Record<string, unknown> = { promoId: item.promoId };
+      for (const field of item.unparsedCapFields) {
+        const value = capValues[field];
+        if (!value) continue;
+        if (field === "minOdds") {
+          const parsedValue = Number.parseInt(value, 10);
+          if (!Number.isNaN(parsedValue)) payload.minOddsAmerican = parsedValue;
+        } else {
+          payload[field] = value;
+        }
+      }
+
+      const outcome = await enterPromoCaps(payload);
+
+      if (outcome.status === "ok") {
+        setCapsOpen(false);
+        setCapValues({});
+        setCapFieldErrors({});
+        setMessage(null);
+        onChanged();
+        return;
+      }
+
+      if (outcome.status === "invalid" && outcome.fieldErrors && Object.keys(outcome.fieldErrors).length > 0) {
+        setCapFieldErrors({
+          maxStake: outcome.fieldErrors.maxStake?.[0],
+          maxWinnings: outcome.fieldErrors.maxWinnings?.[0],
+          minOdds: outcome.fieldErrors.minOdds?.[0],
+        });
+        return;
+      }
+
       handleOutcome(outcome);
     });
   }
@@ -90,6 +241,27 @@ export function QueueItemCard({ item, onChanged }: QueueItemCardProps) {
             Confirm
           </Button>
         ) : null}
+        {item.kind === "match" ? (
+          <Button
+            variant="outline"
+            className="h-10"
+            aria-label="Correct this match"
+            onClick={() => setCorrectOpen((open) => !open)}
+            disabled={isPending}
+          >
+            Correct
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="h-10"
+            aria-label="Enter cap details"
+            onClick={() => setCapsOpen((open) => !open)}
+            disabled={isPending}
+          >
+            Enter cap details
+          </Button>
+        )}
         <Button
           variant="outline"
           className="h-10 text-destructive"
@@ -100,6 +272,127 @@ export function QueueItemCard({ item, onChanged }: QueueItemCardProps) {
           Dismiss
         </Button>
       </div>
+
+      {correctOpen ? (
+        <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`correct-event-${item.promoId}`}>Event</Label>
+            <Select
+              value={eventValue}
+              onValueChange={(value) => {
+                setEventValue(value ?? null);
+                setMarketValue("best");
+              }}
+            >
+              <SelectTrigger id={`correct-event-${item.promoId}`} className="h-10 w-full">
+                <SelectValue placeholder="Choose a game or day" />
+              </SelectTrigger>
+              <SelectContent>
+                {sportGroups.map((group) => (
+                  <SelectGroup key={group.sportKey}>
+                    <SelectLabel>{group.sportLabel}</SelectLabel>
+                    {group.sportDays.map((day) => (
+                      <SelectItem key={day.value} value={`${DAY_PREFIX}${day.value}`}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                    {group.events.map((event) => (
+                      <SelectItem key={event.eventId} value={`${EVENT_PREFIX}${event.eventId}`}>
+                        {event.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!isSportDaySelected ? (
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`correct-market-${item.promoId}`}>Market / side</Label>
+              <Select value={marketValue} onValueChange={(value) => setMarketValue(value ?? "best")}>
+                <SelectTrigger
+                  id={`correct-market-${item.promoId}`}
+                  className="h-10 w-full"
+                  disabled={!selectedEvent}
+                >
+                  <SelectValue placeholder="Best available (app picks)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(selectedEvent?.markets ?? []).map((market) => (
+                    <SelectItem key={market.value} value={market.value}>
+                      {market.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-10" disabled={!eventValue || isCorrectPending} onClick={saveMatch}>
+              Save match
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-10"
+              onClick={() => {
+                setCorrectOpen(false);
+                setEventValue(null);
+                setMarketValue("best");
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {capsOpen ? (
+        <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+          {item.unparsedCapFields.map((field) => (
+            <div key={field} className="flex flex-col gap-2">
+              <Label htmlFor={`cap-${field}-${item.promoId}`}>{CAP_FIELD_LABELS[field]}</Label>
+              <Input
+                id={`cap-${field}-${item.promoId}`}
+                inputMode={field === "minOdds" ? "numeric" : "decimal"}
+                placeholder={field === "minOdds" ? "-200" : "$0.00"}
+                className="num h-10"
+                value={capValues[field] ?? ""}
+                onChange={(event) => {
+                  const { value } = event.target;
+                  setCapValues((prev) => ({ ...prev, [field]: value }));
+                  setCapFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+                }}
+              />
+              {capFieldErrors[field] ? (
+                <p className="text-sm text-destructive">{capFieldErrors[field]}</p>
+              ) : null}
+            </div>
+          ))}
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              className="h-10"
+              disabled={item.unparsedCapFields.some((field) => !capValues[field]) || isCapsPending}
+              onClick={saveCaps}
+            >
+              Save & activate
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-10"
+              onClick={() => {
+                setCapsOpen(false);
+                setCapValues({});
+                setCapFieldErrors({});
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <DismissPromoDialog
         open={dismissOpen}
