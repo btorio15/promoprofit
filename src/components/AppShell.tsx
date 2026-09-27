@@ -9,6 +9,7 @@ import { OddsStatusBar } from "@/components/finder/OddsStatusBar";
 import { CreditBanner } from "@/components/finder/CreditBanner";
 import { FinderScreen } from "@/components/finder/FinderScreen";
 import { ArbScreen } from "@/components/arb/ArbScreen";
+import { PromosScreen } from "@/components/promos/PromosScreen";
 
 export interface AppShellProps {
   status: OddsStatus;
@@ -17,16 +18,16 @@ export interface AppShellProps {
   displayName: string;
 }
 
-type ActiveTab = "bonus" | "arbitrage";
+type ActiveTab = "bonus" | "arbitrage" | "promos";
 
 /**
- * Page shell (D-09): one sticky status bar + credit banner shared above the
- * top-level "Bonus bets | Arbitrage" tabs, so odds age/credits/refresh stay
- * visible regardless of which tab is open. Owns recomputeKey (bumped after
- * a refresh or a successful spreads/totals search, so both tabs recompute
- * together) and activeTab (default "bonus", not URL-synced). Both
- * TabsContent panels are keepMounted so switching tabs never discards the
- * other tab's results/state.
+ * Page shell (D-09, D-01): one sticky status bar + credit banner shared
+ * above the top-level "Bonus bets | Arbitrage | Promos" tabs, so odds
+ * age/credits/refresh stay visible regardless of which tab is open. Owns
+ * recomputeKey (bumped after a refresh or a successful spreads/totals
+ * search, so all three tabs recompute together) and activeTab (default
+ * "bonus", not URL-synced). Every tab panel below stays mounted while
+ * inactive so switching tabs never discards another tab's results/state.
  */
 export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: AppShellProps) {
   const [recomputeKey, setRecomputeKey] = useState(0);
@@ -53,6 +54,7 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
           <TabsList variant="line" aria-label="Select a tab" className="mt-2">
             <TabsTrigger value="bonus">Bonus bets</TabsTrigger>
             <TabsTrigger value="arbitrage">Arbitrage</TabsTrigger>
+            <TabsTrigger value="promos">Promos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="bonus" keepMounted>
@@ -70,6 +72,10 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
               recomputeKey={recomputeKey}
               onSearched={bumpRecompute}
             />
+          </TabsContent>
+
+          <TabsContent value="promos" keepMounted>
+            <PromosScreen hasCachedOdds={hasCachedOdds} recomputeKey={recomputeKey} />
           </TabsContent>
         </Tabs>
       </main>
