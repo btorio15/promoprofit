@@ -11,6 +11,7 @@ import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
 import { ReviewQueueSection } from "./ReviewQueueSection";
 import { PromosEmptyState } from "./PromosEmptyState";
+import { ProfitSummary } from "./ProfitSummary";
 import { PromoRow } from "./PromoRow";
 import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
 
@@ -92,6 +93,13 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
       </header>
 
       {response?.status === "ok" ? <ScrapeStatusPanel scrapeStatus={response.scrapeStatus} /> : null}
+
+      {/* quick-260927-n12: shown in EVERY "ok" state, including every
+          empty-state variant, so the headline/period numbers never
+          disappear just because the live feed is momentarily empty. */}
+      {response?.status === "ok" ? (
+        <ProfitSummary totalProfit={response.totalProfit} availableProfit={response.availableProfit} />
+      ) : null}
 
       {response?.status === "ok" ? (
         <ReviewQueueSection

@@ -2,7 +2,9 @@
 
 import type { UnprofitablePromoRowDTO } from "@/domain/promos/dto";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { FlagMatchButton } from "./FlagMatchButton";
+import { MarkUsedButton } from "./MarkUsedButton";
 import { NO_PROMO_BOOK_HINT } from "./PromoRow";
 
 interface UnprofitablePromoRowProps {
@@ -18,15 +20,25 @@ interface UnprofitablePromoRowProps {
  * fields present on UnprofitablePromoRowDTO: never a promo/hedge amount,
  * a payout, a hedge book, a profit column, a rate, or "place" wording,
  * since a non-positive result is not a real opportunity.
+ *
+ * quick-260927-n12 (scope change A): a used row swaps its background for
+ * the same used-row-bg gradient PromoRow uses (dropping the dimmed/opacity
+ * treatment, since "marked used" is a distinct, non-muted state) and gets
+ * a "Marked used" badge plus the Mark used/Undo toggle.
  */
 export function UnprofitablePromoRow({ row, onChanged }: UnprofitablePromoRowProps) {
   return (
     <div
-      className="rounded-lg border border-border bg-secondary/40 p-4 opacity-60"
+      className={cn(
+        "rounded-lg border border-border p-4",
+        row.used ? "used-row-bg" : "bg-secondary/40 opacity-60",
+      )}
       aria-label={
-        row.hasPromoBook
-          ? `${row.bookName} ${row.title} — ${row.note}`
-          : `${row.bookName} ${row.title} — ${row.note} (${NO_PROMO_BOOK_HINT})`
+        row.used
+          ? `${row.bookName} ${row.title} — ${row.note} (Marked used)`
+          : row.hasPromoBook
+            ? `${row.bookName} ${row.title} — ${row.note}`
+            : `${row.bookName} ${row.title} — ${row.note} (${NO_PROMO_BOOK_HINT})`
       }
     >
       <div className="flex flex-col gap-1">
@@ -40,6 +52,8 @@ export function UnprofitablePromoRow({ row, onChanged }: UnprofitablePromoRowPro
               <FlagMatchButton promoId={row.promoId} onChanged={onChanged} />
             </>
           ) : null}
+          {row.used ? <Badge variant="outline">Marked used</Badge> : null}
+          <MarkUsedButton promoId={row.promoId} used={row.used} onChanged={onChanged} />
         </span>
         <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
         <span className="text-sm text-muted-foreground">{row.note}</span>

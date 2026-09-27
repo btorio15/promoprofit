@@ -4,6 +4,7 @@ import type { ActivePromo } from "@/db/promos";
 import type { QueueRow } from "@/db/promoReview";
 import type { ScrapedPromo } from "@/domain/promos/scraped";
 import { formatKickoff } from "@/lib/format";
+import { denverDate } from "@/domain/promos/profitTotals";
 
 const {
   mockRequireUser,
@@ -15,6 +16,9 @@ const {
   mockGetCachedExtendedEvents,
   mockGetHedgeBookKeys,
   mockGetUserBookKeys,
+  mockGetUsedPromoIds,
+  mockGetProfitObservationsSince,
+  mockRecordCurrentProfitObservations,
 } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
   mockGetScrapeStatus: vi.fn(),
@@ -25,6 +29,9 @@ const {
   mockGetCachedExtendedEvents: vi.fn(),
   mockGetHedgeBookKeys: vi.fn(),
   mockGetUserBookKeys: vi.fn(),
+  mockGetUsedPromoIds: vi.fn(),
+  mockGetProfitObservationsSince: vi.fn(),
+  mockRecordCurrentProfitObservations: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
@@ -41,6 +48,13 @@ vi.mock("@/db/queries", () => ({
   getCachedExtendedEvents: mockGetCachedExtendedEvents,
   getHedgeBookKeys: mockGetHedgeBookKeys,
   getUserBookKeys: mockGetUserBookKeys,
+}));
+vi.mock("@/db/promoTracking", () => ({
+  getUsedPromoIds: mockGetUsedPromoIds,
+  getProfitObservationsSince: mockGetProfitObservationsSince,
+}));
+vi.mock("@/db/promoObservations", () => ({
+  recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
 }));
 
 import { getPromos } from "./get-promos";
@@ -237,6 +251,9 @@ beforeEach(() => {
   mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
   mockGetHedgeBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
   mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
+  mockGetUsedPromoIds.mockResolvedValue(new Set());
+  mockGetProfitObservationsSince.mockResolvedValue([]);
+  mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
 });
 
 describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () => {
@@ -594,6 +611,7 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         note: "No profitable hedge right now (best: −$0.65)",
         // The member only has BetMGM, not the promo's own book (WR-07).
         hasPromoBook: false,
+        used: false,
       },
     ]);
   });
@@ -877,5 +895,145 @@ describe("getPromos promo-book ordering (WR-07)", () => {
     expect(result.emptyVariant).toBeNull();
     expect(result.unprofitableRows.map((r) => r.promoId)).toEqual([6, 5, 7]);
     expect(result.unprofitableRows.map((r) => r.hasPromoBook)).toEqual([true, false, false]);
+  });
+});
+
+// quick-260927-n12 owner decisions 1/2 + scope change A: a used promo stays
+// INLINE in rows/unprofitableRows (never filtered out) with a `used` flag,
+// and is excluded from totalProfit.
+describe("getPromos used-state and totalProfit (quick-260927-n12)", () => {
+  it("marks a used promo's `used` flag true, keeps it inline in rows, and excludes it from totalProfit", async () => {
+    const event = moneylineEvent({
+      id: "nfl-total",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+        { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+      ],
+    });
+    const promoA = activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" });
+    const promoB = activeBoostPromo({ id: 2, bookKey: "draftkings", maxStake: "10.00" });
+
+    mockGetActivePromos.mockResolvedValue([promoA, promoB]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetUsedPromoIds.mockResolvedValue(new Set([2]));
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    // Both stay inline -- neither is removed or moved to a separate list.
+    expect(result.rows.map((r) => r.promoId).sort()).toEqual([1, 2]);
+    const rowA = result.rows.find((r) => r.promoId === 1);
+    const rowB = result.rows.find((r) => r.promoId === 2);
+    expect(rowA?.used).toBe(false);
+    expect(rowB?.used).toBe(true);
+    // totalProfit is exactly rowA's own guaranteed profit -- rowB is
+    // excluded even though it's also at an own book.
+    expect(result.totalProfit).toBe(rowA?.guaranteedProfit);
+  });
+
+  it("marks a used promo's `used` flag true and keeps it inline in unprofitableRows", async () => {
+    const event = moneylineEvent({
+      id: "nfl-worked-used",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "ballybet", homePrice: 107, awayPrice: -135 },
+        { bookKey: "betmgm", homePrice: 105, awayPrice: -125 },
+      ],
+    });
+    const negativePromo = activeBoostPromo({
+      id: 3,
+      bookKey: "ballybet",
+      boostPercent: "10.00",
+      maxStake: "20.00",
+      minOddsAmerican: 100,
+      scopeLabel: "Denver Broncos @ Los Angeles Rams",
+      autoMatched: true,
+    });
+
+    mockGetActivePromos.mockResolvedValue([negativePromo]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetBonusBooks.mockResolvedValue([
+      { key: "ballybet", displayName: "Bally Bet" },
+      { key: "betmgm", displayName: "BetMGM" },
+    ]);
+    mockGetUserBookKeys.mockResolvedValue(["ballybet"]);
+    mockGetHedgeBookKeys.mockResolvedValue(["ballybet", "betmgm"]);
+    mockGetUsedPromoIds.mockResolvedValue(new Set([3]));
+
+    const result = await getPromos({ precision: "cents" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.unprofitableRows).toHaveLength(1);
+    expect(result.unprofitableRows[0].used).toBe(true);
+  });
+
+  it("totalProfit is '0.00' when there are no rows", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.totalProfit).toBe("0.00");
+  });
+});
+
+// quick-260927-n12 owner decision 3 + scope change B: profit-observation
+// recording is unconditional (every "ok" branch), and availableProfit
+// always reflects persisted observations at the member's own books.
+describe("getPromos profit observation recording + availableProfit (quick-260927-n12)", () => {
+  it("calls recordCurrentProfitObservations with now, the loaded activePromos, and precision", async () => {
+    const promo = activeBoostPromo();
+    mockGetActivePromos.mockResolvedValue([promo]);
+
+    await getPromos({ precision: "cents" });
+
+    expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
+      activePromos: [promo],
+      precision: "cents",
+    });
+  });
+
+  it("still calls recordCurrentProfitObservations when there are zero active promos", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+
+    await getPromos({ precision: "whole" });
+
+    expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
+      activePromos: [],
+      precision: "whole",
+    });
+  });
+
+  it("returns availableProfit from getProfitObservationsSince, scoped to the member's own books, even with zero active promos", async () => {
+    const today = denverDate(new Date());
+    mockGetActivePromos.mockResolvedValue([]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
+    mockGetProfitObservationsSince.mockResolvedValue([
+      { promoId: 1, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "12.34" },
+      // Not an own book -- excluded from every period.
+      { promoId: 2, bookKey: "fanduel", denverDate: today, maxGuaranteedProfit: "999.00" },
+    ]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.availableProfit).toEqual({ today: "12.34", week: "12.34", month: "12.34" });
+  });
+
+  it("queries getProfitObservationsSince with an ISO date string covering both week and month starts", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+
+    await getPromos({ precision: "whole" });
+
+    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
   });
 });

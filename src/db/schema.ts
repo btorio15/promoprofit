@@ -270,3 +270,58 @@ export const scrapeRuns = pgTable(
   },
   (table) => [index("scrape_runs_book_key_ran_at_idx").on(table.bookKey, table.ranAt)],
 );
+
+/**
+ * quick-260927-n12 (owner decision 2): per-member "mark used" state. A
+ * member marking a promo used only affects THEIR OWN feed/total -- other
+ * members still see the promo -- so this is a join table keyed on
+ * (user_id, promo_id), never a column on promos itself. Composite PK makes
+ * repeat marks idempotent (mirrors user_books' shape). ON DELETE CASCADE on
+ * both FKs: a deleted user or a deleted promo (never happens in practice,
+ * but the FK is there) should never leave an orphaned completion row.
+ */
+export const promoCompletions = pgTable(
+  "promo_completions",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.promoId] })],
+);
+
+/**
+ * quick-260927-n12 (owner decision 3): the best guaranteed profit observed
+ * for a promo on a given America/Denver calendar day, recorded by getPromos
+ * on every Promos-tab load (never by the scraper -- see get-promos.ts's
+ * doc comment) from already-cached odds, so this never costs an Odds API
+ * credit. Keyed (promo_id, denver_date) so a repeat load on the same day
+ * can only ever raise the stored value (GREATEST upsert in
+ * src/db/promoTracking.ts), never duplicate a day's row. denver_date is
+ * TEXT ("YYYY-MM-DD"), not a DATE/timestamp column, specifically so no
+ * driver/session timezone can silently coerce it -- the Denver calendar day
+ * is computed once in application code (profitTotals.ts's denverDate) and
+ * stored verbatim.
+ */
+export const promoProfitObservations = pgTable(
+  "promo_profit_observations",
+  {
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    denverDate: text("denver_date").notNull(),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    maxGuaranteedProfit: numeric("max_guaranteed_profit", { precision: 10, scale: 2 }).notNull(),
+    lastObservedAt: timestamp("last_observed_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.promoId, table.denverDate] }),
+    index("promo_profit_observations_denver_date_idx").on(table.denverDate),
+  ],
+);

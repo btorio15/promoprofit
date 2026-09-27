@@ -1,7 +1,10 @@
 # Scheduled + manual promo scraper (PROMO-03, D-07, D-08). Installs no
-# browser and spends zero Odds API credits -- all three target books are
-# render_mode "http" (D-09), so this job is a plain `npm ci` + one Node
-# script writing straight to the shared Neon Postgres DB.
+# browser -- all three target books are render_mode "http" (D-09), so the
+# scrape step itself is a plain `npm ci` + one Node script writing straight
+# to the shared Neon Postgres DB and spends zero Odds API credits. The
+# second step (quick-260927-n12) spends ONE moneyline-only refresh, but
+# only on the 8am Denver run (gated inside the script) -- the noon/5pm runs
+# of this same schedule call it too and no-op.
 #
 # `timezone` (GitHub Changelog, 2026-03-19) lets a cron schedule name an IANA
 # zone directly so 8am/noon/5pm Mountain Time stays correct across DST
@@ -16,7 +19,12 @@ on:
   schedule:
     - cron: "0 8,12,17 * * *"
       timezone: "America/Denver"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_morning_observe:
+        description: "Force the moneyline odds refresh + profit-observation step, even outside the 8am Denver window"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,3 +47,14 @@ jobs:
       - run: npm run scrape:promos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # quick-260927-n12 (owner scope change B): moneyline-only odds refresh
+      # + profit-observation recording, gated to the 8am Denver run inside
+      # the script itself (isMorningObservationWindow) -- the noon/5pm runs
+      # of this same schedule call the script too, but it no-ops for them.
+      # `--force` (workflow_dispatch input) bypasses the Denver-hour gate
+      # for manual testing. Never the spreads/totals extended refresh here
+      # (3x the credit cost would blow the 500-credit monthly budget).
+      - run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
