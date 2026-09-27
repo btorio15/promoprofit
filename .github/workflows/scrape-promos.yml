@@ -1,0 +1,41 @@
+# Scheduled + manual promo scraper (PROMO-03, D-07, D-08). Installs no
+# browser and spends zero Odds API credits -- all three target books are
+# render_mode "http" (D-09), so this job is a plain `npm ci` + one Node
+# script writing straight to the shared Neon Postgres DB.
+#
+# `timezone` (GitHub Changelog, 2026-03-19) lets a cron schedule name an IANA
+# zone directly so 8am/noon/5pm Mountain Time stays correct across DST
+# without a manual UTC-offset flip twice a year. If GitHub ever rejects this
+# field on a workflow run, the fallback is a fixed UTC schedule tuned for MDT
+# (UTC-6) -- `cron: "0 14,18,23 * * *"` -- which drifts about an hour during
+# MST (Nov-Mar), an acceptable seasonal trade-off (03-RECON.md
+# cron_hours_mountain).
+name: Scrape promos
+
+on:
+  schedule:
+    - cron: "0 8,12,17 * * *"
+      timezone: "America/Denver"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scrape-promos
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run scrape:promos
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

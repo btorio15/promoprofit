@@ -173,7 +173,12 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("none-scraped");
     expect(result.rows).toEqual([]);
+    // Ordered by config/books.ts's sortOrder among the three D-09 http
+    // targets (draftkings, fanduel, ballybet), not SCRAPE_TARGET_BOOK_KEYS's
+    // own array order.
     expect(result.scrapeStatus).toEqual([
+      { bookKey: "draftkings", bookName: "DraftKings", lastOkAt: null, lastRunFailed: false },
+      { bookKey: "fanduel", bookName: "FanDuel", lastOkAt: null, lastRunFailed: false },
       { bookKey: "ballybet", bookName: "Bally Bet", lastOkAt: null, lastRunFailed: false },
     ]);
   });
@@ -203,7 +208,7 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
 
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("unreachable");
-    expect(result.scrapeStatus[0]).toEqual({
+    expect(result.scrapeStatus.find((line) => line.bookKey === "ballybet")).toEqual({
       bookKey: "ballybet",
       bookName: "Bally Bet",
       lastOkAt: null,
