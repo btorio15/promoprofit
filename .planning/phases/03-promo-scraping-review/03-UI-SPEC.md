@@ -82,7 +82,7 @@ Unchanged from Phase 1/01.1/2 — confirmed against the live repo, not re-decide
 
 **Dismiss confirmation** (shared `AlertDialog`, both kinds — reuses the exact `RefreshConfirmDialog`/`Search spreads & totals` confirm-dialog component, new copy only):
 - Heading: "Dismiss this promo?"
-- Body: "It won't be suggested again from later scrapes of this book (D-14). This can't be undone from here."
+- Body: "It won't be suggested again from later scrapes of this book. This can't be undone from here." (D-14)
 - Buttons: **Dismiss** (destructive-styled confirm button) / **Cancel** (ghost).
 - Claude's discretion — defaulted: this is the one meaningfully irreversible action in this phase (D-14: a dismissal is never re-queued), which is exactly the bar Phase 2's Color section set for reserving red/a confirm dialog — Confirm and Correct are not gated behind a dialog because both remain correctable later (D-11's flag-back safety net), but nothing undoes a Dismiss in this UI.
 
