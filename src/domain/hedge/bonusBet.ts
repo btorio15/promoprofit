@@ -1,15 +1,24 @@
 import Decimal from "decimal.js";
 import { americanToDecimal } from "./americanOdds";
+import type { StakePrecision } from "./arbMath";
 
 /**
  * Bonus-bet (stake-not-returned) hedge solver. Self-contained: no shared
- * "generic hedge" function with future promo types (profit boosts get
- * their own module in a later phase — see project PITFALLS.md Pitfall 2).
+ * "generic hedge" function with future promo types (profit boosts have
+ * their own module, src/domain/hedge/profitBoost.ts — see 03-RESEARCH.md
+ * Pitfall 3).
+ *
+ * `precision` (D-05) is optional and defaults to "cents": the Promos tab
+ * (Phase 3) can request whole-dollar bonus-bet hedges to follow the same
+ * stake-precision setting profit boosts use, while every existing caller
+ * (the bonus-bet finder, `rankBonusBetHedges.ts`) that omits it keeps its
+ * byte-for-byte cent-precision behavior unchanged.
  */
 export interface BonusBetHedgeInput {
   bonusAmount: Decimal;
   bonusOddsAmerican: number;
   hedgeOddsAmerican: number;
+  precision?: StakePrecision;
 }
 
 export interface BonusBetHedgeResult {
@@ -72,9 +81,14 @@ export function calculateBonusBetHedge(input: BonusBetHedgeInput): BonusBetHedge
     bonusAmount.times(bonusDecimalOdds.minus(1)).dividedBy(hedgeDecimalOdds),
   );
 
+  // D-05: precision defaults to "cents" so every existing caller that
+  // omits it is unaffected. The Promos tab can pass "whole" to round the
+  // hedge stake to the nearest dollar unit instead.
+  const dp = input.precision === "whole" ? 0 : 2;
+
   const roundedCandidates = [
-    hedgeStakeExact.toDecimalPlaces(2, Decimal.ROUND_DOWN),
-    hedgeStakeExact.toDecimalPlaces(2, Decimal.ROUND_UP),
+    hedgeStakeExact.toDecimalPlaces(dp, Decimal.ROUND_DOWN),
+    hedgeStakeExact.toDecimalPlaces(dp, Decimal.ROUND_UP),
   ];
   // Dedupe: the two roundings are equal whenever H is already cent-exact.
   const candidateStakes = roundedCandidates.filter(
