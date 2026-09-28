@@ -10,7 +10,7 @@
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
 import { matchPromo } from "@/domain/promos/matcher";
-import type { BookScraper, HttpRequestSpec } from "@/domain/promos/scraped";
+import { SKIP_REASONS, type BookScraper, type HttpRequestSpec, type SkipReason } from "@/domain/promos/scraped";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { fetchRequest, type FetchRequest } from "./fetchPage";
@@ -35,6 +35,22 @@ export interface BookRunOutcome {
   skippedByReason: Record<string, number>;
   errorMessage: string | null;
 }
+
+/**
+ * quick-260927-ov2: reasons a candidate can be deliberately excluded without
+ * that indicating anything is broken -- parlays/SGPs, live-only, futures,
+ * outrights, props, new-customer/deposit-only offers, non-promo marketing
+ * copy, unsupported sports, non-half-point lines. A book whose every found
+ * promo lands in this set legitimately has nothing usable today (e.g. the
+ * first real FanDuel run: 8 not_a_promo + 2 new_customer + 1
+ * unsupported_sport + 1 outright, all correct exclusions). "unrecognized"
+ * and "schema_invalid" are deliberately excluded from this set -- they
+ * signal a likely parser regression, not a legitimate exclusion, and must
+ * keep failing the run loudly (owner-locked decision 1).
+ */
+export const LEGITIMATE_SKIP_REASONS: ReadonlySet<SkipReason> = new Set(
+  SKIP_REASONS.filter((reason) => reason !== "unrecognized" && reason !== "schema_invalid"),
+);
 
 /** Design Implication 7: a handful of requests per book, >= 2s apart. */
 const DEFAULT_MIN_GAP_MS = 2000;
@@ -194,36 +210,53 @@ export async function runPromoScrape(opts?: {
         continue;
       }
 
-      // WR-03: zero promos found, OR promos found but none usable (every
-      // entry skipped -- e.g. a parser/schema regression), is a failed run:
-      // nothing is written and nothing is expired, so the book's live rows
-      // (including human-confirmed, cap-entered and flagged ones) survive.
+      // WR-03 (refined by quick-260927-ov2): zero promos found is always a
+      // failed run ("zero promos parsed"). Promos found but none kept splits
+      // in two: if every skip reason is a legitimate exclusion (parlays,
+      // new-customer offers, unsupported sports, etc. -- LEGITIMATE_SKIP_REASONS),
+      // the book genuinely has nothing usable today and the run is ok/0-kept;
+      // otherwise (any "unrecognized"/"schema_invalid" skip, or no skips at
+      // all despite zero candidates) it's a likely parser regression and
+      // stays a failed run. Either way nothing is written and nothing is
+      // expired here, so the book's live rows (including human-confirmed,
+      // cap-entered and flagged ones) survive.
       if (parseResult.found === 0 || parseResult.candidates.length === 0) {
         const skippedByReason: Record<string, number> = {};
         for (const skip of parseResult.skipped) {
           skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
         }
+
+        const allLegitimate =
+          parseResult.found > 0 &&
+          parseResult.skipped.length > 0 &&
+          parseResult.skipped.every((skip) => LEGITIMATE_SKIP_REASONS.has(skip.reason));
+
+        const status: "ok" | "failed" = parseResult.found === 0 ? "failed" : allLegitimate ? "ok" : "failed";
+        const errorMessage =
+          parseResult.found === 0
+            ? "zero promos parsed"
+            : allLegitimate
+              ? null
+              : `${parseResult.found} promos found but none usable; existing promos kept`;
+
         const outcome: BookRunOutcome = {
           bookKey,
-          status: "failed",
+          status,
           promosFound: parseResult.found,
           promosKept: 0,
           detailRequests: plans.length,
           detailFailures,
           skippedByReason,
-          errorMessage:
-            parseResult.found === 0
-              ? "zero promos parsed"
-              : `${parseResult.found} promos found but none usable; existing promos kept`,
+          errorMessage,
         };
         outcomes.push(outcome);
         await safeRecordScrapeRun(store, {
           bookKey,
           ranAt: now,
-          status: "failed",
+          status,
           promosFound: parseResult.found,
           promosKept: 0,
-          errorMessage: outcome.errorMessage,
+          errorMessage,
         });
         continue;
       }
@@ -294,4 +327,14 @@ export async function runPromoScrape(opts?: {
   }
 
   return outcomes;
+}
+
+/**
+ * quick-260927-ov2: the scheduled job's own exit code -- 1 if any book's run
+ * failed (a real problem worth surfacing red in Actions), 0 otherwise
+ * (including an all-ok run where one or more books legitimately had nothing
+ * usable today). Used by scripts/scrape-promos.ts.
+ */
+export function scrapeExitCode(outcomes: readonly BookRunOutcome[]): 0 | 1 {
+  return outcomes.some((outcome) => outcome.status === "failed") ? 1 : 0;
 }
