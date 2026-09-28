@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 1 of 11
 Status: Executing Phase 3
-Last activity: 2026-09-28 - Completed quick task 260928-i3r: DK HR prop, FanDuel pre-live fix, cron :07
+Last activity: 2026-09-28 - Completed quick task 260928-it1: uncertain promos to review, NHL
 
 Progress: [██████████] 100%
 
@@ -144,15 +144,16 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
-| 260925-wy0 | revert CR-02: apply hedge cap after picking best orientation | 2026-09-26 | 5aef9e1 | [260925-wy0-revert-cr-02-apply-hedge-cap-after-picki](./quick/260925-wy0-revert-cr-02-apply-hedge-cap-after-picki/) |
-| 260927-edt | show unprofitable promos greyed out on Promos tab | 2026-09-27 | b86f24e | [260927-edt-show-unprofitable-promos-greyed-out](./quick/260927-edt-show-unprofitable-promos-greyed-out/) |
-| fast | fix Base UI nativeButton console errors (empty-state links, Multiple books badge) | 2026-09-27 | 06f67f8 | — |
-| 260927-n12 | promos total profit, mark-used state, daily/weekly/monthly profit tracking + morning odds refresh | 2026-09-27 | 8254f50 | [260927-n12-promos-total-profit-mark-used-state-dail](./quick/260927-n12-promos-total-profit-mark-used-state-dail/) |
-| 260927-ov2 | scraper: don't fail job when a book has no usable promos; morning step runs after failed scrape; Actions v7 | 2026-09-27 | be48e83 | [260927-ov2-scraper-do-not-fail-job-when-book-has-no](./quick/260927-ov2-scraper-do-not-fail-job-when-book-has-no/) |
-| 260927-pcc | DraftKings: parse single-game boosts; label player-stat Super Boosts as prop | 2026-09-27 | fcc35c1 | [260927-pcc-draftkings-single-game-boosts-and-super-](./quick/260927-pcc-draftkings-single-game-boosts-and-super-/) |
-| 260928-i3r | DK HR Bet-and-Get as prop, missing-boost guard, FanDuel pre-live fix, cron to :07 | 2026-09-28 | 3f429c2 | [260928-i3r-draftkings-bet-and-get-prop-skip-and-sch](./quick/260928-i3r-draftkings-bet-and-get-prop-skip-and-sch/) |
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260925-wy0 | revert CR-02: apply hedge cap after picking best orientation | 2026-09-26 | 5aef9e1 |  | [260925-wy0-revert-cr-02-apply-hedge-cap-after-picki](./quick/260925-wy0-revert-cr-02-apply-hedge-cap-after-picki/) |
+| 260927-edt | show unprofitable promos greyed out on Promos tab | 2026-09-27 | b86f24e |  | [260927-edt-show-unprofitable-promos-greyed-out](./quick/260927-edt-show-unprofitable-promos-greyed-out/) |
+| fast | fix Base UI nativeButton console errors (empty-state links, Multiple books badge) | 2026-09-27 | 06f67f8 |  | — |
+| 260927-n12 | promos total profit, mark-used state, daily/weekly/monthly profit tracking + morning odds refresh | 2026-09-27 | 8254f50 |  | [260927-n12-promos-total-profit-mark-used-state-dail](./quick/260927-n12-promos-total-profit-mark-used-state-dail/) |
+| 260927-ov2 | scraper: don't fail job when a book has no usable promos; morning step runs after failed scrape; Actions v7 | 2026-09-27 | be48e83 |  | [260927-ov2-scraper-do-not-fail-job-when-book-has-no](./quick/260927-ov2-scraper-do-not-fail-job-when-book-has-no/) |
+| 260927-pcc | DraftKings: parse single-game boosts; label player-stat Super Boosts as prop | 2026-09-27 | fcc35c1 |  | [260927-pcc-draftkings-single-game-boosts-and-super-](./quick/260927-pcc-draftkings-single-game-boosts-and-super-/) |
+| 260928-i3r | DK HR Bet-and-Get as prop, missing-boost guard, FanDuel pre-live fix, cron to :07 | 2026-09-28 | 3f429c2 |  | [260928-i3r-draftkings-bet-and-get-prop-skip-and-sch](./quick/260928-i3r-draftkings-bet-and-get-prop-skip-and-sch/) |
+| 260928-it1 | uncertain promos to 'Needs a look' review queue; NHL support | 2026-09-28 | 69f47e9 | Needs Review | [260928-it1-uncertain-promos-to-review-queue-and-add](./quick/260928-it1-uncertain-promos-to-review-queue-and-add/) |
 
 ## Deferred Items
 
