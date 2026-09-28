@@ -38,7 +38,11 @@ export interface SignupOfferGroupDTO {
 
 export interface GetSignupOffersResponse {
   status: "ok";
+  /** Books the member does NOT have -- the default view. */
   groups: SignupOfferGroupDTO[];
+  /** Books the member already has; shown only behind "Show books I already have". */
+  ownedGroups: SignupOfferGroupDTO[];
+  /** Describes the default (not-owned) view only. */
   empty: null | "none" | "have-all";
 }
 
@@ -89,38 +93,39 @@ function compareBookKeys(a: string, b: string): number {
 }
 
 /**
- * Groups active sign-up offers by book, for books the member does NOT
- * already own (owner decision 3 -- these are useful when deciding which
- * book to add next). "none" when there are no active offers at all;
- * "have-all" when the member already owns every book that has one.
+ * Groups active sign-up offers by book: `groups` for books the member does
+ * NOT already own (owner decision 3 -- the default view, useful when
+ * deciding which book to add next), `ownedGroups` for books they do (shown
+ * only behind the "Show books I already have" checkbox). "none" when there
+ * are no active offers at all; "have-all" when the member already owns
+ * every book that has one.
  */
 export function groupSignupOffersForMember(
   rows: readonly SignupOfferRow[],
   ownedBookKeys: ReadonlySet<string>,
 ): GetSignupOffersResponse {
   if (rows.length === 0) {
-    return { status: "ok", groups: [], empty: "none" };
+    return { status: "ok", groups: [], ownedGroups: [], empty: "none" };
   }
 
+  const notOwned = rows.filter((row) => !ownedBookKeys.has(row.bookKey));
+  const owned = rows.filter((row) => ownedBookKeys.has(row.bookKey));
+  const groups = toGroups(notOwned);
+
+  return { status: "ok", groups, ownedGroups: toGroups(owned), empty: groups.length === 0 ? "have-all" : null };
+}
+
+function toGroups(rows: readonly SignupOfferRow[]): SignupOfferGroupDTO[] {
   const byBook = new Map<string, SignupOfferRow[]>();
   for (const row of rows) {
-    if (ownedBookKeys.has(row.bookKey)) continue;
     const list = byBook.get(row.bookKey) ?? [];
     list.push(row);
     byBook.set(row.bookKey, list);
   }
 
-  if (byBook.size === 0) {
-    return { status: "ok", groups: [], empty: "have-all" };
-  }
-
-  const bookKeys = [...byBook.keys()].sort(compareBookKeys);
-
-  const groups: SignupOfferGroupDTO[] = bookKeys.map((bookKey) => {
+  return [...byBook.keys()].sort(compareBookKeys).map((bookKey) => {
     const bookName = COLORADO_BOOKS.find((book) => book.key === bookKey)?.displayName ?? bookKey;
     const sortedRows = [...(byBook.get(bookKey) ?? [])].sort(compareOffers);
     return { bookKey, bookName, offers: sortedRows.map(toDTO) };
   });
-
-  return { status: "ok", groups, empty: null };
 }

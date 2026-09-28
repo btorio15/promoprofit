@@ -26,6 +26,7 @@ describe("groupSignupOffersForMember", () => {
     expect(result.empty).toBeNull();
     expect(result.groups.map((g) => g.bookKey)).toEqual(["fanduel", "ballybet"]);
     expect(result.groups.every((g) => g.offers.length === 1)).toBe(true);
+    expect(result.ownedGroups.map((g) => g.bookKey)).toEqual(["draftkings"]);
   });
 
   it("owned every book that has an offer gives groups [] and empty have-all", () => {
@@ -33,6 +34,7 @@ describe("groupSignupOffersForMember", () => {
     const result = groupSignupOffersForMember(rows, new Set(["draftkings", "fanduel"]));
     expect(result.groups).toEqual([]);
     expect(result.empty).toBe("have-all");
+    expect(result.ownedGroups.map((g) => g.bookKey)).toEqual(["draftkings", "fanduel"]);
   });
 
   it("no offers at all gives groups [] and empty none", () => {

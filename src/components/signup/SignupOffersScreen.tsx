@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { getSignupOffers } from "@/app/actions/get-signup-offers";
-import type { GetSignupOffersResponse } from "@/domain/promos/signupOffers";
+import type { GetSignupOffersResponse, SignupOfferGroupDTO } from "@/domain/promos/signupOffers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { etDayLabel } from "@/domain/promos/etTime";
 
 /**
@@ -20,6 +23,7 @@ import { etDayLabel } from "@/domain/promos/etTime";
 export function SignupOffersScreen() {
   const [response, setResponse] = useState<GetSignupOffersResponse | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [showOwned, setShowOwned] = useState(false);
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
 
@@ -47,6 +51,14 @@ export function SignupOffersScreen() {
   }, []);
 
   const showSkeleton = isPending && response === null;
+  const hasOwnedOffers = response?.status === "ok" && response.ownedGroups.length > 0;
+  const visibleGroups: Array<SignupOfferGroupDTO & { owned: boolean }> =
+    response?.status === "ok"
+      ? [
+          ...response.groups.map((group) => ({ ...group, owned: false })),
+          ...(showOwned ? response.ownedGroups.map((group) => ({ ...group, owned: true })) : []),
+        ]
+      : [];
 
   return (
     <div className="flex flex-col gap-8">
@@ -55,6 +67,16 @@ export function SignupOffersScreen() {
         <p className="text-sm text-muted-foreground">
           New-customer offers at sportsbooks you haven&apos;t added yet. For reference only, with no hedge math.
         </p>
+        {hasOwnedOffers ? (
+          <Label htmlFor="signup-show-owned" className="mt-2 min-h-10 w-fit cursor-pointer gap-2 font-normal">
+            <Checkbox
+              id="signup-show-owned"
+              checked={showOwned}
+              onCheckedChange={(checked) => setShowOwned(checked === true)}
+            />
+            Show books I already have
+          </Label>
+        ) : null}
       </header>
 
       {showSkeleton ? (
@@ -80,7 +102,7 @@ export function SignupOffersScreen() {
             scheduled scrape.
           </p>
         </div>
-      ) : response?.status === "ok" && response.empty === "have-all" ? (
+      ) : response?.status === "ok" && response.empty === "have-all" && !showOwned ? (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
           <h3 className="text-xl font-semibold">You already have every book with a sign-up offer</h3>
           <p className="max-w-prose text-sm text-muted-foreground">
@@ -94,9 +116,12 @@ export function SignupOffersScreen() {
         </div>
       ) : response?.status === "ok" ? (
         <div className="flex flex-col gap-8">
-          {response.groups.map((group) => (
+          {visibleGroups.map((group) => (
             <section key={group.bookKey} className="flex flex-col gap-3">
-              <h2 className="text-xl font-semibold">{group.bookName}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-semibold">{group.bookName}</h2>
+                {group.owned ? <Badge variant="outline">You have this book</Badge> : null}
+              </div>
               <div className="flex flex-col gap-3">
                 {group.offers.map((offer) => (
                   <div key={offer.id} className="rounded-lg border border-border bg-secondary p-4">
