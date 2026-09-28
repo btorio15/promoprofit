@@ -326,6 +326,42 @@ export const promoCompletions = pgTable(
  * is computed once in application code (profitTotals.ts's denverDate) and
  * stored verbatim.
  */
+/**
+ * quick-260928-mgi (owner decision 3): new-customer/sign-up offers found by
+ * the scraper, kept for informational display only. Deliberately a
+ * SEPARATE table from `promos` -- a sign-up offer never enters profit
+ * ranking, the review queue, promo dedupe, or the dismissed-classify-row
+ * collision space (rows 6-11 of that table's own history). dedupe_key is
+ * unique (upsert target); status flips to 'expired' on any successful
+ * scrape of that book that no longer sees the offer (signupStore.ts) --
+ * a FAILED book run never expires anything. first_seen_at is never
+ * overwritten by the upsert (signupStore.ts's ON CONFLICT clause omits it).
+ */
+export const signupOffers = pgTable(
+  "signup_offers",
+  {
+    id: serial("id").primaryKey(),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    externalId: text("external_id"),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    rawText: text("raw_text").notNull(),
+    bonusAmount: numeric("bonus_amount", { precision: 10, scale: 2 }),
+    sourceUrl: text("source_url").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull(),
+  },
+  (table) => [
+    index("signup_offers_status_idx").on(table.status),
+    index("signup_offers_book_key_idx").on(table.bookKey),
+  ],
+);
+
 export const promoProfitObservations = pgTable(
   "promo_profit_observations",
   {

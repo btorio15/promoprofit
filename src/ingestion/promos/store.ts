@@ -22,6 +22,8 @@ import type { MatchResult } from "@/domain/promos/matcher";
 import type { ScopeGuess } from "@/domain/promos/scope";
 import type { ScrapedPromo } from "@/domain/promos/scraped";
 import type { CapField, PromoMarketType, PromoSelection, PromoSide, PromoStatus, PromoType, ReviewReason } from "@/domain/promos/types";
+import { commitSignupOffers, type CommitSignupOffersOutcome } from "./signupStore";
+import type { SignupOfferInput } from "./signupOffers";
 
 export interface PromoWrite {
   dedupeKey: string;
@@ -83,6 +85,13 @@ export interface PromoStore {
     now: Date,
     opts?: CommitScrapedPromosOpts,
   ): Promise<CommitOutcome>;
+  /**
+   * quick-260928-mgi: upserts this book's sign-up offers and expires its
+   * previously active ones not seen this run, in ONE transaction. Unlike
+   * commitScrapedPromos, an empty `offers` list is never refused -- see
+   * signupStore.ts's doc comment.
+   */
+  commitSignupOffers(bookKey: string, offers: SignupOfferInput[], now: Date): Promise<CommitSignupOffersOutcome>;
 }
 
 type Statement = BatchItem<"pg">;
@@ -587,4 +596,5 @@ export async function commitScrapedPromos(
 export const promoStore: PromoStore = {
   recordScrapeRun,
   commitScrapedPromos,
+  commitSignupOffers,
 };
