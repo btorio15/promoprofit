@@ -9,7 +9,7 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-import { runPromoScrape } from "../src/ingestion/promos/run";
+import { runPromoScrape, scrapeExitCode } from "../src/ingestion/promos/run";
 
 async function main() {
   const outcomes = await runPromoScrape();
@@ -18,8 +18,7 @@ async function main() {
     console.log(JSON.stringify(outcome));
   }
 
-  const anyFailed = outcomes.some((o) => o.status === "failed");
-  process.exit(anyFailed ? 1 : 0);
+  process.exit(scrapeExitCode(outcomes));
 }
 
 main().catch((err) => {
