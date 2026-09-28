@@ -12,6 +12,8 @@
  * checked first as a second layer of the same guarantee.
  */
 
+import { TEAM_ALIASES, resolveTeam } from "@/domain/promos/aliases";
+
 export type SportHint =
   | { kind: "supported"; sportKey: string }
   | { kind: "unsupported"; label: string }
@@ -82,4 +84,27 @@ export function sportFromTags(tags: readonly string[]): SportHint {
     if (lower.has(tag)) return { kind: "supported", sportKey };
   }
   return { kind: "unknown" };
+}
+
+/**
+ * Infers a supported sport from a resolved team-name pair, for single-game
+ * promos whose own text never names a sport (DraftKings "for the A @ B
+ * game on <date>" boosts -- real fixture 1126403, "LA Rams @ DEN Broncos
+ * 50% Profit Boost"). A sport only qualifies when BOTH team texts resolve
+ * to exactly one team in that sport's TEAM_ALIASES table, and exactly one
+ * sport qualifies overall -- this never guesses. There are no ncaaf/ncaab
+ * alias tables, so a college matchup always returns "unknown" here; that
+ * is fine because the matcher (src/domain/promos/matcher.ts) resolves
+ * teamsText against cached events independently of this hint.
+ */
+export function sportFromTeamPair(teamA: string, teamB: string): SportHint {
+  const qualifying: string[] = [];
+  for (const sportKey of Object.keys(TEAM_ALIASES)) {
+    const aMatches = resolveTeam(teamA, [], sportKey);
+    const bMatches = resolveTeam(teamB, [], sportKey);
+    if (aMatches.length === 1 && bMatches.length === 1) {
+      qualifying.push(sportKey);
+    }
+  }
+  return qualifying.length === 1 ? { kind: "supported", sportKey: qualifying[0] } : { kind: "unknown" };
 }

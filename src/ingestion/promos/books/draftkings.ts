@@ -10,10 +10,10 @@ import {
   type SkippedEntry,
 } from "@/domain/promos/scraped";
 import { PROMO_MARKET_TYPES, type WinningsCapKind } from "@/domain/promos/types";
-import { slateWindow } from "@/domain/promos/etTime";
+import { slateWindow, parseEtDateTime } from "@/domain/promos/etTime";
 import { parseMaxStake, parseMaxWinnings, parseMinOdds, extractFinePrintNote } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
-import { sportFromText } from "@/ingestion/promos/sportHints";
+import { sportFromText, sportFromTeamPair } from "@/ingestion/promos/sportHints";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
 const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
@@ -47,6 +47,16 @@ const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
  * "New Customers: Deposit Bonus" entry as `new_customer` (matches the
  * text-level "New Customers" wording) rather than falling through to this
  * file's not-a-promo gate.
+ *
+ * Single-game scope handling (real fixture 1126403, "LA Rams @ DEN Broncos
+ * 50% Profit Boost"): not every single-game boost's text names a sport --
+ * some only say "for the <A> @ <B> game on <date>". When sportFromText
+ * comes back unknown, GAME_SCOPE_RE/parseGameScope is tried as a fallback
+ * scope signal before giving up as "unrecognized"; when it matches, the
+ * candidate gets a real teamsText pair and, if no sport word was found
+ * either, a sportKeyHint inferred from the team names themselves
+ * (sportFromTeamPair). The sport-wide "for all <sport> games on <date>"
+ * phrase (SCOPE_RE) always wins when both phrases are present.
  */
 
 const LIST_URL = "https://api.draftkings.com/en/api/promotions/v3/promotions/query";
@@ -112,6 +122,45 @@ const BOOST_PERCENT_RE = /profit\s+boost:\s*(\d+(?:\.\d+)?)%/i;
  * 9/26/2026" (03-RECON.md Scraper Contract scope row). Non-greedy sport
  * word group so it stops at " games on ", not at the next occurrence. */
 const SCOPE_RE = /for all ([A-Za-z][A-Za-z\s]*?) games on (\d{1,2}\/\d{1,2}\/\d{4})/i;
+
+/** "for the LA Rams @ DEN Broncos game on 9/27/2026 at 08:20 PM ET" (real
+ * fixture 1126403) -- a single-game profit boost whose text never says a
+ * sport (unlike SCOPE_RE's "for all NFL games on..."). Requires the
+ * literal "for the" prefix so generic copy like "end of the final NFL
+ * game on 9/27/2026" (real fixture wording, both DK fixtures) can never
+ * match: that phrase has no "for the" immediately before a team pair. The
+ * team groups are limited to a negated character class excluding
+ * newline/@/! (no nested quantifiers -- no catastrophic-backtracking risk,
+ * T-pcc-02) so they can't cross a numbered-list line or swallow the "!" DK
+ * puts at the end of its opt-in sentence. The trailing "at <time> ET" is
+ * optional -- some single-game boosts' terms omit it. */
+const GAME_SCOPE_RE =
+  /for the ([^\n@!]+?) (?:@|vs\.?) ([^\n@!]+?) game on (\d{1,2}\/\d{1,2}\/\d{4})(?: at (\d{1,2}:\d{2}\s*[AP]M) ET)?/i;
+
+interface GameScope {
+  teams: [string, string];
+  dateText: string;
+  timeText: string | null;
+  scopeText: string;
+}
+
+/** Pure helper: parses the GAME_SCOPE_RE phrase, or null when absent. */
+function parseGameScope(text: string): GameScope | null {
+  const match = GAME_SCOPE_RE.exec(text);
+  if (!match) return null;
+
+  const away = match[1].trim();
+  const home = match[2].trim();
+  const dateText = match[3];
+  const timeText = match[4] ? match[4].trim() : null;
+  if (away.length === 0 || home.length === 0) return null;
+
+  const scopeTextRaw = timeText
+    ? `${away} @ ${home} game on ${dateText} at ${timeText} ET`
+    : `${away} @ ${home} game on ${dateText}`;
+
+  return { teams: [away, home], dateText, timeText, scopeText: truncate(scopeTextRaw, 200) };
+}
 
 const OPT_IN_TEXT_RE = /\bopt-in\b/i;
 
@@ -193,11 +242,15 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
   if (minOddsParse.status === "unparsed") unparsedCapFields.push("minOdds");
 
   const scopeMatch = SCOPE_RE.exec(text);
+  // SCOPE_RE (sport-wide) wins when both phrases match -- only look for the
+  // single-game phrase when the sport-wide one isn't present.
+  const gameScope = scopeMatch ? null : parseGameScope(text);
   const expiresAt = normalizeDkTimestamp(entry.expirationDate);
 
   let scopeText = title;
   let windowStart: string | null = null;
   let windowEnd: string | null = null;
+  let teamsText: string[] = [];
 
   if (scopeMatch) {
     const sportWords = scopeMatch[1].trim();
@@ -207,6 +260,27 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
     if (window) {
       windowStart = window.start;
       windowEnd = window.end;
+    }
+  } else if (gameScope) {
+    scopeText = gameScope.scopeText;
+    teamsText = gameScope.teams;
+    const window = slateWindow(gameScope.dateText, expiresAt);
+    if (window) {
+      windowStart = window.start;
+      windowEnd = window.end;
+
+      if (gameScope.timeText) {
+        const kickoffIso = parseEtDateTime(`${gameScope.dateText} at ${gameScope.timeText} ET`);
+        if (kickoffIso !== null) {
+          const kickoffMs = new Date(kickoffIso).getTime();
+          if (kickoffMs < new Date(windowStart).getTime() || kickoffMs > new Date(windowEnd).getTime()) {
+            // Kickoff falls outside the slate window -- fall through to the
+            // startDate/expiresAt fallback below instead of trusting it.
+            windowStart = null;
+            windowEnd = null;
+          }
+        }
+      }
     }
   }
 
@@ -218,7 +292,11 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
   }
 
   const sportHint = sportFromText(`${title} ${text}`);
-  const sportKeyHint = sportHint.kind === "supported" ? sportHint.sportKey : null;
+  let sportKeyHint = sportHint.kind === "supported" ? sportHint.sportKey : null;
+  if (sportKeyHint === null && teamsText.length === 2) {
+    const teamSportHint = sportFromTeamPair(teamsText[0], teamsText[1]);
+    if (teamSportHint.kind === "supported") sportKeyHint = teamSportHint.sportKey;
+  }
 
   const claimRequired: ScrapedPromo["claimRequired"] =
     entry.isOptInPromotion === true || OPT_IN_TEXT_RE.test(text) ? "opt_in" : null;
@@ -232,7 +310,7 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
     sourceUrl: LIST_URL,
     sportKeyHint,
     scopeText,
-    teamsText: [],
+    teamsText,
     windowStart,
     windowEnd,
     expiresAt,
@@ -307,8 +385,13 @@ export const draftkingsScraper: BookScraper = {
         continue;
       }
       if (sportHint.kind === "unknown") {
-        skipped.push(skippedEntry("unrecognized", entry, title));
-        continue;
+        // No sport word in the text -- still let it through when it's a
+        // single-game "for the A @ B game on <date>" boost (real fixture
+        // 1126403); the team names, not a sport word, pin its scope.
+        if (parseGameScope(text) === null) {
+          skipped.push(skippedEntry("unrecognized", entry, title));
+          continue;
+        }
       }
 
       const candidate = buildCandidate(entry, title, text);
