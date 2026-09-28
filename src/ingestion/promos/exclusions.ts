@@ -50,7 +50,16 @@ const FUTURES_TITLE_RE = /\bchampion\b|\bto win the\b/i;
 const OUTRIGHT_RE =
   /\bpresidents cup\b|\bmasters\b|\b(?:u\.?s\.?|british|french|australian) open\b|\bthe open championship\b|\btournament winner\b|\boutright\b/i;
 
-const PROP_RE = /\bscorer\b|\bplayer prop\b|\banytime touchdown\b/i;
+// Player-stat wordings from the DK "Super Boost" rows (real fixture
+// 1127153, "Bet Waddle & Adams to record 40+ Receiving Yards each"). No
+// bare "points" alternative -- spread/total copy ("Broncos -3.5 points",
+// "Over 45.5 total points") also says "points", so that word alone would
+// false-positive ordinary game lines. The "to record"/"to each have"
+// alternative requires a trailing "N+" for the same reason: bare "record"
+// appears in generic legal boilerplate ("keep a record of your bets"),
+// and Bally/FanDuel copy is not boilerplate-stripped the way DK's is.
+const PROP_RE =
+  /\bscorer\b|\bplayer prop\b|\banytime touchdown\b|\b(?:receiving|rushing|passing) yards\b|\breceptions?\b|\bstrikeouts?\b|\brebounds\b|\bassists\b|\bto (?:each )?(?:record|have)\s+\d+\+/i;
 
 const SGP_RE = /\bsgp\s*\(?x?\)?\b|\bsame game parlay\b/i;
 const PARLAY_RE = /\bparlay\b/i;
