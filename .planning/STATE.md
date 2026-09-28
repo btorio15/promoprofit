@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 1 of 11
 Status: Executing Phase 3
-Last activity: 2026-09-27 - Completed quick task 260927-ov2: scraper no-usable-promos fix
+Last activity: 2026-09-27 - Completed quick task 260927-pcc: DraftKings single-game boosts and prop label
 
 Progress: [██████████] 100%
 
@@ -151,6 +151,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | fast | fix Base UI nativeButton console errors (empty-state links, Multiple books badge) | 2026-09-27 | 06f67f8 | — |
 | 260927-n12 | promos total profit, mark-used state, daily/weekly/monthly profit tracking + morning odds refresh | 2026-09-27 | 8254f50 | [260927-n12-promos-total-profit-mark-used-state-dail](./quick/260927-n12-promos-total-profit-mark-used-state-dail/) |
 | 260927-ov2 | scraper: don't fail job when a book has no usable promos; morning step runs after failed scrape; Actions v7 | 2026-09-27 | be48e83 | [260927-ov2-scraper-do-not-fail-job-when-book-has-no](./quick/260927-ov2-scraper-do-not-fail-job-when-book-has-no/) |
+| 260927-pcc | DraftKings: parse single-game boosts; label player-stat Super Boosts as prop | 2026-09-27 | fcc35c1 | [260927-pcc-draftkings-single-game-boosts-and-super-](./quick/260927-pcc-draftkings-single-game-boosts-and-super-/) |
 
 ## Deferred Items
 
