@@ -62,14 +62,17 @@ function makePromo(overrides: Partial<ScrapedPromo> = {}): ScrapedPromo {
 }
 
 const COMMIT_RESOLVED: CommitOutcome = { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0, expired: 0 };
+const SIGNUP_COMMIT_RESOLVED = { upserted: 0, expired: 0 };
 
 function makeStore(): PromoStore & {
   recordScrapeRun: ReturnType<typeof vi.fn>;
   commitScrapedPromos: ReturnType<typeof vi.fn>;
+  commitSignupOffers: ReturnType<typeof vi.fn>;
 } {
   return {
     recordScrapeRun: vi.fn().mockResolvedValue(undefined),
     commitScrapedPromos: vi.fn().mockResolvedValue(COMMIT_RESOLVED),
+    commitSignupOffers: vi.fn().mockResolvedValue(SIGNUP_COMMIT_RESOLVED),
   };
 }
 
@@ -162,8 +165,10 @@ describe("runPromoScrape", () => {
         skippedByReason: {},
         sentToReview: 0,
         errorMessage: null,
+        signup: { offers: 0, referralsExcluded: 0, notSignup: 0, upserted: 0, expired: 0 },
       },
     ]);
+    expect(store.commitSignupOffers).toHaveBeenCalledWith("testbook", [], NOW);
   });
 
   it("one detail failing does not fail the book; the failed key is absent from detailBodies", async () => {
@@ -314,10 +319,14 @@ describe("runPromoScrape", () => {
     expect(writesArg).toEqual([]);
     expect(optsArg.classify).toHaveLength(2);
     expect(optsArg.expireUnseen).toBe(false);
+    // quick-260928-mgi: a zero-candidate ok book that DOES have classify
+    // writes still calls commitSignupOffers exactly once.
+    expect(store.commitSignupOffers).toHaveBeenCalledTimes(1);
+    expect(store.commitSignupOffers).toHaveBeenCalledWith("testbook", [], NOW);
     expect(scrapeExitCode(outcomes)).toBe(0);
   });
 
-  it("(c) a book whose every found promo is a clear/legitimate exclusion is ok with 0 kept, and nothing is committed", async () => {
+  it("(c) a book whose every found promo is a clear/legitimate exclusion is ok with 0 kept, commits no promos, and still commits (expires) sign-up offers with an empty list", async () => {
     const skipped: SkippedEntry[] = [
       ...Array.from({ length: 8 }, (_, i) => ({ reason: "not_a_promo" as const, externalId: `na-${i}`, title: `NA ${i}` })),
       ...Array.from({ length: 2 }, (_, i) => ({ reason: "new_customer" as const, externalId: `nc-${i}`, title: `NC ${i}` })),
@@ -357,6 +366,11 @@ describe("runPromoScrape", () => {
       promosKept: 0,
       errorMessage: null,
     });
+    // quick-260928-mgi: no new_customer skip in this fixture carries
+    // evidence, so extractSignupOffers produces an empty list -- but the
+    // commit still runs exactly once, expiring this book's stale offers.
+    expect(store.commitSignupOffers).toHaveBeenCalledTimes(1);
+    expect(store.commitSignupOffers).toHaveBeenCalledWith("testbook", [], NOW);
     expect(scrapeExitCode(outcomes)).toBe(0);
   });
 
@@ -441,6 +455,126 @@ describe("runPromoScrape", () => {
     expect(draft.expiresAt).toBe("2026-10-01T00:00:00.000Z");
   });
 
+  it("(h) a new_customer skip with evidence produces a sign-up offer, and commitSignupOffers is called with it", async () => {
+    const skip: SkippedEntry = {
+      reason: "new_customer",
+      externalId: "nc-1",
+      title: "Bet $5 Get $150 in Bonus Bets",
+      evidence: {
+        rawText: "New customers only. Bet $5 Get $150 in Bonus Bets.",
+        sourceUrl: "https://example.com/list",
+        expiresAt: null,
+        partial: null,
+      },
+    };
+    const scraper = makeScraper({
+      listRequest: req("https://example.com/list"),
+      parse: () => ({ found: 1, candidates: [], skipped: [skip] }),
+    });
+    const store = makeStore();
+
+    await runPromoScrape({
+      now: NOW,
+      // SIGNUP_PAGE_URLS only recognizes real book keys -- "draftkings" here
+      // (not "testbook") so extractSignupOffers doesn't drop this offer as
+      // an unknown-book notSignup.
+      targets: ["draftkings"],
+      scrapers: { draftkings: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+    });
+
+    expect(store.commitSignupOffers).toHaveBeenCalledTimes(1);
+    const [bookKeyArg, offersArg, nowArg] = store.commitSignupOffers.mock.calls[0];
+    expect(bookKeyArg).toBe("draftkings");
+    expect(offersArg).toHaveLength(1);
+    expect(offersArg[0].bonusAmount).toBe("150.00");
+    expect(nowArg).toBe(NOW);
+  });
+
+  it("commitSignupOffers rejecting leaves the book status 'ok' and logs a warning", async () => {
+    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const store = makeStore();
+    store.commitSignupOffers.mockRejectedValue(new Error("db down"));
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+    });
+
+    expect(outcomes[0].status).toBe("ok");
+    expect(outcomes[0].promosKept).toBe(1);
+    expect(outcomes[0].signup).toEqual({ offers: 0, referralsExcluded: 0, notSignup: 0, upserted: null, expired: null });
+    expect(consoleWarn).toHaveBeenCalled();
+  });
+
+  it("with a reader configured, the sign-up offers come from the parser's OWN pre-reader skips (a reader that returns not_usable for everything gives the same offers)", async () => {
+    const skip: SkippedEntry = {
+      reason: "new_customer",
+      externalId: "nc-2",
+      title: "Bet $5 Get $150 in Bonus Bets",
+      evidence: {
+        rawText: "New customers only. Bet $5 Get $150 in Bonus Bets.",
+        sourceUrl: "https://example.com/list",
+        expiresAt: null,
+        partial: null,
+      },
+    };
+    const scraper = makeScraper({
+      listRequest: req("https://example.com/list"),
+      parse: () => ({ found: 1, candidates: [], skipped: [skip] }),
+    });
+    const store = makeStore();
+    const notUsableReader: PromoReader = {
+      read: vi.fn(async (): Promise<ReaderResult> => ({
+        source: "api",
+        reading: {
+          kind: "not_usable",
+          skipReason: "new_customer",
+          boostPercent: null,
+          bonusAmount: null,
+          maxStake: null,
+          maxWinnings: null,
+          minOddsAmerican: null,
+          sport: null,
+          teams: [],
+          singleGame: false,
+          liveOnly: false,
+          parlayOrSgpOnly: false,
+          propOnly: false,
+          newCustomerOnly: true,
+          eventDateText: null,
+          confidence: "high",
+          evidence: { boostPercent: null, bonusAmount: null, maxStake: null, maxWinnings: null, minOddsAmerican: null },
+        },
+        usage: { inputTokens: 1, outputTokens: 1 },
+      })),
+    };
+
+    await runPromoScrape({
+      now: NOW,
+      targets: ["draftkings"],
+      scrapers: { draftkings: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+      reader: notUsableReader,
+    });
+
+    expect(store.commitSignupOffers).toHaveBeenCalledTimes(1);
+    const [, offersArg] = store.commitSignupOffers.mock.calls[0];
+    expect(offersArg).toHaveLength(1);
+    expect(offersArg[0].bonusAmount).toBe("150.00");
+  });
 
   it("a failed list fetch records failed with the reason and makes no detail/upsert/expire calls", async () => {
     const scraper = makeScraper();
@@ -470,6 +604,7 @@ describe("runPromoScrape", () => {
       errorMessage: "HTTP 403",
     });
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(store.commitSignupOffers).not.toHaveBeenCalled();
     expect(store.recordScrapeRun).toHaveBeenCalledWith({
       bookKey: "testbook",
       ranAt: NOW,
@@ -497,6 +632,7 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].status).toBe("failed");
     expect(outcomes[0].errorMessage).toBe("zero promos parsed");
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(store.commitSignupOffers).not.toHaveBeenCalled();
     expect(scrapeExitCode(outcomes)).toBe(1);
   });
 
@@ -523,6 +659,7 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].errorMessage).toHaveLength(300);
     expect(outcomes[0].errorMessage).toBe(longMessage.slice(0, 300));
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(store.commitSignupOffers).not.toHaveBeenCalled();
   });
 
   it("isolates books: the first target throwing inside fetch does not stop the rest, and cadence still holds", async () => {

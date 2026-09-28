@@ -18,9 +18,13 @@ export type ReconcileOutcome =
   | {
       kind: "review";
       skip: SkippedEntry;
-      why: "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review" | "clear_reason_conflict";
+      why: "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review";
     }
-  | { kind: "skip"; skip: SkippedEntry; via: "agree_not_usable" | "pattern_only" };
+  | {
+      kind: "skip";
+      skip: SkippedEntry;
+      via: "agree_not_usable" | "pattern_only" | "clear_reason_kept" | "rescue_without_amount";
+    };
 
 const RAW_TEXT_MAX_CHARS = 2000;
 
@@ -66,7 +70,7 @@ function fmtReader(reading: GuardedReading): string {
   return `${reading.kind}, boost ${reading.boostPercent ?? "null"}%, bonus $${reading.bonusAmount ?? "null"}, max stake $${reading.maxStake ?? "null"}, max winnings $${reading.maxWinnings ?? "null"}, min odds ${reading.minOddsAmerican ?? "null"}, sport ${reading.sport ?? "null"}, teams ${reading.teams.length > 0 ? reading.teams.join("/") : "none"}, event ${reading.eventDateText ?? "null"}`;
 }
 
-type ReviewWhy = "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review" | "clear_reason_conflict";
+type ReviewWhy = "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review";
 
 function buildSummaryLine(why: ReviewWhy, entry: ReconcileEntry, reading: GuardedReading): string {
   const dropped = reading.droppedFields.length > 0 ? reading.droppedFields.join(", ") : "none";
@@ -186,10 +190,17 @@ function reconcileCandidate(
 /**
  * Rule order (skip entry): unusable -> agree_not_usable (with a possible
  * CLEAR_SKIP_REASONS reason swap) or leave untouched; usable -> a positive
- * parser exclusion (CLEAR_SKIP_REASONS) is never auto-rescued
- * (clear_reason_conflict, planner discretion); an uncertain reason gets a
- * rescue attempt via buildClassifyDraft + overlay, gated on high confidence,
- * a clean guard, valid team count, and a full ScrapedPromoSchema pass.
+ * parser exclusion (CLEAR_SKIP_REASONS) always wins over the reader
+ * (quick-260928-mgi, owner decision 1) -- the skip is kept exactly as the
+ * parser found it (via "clear_reason_kept"), never sent to review, since the
+ * shared classifier already positively identified what this is; an
+ * uncertain reason gets a rescue attempt via buildClassifyDraft + overlay,
+ * gated on high confidence, a clean guard, valid team count, and a full
+ * ScrapedPromoSchema pass. A rescue that fails that gate only reaches human
+ * review when it carries at least one guard-backed amount (boostPercent or
+ * bonusAmount, owner decision 2) -- otherwise it is skipped and suppressed
+ * (via "rescue_without_amount", reviewSuppressed set) so unbacked noise
+ * never floods the classify queue.
  */
 function reconcileSkip(
   bookKey: string,
@@ -212,11 +223,7 @@ function reconcileSkip(
   }
 
   if (CLEAR_SKIP_REASONS.has(skip.reason)) {
-    return {
-      kind: "review",
-      skip: buildReviewSkip(entry, reading, "clear_reason_conflict", { partial: null }, fallbackSourceUrl),
-      why: "clear_reason_conflict",
-    };
+    return { kind: "skip", skip, via: "clear_reason_kept" };
   }
 
   // Uncertain reason (REVIEW_SKIP_REASONS or not_a_promo): attempt a rescue.
@@ -250,6 +257,18 @@ function reconcileSkip(
     if (validated.success) {
       return { kind: "candidate", candidate: validated.data, via: "rescued" };
     }
+  }
+
+  // quick-260928-mgi (owner decision 2): a rescue that didn't qualify above
+  // only reaches human review when it carries at least one guard-backed
+  // amount -- otherwise there is nothing concrete for a member to act on, so
+  // it is skipped and suppressed instead of flooding the classify queue.
+  if (reading.boostPercent === null && reading.bonusAmount === null) {
+    return {
+      kind: "skip",
+      skip: { ...skip, reviewSuppressed: "reader_rescue_without_amount" },
+      via: "rescue_without_amount",
+    };
   }
 
   return {

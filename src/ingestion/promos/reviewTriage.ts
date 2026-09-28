@@ -78,8 +78,15 @@ function hasConcreteOffer(combined: string): boolean {
  * true for any REVIEW_SKIP_REASONS; false for CLEAR_SKIP_REASONS; for
  * not_a_promo, true only when classifyExclusion (re-run over the skip's own
  * title/rawText) finds nothing AND a concrete-offer regex matches.
+ *
+ * quick-260928-mgi: reviewSuppressed is checked FIRST and short-circuits
+ * every other rule, including REVIEW_SKIP_REASONS -- a reader rescue with no
+ * guard-backed amount must never reach the classify queue, even for a
+ * reason (unrecognized/unsupported_sport/schema_invalid) that would
+ * otherwise always be review-worthy.
  */
 export function isReviewWorthySkip(skip: SkippedEntry): boolean {
+  if (skip.reviewSuppressed) return false;
   if (REVIEW_SKIP_REASONS.has(skip.reason)) return true;
   if (CLEAR_SKIP_REASONS.has(skip.reason)) return false;
 

@@ -23,6 +23,7 @@ import { buildClassifyDraft, isReviewWorthySkip } from "./reviewTriage";
 import { fetchRequest, type FetchRequest } from "./fetchPage";
 import type { PromoReader } from "./promoReader";
 import { applyPromoReader, type ReaderBookStats } from "./readerPass";
+import { extractSignupOffers, type SignupOfferInput } from "./signupOffers";
 import { promoStore, type ClassifyWrite, type PromoStore, type PromoWrite, type ScrapeRunRow } from "./store";
 import { BOOK_SCRAPERS } from "./books";
 
@@ -47,6 +48,14 @@ export interface BookRunOutcome {
   errorMessage: string | null;
   /** quick-260928-kc5: present only on an "ok" outcome when a reader was configured for this run. */
   reader?: ReaderBookStats;
+  /**
+   * quick-260928-mgi: present only on an "ok" outcome -- a failed book run
+   * never touches sign-up offers at all. upserted/expired are the parser's
+   * own attempted counts (offers.length / null) when commitSignupOffers
+   * itself never ran or rejected (commitSignupOffersSafely), so a DB write
+   * failure is visible without ever failing the book.
+   */
+  signup?: { offers: number; referralsExcluded: number; notSignup: number; upserted: number | null; expired: number | null };
 }
 
 /** Design Implication 7: a handful of requests per book, >= 2s apart. */
@@ -83,6 +92,26 @@ async function safeRecordScrapeRun(store: PromoStore, row: ScrapeRunRow): Promis
     await store.recordScrapeRun(row);
   } catch (err) {
     console.error(`runPromoScrape: recordScrapeRun failed for ${row.bookKey}:`, err);
+  }
+}
+
+/**
+ * quick-260928-mgi (T-mgi-06): a sign-up write failure (e.g. before
+ * migration 0008 is applied) must never fail the book. Returns null on
+ * error, after logging a truncated warning -- the caller reports this in the
+ * outcome's `signup.upserted`/`expired` fields as null rather than crashing.
+ */
+async function commitSignupOffersSafely(
+  store: PromoStore,
+  bookKey: string,
+  offers: SignupOfferInput[],
+  now: Date,
+): Promise<{ upserted: number; expired: number } | null> {
+  try {
+    return await store.commitSignupOffers(bookKey, offers, now);
+  } catch (err) {
+    console.warn(`runPromoScrape: commitSignupOffers failed for ${bookKey}: ${errorMessageFrom(err)}`);
+    return null;
   }
 }
 
@@ -283,6 +312,13 @@ export async function runPromoScrape(opts?: {
         continue;
       }
 
+      // quick-260928-mgi: captured from the PARSER's own pre-reader skips,
+      // before applyPromoReader runs -- identical whether or not a reader is
+      // configured for this run, and independent of whatever the reader
+      // later does with the same skip (the reader is never consulted for
+      // sign-up money, T-mgi-03).
+      const signupExtraction = extractSignupOffers(bookKey, parseResult.skipped);
+
       // quick-260928-kc5: every later use of parseResult.candidates/skipped
       // in this book's block reads the effective (possibly reader-updated)
       // result. A reader-pass exception degrades to the unmodified pattern
@@ -311,6 +347,8 @@ export async function runPromoScrape(opts?: {
             rescues: 0,
             reviewRouted: 0,
             skippedByReader: 0,
+            clearSkipOverrides: 0,
+            rescuesWithoutAmount: 0,
             inputTokens: 0,
             outputTokens: 0,
           };
@@ -338,6 +376,13 @@ export async function runPromoScrape(opts?: {
           await store.commitScrapedPromos(bookKey, [], now, { classify: classifyWrites, expireUnseen: false });
         }
 
+        // quick-260928-mgi (T-mgi-06): called UNCONDITIONALLY, even when
+        // signupExtraction.offers is empty -- a successful run whose promos
+        // are all clear exclusions still expires this book's stale sign-up
+        // offers. Outside the classifyWrites.length > 0 guard above on
+        // purpose. Never fails the book (commitSignupOffersSafely).
+        const signupCommit = await commitSignupOffersSafely(store, bookKey, signupExtraction.offers, now);
+
         const outcome: BookRunOutcome = {
           bookKey,
           status: "ok",
@@ -349,6 +394,13 @@ export async function runPromoScrape(opts?: {
           sentToReview: classifyWrites.length,
           errorMessage: null,
           ...(reader ? { reader: readerStats } : {}),
+          signup: {
+            offers: signupExtraction.offers.length,
+            referralsExcluded: signupExtraction.referralsExcluded,
+            notSignup: signupExtraction.notSignup,
+            upserted: signupCommit ? signupCommit.upserted : null,
+            expired: signupCommit ? signupCommit.expired : null,
+          },
         };
         outcomes.push(outcome);
         await safeRecordScrapeRun(store, {
@@ -386,6 +438,11 @@ export async function runPromoScrape(opts?: {
       // candidate and classify writes together.
       await store.commitScrapedPromos(bookKey, writes, now, { classify: classifyWrites, expireUnseen: true });
 
+      // quick-260928-mgi (T-mgi-06): called UNCONDITIONALLY, right after the
+      // candidate commit, with a possibly empty offers list. Never fails
+      // the book (commitSignupOffersSafely).
+      const signupCommit = await commitSignupOffersSafely(store, bookKey, signupExtraction.offers, now);
+
       outcomes.push({
         bookKey,
         status: "ok",
@@ -397,6 +454,13 @@ export async function runPromoScrape(opts?: {
         sentToReview: classifyWrites.length,
         errorMessage: null,
         ...(reader ? { reader: readerStats } : {}),
+        signup: {
+          offers: signupExtraction.offers.length,
+          referralsExcluded: signupExtraction.referralsExcluded,
+          notSignup: signupExtraction.notSignup,
+          upserted: signupCommit ? signupCommit.upserted : null,
+          expired: signupCommit ? signupCommit.expired : null,
+        },
       });
       await safeRecordScrapeRun(store, {
         bookKey,

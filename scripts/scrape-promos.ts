@@ -72,14 +72,25 @@ async function main() {
           cacheHits: acc.cacheHits + stats.cacheHits,
           fallbacks: acc.fallbacks + stats.fallbacks,
           disagreements: acc.disagreements + stats.disagreements,
+          clearSkipOverrides: acc.clearSkipOverrides + stats.clearSkipOverrides,
+          rescuesWithoutAmount: acc.rescuesWithoutAmount + stats.rescuesWithoutAmount,
           inputTokens: acc.inputTokens + stats.inputTokens,
           outputTokens: acc.outputTokens + stats.outputTokens,
         };
       },
-      { calls: 0, cacheHits: 0, fallbacks: 0, disagreements: 0, inputTokens: 0, outputTokens: 0 },
+      {
+        calls: 0,
+        cacheHits: 0,
+        fallbacks: 0,
+        disagreements: 0,
+        clearSkipOverrides: 0,
+        rescuesWithoutAmount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      },
     );
     console.log(
-      `promo reader usage: calls=${totals.calls} cacheHits=${totals.cacheHits} fallbacks=${totals.fallbacks} disagreements=${totals.disagreements} inputTokens=${totals.inputTokens} outputTokens=${totals.outputTokens} estCost=$${estimatedUsd(totals.inputTokens, totals.outputTokens)}`,
+      `promo reader usage: calls=${totals.calls} cacheHits=${totals.cacheHits} fallbacks=${totals.fallbacks} disagreements=${totals.disagreements} clearSkipOverrides=${totals.clearSkipOverrides} rescuesWithoutAmount=${totals.rescuesWithoutAmount} inputTokens=${totals.inputTokens} outputTokens=${totals.outputTokens} estCost=$${estimatedUsd(totals.inputTokens, totals.outputTokens)}`,
     );
   }
 

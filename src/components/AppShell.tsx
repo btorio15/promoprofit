@@ -10,6 +10,7 @@ import { CreditBanner } from "@/components/finder/CreditBanner";
 import { FinderScreen } from "@/components/finder/FinderScreen";
 import { ArbScreen } from "@/components/arb/ArbScreen";
 import { PromosScreen } from "@/components/promos/PromosScreen";
+import { SignupOffersScreen } from "@/components/signup/SignupOffersScreen";
 
 export interface AppShellProps {
   status: OddsStatus;
@@ -18,16 +19,19 @@ export interface AppShellProps {
   displayName: string;
 }
 
-type ActiveTab = "bonus" | "arbitrage" | "promos";
+type ActiveTab = "bonus" | "arbitrage" | "promos" | "signup";
 
 /**
  * Page shell (D-09, D-01): one sticky status bar + credit banner shared
- * above the top-level "Bonus bets | Arbitrage | Promos" tabs, so odds
- * age/credits/refresh stay visible regardless of which tab is open. Owns
- * recomputeKey (bumped after a refresh or a successful spreads/totals
- * search, so all three tabs recompute together) and activeTab (default
- * "bonus", not URL-synced). Every tab panel below stays mounted while
- * inactive so switching tabs never discards another tab's results/state.
+ * above the top-level "Bonus bets | Arbitrage | Promos | Sign-up offers"
+ * tabs, so odds age/credits/refresh stay visible regardless of which tab is
+ * open. Owns recomputeKey (bumped after a refresh or a successful
+ * spreads/totals search, so the odds-dependent tabs recompute together) and
+ * activeTab (default "bonus", not URL-synced). Every tab panel below stays
+ * mounted while inactive so switching tabs never discards another tab's
+ * results/state. quick-260928-mgi: the Sign-up offers tab needs neither
+ * recomputeKey nor hasCachedOdds -- it's informational only, independent of
+ * odds/ranking (T-mgi-08).
  */
 export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: AppShellProps) {
   const [recomputeKey, setRecomputeKey] = useState(0);
@@ -55,6 +59,7 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
             <TabsTrigger value="bonus">Bonus bets</TabsTrigger>
             <TabsTrigger value="arbitrage">Arbitrage</TabsTrigger>
             <TabsTrigger value="promos">Promos</TabsTrigger>
+            <TabsTrigger value="signup">Sign-up offers</TabsTrigger>
           </TabsList>
 
           <TabsContent value="bonus" keepMounted>
@@ -76,6 +81,10 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
 
           <TabsContent value="promos" keepMounted>
             <PromosScreen hasCachedOdds={hasCachedOdds} recomputeKey={recomputeKey} />
+          </TabsContent>
+
+          <TabsContent value="signup" keepMounted>
+            <SignupOffersScreen />
           </TabsContent>
         </Tabs>
       </main>

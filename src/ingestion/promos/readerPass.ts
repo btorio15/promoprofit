@@ -3,7 +3,7 @@ import { readerText } from "./promoReading";
 import type { PromoReader } from "./promoReader";
 import { reconcileEntry, type ReconcileEntry, type ReconcileOutcome } from "./reconcile";
 import { isReviewWorthySkip } from "./reviewTriage";
-import { guardReading } from "./verbatimGuard";
+import { guardReading, type GuardedReading } from "./verbatimGuard";
 
 /**
  * quick-260928-kc5: per-book promo-reader pass. Reads every scraped entry
@@ -22,6 +22,10 @@ export interface ReaderBookStats {
   rescues: number;
   reviewRouted: number;
   skippedByReader: number;
+  /** quick-260928-mgi (owner decision 1): a clear parser exclusion the reader tried to override, kept as-is. */
+  clearSkipOverrides: number;
+  /** quick-260928-mgi (owner decision 2): a reader rescue with no guard-backed amount, skipped and suppressed. */
+  rescuesWithoutAmount: number;
   inputTokens: number;
   outputTokens: number;
 }
@@ -36,6 +40,8 @@ function emptyStats(): ReaderBookStats {
     rescues: 0,
     reviewRouted: 0,
     skippedByReader: 0,
+    clearSkipOverrides: 0,
+    rescuesWithoutAmount: 0,
     inputTokens: 0,
     outputTokens: 0,
   };
@@ -86,7 +92,7 @@ export async function applyPromoReader(input: {
   const rescuedCandidates: ScrapedPromo[] = [];
   const skipped: SkippedEntry[] = [];
 
-  function applyOutcome(entry: ReconcileEntry, outcome: ReconcileOutcome): void {
+  function applyOutcome(entry: ReconcileEntry, outcome: ReconcileOutcome, guarded?: GuardedReading): void {
     if (outcome.kind === "candidate") {
       if (outcome.via === "rescued") {
         rescuedCandidates.push(outcome.candidate);
@@ -118,6 +124,22 @@ export async function applyPromoReader(input: {
 
     // outcome.kind === "skip"
     if (outcome.via === "agree_not_usable") stats.skippedByReader++;
+    if (outcome.via === "clear_reason_kept") {
+      stats.clearSkipOverrides++;
+      if (guarded) {
+        console.warn(
+          `applyPromoReader: clear skip kept for ${bookKey} ${externalIdOf(entry) ?? "(no id)"}: parser ${outcome.skip.reason}, reader said ${guarded.kind} (${guarded.confidence}) -- not sent to review`,
+        );
+      }
+    }
+    if (outcome.via === "rescue_without_amount") {
+      stats.rescuesWithoutAmount++;
+      if (guarded) {
+        console.warn(
+          `applyPromoReader: rescue skipped for ${bookKey} ${externalIdOf(entry) ?? "(no id)"}: reader said ${guarded.kind} (${guarded.confidence}) with no guard-backed amount -- not sent to review`,
+        );
+      }
+    }
     skipped.push(outcome.skip);
   }
 
@@ -150,7 +172,7 @@ export async function applyPromoReader(input: {
       if (guarded.droppedFields.length > 0) stats.guardDrops++;
 
       const outcome = reconcileEntry(bookKey, entry, guarded, fallbackSourceUrl);
-      applyOutcome(entry, outcome);
+      applyOutcome(entry, outcome, guarded);
     } catch (err) {
       stats.fallbacks++;
       console.warn(

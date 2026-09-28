@@ -207,13 +207,64 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome.skip.evidence?.dedupeKey).toBe(promoDedupeKey(candidate));
   });
 
-  it("(g) 1126078 futures with the reader saying profit_boost usable gives review(clear_reason_conflict)", () => {
+  it("(g) 1126078 futures with the reader saying profit_boost usable gives skip(clear_reason_kept), reason unchanged", () => {
     const skip = findSkip("1126078");
     const reading = guardedReading({ kind: "profit_boost", boostPercent: "30.00", confidence: "high" });
     const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome).toEqual({ kind: "skip", skip, via: "clear_reason_kept" });
+    expect(outcome.kind).toBe("skip");
+    if (outcome.kind !== "skip") throw new Error("expected skip");
+    expect(outcome.skip.reason).toBe("futures");
+  });
+
+  it("(k) a not_a_promo skip plus a high-confidence usable reading with no amount gives skip(rescue_without_amount), reviewSuppressed set", () => {
+    const skip: SkippedEntry = {
+      reason: "not_a_promo",
+      externalId: "na-1",
+      title: "Bally's Profit Boost",
+      evidence: {
+        rawText: "Boost your profits and take your game to the next level! Increase your winnings up to 100%",
+        sourceUrl: SOURCE_URL,
+        expiresAt: null,
+        partial: null,
+      },
+    };
+    const reading = guardedReading({
+      kind: "profit_boost",
+      boostPercent: null,
+      bonusAmount: null,
+      confidence: "high",
+    });
+    const outcome = reconcileEntry("ballybet", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("skip");
+    if (outcome.kind !== "skip") throw new Error("expected skip");
+    expect(outcome.via).toBe("rescue_without_amount");
+    expect(outcome.skip.reviewSuppressed).toBe("reader_rescue_without_amount");
+    expect(outcome.skip.reason).toBe("not_a_promo");
+  });
+
+  it("(l) an unsupported_sport skip plus a medium-confidence reading with a guard-backed bonusAmount still gives review(rescue_needs_review)", () => {
+    const skip: SkippedEntry = {
+      reason: "unsupported_sport",
+      externalId: "us-1",
+      title: "Some Bonus Bet",
+      evidence: {
+        rawText: "Get $50 in Bonus Bets when you sign up",
+        sourceUrl: SOURCE_URL,
+        expiresAt: null,
+        partial: null,
+      },
+    };
+    const reading = guardedReading({
+      kind: "bonus_bet",
+      boostPercent: null,
+      bonusAmount: "50.00",
+      confidence: "medium",
+    });
+    const outcome = reconcileEntry("ballybet", { kind: "skip", skip }, reading, SOURCE_URL);
     expect(outcome.kind).toBe("review");
     if (outcome.kind !== "review") throw new Error("expected review");
-    expect(outcome.why).toBe("clear_reason_conflict");
+    expect(outcome.why).toBe("rescue_needs_review");
   });
 
   it("(h) merge: a candidate missing maxStake (with it in unparsedCapFields) gets it filled from a guard-backed reader", () => {
