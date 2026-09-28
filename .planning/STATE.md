@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 1 of 11
 Status: Executing Phase 3
-Last activity: 2026-09-28 - Completed quick task 260928-kc5: Claude Haiku promo reader
+Last activity: 2026-09-28 - Completed quick task 260928-mgi: reader review tightening, Sign-up offers tab
 
 Progress: [██████████] 100%
 
@@ -155,6 +155,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260928-i3r | DK HR Bet-and-Get as prop, missing-boost guard, FanDuel pre-live fix, cron to :07 | 2026-09-28 | 3f429c2 |  | [260928-i3r-draftkings-bet-and-get-prop-skip-and-sch](./quick/260928-i3r-draftkings-bet-and-get-prop-skip-and-sch/) |
 | 260928-it1 | uncertain promos to 'Needs a look' review queue; NHL support | 2026-09-28 | 69f47e9 | Needs Review | [260928-it1-uncertain-promos-to-review-queue-and-add](./quick/260928-it1-uncertain-promos-to-review-queue-and-add/) |
 | 260928-kc5 | Claude Haiku promo reader with field-bound verbatim guard, reconcile, cache, fallback | 2026-09-28 | 022b8fc | Verified | [260928-kc5-claude-haiku-promo-reader-with-verbatim-](./quick/260928-kc5-claude-haiku-promo-reader-with-verbatim-/) |
+| 260928-mgi | reader review tightening (clear skips win, rescue needs amount); Sign-up offers tab | 2026-09-28 | 9121429 | Verified | [260928-mgi-reader-review-tightening-and-new-custome](./quick/260928-mgi-reader-review-tightening-and-new-custome/) |
 
 ## Deferred Items
 
