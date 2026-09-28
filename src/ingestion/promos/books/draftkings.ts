@@ -42,11 +42,17 @@ const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
  * non-promo rows -- casino, sweepstakes, racing, refer-a-friend, offer-card
  * marketing, Discord, DK Horse -- that no keyword in the shared exclusion
  * regexes is written to catch, because they are not excluded promo types,
- * they are not promos at all), then sport support last. This order matters:
- * checking classifyExclusion first is what correctly buckets the
- * "New Customers: Deposit Bonus" entry as `new_customer` (matches the
- * text-level "New Customers" wording) rather than falling through to this
- * file's not-a-promo gate.
+ * they are not promos at all), then sport support, then (last, right before
+ * buildCandidate) a missing-boost-percent guard: buildCandidate always
+ * builds a `profit_boost` candidate with boostedOddsAmerican null, so an
+ * entry with no parseable "Profit Boost: N%" can only ever fail
+ * ScrapedPromoSchema's refinement. Rather than build a doomed candidate and
+ * let the schema reject it (which reads as a scraper bug), that shape is
+ * skipped as "unrecognized" up front -- a new promo shape worth a human
+ * look, not a broken one. This order matters: checking classifyExclusion
+ * first is what correctly buckets the "New Customers: Deposit Bonus" entry
+ * as `new_customer` (matches the text-level "New Customers" wording) rather
+ * than falling through to this file's not-a-promo gate.
  *
  * Single-game scope handling (real fixture 1126403, "LA Rams @ DEN Broncos
  * 50% Profit Boost"): not every single-game boost's text names a sport --
@@ -392,6 +398,20 @@ export const draftkingsScraper: BookScraper = {
           skipped.push(skippedEntry("unrecognized", entry, title));
           continue;
         }
+      }
+
+      // buildCandidate always emits promoType "profit_boost" with
+      // boostedOddsAmerican null, so a missing "Profit Boost: N%" match
+      // could only ever produce a ScrapedPromoSchema failure. Treat that as
+      // a new promo shape needing review -- skip it as "unrecognized" here,
+      // before buildCandidate runs, rather than building a candidate
+      // guaranteed to fail schema validation. BOOST_PERCENT_RE has no /g
+      // flag, so .test() is stateless and safe to call here. The
+      // schema_invalid branch below stays for genuine shape errors on
+      // candidates that DO have a boost percent.
+      if (!BOOST_PERCENT_RE.test(text)) {
+        skipped.push(skippedEntry("unrecognized", entry, title));
+        continue;
       }
 
       const candidate = buildCandidate(entry, title, text);

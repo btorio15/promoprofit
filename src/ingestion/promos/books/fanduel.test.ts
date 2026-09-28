@@ -9,6 +9,7 @@ function readFixture(fixturePath: string): string {
 
 const listFixture = readFixture("src/test/fixtures/promos/fanduel-promos.json");
 const cfbDetailFixture = readFixture("src/test/fixtures/promos/fanduel-promo-detail-cfb-boost.json");
+const listFixture20260928 = readFixture("src/test/fixtures/promos/fanduel-promos-2026-09-28.json");
 
 const DETAIL_URL =
   "https://api.sportsbook.fanduel.com/promos/api/promotions/LOCFB50PBT0926?channel=desktop&rewardsHubEnabled=true&cyrWithPromosEnabled=true&isChallengesEnabled=true&rewardBoxEnabled=false";
@@ -174,5 +175,69 @@ describe("fanduelScraper — Task 2: parsing the real CFB boost with its hidden 
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
+  });
+});
+
+describe("fanduelScraper — 2026-09-28 fixture: 'pre-live wager' no longer false-positives as live_only", () => {
+  it("pins the full keep/skip map -- LONFLMNFRE0928 is now a kept profit_boost candidate", () => {
+    const result = fanduelScraper.parse(
+      { listBody: listFixture20260928, detailBodies: {} },
+      { now: new Date("2026-09-28T12:00:00Z"), sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions" },
+    );
+
+    expect(result.found).toBe(result.candidates.length + result.skipped.length);
+
+    const candidateIds = result.candidates.map((c) => c.externalId).sort();
+    expect(candidateIds).toEqual(["LONFLMNFRE0928"]);
+
+    const reasonByCode = new Map(result.skipped.map((s) => [s.externalId, s.reason]));
+    expect(reasonByCode).toEqual(
+      new Map([
+        ["ACQB5G50BB921", "new_customer"],
+        ["ACQPECBB1G100ST", "new_customer"],
+        ["BPNEPSEAST0902", "not_a_promo"],
+        ["LORTCTST26", "not_a_promo"],
+        ["RAF092126STAT", "not_a_promo"],
+        ["MLBPHSTATIC0901", "not_a_promo"],
+        ["APVTNFSTATIC0917", "not_a_promo"],
+        ["FODAILYSWNG0928", "not_a_promo"],
+        ["BPWNBAST0918", "not_a_promo"],
+        ["COSBKRGMSCCSTAT", "not_a_promo"],
+        ["CORGNFLSW0921", "not_a_promo"],
+      ]),
+    );
+    expect(reasonByCode.get("LONFLMNFRE0928")).toBeUndefined();
+  });
+
+  it("LONFLMNFRE0928 (NFL Reward Escalator) -- every field, exactly", () => {
+    const result = fanduelScraper.parse(
+      { listBody: listFixture20260928, detailBodies: {} },
+      { now: new Date("2026-09-28T12:00:00Z"), sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions" },
+    );
+    const promo = result.candidates.find((c) => c.externalId === "LONFLMNFRE0928");
+    expect(promo).toBeDefined();
+
+    expect(promo!.promoType).toBe("profit_boost");
+    expect(promo!.title).toBe("NFL Reward Escalator");
+    // The "UP TO a 100% PBT(s)" escalator ceiling wording must NOT win over
+    // the promo's actual "30% Profit Boost" -- BOOST_PERCENT_RE only matches
+    // a number directly followed by "% ... profit boost", which "100% PBT"
+    // never satisfies.
+    expect(promo!.boostPercent).toBe("30.00");
+    expect(promo!.sportKeyHint).toBe("americanfootball_nfl");
+    expect(promo!.teamsText).toEqual(["Eagles", "Bears"]);
+    expect(promo!.scopeText).toBe("Eagles @ Bears game on September 28");
+    expect(promo!.expiresAt).toBe("2026-09-29T00:15:00.000Z");
+    // No detail body was fetched (list-only path) -- max stake is unknown in
+    // the list data, so it lands in the normal cap-review path exactly like
+    // every other FanDuel list-only candidate, never invented.
+    expect(promo!.maxStake).toBeNull();
+    expect(promo!.unparsedCapFields).toEqual(["maxStake", "minOdds"]);
+    expect(promo!.winningsCapKind).toBe("boost_extra");
+    expect(promo!.claimRequired).toBe("claim_token");
+
+    // The window contains the named game's ET calendar day.
+    expect(promo!.windowStart).toBe("2026-09-28T04:00:00.000Z");
+    expect(promo!.windowEnd).toBe("2026-09-29T03:59:59.999Z");
   });
 });

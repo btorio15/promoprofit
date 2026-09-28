@@ -3,26 +3,34 @@
 # scrape step itself is a plain `npm ci` + one Node script writing straight
 # to the shared Neon Postgres DB and spends zero Odds API credits. The
 # second step (quick-260927-n12) spends ONE moneyline-only refresh, but
-# only on the 8am Denver run (gated inside the script) -- the noon/5pm runs
-# of this same schedule call it too and no-op.
+# only on the 8:07am Denver run (gated inside the script) -- the 12:07/5:07pm
+# runs of this same schedule call it too and no-op.
 #
 # `timezone` (GitHub Changelog, 2026-03-19) lets a cron schedule name an IANA
-# zone directly so 8am/noon/5pm Mountain Time stays correct across DST
-# without a manual UTC-offset flip twice a year. If GitHub ever rejects this
-# field on a workflow run, the fallback is a fixed UTC schedule tuned for MDT
-# (UTC-6) -- `cron: "0 14,18,23 * * *"` -- which drifts about an hour during
-# MST (Nov-Mar), an acceptable seasonal trade-off (03-RECON.md
+# zone directly so 8:07am/12:07pm/5:07pm Mountain Time stays correct across
+# DST without a manual UTC-offset flip twice a year. If GitHub ever rejects
+# this field on a workflow run, the fallback is a fixed UTC schedule tuned
+# for MDT (UTC-6) -- `cron: "7 14,18,23 * * *"` -- which drifts about an
+# hour during MST (Nov-Mar), an acceptable seasonal trade-off (03-RECON.md
 # cron_hours_mountain).
+#
+# 260928-i3r: minute :07, not :00 -- GitHub's own docs note the top-of-the-
+# hour slot is the platform's most heavily loaded, so it's the most often
+# delayed and the most often dropped scheduled-run minute. No scheduled run
+# had fired yet as of 2026-09-28 under the old "0 8,12,17 * * *" schedule.
+# isMorningObservationWindow (Denver hour < 10) still covers the 8:07 run
+# with about 1h52m of scheduling-delay tolerance; the 12:07/17:07 runs are
+# outside that window regardless (same as they were at :00).
 name: Scrape promos
 
 on:
   schedule:
-    - cron: "0 8,12,17 * * *"
+    - cron: "7 8,12,17 * * *"
       timezone: "America/Denver"
   workflow_dispatch:
     inputs:
       force_morning_observe:
-        description: "Force the moneyline odds refresh + profit-observation step, even outside the 8am Denver window"
+        description: "Force the moneyline odds refresh + profit-observation step, even outside the 8:07am Denver window"
         type: boolean
         default: false
 
@@ -48,17 +56,17 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # quick-260927-n12 (owner scope change B): moneyline-only odds refresh
-      # + profit-observation recording, gated to the 8am Denver run inside
-      # the script itself (isMorningObservationWindow) -- the noon/5pm runs
-      # of this same schedule call the script too, but it no-ops for them.
-      # `--force` (workflow_dispatch input) bypasses the Denver-hour gate
-      # for manual testing. Never the spreads/totals extended refresh here
-      # (3x the credit cost would blow the 500-credit monthly budget).
+      # + profit-observation recording, gated to the 8:07am Denver run inside
+      # the script itself (isMorningObservationWindow) -- the 12:07/5:07pm
+      # runs of this same schedule call the script too, but it no-ops for
+      # them. `--force` (workflow_dispatch input) bypasses the Denver-hour
+      # gate for manual testing. Never the spreads/totals extended refresh
+      # here (3x the credit cost would blow the 500-credit monthly budget).
       # quick-260927-ov2: runs even when the scrape step above fails (a
       # flaky/all-excluded book must not block the once-daily moneyline
       # refresh), but not when the run is cancelled -- the script's own
-      # 8am-Denver gate still makes noon/5pm runs no-op, so no extra credit
-      # spend either way.
+      # 8:07am-Denver gate still makes the 12:07/5:07pm runs no-op, so no
+      # extra credit spend either way.
       - if: ${{ !cancelled() }}
         run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
         env:

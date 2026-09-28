@@ -25,6 +25,14 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     ).toBe("live_only");
   });
 
+  it.each([
+    ["pre-live wager", "Get a 30% Profit Boost Token to use on any pre-live wager for the Eagles @ Bears NFL Game on September 28"],
+    ["pre live wager (space, no hyphen)", "Get a 30% Profit Boost Token to use on any pre live wager for the Eagles @ Bears NFL Game on September 28"],
+    ["Pre-Live Wagers (plural, mixed case)", "Valid on any Pre-Live Wagers for tonight's game"],
+  ])("does not classify %s as live_only (pre-live means pre-game, not live)", (_label, text) => {
+    expect(classify("NFL Boost", text)).not.toBe("live_only");
+  });
+
   it("classifies a title-level Parlay signal over an incidental Scorer/prop mention", () => {
     expect(classify("25% NFL TD Scorer Parlay Profit Boost")).toBe("parlay");
   });
@@ -60,6 +68,55 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     ["NFL Boost", "keep a record of your bets"],
   ])("does not classify unrelated copy as prop: %s / %s", (title, text) => {
     expect(classify(title, text)).not.toBe("prop");
+  });
+
+  it.each([
+    ["MLB HR Bet and Get", ""],
+    ["Super Boost", "Bet a HR, get a Bonus Bet for HRs hit in that game!"],
+    ["Super Boost", "Place a pre-game Home Run bet (Under Batter > Home Runs)"],
+    ["Super Boost", "every home run hit in the game"],
+    ["Super Boost", "Batter > Hits"],
+  ])("classifies HR / home run / batter-prop wording as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).toBe("prop");
+  });
+
+  it.each([
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Offer runs through 9/28.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Thursday Night Football special.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Prices may shrink as running total updates.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Bonus bet issued within 24 hr window.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Reward issued within 48 hrs of settlement.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. View in Chrome for best results.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. This offer runs the promo through 9/28.",
+    ],
+  ])("does not classify lowercase hr/run-containing boilerplate words as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).not.toBe("prop");
+  });
+
+  it("the case-sensitive HRs? boundary does not match inside 'through', 'Thursday', or '3hrs'", () => {
+    expect(classify("NFL Boost", "Offer runs through 9/28.")).not.toBe("prop");
+    expect(classify("NFL Boost", "Thursday Night special.")).not.toBe("prop");
+    expect(classify("NFL Boost", "Reward issued within 3hrs.")).not.toBe("prop");
   });
 
   it("classifies futures/outright titles", () => {
