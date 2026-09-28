@@ -41,6 +41,9 @@ describe("sportHints — sportFromText", () => {
     expect(sportFromText("NCAAB")).toEqual({ kind: "supported", sportKey: "basketball_ncaab" });
     expect(sportFromText("NBA")).toEqual({ kind: "supported", sportKey: "basketball_nba" });
     expect(sportFromText("MLB")).toEqual({ kind: "supported", sportKey: "baseball_mlb" });
+    // quick-260928-it1: NHL moved from unsupported to supported.
+    expect(sportFromText("NHL 50% Profit Boost")).toEqual({ kind: "supported", sportKey: "icehockey_nhl" });
+    expect(sportFromText("Hockey Boost")).toEqual({ kind: "supported", sportKey: "icehockey_nhl" });
   });
 
   it("never matches WNBA as NBA", () => {
@@ -54,10 +57,6 @@ describe("sportHints — sportFromText", () => {
     expect(sportFromText("30% Soccer Profit Boost Token")).toEqual({
       kind: "unsupported",
       label: "Soccer",
-    });
-    expect(sportFromText("NHL Futures 25% Profit Boost")).toEqual({
-      kind: "unsupported",
-      label: "NHL",
     });
     expect(sportFromText("Golf 25% PBT - Presidents Cup")).toEqual({
       kind: "unsupported",

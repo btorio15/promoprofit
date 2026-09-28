@@ -1,10 +1,11 @@
 /**
  * Sport-hint resolution from promo title/description text or FanDuel's
  * `.tags` array. A promo whose sport can't be resolved is either
- * unsupported (the odds cache has no markets to hedge it, e.g. WNBA/NHL/
- * soccer/golf) -- reason `unsupported_sport`, always skipped -- or unknown
- * (e.g. a game-named promo where the two team names alone pin the sport
- * once matched against cached events, so no sport hint is needed here).
+ * unsupported (the odds cache has no markets to hedge it, e.g. WNBA/soccer/
+ * golf) -- reason `unsupported_sport`, always skipped -- or unknown (e.g. a
+ * game-named promo where the two team names alone pin the sport once
+ * matched against cached events, so no sport hint is needed here).
+ * quick-260928-it1: NHL moved from unsupported to supported (icehockey_nhl).
  *
  * Word-boundary regexes throughout so "WNBA" never matches NBA (the "NBA"
  * substring inside "WNBA" is never preceded by a word boundary, since the
@@ -21,7 +22,6 @@ export type SportHint =
 
 const UNSUPPORTED_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\bwnba\b/i, "WNBA"],
-  [/\bnhl\b/i, "NHL"],
   [/\bsoccer\b/i, "Soccer"],
   [/\bgolf\b/i, "Golf"],
   [/\btennis\b/i, "Tennis"],
@@ -39,6 +39,7 @@ const SUPPORTED_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\bnfl\b/i, "americanfootball_nfl"],
   [/\bnba\b/i, "basketball_nba"],
   [/\bmlb\b/i, "baseball_mlb"],
+  [/\b(?:nhl|hockey)\b/i, "icehockey_nhl"],
 ];
 
 export function sportFromText(text: string): SportHint {
@@ -53,7 +54,6 @@ export function sportFromText(text: string): SportHint {
 
 const UNSUPPORTED_TAGS: ReadonlyArray<[string, string]> = [
   ["wnba", "WNBA"],
-  ["nhl", "NHL"],
   ["soccer", "Soccer"],
   ["golf", "Golf"],
   ["tennis", "Tennis"],
@@ -72,6 +72,7 @@ const SUPPORTED_TAGS: ReadonlyArray<[string, string]> = [
   ["ncaab", "basketball_ncaab"],
   ["nba", "basketball_nba"],
   ["mlb", "baseball_mlb"],
+  ["nhl", "icehockey_nhl"],
 ];
 
 export function sportFromTags(tags: readonly string[]): SportHint {

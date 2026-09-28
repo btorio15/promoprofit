@@ -225,8 +225,33 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
 }
 
-function skippedEntry(reason: SkipReason, entry: PromotionEntry, title: string): SkippedEntry {
-  return { reason, externalId: String(entry.promotionId), title };
+/**
+ * quick-260928-it1: every skip carries evidence (rawText/sourceUrl/
+ * expiresAt/partial) so an uncertain one can become a "classify" review row
+ * (reviewTriage.ts) instead of silently disappearing. `partial` is the
+ * schema_invalid branch's already-built candidate, or -- for the
+ * missing-boost-% "unrecognized" branch -- a best-effort guess of
+ * promoType/sportKeyHint when a supported sport was found; otherwise null
+ * (never guessed).
+ */
+function skippedEntry(
+  reason: SkipReason,
+  entry: PromotionEntry,
+  title: string,
+  text: string,
+  partial: Partial<ScrapedPromo> | null = null,
+): SkippedEntry {
+  return {
+    reason,
+    externalId: String(entry.promotionId),
+    title,
+    evidence: {
+      rawText: truncate(text, 2000),
+      sourceUrl: LIST_URL,
+      expiresAt: normalizeDkTimestamp(entry.expirationDate),
+      partial,
+    },
+  };
 }
 
 function buildCandidate(entry: PromotionEntry, title: string, text: string): ScrapedPromo {
@@ -376,18 +401,18 @@ export const draftkingsScraper: BookScraper = {
 
       const exclusionReason = classifyExclusion({ title, text, category });
       if (exclusionReason !== null) {
-        skipped.push(skippedEntry(exclusionReason, entry, title));
+        skipped.push(skippedEntry(exclusionReason, entry, title, text));
         continue;
       }
 
       if (!MENTIONS_BOOST_OR_BONUS_RE.test(`${title}\n${text}`)) {
-        skipped.push(skippedEntry("not_a_promo", entry, title));
+        skipped.push(skippedEntry("not_a_promo", entry, title, text));
         continue;
       }
 
       const sportHint = sportFromText(`${title} ${text}`);
       if (sportHint.kind === "unsupported") {
-        skipped.push(skippedEntry("unsupported_sport", entry, title));
+        skipped.push(skippedEntry("unsupported_sport", entry, title, text));
         continue;
       }
       if (sportHint.kind === "unknown") {
@@ -395,7 +420,7 @@ export const draftkingsScraper: BookScraper = {
         // single-game "for the A @ B game on <date>" boost (real fixture
         // 1126403); the team names, not a sport word, pin its scope.
         if (parseGameScope(text) === null) {
-          skipped.push(skippedEntry("unrecognized", entry, title));
+          skipped.push(skippedEntry("unrecognized", entry, title, text));
           continue;
         }
       }
@@ -410,7 +435,9 @@ export const draftkingsScraper: BookScraper = {
       // schema_invalid branch below stays for genuine shape errors on
       // candidates that DO have a boost percent.
       if (!BOOST_PERCENT_RE.test(text)) {
-        skipped.push(skippedEntry("unrecognized", entry, title));
+        const guessedPartial: Partial<ScrapedPromo> | null =
+          sportHint.kind === "supported" ? { promoType: "profit_boost", sportKeyHint: sportHint.sportKey } : null;
+        skipped.push(skippedEntry("unrecognized", entry, title, text, guessedPartial));
         continue;
       }
 
@@ -421,7 +448,7 @@ export const draftkingsScraper: BookScraper = {
           `draftkingsScraper: candidate ${entry.promotionId} failed ScrapedPromoSchema`,
           validated.error.issues,
         );
-        skipped.push(skippedEntry("schema_invalid", entry, title));
+        skipped.push(skippedEntry("schema_invalid", entry, title, text, candidate));
         continue;
       }
 

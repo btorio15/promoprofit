@@ -8,6 +8,7 @@ import {
   type HttpRequestSpec,
   type ParseResult,
   type ScrapedPromo,
+  type SkipEvidence,
   type SkipReason,
   type SkippedEntry,
 } from "@/domain/promos/scraped";
@@ -244,7 +245,9 @@ function scopeFromTitle(title: string): string {
   return title.replace(TITLE_SCOPE_STRIP_RE, "").replace(TITLE_SCOPE_TRAIL_RE, "").trim();
 }
 
-type BuildResult = { status: "candidate"; promo: ScrapedPromo } | { status: "skip"; reason: SkipReason };
+type BuildResult =
+  | { status: "candidate"; promo: ScrapedPromo }
+  | { status: "skip"; reason: SkipReason; evidence?: SkipEvidence };
 
 function buildFromListFallback(card: ListCard, slug: string, titleSportHint: SportHint): BuildResult {
   const listText = htmlToText(card.description);
@@ -293,22 +296,31 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
   const descText = htmlToText(detail.description ?? "");
   const termsText = htmlToText(detail.terms ?? "");
   const text = `${descText}\n${termsText}`;
+  const sourceUrl = detailUrlFor(slug);
+
+  // Computed early so every skip return below can attach evidence with the
+  // detail's own text/URL/expiry -- windowEnd (when the claimable-scope
+  // phrase parsed) doubles as the promo's own expiry, same as the candidate
+  // path further down.
+  const earlyClaimMatch = CLAIMABLE_SCOPE_RE.exec(text);
+  const earlyWindowEnd = earlyClaimMatch ? parseEtDateTime(earlyClaimMatch[3].trim()) : null;
+  const evidence: SkipEvidence = { rawText: truncate(text, RAW_TEXT_MAX_CHARS), sourceUrl, expiresAt: earlyWindowEnd, partial: null };
 
   // Detail text can reveal an exclusion the list card's title/description
   // didn't (e.g. "Live Wagers Only" in the Offer Details bullets).
   const exclusion = classifyExclusion({ title, text });
-  if (exclusion) return { status: "skip", reason: exclusion };
+  if (exclusion) return { status: "skip", reason: exclusion, evidence };
 
   let sportHint = sportFromText(detail.promotionCta?.url ?? "");
   if (sportHint.kind === "unknown") sportHint = sportFromText(title);
-  if (sportHint.kind === "unsupported") return { status: "skip", reason: "unsupported_sport" };
+  if (sportHint.kind === "unsupported") return { status: "skip", reason: "unsupported_sport", evidence };
   const sportKeyHint = sportHint.kind === "supported" ? sportHint.sportKey : null;
 
   // "Any Wager" is the only eligible-bet-type wording recon found on any
   // Bally Bet promo (Observed Promos rows 1-3) -- anything else is a market
   // wording this parser can't map, so it's skipped rather than guessed.
   if (!ANY_WAGER_RE.test(text)) {
-    return { status: "skip", reason: "unrecognized" };
+    return { status: "skip", reason: "unrecognized", evidence };
   }
 
   const maxStakeParse = parseMaxStake(text);
@@ -326,10 +338,10 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
   const maxWinnings = maxWinningsParse.status === "parsed" ? maxWinningsParse.value : null;
   if (maxWinningsParse.status === "unparsed") unparsedCapFields.push("maxWinnings");
 
-  const claimMatch = CLAIMABLE_SCOPE_RE.exec(text);
+  const claimMatch = earlyClaimMatch;
   const scopeText = claimMatch ? claimMatch[1].trim() : scopeFromTitle(title);
   const windowStart = claimMatch ? parseEtDateTime(claimMatch[2].trim()) : null;
-  const windowEnd = claimMatch ? parseEtDateTime(claimMatch[3].trim()) : null;
+  const windowEnd = earlyWindowEnd;
 
   const promo: ScrapedPromo = {
     bookKey: "ballybet",
@@ -337,7 +349,7 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
     promoType: "profit_boost",
     title,
     rawText: truncate(text, RAW_TEXT_MAX_CHARS),
-    sourceUrl: detailUrlFor(slug),
+    sourceUrl,
     sportKeyHint,
     scopeText,
     teamsText: splitTeams(scopeText) ?? [],
@@ -364,37 +376,45 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
 
 function ballybetParse(
   input: { listBody: string; detailBodies: Readonly<Record<string, string>> },
-  _ctx: { now: Date; sourceUrl: string },
+  ctx: { now: Date; sourceUrl: string },
 ): ParseResult {
-  void _ctx; // BookScraper.parse's ctx isn't needed: Bally states its own expiry/claim window inline.
   const cards = extractListCards(input.listBody);
   const candidates: ScrapedPromo[] = [];
   const skipped: SkippedEntry[] = [];
 
   for (const card of cards) {
     const listText = htmlToText(card.description);
+    // quick-260928-it1: list-level skip evidence -- sourceUrl is the card's
+    // own detail URL when a slug exists (the same URL a member could open
+    // themselves), else the list request's own URL (ctx.sourceUrl).
+    const listEvidence: SkipEvidence = {
+      rawText: truncate(listText, RAW_TEXT_MAX_CHARS),
+      sourceUrl: card.slug ? detailUrlFor(card.slug) : ctx.sourceUrl,
+      expiresAt: null,
+      partial: null,
+    };
 
     const exclusion = classifyExclusion({ title: card.title, text: listText });
     if (exclusion) {
-      skipped.push({ reason: exclusion, externalId: card.slug, title: card.title });
+      skipped.push({ reason: exclusion, externalId: card.slug, title: card.title, evidence: listEvidence });
       continue;
     }
 
     if (!BOOST_BONUS_KEYWORD_RE.test(card.title) || !PERCENT_OR_DOLLAR_RE.test(card.title)) {
-      skipped.push({ reason: "not_a_promo", externalId: card.slug, title: card.title });
+      skipped.push({ reason: "not_a_promo", externalId: card.slug, title: card.title, evidence: listEvidence });
       continue;
     }
 
     const titleSportHint = sportFromText(card.title);
     if (titleSportHint.kind === "unsupported") {
-      skipped.push({ reason: "unsupported_sport", externalId: card.slug, title: card.title });
+      skipped.push({ reason: "unsupported_sport", externalId: card.slug, title: card.title, evidence: listEvidence });
       continue;
     }
 
     if (!card.slug) {
       // A real single-game/sport-wide boost with no resolvable slug can't
       // be planned for a detail fetch or matched later -- never guessed.
-      skipped.push({ reason: "not_a_promo", externalId: null, title: card.title });
+      skipped.push({ reason: "not_a_promo", externalId: null, title: card.title, evidence: listEvidence });
       continue;
     }
 
@@ -404,7 +424,7 @@ function ballybetParse(
       : buildFromListFallback(card, card.slug, titleSportHint);
 
     if (built.status === "skip") {
-      skipped.push({ reason: built.reason, externalId: card.slug, title: card.title });
+      skipped.push({ reason: built.reason, externalId: card.slug, title: card.title, evidence: built.evidence ?? listEvidence });
       continue;
     }
 
@@ -414,7 +434,12 @@ function ballybetParse(
         `[ballybet] candidate failed ScrapedPromoSchema for "${card.title}" (${card.slug}):`,
         validated.error.issues,
       );
-      skipped.push({ reason: "schema_invalid", externalId: card.slug, title: card.title });
+      skipped.push({
+        reason: "schema_invalid",
+        externalId: card.slug,
+        title: card.title,
+        evidence: { rawText: truncate(built.promo.rawText, RAW_TEXT_MAX_CHARS), sourceUrl: built.promo.sourceUrl, expiresAt: built.promo.expiresAt, partial: built.promo },
+      });
       continue;
     }
 

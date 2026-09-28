@@ -134,7 +134,9 @@ describe("ScrapedPromoSchema", () => {
   });
 
   it("rejects sportKeyHint values outside SPORT_KEYS", () => {
-    expectInvalid({ ...sportWideBoost, sportKeyHint: "icehockey_nhl" });
+    // quick-260928-it1: icehockey_nhl moved from unsupported to supported
+    // (SPORT_KEYS), so this must use a still-unsupported sport key instead.
+    expectInvalid({ ...sportWideBoost, sportKeyHint: "soccer_epl" });
   });
 
   it("rejects windowStart >= windowEnd", () => {
