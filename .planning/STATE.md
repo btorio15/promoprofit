@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 1 of 11
 Status: Executing Phase 3
-Last activity: 2026-09-27 - Completed quick task 260927-pcc: DraftKings single-game boosts and prop label
+Last activity: 2026-09-28 - Completed quick task 260928-i3r: DK HR prop, FanDuel pre-live fix, cron :07
 
 Progress: [██████████] 100%
 
@@ -152,6 +152,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260927-n12 | promos total profit, mark-used state, daily/weekly/monthly profit tracking + morning odds refresh | 2026-09-27 | 8254f50 | [260927-n12-promos-total-profit-mark-used-state-dail](./quick/260927-n12-promos-total-profit-mark-used-state-dail/) |
 | 260927-ov2 | scraper: don't fail job when a book has no usable promos; morning step runs after failed scrape; Actions v7 | 2026-09-27 | be48e83 | [260927-ov2-scraper-do-not-fail-job-when-book-has-no](./quick/260927-ov2-scraper-do-not-fail-job-when-book-has-no/) |
 | 260927-pcc | DraftKings: parse single-game boosts; label player-stat Super Boosts as prop | 2026-09-27 | fcc35c1 | [260927-pcc-draftkings-single-game-boosts-and-super-](./quick/260927-pcc-draftkings-single-game-boosts-and-super-/) |
+| 260928-i3r | DK HR Bet-and-Get as prop, missing-boost guard, FanDuel pre-live fix, cron to :07 | 2026-09-28 | 3f429c2 | [260928-i3r-draftkings-bet-and-get-prop-skip-and-sch](./quick/260928-i3r-draftkings-bet-and-get-prop-skip-and-sch/) |
 
 ## Deferred Items
 
