@@ -33,6 +33,35 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     expect(classify("NFL Anytime TD Scorer Boost")).toBe("prop");
   });
 
+  it.each([
+    [
+      "Sunday Night Football Super Boost",
+      "Bet Waddle & Adams to record 40+ Receiving Yards each boosted to +100!",
+    ],
+    ["Super Boost", "Rushing Yards"],
+    ["Super Boost", "Passing Yards"],
+    ["Super Boost", "5+ Receptions"],
+    ["Super Boost", "8+ Strikeouts"],
+    ["Super Boost", "10+ Rebounds"],
+    ["Super Boost", "10+ Assists"],
+    ["Super Boost", "Points + Rebounds + Assists"],
+    ["Super Boost", "to each have 40+ Receiving Yards"],
+    ["Super Boost", "to record 2+ hits"],
+  ])("classifies player-stat Super Boost wording as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).toBe("prop");
+  });
+
+  it.each([
+    ["NFL 50% Profit Boost", "Profit Boost Token only applies to a NFL Single, Parlay, SGP, or SGPx bet."],
+    ["NFL 50% Profit Boost", "Total bet odds must be -200 or longer."],
+    ["10% LA Rams vs. DEN Broncos Profit Boost", "LA Rams vs. DEN Broncos ... Any Wager"],
+    ["NFL Boost", "Broncos -3.5 points"],
+    ["NFL Boost", "Over 45.5 total points"],
+    ["NFL Boost", "keep a record of your bets"],
+  ])("does not classify unrelated copy as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).not.toBe("prop");
+  });
+
   it("classifies futures/outright titles", () => {
     expect(classify("50% Stanley Cup Champion Profit Boost")).toBe("futures");
     expect(classify("NHL Futures 25% Profit Boost")).toBe("futures");

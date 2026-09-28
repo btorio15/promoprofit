@@ -2,15 +2,26 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { draftkingsScraper } from "./draftkings";
-import type { ScrapedPromo } from "@/domain/promos/scraped";
+import { matchPromo } from "@/domain/promos/matcher";
+import type { OddsEvent } from "@/domain/odds/schemas";
+import { ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
 
 const FIXTURE_PATH = join(
   process.cwd(),
   "src/test/fixtures/promos/draftkings-promos.json",
 );
 
+const FIXTURE_PATH_20260927 = join(
+  process.cwd(),
+  "src/test/fixtures/promos/draftkings-promos-2026-09-27.json",
+);
+
 function loadFixture(): string {
   return readFileSync(FIXTURE_PATH, "utf-8");
+}
+
+function loadFixture20260927(): string {
+  return readFileSync(FIXTURE_PATH_20260927, "utf-8");
 }
 
 function parseFixture() {
@@ -20,8 +31,22 @@ function parseFixture() {
   );
 }
 
+function parseFixture20260927() {
+  return draftkingsScraper.parse(
+    { listBody: loadFixture20260927(), detailBodies: {} },
+    { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "https://api.draftkings.com/en/api/promotions/v3/promotions/query" },
+  );
+}
+
 function findCandidate(id: string): ScrapedPromo {
   const result = parseFixture();
+  const candidate = result.candidates.find((c) => c.externalId === id);
+  if (!candidate) throw new Error(`candidate ${id} not found`);
+  return candidate;
+}
+
+function findCandidate20260927(id: string): ScrapedPromo {
+  const result = parseFixture20260927();
   const candidate = result.candidates.find((c) => c.externalId === id);
   if (!candidate) throw new Error(`candidate ${id} not found`);
   return candidate;
@@ -281,5 +306,166 @@ describe("draftkingsScraper — structured fields for the kept boosts (Task 2)",
     } finally {
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("draftkingsScraper — DK single-game 'for the A @ B game on <date>' boosts (2026-09-27 fixture)", () => {
+  it("found is 23, 3 candidates, and the kept externalIds are 1123723/1126385/1126403", () => {
+    const result = parseFixture20260927();
+    expect(result.found).toBe(23);
+    expect(result.candidates).toHaveLength(3);
+    const candidateIds = result.candidates.map((c) => c.externalId).sort();
+    expect(candidateIds).toEqual(["1123723", "1126385", "1126403"]);
+  });
+
+  it("pins the full skip map for the new fixture -- no unrecognized or schema_invalid skips", () => {
+    const result = parseFixture20260927();
+    const reasonById: Record<string, string> = {};
+    for (const s of result.skipped) {
+      reasonById[s.externalId as string] = s.reason;
+    }
+    expect(reasonById).toEqual({
+      "1118611": "new_customer",
+      "1098873": "new_customer",
+      "1127153": "prop",
+      "1116571": "not_a_promo",
+      "1124647": "sgp",
+      "1126395": "sgp",
+      "1126078": "futures",
+      "1123721": "not_a_promo",
+      "1098879": "not_a_promo",
+      "1001646": "not_a_promo",
+      "1020206": "not_a_promo",
+      "882364": "new_customer",
+      "1119078": "futures",
+      "782037": "new_customer",
+      "861287": "not_a_promo",
+      "1107235": "new_customer",
+      "1114582": "not_a_promo",
+      "1119017": "not_a_promo",
+      "600295": "not_a_promo",
+      "779769": "new_customer",
+    });
+    expect(Object.values(reasonById)).not.toContain("unrecognized");
+    expect(Object.values(reasonById)).not.toContain("schema_invalid");
+  });
+
+  it("1126403 (LA Rams @ DEN Broncos 50% Profit Boost) -- every field, exactly", () => {
+    const candidate = findCandidate20260927("1126403");
+
+    expect(candidate.promoType).toBe("profit_boost");
+    expect(candidate.boostPercent).toBe("50.00");
+    expect(candidate.maxStake).toBe("25.00");
+    expect(candidate.minOddsAmerican).toBe(-200);
+    expect(candidate.teamsText).toEqual(["LA Rams", "DEN Broncos"]);
+    expect(candidate.sportKeyHint).toBe("americanfootball_nfl");
+    expect(candidate.scopeText).toBe("LA Rams @ DEN Broncos game on 9/27/2026 at 08:20 PM ET");
+    expect(candidate.windowStart).toBe("2026-09-27T04:00:00.000Z");
+    expect(candidate.windowEnd).toBe("2026-09-28T03:59:59.999Z");
+    expect(candidate.expiresAt).toBe("2026-09-28T03:59:00.000Z");
+    expect(candidate.claimRequired).toBe("opt_in");
+    expect(candidate.winningsCapKind).toBe("boost_extra");
+
+    // The window contains the 8:20 PM ET kickoff.
+    const kickoffMs = new Date("2026-09-28T00:20:00.000Z").getTime();
+    expect(new Date(candidate.windowStart as string).getTime()).toBeLessThanOrEqual(kickoffMs);
+    expect(new Date(candidate.windowEnd as string).getTime()).toBeGreaterThanOrEqual(kickoffMs);
+
+    const validated = ScrapedPromoSchema.safeParse(candidate);
+    expect(validated.success).toBe(true);
+  });
+
+  it("1123723 and 1126385 keep exactly their current sport-wide fields", () => {
+    const c1123723 = findCandidate20260927("1123723");
+    expect(c1123723.teamsText).toEqual([]);
+    expect(c1123723.sportKeyHint).toBe("americanfootball_nfl");
+    expect(c1123723.windowStart).toBe("2026-09-27T04:00:00.000Z");
+    expect(c1123723.windowEnd).toBe("2026-09-28T03:59:59.999Z");
+
+    const c1126385 = findCandidate20260927("1126385");
+    expect(c1126385.teamsText).toEqual([]);
+    expect(c1126385.sportKeyHint).toBe("americanfootball_nfl");
+    expect(c1126385.windowStart).toBe("2026-09-27T15:45:00.000Z");
+    expect(c1126385.windowEnd).toBe("2026-09-28T03:15:00.000Z");
+  });
+
+  it("1126403 matches a synthetic Rams/Broncos event, with or without a sport hint", () => {
+    const candidate = findCandidate20260927("1126403");
+    const event: OddsEvent = {
+      id: "evt-rams-broncos",
+      sport_key: "americanfootball_nfl",
+      commence_time: "2026-09-28T00:20:00Z",
+      home_team: "Denver Broncos",
+      away_team: "Los Angeles Rams",
+      bookmakers: [],
+    };
+    const events = { moneyline: [event], extended: [] as OddsEvent[] };
+
+    const result = matchPromo(candidate, events, { now: new Date("2026-09-27T12:00:00.000Z") });
+    expect(result.status).toBe("matched");
+
+    const noHintCandidate = { ...candidate, sportKeyHint: null };
+    const noHintResult = matchPromo(noHintCandidate, events, { now: new Date("2026-09-27T12:00:00.000Z") });
+    expect(noHintResult.status).toBe("matched");
+  });
+
+  it("(a) a game phrase whose teams resolve to no known sport is kept with sportKeyHint null and teamsText of length 2", () => {
+    const body = buildSyntheticBody({
+      terms:
+        "1. Opt-in and get One (1) Profit Boost for the Boise State Broncos @ Colorado State Rams game on 9/27/2026 at 08:20 PM ET!\n2. Profit Boost: 50% (Profit boost only applies to winnings, excluding original bet amount)\n3. Profit Boost Token only applies to a Single, Parlay, SGP, or SGPx bet.\n4. Total bet odds must be -200 or longer.\n5. Max betting limits apply.",
+      promotionDescription: "Get a 50% boost on this game today!",
+    });
+    const result = draftkingsScraper.parse(
+      { listBody: body, detailBodies: {} },
+      { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "x" },
+    );
+    expect(result.candidates).toHaveLength(1);
+    const candidate = result.candidates[0];
+    expect(candidate.sportKeyHint).toBeNull();
+    expect(candidate.teamsText).toHaveLength(2);
+    expect(result.skipped.find((s) => s.reason === "unrecognized")).toBeUndefined();
+  });
+
+  it("(b) a game phrase without the 'at HH:MM PM ET' suffix still parses", () => {
+    const body = buildSyntheticBody({
+      terms:
+        "1. Opt-in and get One (1) Profit Boost for the LA Rams @ DEN Broncos game on 9/27/2026!\n2. Profit Boost: 50% (Profit boost only applies to winnings, excluding original bet amount)\n3. Profit Boost Token only applies to a Single, Parlay, SGP, or SGPx bet.\n4. Total bet odds must be -200 or longer.\n5. Max betting limits apply.",
+    });
+    const result = draftkingsScraper.parse(
+      { listBody: body, detailBodies: {} },
+      { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "x" },
+    );
+    expect(result.candidates).toHaveLength(1);
+    const candidate = result.candidates[0];
+    expect(candidate.teamsText).toEqual(["LA Rams", "DEN Broncos"]);
+    expect(candidate.sportKeyHint).toBe("americanfootball_nfl");
+  });
+
+  it("(c) terms with neither 'for all <sport> games' nor 'for the A @ B game' and no sport word are still skipped as unrecognized", () => {
+    const body = buildSyntheticBody({
+      terms:
+        "1. Opt-in and get One (1) Profit Boost!\n2. Profit Boost: 50% (Profit boost only applies to winnings, excluding original bet amount)\n3. Profit Boost Token only applies to a Single, Parlay, SGP, or SGPx bet.\n4. Total bet odds must be -200 or longer.\n5. Max betting limits apply.",
+      promotionDescription: "Get a 50% boost today!",
+    });
+    const result = draftkingsScraper.parse(
+      { listBody: body, detailBodies: {} },
+      { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "x" },
+    );
+    expect(result.candidates).toEqual([]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe("unrecognized");
+  });
+
+  it("(d) terms saying 'end of the final NFL game on 9/27/2026' never produce teamsText", () => {
+    const body = buildSyntheticBody({
+      terms:
+        "1. Opt-in and get One (1) Profit Boost for all NFL games on 9/27/2026!\n2. Profit Boost: 50% (Profit boost only applies to winnings, excluding original bet amount)\n3. Profit Boost Token only applies to a NFL Single, Parlay, SGP, or SGPx bet.\n4. Profit Boost Token expires at the end of the final NFL game on 9/27/2026.\n5. Max betting limits apply.",
+    });
+    const result = draftkingsScraper.parse(
+      { listBody: body, detailBodies: {} },
+      { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "x" },
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].teamsText).toEqual([]);
   });
 });
