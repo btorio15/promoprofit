@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runPromoScrape, type LoadPromoMatchEvents } from "./run";
+import { LEGITIMATE_SKIP_REASONS, runPromoScrape, scrapeExitCode, type BookRunOutcome, type LoadPromoMatchEvents } from "./run";
 import type { CommitOutcome, PromoStore, PromoWrite } from "./store";
 import type { FetchRequest, FetchResult } from "./fetchPage";
+import { SKIP_REASONS } from "@/domain/promos/scraped";
 import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo } from "@/domain/promos/scraped";
 
 /** Every run.test.ts scenario is offline: never touch the real cached-odds tables. */
@@ -209,7 +210,7 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].detailRequests).toBe(3);
   });
 
-  it("WR-03: found > 0 with zero kept candidates is a failed run that writes and expires nothing", async () => {
+  it("WR-03: found > 0 with parser-regression skips (schema_invalid/unrecognized) is a failed run that writes and expires nothing", async () => {
     const scraper = makeScraper({
       parse: () => ({
         found: 3,
@@ -249,6 +250,93 @@ describe("runPromoScrape", () => {
       promosKept: 0,
       errorMessage: "3 promos found but none usable; existing promos kept",
     });
+    expect(scrapeExitCode(outcomes)).toBe(1);
+  });
+
+  it("a book whose every found promo is a legitimate exclusion (FanDuel shape) is an ok run with 0 kept, and nothing is committed", async () => {
+    const skipped = [
+      ...Array.from({ length: 8 }, (_, i) => ({ reason: "not_a_promo" as const, externalId: `na-${i}`, title: `NA ${i}` })),
+      ...Array.from({ length: 2 }, (_, i) => ({ reason: "new_customer" as const, externalId: `nc-${i}`, title: `NC ${i}` })),
+      { reason: "unsupported_sport" as const, externalId: "us-1", title: "US 1" },
+      { reason: "outright" as const, externalId: "or-1", title: "OR 1" },
+    ];
+    const scraper = makeScraper({
+      parse: () => ({ found: 12, candidates: [], skipped }),
+    });
+    const store = makeStore();
+    const loadEvents = vi.fn(async () => ({ moneyline: [], extended: [] }));
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents,
+    });
+
+    expect(outcomes[0]).toMatchObject({
+      status: "ok",
+      promosFound: 12,
+      promosKept: 0,
+      skippedByReason: { not_a_promo: 8, new_customer: 2, unsupported_sport: 1, outright: 1 },
+      errorMessage: null,
+    });
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(loadEvents).not.toHaveBeenCalled();
+    expect(store.recordScrapeRun).toHaveBeenCalledWith({
+      bookKey: "testbook",
+      ranAt: NOW,
+      status: "ok",
+      promosFound: 12,
+      promosKept: 0,
+      errorMessage: null,
+    });
+    expect(scrapeExitCode(outcomes)).toBe(0);
+  });
+
+  it("a mix of legitimate skips and one unrecognized skip is still a failed run", async () => {
+    const scraper = makeScraper({
+      parse: () => ({
+        found: 3,
+        candidates: [],
+        skipped: [
+          { reason: "not_a_promo", externalId: "a", title: "A" },
+          { reason: "not_a_promo", externalId: "b", title: "B" },
+          { reason: "unrecognized", externalId: "c", title: "C" },
+        ],
+      }),
+    });
+    const store = makeStore();
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+    });
+
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      promosFound: 3,
+      promosKept: 0,
+      skippedByReason: { not_a_promo: 2, unrecognized: 1 },
+      errorMessage: "3 promos found but none usable; existing promos kept",
+    });
+    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(store.recordScrapeRun).toHaveBeenCalledWith({
+      bookKey: "testbook",
+      ranAt: NOW,
+      status: "failed",
+      promosFound: 3,
+      promosKept: 0,
+      errorMessage: "3 promos found but none usable; existing promos kept",
+    });
+    expect(scrapeExitCode(outcomes)).toBe(1);
   });
 
   it("a failed list fetch records failed with the reason and makes no detail/upsert/expire calls", async () => {
@@ -305,6 +393,7 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].status).toBe("failed");
     expect(outcomes[0].errorMessage).toBe("zero promos parsed");
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
+    expect(scrapeExitCode(outcomes)).toBe(1);
   });
 
   it("parse throwing fails with the message truncated to 300 chars, no upsert/expire", async () => {
@@ -522,5 +611,49 @@ describe("runPromoScrape", () => {
     expect(outcomes.map((o) => o.status)).toEqual(["failed", "ok"]);
     expect(outcomes[0].errorMessage).toBe("neon blip");
     expect(loadEvents).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("LEGITIMATE_SKIP_REASONS", () => {
+  it("contains every SKIP_REASONS value except unrecognized and schema_invalid", () => {
+    const expected = SKIP_REASONS.filter((r) => r !== "unrecognized" && r !== "schema_invalid");
+    expect([...LEGITIMATE_SKIP_REASONS].sort()).toEqual([...expected].sort());
+    expect(LEGITIMATE_SKIP_REASONS.has("unrecognized")).toBe(false);
+    expect(LEGITIMATE_SKIP_REASONS.has("schema_invalid")).toBe(false);
+  });
+});
+
+describe("scrapeExitCode", () => {
+  const ok: BookRunOutcome = {
+    bookKey: "a",
+    status: "ok",
+    promosFound: 1,
+    promosKept: 1,
+    detailRequests: 0,
+    detailFailures: 0,
+    skippedByReason: {},
+    errorMessage: null,
+  };
+  const failed: BookRunOutcome = {
+    bookKey: "b",
+    status: "failed",
+    promosFound: 0,
+    promosKept: 0,
+    detailRequests: 0,
+    detailFailures: 0,
+    skippedByReason: {},
+    errorMessage: "x",
+  };
+
+  it("returns 0 for an empty outcomes array", () => {
+    expect(scrapeExitCode([])).toBe(0);
+  });
+
+  it("returns 1 when any outcome failed", () => {
+    expect(scrapeExitCode([ok, failed])).toBe(1);
+  });
+
+  it("returns 0 when all outcomes are ok", () => {
+    expect(scrapeExitCode([ok])).toBe(0);
   });
 });
