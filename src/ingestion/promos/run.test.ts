@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LEGITIMATE_SKIP_REASONS, runPromoScrape, scrapeExitCode, type BookRunOutcome, type LoadPromoMatchEvents } from "./run";
-import type { CommitOutcome, PromoStore, PromoWrite } from "./store";
+import { runPromoScrape, scrapeExitCode, type BookRunOutcome, type LoadPromoMatchEvents } from "./run";
+import type { ClassifyWrite, CommitOutcome, CommitScrapedPromosOpts, PromoStore, PromoWrite } from "./store";
 import type { FetchRequest, FetchResult } from "./fetchPage";
-import { SKIP_REASONS } from "@/domain/promos/scraped";
-import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo } from "@/domain/promos/scraped";
+import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo, SkippedEntry } from "@/domain/promos/scraped";
 
 /** Every run.test.ts scenario is offline: never touch the real cached-odds tables. */
 const EMPTY_MATCH_EVENTS: LoadPromoMatchEvents = async () => ({ moneyline: [], extended: [] });
@@ -124,11 +123,18 @@ describe("runPromoScrape", () => {
 
     // Upsert + expiry of unseen rows are one transactional store call (WR-03).
     expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
-    const [bookKeyArg, writesArg, nowArg] = store.commitScrapedPromos.mock.calls[0];
+    const [bookKeyArg, writesArg, nowArg, optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
     expect(bookKeyArg).toBe("testbook");
     expect(nowArg).toBe(NOW);
     expect(writesArg).toHaveLength(2);
     expect(writesArg.every((w: PromoWrite) => typeof w.dedupeKey === "string" && w.dedupeKey.length > 0)).toBe(true);
+    expect(optsArg.classify).toEqual([]);
+    expect(optsArg.expireUnseen).toBe(true);
 
     expect(store.recordScrapeRun).toHaveBeenCalledWith({
       bookKey: "testbook",
@@ -148,6 +154,7 @@ describe("runPromoScrape", () => {
         detailRequests: 2,
         detailFailures: 0,
         skippedByReason: {},
+        sentToReview: 0,
         errorMessage: null,
       },
     ]);
@@ -210,15 +217,14 @@ describe("runPromoScrape", () => {
     expect(outcomes[0].detailRequests).toBe(3);
   });
 
-  it("WR-03: found > 0 with parser-regression skips (schema_invalid/unrecognized) is a failed run that writes and expires nothing", async () => {
+  it("(a) 1 candidate + 1 unrecognized + 1 parlay is ok: promosKept 1, sentToReview 1, classify write committed with expireUnseen true", async () => {
     const scraper = makeScraper({
       parse: () => ({
         found: 3,
-        candidates: [],
+        candidates: [makePromo({ externalId: "kept-1" })],
         skipped: [
-          { reason: "schema_invalid", externalId: "a", title: "A" },
-          { reason: "schema_invalid", externalId: "b", title: "B" },
-          { reason: "unrecognized", externalId: "c", title: "C" },
+          { reason: "unrecognized", externalId: "u-1", title: "Mystery Boost" },
+          { reason: "parlay", externalId: "p-1", title: "Parlay Boost" },
         ],
       }),
     });
@@ -235,33 +241,37 @@ describe("runPromoScrape", () => {
     });
 
     expect(outcomes[0]).toMatchObject({
-      status: "failed",
+      status: "ok",
       promosFound: 3,
-      promosKept: 0,
-      skippedByReason: { schema_invalid: 2, unrecognized: 1 },
-      errorMessage: "3 promos found but none usable; existing promos kept",
+      promosKept: 1,
+      sentToReview: 1,
+      skippedByReason: { unrecognized: 1, parlay: 1 },
+      errorMessage: null,
     });
-    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
-    expect(store.recordScrapeRun).toHaveBeenCalledWith({
-      bookKey: "testbook",
-      ranAt: NOW,
-      status: "failed",
-      promosFound: 3,
-      promosKept: 0,
-      errorMessage: "3 promos found but none usable; existing promos kept",
-    });
-    expect(scrapeExitCode(outcomes)).toBe(1);
+    expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
+    const [, writesArg, , optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(writesArg).toHaveLength(1);
+    expect(optsArg.classify).toHaveLength(1);
+    expect(optsArg.classify?.[0].draft.title).toBe("Mystery Boost");
+    expect(optsArg.expireUnseen).toBe(true);
+    expect(scrapeExitCode(outcomes)).toBe(0);
   });
 
-  it("a book whose every found promo is a legitimate exclusion (FanDuel shape) is an ok run with 0 kept, and nothing is committed", async () => {
-    const skipped = [
-      ...Array.from({ length: 8 }, (_, i) => ({ reason: "not_a_promo" as const, externalId: `na-${i}`, title: `NA ${i}` })),
-      ...Array.from({ length: 2 }, (_, i) => ({ reason: "new_customer" as const, externalId: `nc-${i}`, title: `NC ${i}` })),
-      { reason: "unsupported_sport" as const, externalId: "us-1", title: "US 1" },
-      { reason: "outright" as const, externalId: "or-1", title: "OR 1" },
-    ];
+  it("(b) 0 candidates + 2 unrecognized (found 2) is ok, not failed: sentToReview 2, classify writes committed with expireUnseen false", async () => {
     const scraper = makeScraper({
-      parse: () => ({ found: 12, candidates: [], skipped }),
+      parse: () => ({
+        found: 2,
+        candidates: [],
+        skipped: [
+          { reason: "unrecognized", externalId: "u-1", title: "Mystery A" },
+          { reason: "unrecognized", externalId: "u-2", title: "Mystery B" },
+        ],
+      }),
     });
     const store = makeStore();
     const loadEvents = vi.fn(async () => ({ moneyline: [], extended: [] }));
@@ -278,9 +288,57 @@ describe("runPromoScrape", () => {
 
     expect(outcomes[0]).toMatchObject({
       status: "ok",
-      promosFound: 12,
+      promosFound: 2,
       promosKept: 0,
-      skippedByReason: { not_a_promo: 8, new_customer: 2, unsupported_sport: 1, outright: 1 },
+      sentToReview: 2,
+      skippedByReason: { unrecognized: 2 },
+      errorMessage: null,
+    });
+    // A book with zero candidates never needs match events, even when it
+    // has classify writes -- a classify row is never matched.
+    expect(loadEvents).not.toHaveBeenCalled();
+    expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
+    const [bookKeyArg, writesArg, , optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(bookKeyArg).toBe("testbook");
+    expect(writesArg).toEqual([]);
+    expect(optsArg.classify).toHaveLength(2);
+    expect(optsArg.expireUnseen).toBe(false);
+    expect(scrapeExitCode(outcomes)).toBe(0);
+  });
+
+  it("(c) a book whose every found promo is a clear/legitimate exclusion is ok with 0 kept, and nothing is committed", async () => {
+    const skipped: SkippedEntry[] = [
+      ...Array.from({ length: 8 }, (_, i) => ({ reason: "not_a_promo" as const, externalId: `na-${i}`, title: `NA ${i}` })),
+      ...Array.from({ length: 2 }, (_, i) => ({ reason: "new_customer" as const, externalId: `nc-${i}`, title: `NC ${i}` })),
+      { reason: "outright" as const, externalId: "or-1", title: "OR 1" },
+    ];
+    const scraper = makeScraper({
+      parse: () => ({ found: 11, candidates: [], skipped }),
+    });
+    const store = makeStore();
+    const loadEvents = vi.fn(async () => ({ moneyline: [], extended: [] }));
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents,
+    });
+
+    expect(outcomes[0]).toMatchObject({
+      status: "ok",
+      promosFound: 11,
+      promosKept: 0,
+      sentToReview: 0,
+      skippedByReason: { not_a_promo: 8, new_customer: 2, outright: 1 },
       errorMessage: null,
     });
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
@@ -289,24 +347,33 @@ describe("runPromoScrape", () => {
       bookKey: "testbook",
       ranAt: NOW,
       status: "ok",
-      promosFound: 12,
+      promosFound: 11,
       promosKept: 0,
       errorMessage: null,
     });
     expect(scrapeExitCode(outcomes)).toBe(0);
   });
 
-  it("a mix of legitimate skips and one unrecognized skip is still a failed run", async () => {
+  it("(f) a candidate and a classify draft with the same dedupe key: the candidate wins, only one write is sent", async () => {
+    const promo = makePromo({ externalId: "same-key", boostPercent: "50.00" });
+    // A synthetic unrecognized skip whose evidence, once run through
+    // buildClassifyDraft, produces a draft with the SAME dedupe-key
+    // identity fields (bookKey/promoType/boostPercent/externalId) as the
+    // candidate above.
+    const skip: SkippedEntry = {
+      reason: "unrecognized",
+      externalId: "same-key",
+      title: "Duplicate",
+      evidence: {
+        rawText: "50% Profit Boost",
+        sourceUrl: "https://example.com/list",
+        expiresAt: null,
+        partial: { promoType: "profit_boost", boostPercent: "50.00" },
+      },
+    };
     const scraper = makeScraper({
-      parse: () => ({
-        found: 3,
-        candidates: [],
-        skipped: [
-          { reason: "not_a_promo", externalId: "a", title: "A" },
-          { reason: "not_a_promo", externalId: "b", title: "B" },
-          { reason: "unrecognized", externalId: "c", title: "C" },
-        ],
-      }),
+      listRequest: req("https://example.com/list"),
+      parse: () => ({ found: 2, candidates: [promo], skipped: [skip] }),
     });
     const store = makeStore();
 
@@ -320,24 +387,54 @@ describe("runPromoScrape", () => {
       loadEvents: EMPTY_MATCH_EVENTS,
     });
 
-    expect(outcomes[0]).toMatchObject({
-      status: "failed",
-      promosFound: 3,
-      promosKept: 0,
-      skippedByReason: { not_a_promo: 2, unrecognized: 1 },
-      errorMessage: "3 promos found but none usable; existing promos kept",
-    });
-    expect(store.commitScrapedPromos).not.toHaveBeenCalled();
-    expect(store.recordScrapeRun).toHaveBeenCalledWith({
-      bookKey: "testbook",
-      ranAt: NOW,
-      status: "failed",
-      promosFound: 3,
-      promosKept: 0,
-      errorMessage: "3 promos found but none usable; existing promos kept",
-    });
-    expect(scrapeExitCode(outcomes)).toBe(1);
+    expect(outcomes[0]).toMatchObject({ status: "ok", promosKept: 1, sentToReview: 0 });
+    const [, writesArg, , optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(writesArg).toHaveLength(1);
+    expect(optsArg.classify).toEqual([]);
   });
+
+  it("(g) a schema_invalid skip becomes a classify write whose draft carries the evidence.partial fields", async () => {
+    const skip: SkippedEntry = {
+      reason: "schema_invalid",
+      externalId: "bad-1",
+      title: "Broken Promo",
+      evidence: {
+        rawText: "some raw text",
+        sourceUrl: "https://example.com/bad",
+        expiresAt: "2026-10-01T00:00:00.000Z",
+        partial: { promoType: "profit_boost", sportKeyHint: "americanfootball_nfl", boostPercent: "75.00" },
+      },
+    };
+    const scraper = makeScraper({
+      parse: () => ({ found: 1, candidates: [], skipped: [skip] }),
+    });
+    const store = makeStore();
+
+    await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+    });
+
+    const [, , , optsArg] = store.commitScrapedPromos.mock.calls[0] as [string, PromoWrite[], Date, CommitScrapedPromosOpts];
+    expect(optsArg.classify).toHaveLength(1);
+    const draft = (optsArg.classify as ClassifyWrite[])[0].draft;
+    expect(draft.promoType).toBe("profit_boost");
+    expect(draft.sportKeyHint).toBe("americanfootball_nfl");
+    expect(draft.boostPercent).toBe("75.00");
+    expect(draft.sourceUrl).toBe("https://example.com/bad");
+    expect(draft.expiresAt).toBe("2026-10-01T00:00:00.000Z");
+  });
+
 
   it("a failed list fetch records failed with the reason and makes no detail/upsert/expire calls", async () => {
     const scraper = makeScraper();
@@ -363,6 +460,7 @@ describe("runPromoScrape", () => {
       detailRequests: 0,
       detailFailures: 0,
       skippedByReason: {},
+      sentToReview: 0,
       errorMessage: "HTTP 403",
     });
     expect(store.commitScrapedPromos).not.toHaveBeenCalled();
@@ -478,6 +576,7 @@ describe("runPromoScrape", () => {
       detailRequests: 0,
       detailFailures: 0,
       skippedByReason: {},
+      sentToReview: 0,
       errorMessage: "no scraper registered",
     });
     expect(store.recordScrapeRun).toHaveBeenCalledWith({
@@ -614,15 +713,6 @@ describe("runPromoScrape", () => {
   });
 });
 
-describe("LEGITIMATE_SKIP_REASONS", () => {
-  it("contains every SKIP_REASONS value except unrecognized and schema_invalid", () => {
-    const expected = SKIP_REASONS.filter((r) => r !== "unrecognized" && r !== "schema_invalid");
-    expect([...LEGITIMATE_SKIP_REASONS].sort()).toEqual([...expected].sort());
-    expect(LEGITIMATE_SKIP_REASONS.has("unrecognized")).toBe(false);
-    expect(LEGITIMATE_SKIP_REASONS.has("schema_invalid")).toBe(false);
-  });
-});
-
 describe("scrapeExitCode", () => {
   const ok: BookRunOutcome = {
     bookKey: "a",
@@ -632,6 +722,18 @@ describe("scrapeExitCode", () => {
     detailRequests: 0,
     detailFailures: 0,
     skippedByReason: {},
+    sentToReview: 0,
+    errorMessage: null,
+  };
+  const okWithReview: BookRunOutcome = {
+    bookKey: "c",
+    status: "ok",
+    promosFound: 2,
+    promosKept: 0,
+    detailRequests: 0,
+    detailFailures: 0,
+    skippedByReason: { unrecognized: 2 },
+    sentToReview: 2,
     errorMessage: null,
   };
   const failed: BookRunOutcome = {
@@ -642,6 +744,7 @@ describe("scrapeExitCode", () => {
     detailRequests: 0,
     detailFailures: 0,
     skippedByReason: {},
+    sentToReview: 0,
     errorMessage: "x",
   };
 
@@ -653,7 +756,7 @@ describe("scrapeExitCode", () => {
     expect(scrapeExitCode([ok, failed])).toBe(1);
   });
 
-  it("returns 0 when all outcomes are ok", () => {
-    expect(scrapeExitCode([ok])).toBe(0);
+  it("returns 0 when all outcomes are ok, including a book with sentToReview > 0", () => {
+    expect(scrapeExitCode([ok, okWithReview])).toBe(0);
   });
 });

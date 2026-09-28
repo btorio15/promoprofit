@@ -81,7 +81,10 @@ describe("runOddsRefresh", () => {
       { key: "basketball_nba", group: "Basketball", title: "NBA", active: true },
       { key: "baseball_mlb", group: "Baseball", title: "MLB", active: true },
       { key: "americanfootball_nfl", group: "Football", title: "NFL", active: false },
-      { key: "icehockey_nhl", group: "Hockey", title: "NHL", active: true },
+      // quick-260928-it1: icehockey_nhl moved from unsupported to supported
+      // (SPORT_KEYS) -- this fixture's "non-D-01" example must use a still-
+      // unsupported sport instead to keep testing that exclusion path.
+      { key: "soccer_epl", group: "Soccer", title: "EPL", active: true },
     ]);
     mockFetchSportOdds.mockImplementation(async (sportKey: string) => {
       if (sportKey === "basketball_nba") {
