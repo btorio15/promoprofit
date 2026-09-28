@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Permanent boundary/anti-bot guards (PROMO-03, D-09, CLAUDE.md's Playwright
- * scoping). The scraper must never leak into the Next.js app bundle, and no
- * anti-bot/browser dependency may ever re-enter the repo, this phase or any
- * future one.
+ * scoping; quick-260928-kc5 T-kc5-05). The scraper must never leak into the
+ * Next.js app bundle, no anti-bot/browser dependency may ever re-enter the
+ * repo, and the Claude Haiku promo reader's SDK (with its metered,
+ * secret-keyed calls) must stay server-only scrape code too.
  */
 
 const REPO_ROOT = join(__dirname, "..", "..", "..");
@@ -24,10 +25,10 @@ function walkFiles(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const FORBIDDEN_IMPORT_RE = /cheerio|playwright(?:-extra)?|puppeteer|@\/ingestion\/promos/;
+const FORBIDDEN_IMPORT_RE = /cheerio|playwright(?:-extra)?|puppeteer|@anthropic-ai\/sdk|@\/ingestion\/promos/;
 
 describe("scraper/app-router boundary", () => {
-  it("no file under src/app or src/components imports a scraper/browser package or src/ingestion/promos", () => {
+  it("no file under src/app or src/components imports a scraper/browser package, the Anthropic SDK, or src/ingestion/promos", () => {
     const roots = [join(REPO_ROOT, "src", "app"), join(REPO_ROOT, "src", "components")];
     const offenders: string[] = [];
 

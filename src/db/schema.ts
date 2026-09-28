@@ -272,6 +272,25 @@ export const scrapeRuns = pgTable(
 );
 
 /**
+ * quick-260928-kc5: content-addressed cache for the Claude Haiku 4.5 promo
+ * reader (PROMO-03). content_hash is readingCacheKey(bookKey, text) --
+ * sha256 of [prompt version, model, book key, whitespace-normalized text] --
+ * so a prompt-version bump naturally invalidates every cached row without a
+ * migration (a bumped version is simply never looked up again). No FK on
+ * book_key: the cache must never depend on `books` being seeded first. Rows
+ * are re-validated against PromoReadingSchema on every read
+ * (readerCache.ts) -- an invalid cached row counts as a miss, never a crash.
+ */
+export const promoReadings = pgTable("promo_readings", {
+  contentHash: text("content_hash").primaryKey(),
+  bookKey: text("book_key").notNull(),
+  model: text("model").notNull(),
+  promptVersion: text("prompt_version").notNull(),
+  reading: jsonb("reading").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * quick-260927-n12 (owner decision 2): per-member "mark used" state. A
  * member marking a promo used only affects THEIR OWN feed/total -- other
  * members still see the promo -- so this is a join table keyed on

@@ -1,8 +1,14 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { runPromoScrape, scrapeExitCode, type BookRunOutcome, type LoadPromoMatchEvents } from "./run";
 import type { ClassifyWrite, CommitOutcome, CommitScrapedPromosOpts, PromoStore, PromoWrite } from "./store";
 import type { FetchRequest, FetchResult } from "./fetchPage";
 import type { BookScraper, DetailPlan, HttpRequestSpec, ParseResult, ScrapedPromo, SkippedEntry } from "@/domain/promos/scraped";
+import { draftkingsScraper } from "./books/draftkings";
+import { promoDedupeKey } from "@/domain/promos/dedupe";
+import type { PromoReader, ReaderResult } from "./promoReader";
+import type { ReaderBookStats } from "./readerPass";
 
 /** Every run.test.ts scenario is offline: never touch the real cached-odds tables. */
 const EMPTY_MATCH_EVENTS: LoadPromoMatchEvents = async () => ({ moneyline: [], extended: [] });
@@ -758,5 +764,292 @@ describe("scrapeExitCode", () => {
 
   it("returns 0 when all outcomes are ok, including a book with sentToReview > 0", () => {
     expect(scrapeExitCode([ok, okWithReview])).toBe(0);
+  });
+});
+
+describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
+  const DK_NOW = new Date("2026-09-28T12:00:00.000Z");
+  const DK_SOURCE_URL = "https://api.draftkings.com/en/api/promotions/v3/promotions/query";
+
+  function loadDkFixtureBody(): string {
+    return readFileSync(join(process.cwd(), "src/test/fixtures/promos/draftkings-promos-2026-09-28.json"), "utf-8");
+  }
+
+  function makeDkFetch(): FetchRequest {
+    return vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: loadDkFixtureBody() }));
+  }
+
+  async function runDk(reader?: PromoReader | null, store: ReturnType<typeof makeStore> = makeStore()) {
+    const outcomes = await runPromoScrape({
+      now: DK_NOW,
+      targets: ["draftkings"],
+      scrapers: { draftkings: draftkingsScraper },
+      fetch: makeDkFetch(),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+      ...(reader !== undefined ? { reader } : {}),
+    });
+    return { outcomes, store };
+  }
+
+  it("PIN: the real DK 2026-09-28 fixture with no reader -- baseline for every equivalence check below", async () => {
+    const { outcomes, store } = await runDk();
+
+    expect(outcomes[0].status).toBe("ok");
+    expect(outcomes[0].promosFound).toBe(23);
+    expect(outcomes[0]).not.toHaveProperty("reader");
+
+    expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(writesArg.map((w) => w.parsed.externalId)).toEqual(["1125873"]);
+  });
+
+  it("a reader that always falls back produces commitScrapedPromos args deep-equal to the no-reader run, plus reader stats with fallbacks == entries read", async () => {
+    const baseline = await runDk();
+    const fallbackReader: PromoReader = {
+      read: vi.fn(async (): Promise<ReaderResult> => ({ source: "fallback", reason: "api_error" })),
+    };
+    const withReader = await runDk(fallbackReader);
+
+    const [, baseWrites, , baseOpts] = baseline.store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    const [, readerWrites, , readerOpts] = withReader.store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(readerWrites).toEqual(baseWrites);
+    expect(readerOpts).toEqual(baseOpts);
+
+    const { reader: readerStats, ...restOfOutcome } = withReader.outcomes[0];
+    const { ...baselineOutcome } = baseline.outcomes[0];
+    expect(restOfOutcome).toEqual(baselineOutcome);
+    expect(readerStats).toBeDefined();
+    expect((readerStats as ReaderBookStats).calls).toBe(0);
+    expect((readerStats as ReaderBookStats).cacheHits).toBe(0);
+    // 1 candidate + 22 skips (every skip in this fixture carries evidence) == 23 entries read.
+    expect((readerStats as ReaderBookStats).fallbacks).toBe(23);
+  });
+
+  it("agreeing on 1125873 and not_usable/prop on 1127668 leaves the candidate write unchanged, disagreements 0", async () => {
+    const candidate1125873 = draftkingsScraper.parse(
+      { listBody: loadDkFixtureBody(), detailBodies: {} },
+      { now: DK_NOW, sourceUrl: DK_SOURCE_URL },
+    ).candidates.find((c) => c.externalId === "1125873")!;
+    const skip1127668 = draftkingsScraper.parse(
+      { listBody: loadDkFixtureBody(), detailBodies: {} },
+      { now: DK_NOW, sourceUrl: DK_SOURCE_URL },
+    ).skipped.find((s) => s.externalId === "1127668")!;
+
+    const scraper = makeScraper({
+      listRequest: req(DK_SOURCE_URL),
+      parse: () => ({ found: 2, candidates: [candidate1125873], skipped: [skip1127668] }),
+    });
+    const store = makeStore();
+
+    const agreeingReader: PromoReader = {
+      read: vi.fn(async ({ text }): Promise<ReaderResult> => {
+        if (text.includes("NHL 50% Profit Boost")) {
+          return {
+            source: "api",
+            reading: {
+              kind: "profit_boost",
+              skipReason: null,
+              boostPercent: "50",
+              bonusAmount: null,
+              maxStake: "25",
+              maxWinnings: null,
+              minOddsAmerican: -200,
+              sport: "icehockey_nhl",
+              teams: [],
+              singleGame: false,
+              liveOnly: false,
+              parlayOrSgpOnly: false,
+              propOnly: false,
+              newCustomerOnly: false,
+              eventDateText: "9/29/2026",
+              confidence: "high",
+              evidence: {
+                boostPercent: "Profit Boost: 50%",
+                bonusAmount: null,
+                maxStake: "MAX $25 WAGER",
+                maxWinnings: null,
+                minOddsAmerican: "-200 or longer",
+              },
+            },
+            usage: { inputTokens: 400, outputTokens: 200 },
+          };
+        }
+        return {
+          source: "api",
+          reading: {
+            kind: "not_usable",
+            skipReason: "prop",
+            boostPercent: null,
+            bonusAmount: null,
+            maxStake: null,
+            maxWinnings: null,
+            minOddsAmerican: null,
+            sport: null,
+            teams: [],
+            singleGame: false,
+            liveOnly: false,
+            parlayOrSgpOnly: false,
+            propOnly: true,
+            newCustomerOnly: false,
+            eventDateText: null,
+            confidence: "high",
+            evidence: {
+              boostPercent: null,
+              bonusAmount: null,
+              maxStake: null,
+              maxWinnings: null,
+              minOddsAmerican: null,
+            },
+          },
+          usage: { inputTokens: 300, outputTokens: 100 },
+        };
+      }),
+    };
+
+    const outcomes = await runPromoScrape({
+      now: DK_NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+      reader: agreeingReader,
+    });
+
+    expect(outcomes[0].status).toBe("ok");
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0] as [string, PromoWrite[], Date, CommitScrapedPromosOpts];
+    expect(writesArg).toHaveLength(1);
+    expect(writesArg[0].parsed).toEqual(candidate1125873);
+
+    const stats = outcomes[0].reader as ReaderBookStats;
+    expect(stats.calls).toBe(2);
+    expect(stats.cacheHits).toBe(0);
+    expect(stats.disagreements).toBe(0);
+  });
+
+  it("a disagreeing reader on 1125873's boost demotes it to review, preserving its dedupe key", async () => {
+    const realFixtureResult = draftkingsScraper.parse(
+      { listBody: loadDkFixtureBody(), detailBodies: {} },
+      { now: DK_NOW, sourceUrl: DK_SOURCE_URL },
+    );
+    const realCandidate = realFixtureResult.candidates.find((c) => c.externalId === "1125873")!;
+    // A simulated parser mistake: boostPercent 40.00 paired with 1125873's
+    // own real text (which actually says 50%) -- after the field-binding
+    // guard, only a genuinely-backed "50" can prove boostPercent, so this
+    // must disagree rather than pass some fuzzy tolerance.
+    const mistakenCandidate: ScrapedPromo = { ...realCandidate, boostPercent: "40.00" };
+
+    const scraper = makeScraper({
+      listRequest: req(DK_SOURCE_URL),
+      parse: () => ({ found: 1, candidates: [mistakenCandidate], skipped: [] }),
+    });
+    const store = makeStore();
+
+    const disagreeingReader: PromoReader = {
+      read: vi.fn(async (): Promise<ReaderResult> => ({
+        source: "api",
+        reading: {
+          kind: "profit_boost",
+          skipReason: null,
+          boostPercent: "50",
+          bonusAmount: null,
+          maxStake: "25",
+          maxWinnings: null,
+          minOddsAmerican: -200,
+          sport: "icehockey_nhl",
+          teams: [],
+          singleGame: false,
+          liveOnly: false,
+          parlayOrSgpOnly: false,
+          propOnly: false,
+          newCustomerOnly: false,
+          eventDateText: "9/29/2026",
+          confidence: "high",
+          evidence: {
+            boostPercent: "Profit Boost: 50%",
+            bonusAmount: null,
+            maxStake: "MAX $25 WAGER",
+            maxWinnings: null,
+            minOddsAmerican: "-200 or longer",
+          },
+        },
+        usage: { inputTokens: 400, outputTokens: 200 },
+      })),
+    };
+
+    const outcomes = await runPromoScrape({
+      now: DK_NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+      reader: disagreeingReader,
+    });
+
+    expect(outcomes[0].status).toBe("ok");
+    expect((outcomes[0].reader as ReaderBookStats).disagreements).toBe(1);
+
+    expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
+    const [, writesArg, , optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+      string,
+      PromoWrite[],
+      Date,
+      CommitScrapedPromosOpts,
+    ];
+    expect(writesArg).toEqual([]);
+    expect(optsArg.expireUnseen).toBe(false);
+    expect(optsArg.classify).toHaveLength(1);
+    const classifyWrite = (optsArg.classify as ClassifyWrite[])[0];
+    expect(classifyWrite.dedupeKey).toBe(promoDedupeKey(mistakenCandidate));
+    expect(classifyWrite.draft.rawText.startsWith("[Promo reader check: disagreement]")).toBe(true);
+  });
+
+  it("a reader whose read() throws for every entry leaves the book's result equal to the no-reader result, status ok", async () => {
+    const scraper = makeScraper({ parse: () => ({ found: 1, candidates: [makePromo()], skipped: [] }) });
+    const store = makeStore();
+    const throwingReader: PromoReader = {
+      read: vi.fn(async () => {
+        throw new Error("defensive: the real reader never throws");
+      }),
+    };
+
+    const outcomes = await runPromoScrape({
+      now: NOW,
+      targets: ["testbook"],
+      scrapers: { testbook: scraper },
+      fetch: vi.fn(async (): Promise<FetchResult> => ({ ok: true, body: "{}" })),
+      store,
+      sleep: makeSleep(),
+      loadEvents: EMPTY_MATCH_EVENTS,
+      reader: throwingReader,
+    });
+
+    expect(outcomes[0].status).toBe("ok");
+    expect(outcomes[0].promosKept).toBe(1);
+    const stats = outcomes[0].reader as ReaderBookStats;
+    expect(stats.fallbacks).toBe(1);
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0] as [string, PromoWrite[], Date, CommitScrapedPromosOpts];
+    expect(writesArg).toHaveLength(1);
+    expect(writesArg[0].parsed).toEqual(makePromo());
   });
 });
