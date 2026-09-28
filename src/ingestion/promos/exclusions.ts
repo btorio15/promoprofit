@@ -97,6 +97,17 @@ const PARLAY_RE = /\bparlay\b/i;
 const HAS_SINGLE_OR_ANY_WAGER_RE = /\bsingle\b|\bany wager\b/i;
 const RESTRICTS_TO_PARLAY_SGP_RE = /\b(?:parlay|sgp\s*\(?x?\)?)\b/i;
 
+/**
+ * quick-260928-mgi: exposes NEW_CUSTOMER_TEXT_RE for signupOffers.ts's
+ * boilerplate rule (DK's logged-out "please log in or sign up..." boilerplate
+ * is the only new-customer signal in some entries -- once stripped, this
+ * re-check decides whether the entry still counts as a sign-up offer). Never
+ * changes classifyExclusion's own behavior or regex.
+ */
+export function mentionsNewCustomer(text: string): boolean {
+  return NEW_CUSTOMER_TEXT_RE.test(text);
+}
+
 export function classifyExclusion(input: {
   title: string;
   text: string;
