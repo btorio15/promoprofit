@@ -246,6 +246,63 @@ function extractScope(text: string): { scopeText: string; dateText: string } | n
   return { scopeText: `${sportWords} Games on ${dateText}`, dateText };
 }
 
+/** "for the Eagles @ Bears NFL Game on September 28" (real fixture
+ * LONFLMNFRE0928, "NFL Reward Escalator", 2026-09-28) -- a single-game
+ * FanDuel boost, distinct from SCOPE_PHRASE_RE's sport-wide "for any
+ * <sport> Games on <Month Day, Year>" phrasing in two ways: it names the
+ * two teams instead of a sport, and its date has no year. The optional
+ * ALL-CAPS sport code between the team pair and "Game" (e.g. "NFL") is
+ * consumed but discarded, since it is not part of either team name. Team
+ * groups exclude "@" and newlines only (no nested quantifiers -- same
+ * catastrophic-backtracking guard as DraftKings' GAME_SCOPE_RE, T-pcc-02).
+ * Before this regex existed, splitTeams ran directly on the full raw
+ * `entry.name` one-liner as a fallback and would spuriously split on the
+ * embedded " @ " inside this promo's marketing sentence, producing garbage
+ * "team" text that included unrelated words either side of "@" -- this
+ * regex isolates the real team pair before that fallback ever runs. */
+const GAME_SCOPE_RE =
+  /for the ([^\n@]+?) @ ([^\n@]+?)(?:\s+[A-Z]{2,6})?\s+Games?\s+on\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?)\b/i;
+
+interface FanduelGameScope {
+  teams: [string, string];
+  dateText: string;
+  scopeText: string;
+}
+
+/** Pure helper: parses the GAME_SCOPE_RE phrase, or null when absent. */
+function parseGameScope(text: string): FanduelGameScope | null {
+  const match = GAME_SCOPE_RE.exec(text);
+  if (!match) return null;
+
+  const away = match[1].trim();
+  const home = match[2].trim();
+  const dateText = match[3].trim();
+  if (away.length === 0 || home.length === 0) return null;
+
+  return {
+    teams: [away, home],
+    dateText,
+    scopeText: truncate(`${away} @ ${home} game on ${dateText}`, MAX_SCOPE_TEXT_CHARS),
+  };
+}
+
+const EXPIRES_AT_YEAR_RE = /^(\d{4})-/;
+
+/** GAME_SCOPE_RE's dateText has no year ("September 28"), unlike
+ * SCOPE_PHRASE_RE's date, which always includes one -- slateWindow's
+ * underlying date parser requires a 4-digit year to produce a window at
+ * all. The promo's own expiry always falls within a day or two of the
+ * named game in every observed single-game FanDuel fixture, so its year is
+ * a safe, conservative source for the missing year (never guessed from
+ * "now", which could be wrong across a Dec 31/Jan 1 boundary). Returns the
+ * bare dateText unchanged when expiresAt is absent or unparseable, in
+ * which case slateWindow will simply fail closed (null window) exactly as
+ * it does for any other unparseable date. */
+function withInferredYear(dateText: string, expiresAt: string | null): string {
+  const yearMatch = expiresAt ? EXPIRES_AT_YEAR_RE.exec(expiresAt) : null;
+  return yearMatch ? `${dateText}, ${yearMatch[1]}` : dateText;
+}
+
 const ANY_WAGER_RE = /\bany\s+wager\b/i;
 
 const BOOST_PERCENT_RE = /(\d+(?:\.\d+)?)\s*%\s*profit\s+boost/i;
@@ -302,10 +359,30 @@ function buildCandidate(params: {
   } = params;
 
   const scope = extractScope(text);
+  // SCOPE_PHRASE_RE (sport-wide, has its own year) wins when both phrases
+  // match -- only look for the single-game team-pair phrase when the
+  // sport-wide one isn't present.
+  const gameScope = scope ? null : parseGameScope(text);
   const boostPercent = extractBoostPercent(text);
-  const window = scope ? slateWindow(scope.dateText, expiresAt) : null;
-  const scopeText = truncate(scope ? scope.scopeText : entry.name, MAX_SCOPE_TEXT_CHARS);
-  const teamPair = splitTeams(scopeText);
+
+  let window: { start: string; end: string } | null = null;
+  let scopeText: string;
+  let teamsText: string[] = [];
+
+  if (scope) {
+    scopeText = scope.scopeText;
+    window = slateWindow(scope.dateText, expiresAt);
+    const teamPair = splitTeams(scopeText);
+    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+  } else if (gameScope) {
+    scopeText = gameScope.scopeText;
+    teamsText = gameScope.teams;
+    window = slateWindow(withInferredYear(gameScope.dateText, expiresAt), expiresAt);
+  } else {
+    scopeText = truncate(entry.name, MAX_SCOPE_TEXT_CHARS);
+    const teamPair = splitTeams(scopeText);
+    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+  }
 
   return {
     bookKey: "fanduel",
@@ -316,7 +393,7 @@ function buildCandidate(params: {
     sourceUrl,
     sportKeyHint: sportKey,
     scopeText,
-    teamsText: teamPair ? [teamPair[0], teamPair[1]] : [],
+    teamsText,
     windowStart: window ? window.start : null,
     windowEnd: window ? window.end : null,
     expiresAt,

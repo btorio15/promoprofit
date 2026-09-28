@@ -25,6 +25,14 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     ).toBe("live_only");
   });
 
+  it.each([
+    ["pre-live wager", "Get a 30% Profit Boost Token to use on any pre-live wager for the Eagles @ Bears NFL Game on September 28"],
+    ["pre live wager (space, no hyphen)", "Get a 30% Profit Boost Token to use on any pre live wager for the Eagles @ Bears NFL Game on September 28"],
+    ["Pre-Live Wagers (plural, mixed case)", "Valid on any Pre-Live Wagers for tonight's game"],
+  ])("does not classify %s as live_only (pre-live means pre-game, not live)", (_label, text) => {
+    expect(classify("NFL Boost", text)).not.toBe("live_only");
+  });
+
   it("classifies a title-level Parlay signal over an incidental Scorer/prop mention", () => {
     expect(classify("25% NFL TD Scorer Parlay Profit Boost")).toBe("parlay");
   });

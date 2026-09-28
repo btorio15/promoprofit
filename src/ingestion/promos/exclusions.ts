@@ -31,7 +31,17 @@ const NOT_A_PROMO_RE =
 // trailing "Only") while its detail bullet says "Live Wagers Only" -- both
 // must classify the same way (03-RECON.md Observed Promos row 3), so this
 // matches bare "live wager(s)" as well as the "... only" phrasing.
-const LIVE_ONLY_RE = /\blive[- ]wagers?\b|\blive[- ]only\b/i;
+//
+// Coordinator finding (260928-i3r): real FanDuel fixture LONFLMNFRE0928
+// ("NFL Reward Escalator") says "...to use on any pre-live wager for the
+// Eagles @ Bears NFL Game...". "Pre-live" means pre-game -- the opposite of
+// live -- but \blive[- ]wagers?\b's word boundary still fires on "live"
+// inside "pre-live" (a hyphen is a non-word character, same as a space).
+// The negative lookbehind rejects a "live"/"live-only" match that is
+// immediately preceded by "pre-" or "pre " (covers "pre-live wager" and
+// "pre live wager"). A bare "pregame" (no separator before "live") never
+// reaches \blive...\b at all, since "pregame" has no "live" substring.
+const LIVE_ONLY_RE = /(?<!pre[- ])\blive[- ]wagers?\b|(?<!pre[- ])\blive[- ]only\b/i;
 
 // Plural "futures" only, never singular "future" -- a real futures-market
 // promo always names the bet type as a plural noun ("NHL Futures", "for all
