@@ -351,14 +351,28 @@ describe("draftkingsScraper — structured fields for the kept boosts (Task 2)",
   });
 });
 
-describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668) classified as prop", () => {
-  it("found is 23, candidates [] (the honest kept set), and no unrecognized or schema_invalid skips", () => {
+describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668) classified as prop; NHL (1125873) now a candidate", () => {
+  it("found is 23, candidates [1125873] (NHL now supported -- quick-260928-it1), no unrecognized or schema_invalid skips", () => {
     const result = parseFixture20260928();
     expect(result.found).toBe(23);
-    expect(result.candidates).toEqual([]);
+    expect(result.candidates.map((c) => c.externalId)).toEqual(["1125873"]);
   });
 
-  it("pins the full skip map -- 1127668 is prop, every other id unchanged from before the fix", () => {
+  it("1125873 (NHL 50% Profit Boost) -- every field, exactly (quick-260928-it1)", () => {
+    const result = parseFixture20260928();
+    const candidate = result.candidates.find((c) => c.externalId === "1125873");
+    expect(candidate).toBeDefined();
+    expect(candidate!.promoType).toBe("profit_boost");
+    expect(candidate!.sportKeyHint).toBe("icehockey_nhl");
+    expect(candidate!.boostPercent).toBe("50.00");
+    expect(candidate!.maxStake).toBe("25.00");
+    expect(candidate!.minOddsAmerican).toBe(-200);
+    expect(candidate!.teamsText).toEqual([]);
+    const validated = ScrapedPromoSchema.safeParse(candidate);
+    expect(validated.success).toBe(true);
+  });
+
+  it("pins the full skip map -- 1127668 is prop, 1125873 is now a candidate (not skipped), every other id unchanged", () => {
     const result = parseFixture20260928();
     const reasonById: Record<string, string> = {};
     for (const s of result.skipped) {
@@ -381,7 +395,6 @@ describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668)
       "1119017": "not_a_promo",
       "1119078": "futures",
       "1120652": "not_a_promo",
-      "1125873": "unsupported_sport",
       "1126077": "sgp",
       "1126078": "futures",
       "1127118": "prop",
@@ -389,6 +402,7 @@ describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668)
       "1127668": "prop",
       "1127861": "not_a_promo",
     });
+    expect(reasonById["1125873"]).toBeUndefined();
     expect(Object.values(reasonById)).not.toContain("unrecognized");
     expect(Object.values(reasonById)).not.toContain("schema_invalid");
   });

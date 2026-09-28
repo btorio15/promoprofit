@@ -1,20 +1,21 @@
 /**
  * Per-book promo scrape orchestrator (PROMO-03; D-06, D-08, D-09, Design
- * Implication 7). Runs SCRAPE_TARGET_BOOK_KEYS sequentially, one book at a
- * time, each in its own try/catch so one book's exception, timeout, or
- * malformed JSON can never stop another book's run or corrupt its status
- * (D-08). Every HTTP request across the whole run (list + detail, across
- * every book) is spaced at least `minGapMs` apart -- polite cadence, not
- * just "polite per book" (Design Implication 7, PITFALLS Pitfall 8).
+ * Implication 7; quick-260928-it1). Runs SCRAPE_TARGET_BOOK_KEYS sequentially,
+ * one book at a time, each in its own try/catch so one book's exception,
+ * timeout, or malformed JSON can never stop another book's run or corrupt
+ * its status (D-08). Every HTTP request across the whole run (list + detail,
+ * across every book) is spaced at least `minGapMs` apart -- polite cadence,
+ * not just "polite per book" (Design Implication 7, PITFALLS Pitfall 8).
  */
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
 import { matchPromo } from "@/domain/promos/matcher";
-import { SKIP_REASONS, type BookScraper, type HttpRequestSpec, type SkipReason } from "@/domain/promos/scraped";
+import type { BookScraper, HttpRequestSpec, SkippedEntry } from "@/domain/promos/scraped";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
+import { buildClassifyDraft, isReviewWorthySkip } from "./reviewTriage";
 import { fetchRequest, type FetchRequest } from "./fetchPage";
-import { promoStore, type PromoStore, type PromoWrite, type ScrapeRunRow } from "./store";
+import { promoStore, type ClassifyWrite, type PromoStore, type PromoWrite, type ScrapeRunRow } from "./store";
 import { BOOK_SCRAPERS } from "./books";
 
 export type LoadPromoMatchEvents = () => Promise<{ moneyline: OddsEvent[]; extended: OddsEvent[] }>;
@@ -33,24 +34,10 @@ export interface BookRunOutcome {
   detailRequests: number;
   detailFailures: number;
   skippedByReason: Record<string, number>;
+  /** quick-260928-it1: count of classify writes committed (or attempted, for a book whose only skips are review-worthy). */
+  sentToReview: number;
   errorMessage: string | null;
 }
-
-/**
- * quick-260927-ov2: reasons a candidate can be deliberately excluded without
- * that indicating anything is broken -- parlays/SGPs, live-only, futures,
- * outrights, props, new-customer/deposit-only offers, non-promo marketing
- * copy, unsupported sports, non-half-point lines. A book whose every found
- * promo lands in this set legitimately has nothing usable today (e.g. the
- * first real FanDuel run: 8 not_a_promo + 2 new_customer + 1
- * unsupported_sport + 1 outright, all correct exclusions). "unrecognized"
- * and "schema_invalid" are deliberately excluded from this set -- they
- * signal a likely parser regression, not a legitimate exclusion, and must
- * keep failing the run loudly (owner-locked decision 1).
- */
-export const LEGITIMATE_SKIP_REASONS: ReadonlySet<SkipReason> = new Set(
-  SKIP_REASONS.filter((reason) => reason !== "unrecognized" && reason !== "schema_invalid"),
-);
 
 /** Design Implication 7: a handful of requests per book, >= 2s apart. */
 const DEFAULT_MIN_GAP_MS = 2000;
@@ -75,6 +62,7 @@ function emptyOutcome(bookKey: string, errorMessage: string): BookRunOutcome {
     detailRequests: 0,
     detailFailures: 0,
     skippedByReason: {},
+    sentToReview: 0,
     errorMessage,
   };
 }
@@ -86,6 +74,37 @@ async function safeRecordScrapeRun(store: PromoStore, row: ScrapeRunRow): Promis
   } catch (err) {
     console.error(`runPromoScrape: recordScrapeRun failed for ${row.bookKey}:`, err);
   }
+}
+
+function skippedByReasonOf(skipped: readonly SkippedEntry[]): Record<string, number> {
+  const skippedByReason: Record<string, number> = {};
+  for (const skip of skipped) {
+    skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
+  }
+  return skippedByReason;
+}
+
+/**
+ * quick-260928-it1: builds this book's classify writes from its review-worthy
+ * skips (reviewTriage.ts), dropping any draft whose dedupe key collides with
+ * a candidate write (the candidate always wins) or with another classify
+ * draft (the Map naturally collapses duplicates to one write, same as the
+ * candidate dedupe below).
+ */
+function buildClassifyWrites(
+  bookKey: string,
+  skipped: readonly SkippedEntry[],
+  fallbackSourceUrl: string,
+  candidateDedupeKeys: ReadonlySet<string>,
+): ClassifyWrite[] {
+  const classifyByKey = new Map<string, ClassifyWrite>();
+  for (const skip of skipped.filter(isReviewWorthySkip)) {
+    const draft = buildClassifyDraft(bookKey, skip, fallbackSourceUrl);
+    const dedupeKey = promoDedupeKey(draft);
+    if (candidateDedupeKeys.has(dedupeKey)) continue;
+    classifyByKey.set(dedupeKey, { dedupeKey, draft });
+  }
+  return [...classifyByKey.values()];
 }
 
 export async function runPromoScrape(opts?: {
@@ -110,8 +129,11 @@ export async function runPromoScrape(opts?: {
   const outcomes: BookRunOutcome[] = [];
 
   // Loaded lazily, once for the whole run (not per book), and only when at
-  // least one book successfully parses (found > 0) -- matchPromo spends no
-  // Odds API credits itself (D-07), it just reads whatever's already cached.
+  // least one book successfully parses at least one CANDIDATE (found > 0 with
+  // candidates.length > 0) -- matchPromo spends no Odds API credits itself
+  // (D-07), it just reads whatever's already cached, and a book with only
+  // classify drafts never needs match events at all (a classify row is never
+  // matched).
   let eventsPromise: ReturnType<LoadPromoMatchEvents> | null = null;
   function getMatchEventsOnce(): ReturnType<LoadPromoMatchEvents> {
     if (eventsPromise === null) {
@@ -197,6 +219,7 @@ export async function runPromoScrape(opts?: {
           detailRequests: plans.length,
           detailFailures,
           skippedByReason: {},
+          sentToReview: 0,
           errorMessage,
         });
         await safeRecordScrapeRun(store, {
@@ -210,53 +233,80 @@ export async function runPromoScrape(opts?: {
         continue;
       }
 
-      // WR-03 (refined by quick-260927-ov2): zero promos found is always a
-      // failed run ("zero promos parsed"). Promos found but none kept splits
-      // in two: if every skip reason is a legitimate exclusion (parlays,
-      // new-customer offers, unsupported sports, etc. -- LEGITIMATE_SKIP_REASONS),
-      // the book genuinely has nothing usable today and the run is ok/0-kept;
-      // otherwise (any "unrecognized"/"schema_invalid" skip, or no skips at
-      // all despite zero candidates) it's a likely parser regression and
-      // stays a failed run. Either way nothing is written and nothing is
-      // expired here, so the book's live rows (including human-confirmed,
-      // cap-entered and flagged ones) survive.
-      if (parseResult.found === 0 || parseResult.candidates.length === 0) {
-        const skippedByReason: Record<string, number> = {};
-        for (const skip of parseResult.skipped) {
-          skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
-        }
-
-        const allLegitimate =
-          parseResult.found > 0 &&
-          parseResult.skipped.length > 0 &&
-          parseResult.skipped.every((skip) => LEGITIMATE_SKIP_REASONS.has(skip.reason));
-
-        const status: "ok" | "failed" = parseResult.found === 0 ? "failed" : allLegitimate ? "ok" : "failed";
-        const errorMessage =
-          parseResult.found === 0
-            ? "zero promos parsed"
-            : allLegitimate
-              ? null
-              : `${parseResult.found} promos found but none usable; existing promos kept`;
-
+      // WR-03 (refined by quick-260928-it1): zero promos found is always a
+      // failed run ("zero promos parsed") -- an empty/malformed response is a
+      // likely parser regression or an upstream outage, not a legitimate
+      // "nothing usable today." Once found > 0, every skip is either
+      // committed as-is (a legitimate/clear exclusion, LEGITIMATE per
+      // reviewTriage.ts's CLEAR_SKIP_REASONS) or escalated into a "classify"
+      // review row (isReviewWorthySkip) -- there is no longer a "failed, none
+      // usable" status for a book that genuinely found promos: an uncertain
+      // entry always lands in review instead of disappearing or failing the
+      // whole run.
+      if (parseResult.found === 0) {
         const outcome: BookRunOutcome = {
           bookKey,
-          status,
-          promosFound: parseResult.found,
+          status: "failed",
+          promosFound: 0,
           promosKept: 0,
           detailRequests: plans.length,
           detailFailures,
-          skippedByReason,
-          errorMessage,
+          skippedByReason: {},
+          sentToReview: 0,
+          errorMessage: "zero promos parsed",
         };
         outcomes.push(outcome);
         await safeRecordScrapeRun(store, {
           bookKey,
           ranAt: now,
-          status,
+          status: "failed",
+          promosFound: 0,
+          promosKept: 0,
+          errorMessage: outcome.errorMessage,
+        });
+        continue;
+      }
+
+      const skippedByReason = skippedByReasonOf(parseResult.skipped);
+
+      if (parseResult.candidates.length === 0) {
+        // No candidates this run -- only load match events, and only commit,
+        // when there's something worth committing (a book whose every skip
+        // is a clear/legitimate exclusion writes and expires nothing).
+        const classifyWrites = buildClassifyWrites(
+          bookKey,
+          parseResult.skipped,
+          scraper.listRequest.url,
+          new Set(),
+        );
+
+        if (classifyWrites.length > 0) {
+          // A likely parser regression (zero candidates) must never
+          // mass-expire this book's existing live rows -- the uncertain
+          // entries land in review instead, and every currently-active/
+          // pending promo simply survives untouched (expireUnseen false).
+          await store.commitScrapedPromos(bookKey, [], now, { classify: classifyWrites, expireUnseen: false });
+        }
+
+        const outcome: BookRunOutcome = {
+          bookKey,
+          status: "ok",
           promosFound: parseResult.found,
           promosKept: 0,
-          errorMessage,
+          detailRequests: plans.length,
+          detailFailures,
+          skippedByReason,
+          sentToReview: classifyWrites.length,
+          errorMessage: null,
+        };
+        outcomes.push(outcome);
+        await safeRecordScrapeRun(store, {
+          bookKey,
+          ranAt: now,
+          status: "ok",
+          promosFound: parseResult.found,
+          promosKept: 0,
+          errorMessage: null,
         });
         continue;
       }
@@ -274,13 +324,16 @@ export async function runPromoScrape(opts?: {
       }
       const writes = [...writesByKey.values()];
 
-      // Upsert + expiry of unseen rows commit in one transaction (WR-03).
-      await store.commitScrapedPromos(bookKey, writes, now);
+      const classifyWrites = buildClassifyWrites(
+        bookKey,
+        parseResult.skipped,
+        scraper.listRequest.url,
+        new Set(writesByKey.keys()),
+      );
 
-      const skippedByReason: Record<string, number> = {};
-      for (const skip of parseResult.skipped) {
-        skippedByReason[skip.reason] = (skippedByReason[skip.reason] ?? 0) + 1;
-      }
+      // Upsert + expiry of unseen rows commit in one transaction (WR-03),
+      // candidate and classify writes together.
+      await store.commitScrapedPromos(bookKey, writes, now, { classify: classifyWrites, expireUnseen: true });
 
       outcomes.push({
         bookKey,
@@ -290,6 +343,7 @@ export async function runPromoScrape(opts?: {
         detailRequests: plans.length,
         detailFailures,
         skippedByReason,
+        sentToReview: classifyWrites.length,
         errorMessage: null,
       });
       await safeRecordScrapeRun(store, {
@@ -313,6 +367,7 @@ export async function runPromoScrape(opts?: {
         detailRequests: 0,
         detailFailures: 0,
         skippedByReason: {},
+        sentToReview: 0,
         errorMessage,
       });
       await safeRecordScrapeRun(store, {
@@ -330,10 +385,13 @@ export async function runPromoScrape(opts?: {
 }
 
 /**
- * quick-260927-ov2: the scheduled job's own exit code -- 1 if any book's run
- * failed (a real problem worth surfacing red in Actions), 0 otherwise
- * (including an all-ok run where one or more books legitimately had nothing
- * usable today). Used by scripts/scrape-promos.ts.
+ * quick-260928-it1: the scheduled job's own exit code -- 1 if any book's run
+ * failed (a real problem worth surfacing red in Actions), 0 otherwise. A
+ * book is "failed" only on no-scraper, a fetch failure, a parse throw, an
+ * uncaught exception, or zero promos found -- never merely because some (or
+ * even all) of its found promos couldn't be classified; those land in the
+ * review queue (sentToReview) instead of failing the run. Used by
+ * scripts/scrape-promos.ts.
  */
 export function scrapeExitCode(outcomes: readonly BookRunOutcome[]): 0 | 1 {
   return outcomes.some((outcome) => outcome.status === "failed") ? 1 : 0;

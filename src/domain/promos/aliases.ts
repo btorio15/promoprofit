@@ -9,6 +9,14 @@
  * testability, and cannot produce a "close enough" false positive the way
  * a numeric edit-distance cutoff can. Pure, zero-I/O.
  *
+ * quick-260928-it1: adds icehockey_nhl (6 configured sports total). Canonical
+ * names use The Odds API's own icehockey_nhl participant naming (no cached
+ * NHL event fixture existed in the repo to source them from directly): "St
+ * Louis Blues" (no period) and "Montréal Canadiens" (accented) match the
+ * Odds API's team-name conventions seen elsewhere in this file (e.g. the
+ * existing "St. Louis Cardinals" MLB entry uses a period -- NHL's own naming
+ * does not), and "Utah Mammoth" is the franchise's current name.
+ *
  * Never add a city alias shared by two teams within one league -- the
  * only exception is "LA"/"Los Angeles" and "NY"/"New York", which really
  * are shared by two teams in some leagues (NFL Rams/Chargers, NFL
@@ -117,6 +125,40 @@ export const TEAM_ALIASES: Readonly<Record<string, Readonly<Record<string, reado
     "Texas Rangers": ["Rangers", "Texas", "TEX"],
     "Toronto Blue Jays": ["Blue Jays", "Toronto", "TOR"],
     "Washington Nationals": ["Nationals", "Washington", "WAS", "Nats"],
+  },
+  icehockey_nhl: {
+    "Anaheim Ducks": ["Ducks", "Anaheim", "ANA"],
+    "Boston Bruins": ["Bruins", "Boston", "BOS"],
+    "Buffalo Sabres": ["Sabres", "Buffalo", "BUF"],
+    "Calgary Flames": ["Flames", "Calgary", "CGY"],
+    "Carolina Hurricanes": ["Hurricanes", "Carolina", "CAR", "Canes"],
+    "Chicago Blackhawks": ["Blackhawks", "Chicago", "CHI"],
+    "Colorado Avalanche": ["Avalanche", "Colorado", "COL", "Avs"],
+    "Columbus Blue Jackets": ["Blue Jackets", "Columbus", "CBJ", "Jackets"],
+    "Dallas Stars": ["Stars", "Dallas", "DAL"],
+    "Detroit Red Wings": ["Red Wings", "Detroit", "DET", "Wings"],
+    "Edmonton Oilers": ["Oilers", "Edmonton", "EDM"],
+    "Florida Panthers": ["Panthers", "Florida", "FLA"],
+    "Los Angeles Kings": ["Kings", "LA", "Los Angeles", "LAK"],
+    "Minnesota Wild": ["Wild", "Minnesota", "MIN"],
+    "Montréal Canadiens": ["Canadiens", "Montreal", "Montréal", "MTL", "Habs"],
+    "Nashville Predators": ["Predators", "Nashville", "NSH", "Preds"],
+    "New Jersey Devils": ["Devils", "New Jersey", "NJD"],
+    "New York Islanders": ["Islanders", "NY", "New York", "NYI", "Isles"],
+    "New York Rangers": ["Rangers", "NY", "New York", "NYR"],
+    "Ottawa Senators": ["Senators", "Ottawa", "OTT", "Sens"],
+    "Philadelphia Flyers": ["Flyers", "Philadelphia", "PHI", "Philly"],
+    "Pittsburgh Penguins": ["Penguins", "Pittsburgh", "PIT", "Pens"],
+    "San Jose Sharks": ["Sharks", "San Jose", "SJS"],
+    "Seattle Kraken": ["Kraken", "Seattle", "SEA"],
+    "St Louis Blues": ["Blues", "St Louis", "St. Louis", "STL"],
+    "Tampa Bay Lightning": ["Lightning", "Tampa Bay", "TBL", "Bolts"],
+    "Toronto Maple Leafs": ["Maple Leafs", "Toronto", "TOR", "Leafs"],
+    "Utah Mammoth": ["Mammoth", "Utah", "UTA"],
+    "Vancouver Canucks": ["Canucks", "Vancouver", "VAN"],
+    "Vegas Golden Knights": ["Golden Knights", "Vegas", "Las Vegas", "VGK", "Knights"],
+    "Washington Capitals": ["Capitals", "Washington", "WSH", "Caps"],
+    "Winnipeg Jets": ["Jets", "Winnipeg", "WPG"],
   },
 };
 

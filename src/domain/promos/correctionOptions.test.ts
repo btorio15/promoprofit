@@ -172,7 +172,9 @@ describe("listCorrectionOptions (D-14, T-03-09-06)", () => {
   });
 
   it("excludes events for sports outside SPORT_KEYS", () => {
-    const event = fullEvent({ id: "unsupported", sport_key: "icehockey_nhl" });
+    // quick-260928-it1: icehockey_nhl moved from unsupported to supported
+    // (SPORT_KEYS), so this must use a still-unsupported sport key instead.
+    const event = fullEvent({ id: "unsupported", sport_key: "soccer_epl" });
     const result = listCorrectionOptions({ moneyline: [event], extended: [event] }, { now: NOW });
 
     expect(result.events).toEqual([]);

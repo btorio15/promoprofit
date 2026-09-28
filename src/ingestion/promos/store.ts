@@ -1,21 +1,23 @@
 /**
  * Server-only Postgres write path for the promo scraper (PROMO-03, PROMO-04;
- * D-08, D-10, D-11, D-14, D-16, D-18, D-19). This is the ONLY code path that
- * inserts/updates a `promos` row from a scrape, and the only writer of
- * `scrape_runs` -- member review actions (Plans 07-09) write through
- * src/db/promoReview.ts instead. Mirrors src/ingestion/odds/store.ts's
- * db.batch pattern for multi-statement atomicity (one transaction per call).
+ * D-08, D-10, D-11, D-14, D-16, D-18, D-19; quick-260928-it1). This is the
+ * ONLY code path that inserts/updates a `promos` row from a scrape, and the
+ * only writer of `scrape_runs` -- member review actions (Plans 07-09, and
+ * classify-promo.ts) write through src/db/promoReview.ts instead. Mirrors
+ * src/ingestion/odds/store.ts's db.batch pattern for multi-statement
+ * atomicity (one transaction per call).
  *
- * decideScrapedWrite (lifecycle.ts) is the single source of truth for
- * skip/touch/write per row (Plan 08) -- this file's only job is loading the
- * existing row's state, calling it, and translating its decision into SQL.
- * It never applies its own status/scope rules inline.
+ * decideScrapedWrite/decideClassifyWrite (lifecycle.ts) are the single
+ * source of truth for skip/touch/write per row (Plan 08; quick-260928-it1)
+ * -- this file's only job is loading the existing row's state, calling
+ * them, and translating the decision into SQL. It never applies its own
+ * status/scope rules inline.
  */
 import { and, eq, inArray, isNull, notInArray, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "@/db/client";
 import { promos, scrapeRuns } from "@/db/schema";
-import { decideScrapedWrite, type ExistingPromoState } from "@/domain/promos/lifecycle";
+import { decideClassifyWrite, decideScrapedWrite, type ExistingPromoState } from "@/domain/promos/lifecycle";
 import type { MatchResult } from "@/domain/promos/matcher";
 import type { ScopeGuess } from "@/domain/promos/scope";
 import type { ScrapedPromo } from "@/domain/promos/scraped";
@@ -25,6 +27,12 @@ export interface PromoWrite {
   dedupeKey: string;
   parsed: ScrapedPromo;
   match: MatchResult;
+}
+
+/** quick-260928-it1: a classify draft write (no MatchResult -- classify rows are never matched). */
+export interface ClassifyWrite {
+  dedupeKey: string;
+  draft: ScrapedPromo;
 }
 
 export interface ScrapeRunRow {
@@ -47,14 +55,34 @@ export interface CommitOutcome extends UpsertOutcome {
   expired: number;
 }
 
+export interface CommitScrapedPromosOpts {
+  /** quick-260928-it1: classify drafts committed in the SAME batch as the candidate writes. */
+  classify?: ClassifyWrite[];
+  /**
+   * WR-03 refined by quick-260928-it1: a book whose parse produced zero
+   * candidates but at least one classify draft must never mass-expire its
+   * live rows (a likely parser regression should land uncertain entries in
+   * review, not silently wipe active promos) -- the caller passes false in
+   * that case. Defaults to true (the original always-expire-unseen
+   * behavior).
+   */
+  expireUnseen?: boolean;
+}
+
 export interface PromoStore {
   recordScrapeRun(row: ScrapeRunRow): Promise<void>;
   /**
-   * WR-03: upserts every write AND expires the book's live rows not among
-   * them, in ONE transaction -- a failure can never leave the upserts
-   * applied without the matching expiry (or vice versa).
+   * WR-03: upserts every write (candidate and classify) AND, when
+   * expireUnseen is true, expires the book's live rows not among them, in
+   * ONE transaction -- a failure can never leave the upserts applied
+   * without the matching expiry (or vice versa).
    */
-  commitScrapedPromos(bookKey: string, writes: PromoWrite[], now: Date): Promise<CommitOutcome>;
+  commitScrapedPromos(
+    bookKey: string,
+    writes: PromoWrite[],
+    now: Date,
+    opts?: CommitScrapedPromosOpts,
+  ): Promise<CommitOutcome>;
 }
 
 type Statement = BatchItem<"pg">;
@@ -243,19 +271,24 @@ export async function recordScrapeRun(row: ScrapeRunRow): Promise<void> {
 }
 
 /**
- * Builds the statements applying decideScrapedWrite's decision to every
- * write from one book's scrape. Every UPDATE is conditional on the row
- * being unchanged since it was read (CR-05), so the outcome counts are
- * attempted writes -- a row a member acted on mid-run is skipped silently.
+ * Builds the statements applying decideScrapedWrite's (candidate writes) and
+ * decideClassifyWrite's (classify drafts, quick-260928-it1) decisions for
+ * one book's scrape, loading both sets of existing rows in a SINGLE select.
+ * Every UPDATE is conditional on the row being unchanged since it was read
+ * (CR-05), so the outcome counts are attempted writes -- a row a member
+ * acted on mid-run is skipped silently.
  */
 async function buildUpsertStatements(
   db: Db,
   bookKey: string,
   writes: PromoWrite[],
+  classify: ClassifyWrite[],
   now: Date,
 ): Promise<{ statements: Statement[]; outcome: UpsertOutcome }> {
   const outcome: UpsertOutcome = { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0 };
-  if (writes.length === 0) return { statements: [], outcome };
+  if (writes.length === 0 && classify.length === 0) return { statements: [], outcome };
+
+  const allDedupeKeys = [...writes.map((w) => w.dedupeKey), ...classify.map((c) => c.dedupeKey)];
 
   const existingRows = await db
     .select({
@@ -286,7 +319,7 @@ async function buildUpsertStatements(
       unparsedCapFields: promos.unparsedCapFields,
     })
     .from(promos)
-    .where(inArray(promos.dedupeKey, writes.map((w) => w.dedupeKey)));
+    .where(inArray(promos.dedupeKey, allDedupeKeys));
 
   const existingByKey = new Map<string, ExistingPromoRow>(
     existingRows.map((row) => [row.dedupeKey, row]),
@@ -397,32 +430,144 @@ async function buildUpsertStatements(
     }
   }
 
+  for (const cw of classify) {
+    const existingRow = existingByKey.get(cw.dedupeKey) ?? null;
+    const draft = cw.draft;
+    const existingState = existingRow ? existingStateFrom(existingRow) : null;
+    const decision = decideClassifyWrite(existingState, now);
+
+    if (decision.kind === "skip") {
+      outcome.skippedDismissed++;
+      continue;
+    }
+
+    if (decision.kind === "touch") {
+      if (!existingRow) continue;
+      statements.push(
+        db
+          .update(promos)
+          .set({ lastSeenAt: now, expiresAt: draft.expiresAt ? new Date(draft.expiresAt) : null })
+          .where(unchangedSinceRead(existingRow)),
+      );
+      outcome.refreshed++;
+      continue;
+    }
+
+    if (decision.kind === "refresh-draft") {
+      if (!existingRow) continue;
+      statements.push(
+        db
+          .update(promos)
+          .set({
+            lastSeenAt: now,
+            parsed: draft,
+            ...structuredCapColumns(draft),
+          })
+          .where(unchangedSinceRead(existingRow)),
+      );
+      outcome.refreshed++;
+      continue;
+    }
+
+    // decision.kind === "write"
+    if (existingRow === null) {
+      statements.push(
+        db.insert(promos).values({
+          bookKey,
+          dedupeKey: cw.dedupeKey,
+          promoType: draft.promoType,
+          status: decision.status,
+          reviewReason: decision.reviewReason,
+          autoMatched: decision.autoMatched,
+          autoMatchBlocked: false,
+          ...scopeColumnsFrom(decision.scope),
+          ...pinColumnsFrom(decision.pinned),
+          bestGuess: decision.bestGuess,
+          parsed: draft,
+          ...structuredCapColumns(draft),
+          unparsedCapFields: decision.unparsedCapFields,
+          firstSeenAt: now,
+          lastSeenAt: now,
+        }),
+      );
+      outcome.inserted++;
+      continue;
+    }
+
+    const classifyWasExpired = existingRow.status === "expired";
+    // Same WR-02/CR-03 rule as the candidate path above: capsFrom "existing"
+    // (a human-scope revival, or member-entered caps) never overwrites the
+    // row's cap columns, but the parsed payload/expiry are always refreshed.
+    const classifyCapColumns =
+      decision.capsFrom === "parsed"
+        ? { parsed: draft, ...structuredCapColumns(draft) }
+        : { parsed: draft, expiresAt: draft.expiresAt ? new Date(draft.expiresAt) : null };
+    statements.push(
+      db
+        .update(promos)
+        .set({
+          status: decision.status,
+          reviewReason: decision.reviewReason,
+          autoMatched: decision.autoMatched,
+          ...scopeColumnsFrom(decision.scope),
+          ...pinColumnsFrom(decision.pinned),
+          bestGuess: decision.bestGuess,
+          ...classifyCapColumns,
+          unparsedCapFields: decision.unparsedCapFields,
+          lastSeenAt: now,
+        })
+        .where(unchangedSinceRead(existingRow)),
+    );
+    if (classifyWasExpired) {
+      outcome.revived++;
+    } else {
+      outcome.refreshed++;
+    }
+  }
+
   return { statements, outcome };
 }
 
 /**
- * Upserts one book's scrape and expires every live (active/pending_review)
- * row of that book NOT among `writes`, in a single db.batch transaction
- * (all-or-nothing, mirroring odds/store.ts's commitOddsRefresh; WR-03). A
- * failed run must never call this (D-08). An empty `writes` list is refused
- * outright (nothing written, nothing expired): a successful run with zero
- * usable promos must never mass-expire the book's live rows.
+ * Upserts one book's scrape (candidate AND classify writes together) and,
+ * when expireUnseen (default true), expires every live (active/
+ * pending_review) row of that book NOT among either set, in a single
+ * db.batch transaction (all-or-nothing, mirroring odds/store.ts's
+ * commitOddsRefresh; WR-03). A failed run must never call this (D-08). Both
+ * lists empty is refused outright (nothing written, nothing expired): a
+ * successful run with zero usable promos must never mass-expire the book's
+ * live rows. quick-260928-it1: expireUnseen false lets a book whose parse
+ * produced only classify drafts (zero candidates) commit those drafts
+ * without expiring its existing live rows -- a likely parser regression
+ * must land uncertain entries in review, never silently wipe active promos.
  */
 export async function commitScrapedPromos(
   bookKey: string,
   writes: PromoWrite[],
   now: Date,
+  opts?: CommitScrapedPromosOpts,
 ): Promise<CommitOutcome> {
-  if (writes.length === 0) {
+  const classify = opts?.classify ?? [];
+  const expireUnseen = opts?.expireUnseen ?? true;
+
+  if (writes.length === 0 && classify.length === 0) {
     return { inserted: 0, refreshed: 0, revived: 0, skippedDismissed: 0, expired: 0 };
   }
 
   const db = getDb();
-  const { statements, outcome } = await buildUpsertStatements(db, bookKey, writes, now);
+  const { statements, outcome } = await buildUpsertStatements(db, bookKey, writes, classify, now);
+
+  if (!expireUnseen) {
+    if (statements.length > 0) {
+      await db.batch(statements as [Statement, ...Statement[]]);
+    }
+    return { ...outcome, expired: 0 };
+  }
 
   // Expiry is a status flip, not a timestamped column on this table. It
-  // only touches rows NOT in this run's writes, so it is independent of the
-  // upsert statements' order within the batch.
+  // only touches rows NOT in this run's writes (candidate or classify), so
+  // it is independent of the upsert statements' order within the batch.
+  const allDedupeKeys = [...writes.map((w) => w.dedupeKey), ...classify.map((c) => c.dedupeKey)];
   const expireStatement = db
     .update(promos)
     .set({ status: "expired" })
@@ -430,10 +575,7 @@ export async function commitScrapedPromos(
       and(
         eq(promos.bookKey, bookKey),
         inArray(promos.status, ["active", "pending_review"]),
-        notInArray(
-          promos.dedupeKey,
-          writes.map((w) => w.dedupeKey),
-        ),
+        notInArray(promos.dedupeKey, allDedupeKeys),
       ),
     )
     .returning({ id: promos.id });

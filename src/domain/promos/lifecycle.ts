@@ -34,11 +34,12 @@ export function statusAfterMatch(p: {
 }
 
 /**
- * Everything decideScrapedWrite needs to know about a promo's existing row
- * (Plan 06/07/08): D-11's flag (autoMatchBlocked), D-14's dismissal, and
- * whichever scope/pin a human already confirmed or corrected (humanScope/
- * humanPinned -- populated by the caller only when confirmed_by_user_id or
- * corrected_by_user_id is set on the row).
+ * Everything decideScrapedWrite/decideClassifyWrite need to know about a
+ * promo's existing row (Plan 06/07/08; quick-260928-it1): D-11's flag
+ * (autoMatchBlocked), D-14's dismissal, and whichever scope/pin a human
+ * already confirmed or corrected (humanScope/humanPinned -- populated by the
+ * caller only when confirmed_by_user_id or corrected_by_user_id is set on
+ * the row).
  */
 export interface ExistingPromoState {
   status: PromoStatus;
@@ -277,6 +278,117 @@ export function decideScrapedWrite(
     return writeForMatch(caps, match);
   }
 
+  // quick-260928-it1: the parser now understands an entry that was
+  // previously a "classify" review row -- treat it exactly like a fresh
+  // match attempt (writeForMatch), never the defensive touch fallback.
+  if (existing.status === "pending_review" && existing.reviewReason === "classify") {
+    return writeForMatch(capsFromParsed(parsed), match);
+  }
+
   // Defensive fallback for an unrecognized pending_review reviewReason: never write.
   return { kind: "touch" };
+}
+
+/**
+ * quick-260928-it1: decision shape for a classify draft write (store.ts).
+ * Reuses ScrapedWriteDecision's "skip"/"touch"/"write" shapes; adds
+ * "refresh-draft" for the one case unique to classify rows -- an existing
+ * pending_review/classify row whose fresh draft simply overwrites the
+ * parsed/raw/cap columns while its status stays pending_review/classify
+ * (a member hasn't acted on it yet, so there is nothing to re-derive).
+ */
+export type ClassifyWriteDecision =
+  | { kind: "skip" }
+  | { kind: "touch" }
+  | { kind: "refresh-draft" }
+  | Extract<ScrapedWriteDecision, { kind: "write" }>;
+
+function freshClassifyWrite(): ClassifyWriteDecision {
+  return {
+    kind: "write",
+    status: "pending_review",
+    reviewReason: "classify",
+    autoMatched: false,
+    scope: null,
+    pinned: null,
+    bestGuess: null,
+    unparsedCapFields: [],
+    capsFrom: "parsed",
+  };
+}
+
+function classifyMatchReviewWrite(existing: ExistingPromoState): ClassifyWriteDecision {
+  return {
+    kind: "write",
+    status: "pending_review",
+    reviewReason: "match",
+    autoMatched: false,
+    scope: null,
+    pinned: null,
+    bestGuess: null,
+    unparsedCapFields: [...existing.unparsedCapFields],
+    capsFrom: "existing",
+  };
+}
+
+/**
+ * Pure decision for one classify draft's write (quick-260928-it1, D-10-style
+ * "never guess" discipline extended to uncertain-entry drafts). Does not take
+ * the draft's own fields at all -- a classify write either creates/refreshes
+ * a pending_review/classify row (whose cap/parsed columns store.ts fills
+ * in from the draft, capsFrom "parsed") or defers entirely to whatever a
+ * member/the candidate path already did to the row (touch/skip, or a
+ * D-19-style revival using the ROW's own existing caps, capsFrom "existing").
+ */
+export function decideClassifyWrite(existing: ExistingPromoState | null, now: Date): ClassifyWriteDecision {
+  if (existing === null) {
+    return freshClassifyWrite();
+  }
+
+  if (existing.status === "dismissed") {
+    return { kind: "skip" };
+  }
+
+  if (existing.status === "pending_review" && existing.reviewReason === "classify") {
+    return { kind: "refresh-draft" };
+  }
+
+  if (existing.status !== "expired") {
+    // active, pending_review/caps, pending_review/match: a member or the
+    // candidate path already owns this row -- a classify draft never
+    // overwrites it.
+    return { kind: "touch" };
+  }
+
+  // existing.status === "expired"
+  if (existing.humanScope !== null && !isScopeOver(existing.humanScope, now)) {
+    const after = statusAfterMatch({
+      promoType: existing.promoType,
+      maxStake: existing.maxStake,
+      bonusAmount: existing.bonusAmount,
+      unparsedCapFields: existing.unparsedCapFields,
+    });
+    return {
+      kind: "write",
+      status: after.status,
+      reviewReason: after.reviewReason,
+      autoMatched: false,
+      scope: existing.humanScope,
+      pinned: existing.humanPinned,
+      bestGuess: null,
+      unparsedCapFields: after.unparsedCapFields,
+      capsFrom: "existing",
+    };
+  }
+
+  if (existing.humanScope !== null) {
+    // Not caught by the branch above, so its scope must be over.
+    return classifyMatchReviewWrite(existing);
+  }
+
+  if (existing.capsEnteredByMember) {
+    return classifyMatchReviewWrite(existing);
+  }
+
+  return freshClassifyWrite();
 }

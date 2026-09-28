@@ -10,6 +10,7 @@ const {
   mockApplyDismissal,
   mockApplyCorrectedMatch,
   mockApplyCapEntry,
+  mockApplyClassification,
   mockGetActivePromoForFlag,
   mockApplyFlag,
   mockGetCachedEvents,
@@ -21,6 +22,7 @@ const {
   mockApplyDismissal: vi.fn(),
   mockApplyCorrectedMatch: vi.fn(),
   mockApplyCapEntry: vi.fn(),
+  mockApplyClassification: vi.fn(),
   mockGetActivePromoForFlag: vi.fn(),
   mockApplyFlag: vi.fn(),
   mockGetCachedEvents: vi.fn(),
@@ -35,6 +37,7 @@ vi.mock("@/db/promoReview", () => ({
   applyDismissal: mockApplyDismissal,
   applyCorrectedMatch: mockApplyCorrectedMatch,
   applyCapEntry: mockApplyCapEntry,
+  applyClassification: mockApplyClassification,
   getActivePromoForFlag: mockGetActivePromoForFlag,
   applyFlag: mockApplyFlag,
 }));
@@ -49,6 +52,7 @@ import { dismissPromo } from "./dismiss-promo";
 import { correctPromoMatch } from "./correct-promo-match";
 import { enterPromoCaps } from "./enter-promo-caps";
 import { flagPromoMatch } from "./flag-promo-match";
+import { classifyPromo } from "./classify-promo";
 
 const mockRevalidatePath = vi.mocked(revalidatePath);
 
@@ -202,6 +206,31 @@ function capsQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: ["maxStake"],
+    ...overrides,
+  };
+}
+
+function classifyQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
+  return {
+    id: 12,
+    bookKey: "draftkings",
+    promoType: "profit_boost",
+    reviewReason: "classify",
+    parsed: baseParsed({
+      promoType: "profit_boost",
+      boostPercent: null,
+      title: "Mystery Promo",
+      rawText: "Mystery Promo text",
+    }),
+    bestGuess: null,
+    flagged: false,
+    scope: null,
+    maxStake: null,
+    maxWinnings: null,
+    maxWinningsKind: null,
+    minOddsAmerican: null,
+    bonusAmount: null,
+    unparsedCapFields: [],
     ...overrides,
   };
 }
@@ -974,6 +1003,299 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
     mockApplyFlag.mockResolvedValue(false);
 
     const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
+  });
+});
+
+describe("classifyPromo server action (quick-260928-it1, CR-04, T-it1-01..03)", () => {
+  it("rejects when logged out, before any read or write", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+
+    await expect(
+      classifyPromo({ promoId: 12, promoType: "profit_boost", boostPercent: "50", scope: null }),
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+
+  it("rejects an extra 'userId' field (strict schema, IDOR guard)", async () => {
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      scope: null,
+      userId: 99,
+    });
+
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed boostPercent ('abc'), without reading the row", async () => {
+    const result = await classifyPromo({ promoId: 12, promoType: "profit_boost", boostPercent: "abc", scope: null });
+
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("rejects a zero or negative boostPercent", async () => {
+    const zero = await classifyPromo({ promoId: 12, promoType: "profit_boost", boostPercent: "0", scope: null });
+    expect(zero).toEqual({ status: "invalid" });
+
+    const negative = await classifyPromo({ promoId: 12, promoType: "profit_boost", boostPercent: "-5", scope: null });
+    expect(negative).toEqual({ status: "invalid" });
+  });
+
+  it("rejects a malformed maxStake ('abc')", async () => {
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "abc",
+      scope: null,
+    });
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed bonusAmount ('abc')", async () => {
+    const result = await classifyPromo({ promoId: 12, promoType: "bonus_bet", bonusAmount: "abc", scope: null });
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("returns conflict when the row is missing", async () => {
+    mockGetPendingPromo.mockResolvedValue(null);
+
+    const result = await classifyPromo({ promoId: 12, promoType: "profit_boost", boostPercent: "50", scope: null });
+
+    expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
+  });
+
+  it("returns conflict when the row's reviewReason is not 'classify'", async () => {
+    mockGetPendingPromo.mockResolvedValue(matchQueueRow());
+
+    const result = await classifyPromo({ promoId: 5, promoType: "profit_boost", boostPercent: "50", scope: null });
+
+    expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+
+  it("returns stale when the chosen event is missing from the cache", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: new Date() });
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "event", eventId: "nfl-1" },
+    });
+
+    expect(result).toEqual({
+      status: "stale",
+      message: "That game is no longer in the cached odds. Pick another.",
+    });
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+
+  it("returns stale when the chosen event has already started", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: [futureEvent({ commence_time: minusHours(1) })], fetchedAt: new Date() });
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "event", eventId: "nfl-1" },
+    });
+
+    expect(result).toEqual({
+      status: "stale",
+      message: "That game is no longer in the cached odds. Pick another.",
+    });
+  });
+
+  it("WR-12: rejects an impossible sport_day calendar date", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: "2026-02-31" },
+    });
+
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+
+  it("returns stale when the chosen sport_day has already passed", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: "2020-01-01" },
+    });
+
+    expect(result).toEqual({ status: "stale", message: "That day has already passed. Pick another." });
+  });
+
+  it("profit boost + max stake + event: active, maxStake normalized to 2dp, revalidates '/'", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: [futureEvent()], fetchedAt: new Date() });
+    mockApplyClassification.mockResolvedValue(true);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25",
+      scope: { kind: "event", eventId: "nfl-1" },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyClassification).toHaveBeenCalledTimes(1);
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.promoId).toBe(12);
+    expect(args.userId).toBe(7);
+    expect(args.promoType).toBe("profit_boost");
+    expect(args.boostPercent).toBe("50.00");
+    expect(args.maxStake).toBe("25.00");
+    expect(args.scope).toEqual({
+      kind: "event",
+      eventId: "nfl-1",
+      sportKey: "americanfootball_nfl",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: futureEvent().commence_time,
+    });
+    expect(args.next).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("CR-04: profit boost with NO max stake routes to pending_review/caps, never active", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: [futureEvent()], fetchedAt: new Date() });
+    mockApplyClassification.mockResolvedValue(true);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      scope: { kind: "event", eventId: "nfl-1" },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.next).toEqual({
+      status: "pending_review",
+      reviewReason: "caps",
+      unparsedCapFields: ["maxStake"],
+    });
+  });
+
+  it("refuses maxWinnings when the row's maxWinningsKind is unknown", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow({ maxWinningsKind: null }));
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      maxWinnings: "500.00",
+      scope: null,
+    });
+
+    expect(result).toEqual({
+      status: "invalid",
+      fieldErrors: { maxWinnings: ["This book's winnings rule is unknown. Dismiss this promo instead."] },
+    });
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+
+  it("accepts maxWinnings when the row's maxWinningsKind is known", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow({ maxWinningsKind: "net_winnings" }));
+    mockApplyClassification.mockResolvedValue(true);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      maxWinnings: "500",
+      scope: null,
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.maxWinnings).toBe("500.00");
+    expect(args.maxWinningsKind).toBe("net_winnings");
+  });
+
+  it("bonus bet + sport_day: promoType bonus_bet, active, sport_window scope recomputed server-side", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockApplyClassification.mockResolvedValue(true);
+
+    const etDate = etDateOf(plusHours(24));
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "bonus_bet",
+      bonusAmount: "50",
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.promoType).toBe("bonus_bet");
+    expect(args.bonusAmount).toBe("50.00");
+    expect(args.next).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
+    expect(args.scope).toEqual({
+      kind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: expect.any(String),
+      windowEnd: expect.any(String),
+    });
+  });
+
+  it("no scope chosen: pending_review/match, scope null", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockApplyClassification.mockResolvedValue(true);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: null,
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.scope).toBeNull();
+    expect(args.next).toEqual({ status: "pending_review", reviewReason: "match", unparsedCapFields: [] });
+    expect(mockGetCachedEvents).not.toHaveBeenCalled();
+  });
+
+  it("returns conflict when applyClassification affects zero rows", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockApplyClassification.mockResolvedValue(false);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: null,
+    });
 
     expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
   });

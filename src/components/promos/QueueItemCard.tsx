@@ -9,17 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { DismissPromoDialog } from "./DismissPromoDialog";
+import { CorrectionScopeSelect, EVENT_PREFIX, DAY_PREFIX, scopeInputFromValue } from "./CorrectionScopeSelect";
 
 interface QueueItemCardProps {
   item: QueueItemDTO;
@@ -37,47 +30,6 @@ const CAP_FIELD_LABELS: Record<CapKey, string> = {
   maxWinnings: "Max winnings",
   minOdds: "Min odds",
 };
-
-const EVENT_PREFIX = "event:";
-const DAY_PREFIX = "day:";
-
-interface SportGroup {
-  sportKey: string;
-  sportLabel: string;
-  sportDays: CorrectionOptions["sportDays"];
-  events: CorrectionOptions["events"];
-}
-
-/**
- * Groups correctionOptions' two flat lists into one Select's sport-labelled
- * groups, sport-day choices listed before that sport's games within each
- * group (03-UI-SPEC.md "Correct sub-panel"). Both source lists already come
- * pre-sorted by SPORTS order (correctionOptions.ts), so insertion order here
- * is preserved as-is, never re-sorted.
- */
-function groupCorrectionOptions(options: CorrectionOptions): SportGroup[] {
-  const order: string[] = [];
-  const groups = new Map<string, SportGroup>();
-
-  function groupFor(sportKey: string, sportLabel: string): SportGroup {
-    let group = groups.get(sportKey);
-    if (!group) {
-      group = { sportKey, sportLabel, sportDays: [], events: [] };
-      groups.set(sportKey, group);
-      order.push(sportKey);
-    }
-    return group;
-  }
-
-  for (const day of options.sportDays) {
-    groupFor(day.sportKey, day.sportLabel).sportDays.push(day);
-  }
-  for (const event of options.events) {
-    groupFor(event.sportKey, event.sportLabel).events.push(event);
-  }
-
-  return order.map((key) => groups.get(key)!);
-}
 
 /**
  * One review-queue card, match or caps kind (D-13, D-14, D-18, PROMO-04;
@@ -126,7 +78,6 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
     });
   }
 
-  const sportGroups = groupCorrectionOptions(correctionOptions);
   const selectedEvent = eventValue?.startsWith(EVENT_PREFIX)
     ? correctionOptions.events.find((e) => e.eventId === eventValue.slice(EVENT_PREFIX.length))
     : undefined;
@@ -135,16 +86,15 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
   function saveMatch() {
     if (!eventValue) return;
 
-    const scope = eventValue.startsWith(EVENT_PREFIX)
-      ? {
-          kind: "event" as const,
-          eventId: eventValue.slice(EVENT_PREFIX.length),
-          pinned: selectedEvent?.markets.find((m) => m.value === marketValue)?.pinned ?? null,
-        }
-      : (() => {
-          const [sportKey, etDate] = eventValue.slice(DAY_PREFIX.length).split("|");
-          return { kind: "sport_day" as const, sportKey, etDate };
-        })();
+    const scopeInput = scopeInputFromValue(eventValue);
+    const scope =
+      scopeInput.kind === "event"
+        ? {
+            kind: "event" as const,
+            eventId: scopeInput.eventId,
+            pinned: selectedEvent?.markets.find((m) => m.value === marketValue)?.pinned ?? null,
+          }
+        : scopeInput;
 
     startCorrectTransition(async () => {
       const outcome = await correctPromoMatch({ promoId: item.promoId, scope });
@@ -275,37 +225,15 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
 
       {correctOpen ? (
         <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`correct-event-${item.promoId}`}>Event</Label>
-            <Select
-              value={eventValue}
-              onValueChange={(value) => {
-                setEventValue(value ?? null);
-                setMarketValue("best");
-              }}
-            >
-              <SelectTrigger id={`correct-event-${item.promoId}`} className="h-10 w-full">
-                <SelectValue placeholder="Choose a game or day" />
-              </SelectTrigger>
-              <SelectContent>
-                {sportGroups.map((group) => (
-                  <SelectGroup key={group.sportKey}>
-                    <SelectLabel>{group.sportLabel}</SelectLabel>
-                    {group.sportDays.map((day) => (
-                      <SelectItem key={day.value} value={`${DAY_PREFIX}${day.value}`}>
-                        {day.label}
-                      </SelectItem>
-                    ))}
-                    {group.events.map((event) => (
-                      <SelectItem key={event.eventId} value={`${EVENT_PREFIX}${event.eventId}`}>
-                        {event.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <CorrectionScopeSelect
+            id={`correct-event-${item.promoId}`}
+            value={eventValue}
+            onValueChange={(value) => {
+              setEventValue(value);
+              setMarketValue("best");
+            }}
+            options={correctionOptions}
+          />
 
           {!isSportDaySelected ? (
             <div className="flex flex-col gap-2">

@@ -18,6 +18,16 @@ async function main() {
     console.log(JSON.stringify(outcome));
   }
 
+  // quick-260928-it1: a per-book breakdown of how many uncertain entries
+  // landed in the review queue this run, summed into a total summary line.
+  const totalSentToReview = outcomes.reduce((sum, outcome) => sum + outcome.sentToReview, 0);
+  console.log(`promos sent to review: ${totalSentToReview}`);
+  for (const outcome of outcomes) {
+    if (outcome.sentToReview > 0) {
+      console.log(`  ${outcome.bookKey}: ${outcome.sentToReview}`);
+    }
+  }
+
   process.exit(scrapeExitCode(outcomes));
 }
 

@@ -243,9 +243,14 @@ describe("ballybetScraper.parse — real fixture", () => {
     );
 
     expect(result.candidates).toHaveLength(0);
-    expect(result.skipped).toEqual([
-      { reason: "schema_invalid", externalId: "bad-window", title: "40% Bad Team vs. Worse Team Profit Boost" },
-    ]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      reason: "schema_invalid",
+      externalId: "bad-window",
+      title: "40% Bad Team vs. Worse Team Profit Boost",
+    });
+    // quick-260928-it1: schema_invalid skips carry the built (invalid) candidate as evidence.partial.
+    expect(result.skipped[0].evidence?.partial).toMatchObject({ boostPercent: "40.00" });
     expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
@@ -290,12 +295,16 @@ describe("ballybetScraper.parse — real fixture", () => {
     );
 
     expect(result.candidates).toHaveLength(0);
-    expect(result.skipped).toEqual([
-      {
-        reason: "unrecognized",
-        externalId: "unrecognized-market",
-        title: "40% Some Team vs. Other Team Profit Boost",
-      },
-    ]);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]).toMatchObject({
+      reason: "unrecognized",
+      externalId: "unrecognized-market",
+      title: "40% Some Team vs. Other Team Profit Boost",
+    });
+    // quick-260928-it1: an "unrecognized" (non-schema_invalid) skip's evidence
+    // still carries the detail's own text/URL, with a null partial (nothing
+    // was built for this branch).
+    expect(result.skipped[0].evidence).toMatchObject({ partial: null });
+    expect(result.skipped[0].evidence?.rawText).toContain("40% Profit Boost");
   });
 });

@@ -6,6 +6,7 @@ import type {
   HttpRequestSpec,
   ParseResult,
   ScrapedPromo,
+  SkipEvidence,
   SkipReason,
   SkippedEntry,
 } from "@/domain/promos/scraped";
@@ -484,12 +485,23 @@ function parse(
   const skipped: SkippedEntry[] = [];
 
   for (const entry of entries) {
+    // quick-260928-it1: every skip's evidence mirrors what buildCandidateListOnly
+    // would compute for this entry -- the list `.title`/`.name` text, the
+    // list request's own URL, and the entry's own stated expiry.
+    const evidence: SkipEvidence = {
+      rawText: truncate(`${entry.title}\n${entry.name}`, MAX_RAW_TEXT_CHARS),
+      sourceUrl: ctx.sourceUrl,
+      expiresAt: entry.combinedEndDate ?? null,
+      partial: null,
+    };
+
     const classification = classifyFanduelEntry(entry);
     if (!classification.candidate || classification.sportKey === null) {
       skipped.push({
         reason: classification.reason ?? "unrecognized",
         externalId: entry.promoCode,
         title: entry.title,
+        evidence,
       });
       continue;
     }
@@ -514,7 +526,12 @@ function parse(
       console.warn(
         `fanduel parser: schema_invalid for ${entry.promoCode}: ${validated.error.message}`,
       );
-      skipped.push({ reason: "schema_invalid", externalId: entry.promoCode, title: entry.title });
+      skipped.push({
+        reason: "schema_invalid",
+        externalId: entry.promoCode,
+        title: entry.title,
+        evidence: { rawText: truncate(promo.rawText, MAX_RAW_TEXT_CHARS), sourceUrl: promo.sourceUrl, expiresAt: promo.expiresAt, partial: promo },
+      });
       continue;
     }
 

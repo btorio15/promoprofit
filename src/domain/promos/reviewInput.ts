@@ -73,6 +73,25 @@ const SportDayScopeInputSchema = z.strictObject({
 });
 
 /**
+ * quick-260928-it1: classifyPromo's scope input (T-it1-03) -- unlike
+ * CorrectMatchInputSchema's event branch, a classify card's Game-or-day
+ * select never offers a market/side pin (D-18-style "never guess a market
+ * for a promo the app doesn't even know the type of yet"), so this branch is
+ * strict with no `pinned` field at all.
+ */
+const ClassifyEventScopeInputSchema = z.strictObject({
+  kind: z.literal("event"),
+  eventId: z.string().min(1).max(100),
+});
+
+export const ClassifyScopeInputSchema = z.discriminatedUnion("kind", [
+  ClassifyEventScopeInputSchema,
+  SportDayScopeInputSchema,
+]);
+
+export type ClassifyScopeInput = z.infer<typeof ClassifyScopeInputSchema>;
+
+/**
  * correctPromoMatch's input (D-14, T-03-09-01/02): a strict discriminated
  * union over the two scope kinds the Correct sub-panel can produce -- one
  * specific game (with an optional market/side pin) or a sport+ET-day
@@ -126,3 +145,57 @@ export const EnterCapsInputSchema = z.strictObject({
 });
 
 export type EnterCapsInput = z.infer<typeof EnterCapsInputSchema>;
+
+const BOOST_PERCENT_PATTERN = /^\d{1,4}(\.\d{1,2})?$/;
+const BOOST_PERCENT_MESSAGE = "Enter a boost percent greater than 0 and at most 1000.";
+
+/**
+ * quick-260928-it1: classifyPromo's boost-percent field (T-it1-03) -- a
+ * string, never a native float, compared with decimal.js (project-wide money-
+ * math rule). Bounded to (0, 1000] -- generous enough for any real profit-
+ * boost promo, but never unbounded.
+ */
+const BoostPercentFieldSchema = z
+  .string()
+  .regex(BOOST_PERCENT_PATTERN, BOOST_PERCENT_MESSAGE)
+  .refine(
+    (value) => {
+      if (!BOOST_PERCENT_PATTERN.test(value)) return true; // already failed the regex check above
+      const decimal = new Decimal(value);
+      return decimal.gt(0) && decimal.lte(1000);
+    },
+    { message: BOOST_PERCENT_MESSAGE },
+  );
+
+/**
+ * classifyPromo's input (T-it1-01/02/03, CR-04, IDOR guard): a strict
+ * discriminated union on promoType -- a member declares which kind of promo
+ * this uncertain entry actually is, then supplies exactly that kind's
+ * required/optional fields. No userId field (IDOR guard, same discipline as
+ * every other review-action schema in this file): the acting user always
+ * comes from requireUser()'s session inside classify-promo.ts.
+ */
+const ClassifyProfitBoostInputSchema = z.strictObject({
+  promoId: z.number().int().positive(),
+  promoType: z.literal("profit_boost"),
+  boostPercent: BoostPercentFieldSchema,
+  maxStake: MoneyFieldSchema.optional(),
+  maxWinnings: MoneyFieldSchema.optional(),
+  minOddsAmerican: MinOddsFieldSchema.optional(),
+  scope: ClassifyScopeInputSchema.nullable(),
+});
+
+const ClassifyBonusBetInputSchema = z.strictObject({
+  promoId: z.number().int().positive(),
+  promoType: z.literal("bonus_bet"),
+  bonusAmount: MoneyFieldSchema,
+  minOddsAmerican: MinOddsFieldSchema.optional(),
+  scope: ClassifyScopeInputSchema.nullable(),
+});
+
+export const ClassifyPromoInputSchema = z.discriminatedUnion("promoType", [
+  ClassifyProfitBoostInputSchema,
+  ClassifyBonusBetInputSchema,
+]);
+
+export type ClassifyPromoInput = z.infer<typeof ClassifyPromoInputSchema>;

@@ -91,10 +91,27 @@ export interface ScrapedPromo {
   finePrintNote: string | null;
 }
 
+/**
+ * quick-260928-it1: evidence carried on every skip so an uncertain one
+ * (unrecognized/unsupported_sport/schema_invalid, or a not_a_promo naming a
+ * concrete offer -- reviewTriage.ts) can become a "classify" review row
+ * instead of silently disappearing. Optional on SkippedEntry so any other
+ * producer still compiles without it.
+ */
+export interface SkipEvidence {
+  /** <= 2000 chars. */
+  rawText: string;
+  sourceUrl: string;
+  expiresAt: string | null;
+  /** The candidate the parser built before validation failed (schema_invalid), or a partial guess; null when nothing was built. */
+  partial: Partial<ScrapedPromo> | null;
+}
+
 export interface SkippedEntry {
   reason: SkipReason;
   externalId: string | null;
   title: string;
+  evidence?: SkipEvidence;
 }
 
 export interface ParseResult {
@@ -155,34 +172,44 @@ const MaxWinningsSchema = z.strictObject({
   kind: z.enum(WINNINGS_CAP_KINDS),
 });
 
-export const ScrapedPromoSchema = z
-  .strictObject({
-    bookKey: z.string().min(1),
-    externalId: z.string().max(200).nullable(),
-    promoType: z.enum(PROMO_TYPES),
-    title: z.string().min(1).max(200),
-    rawText: z.string().max(2000),
-    sourceUrl: z.string().min(1),
-    sportKeyHint: z.string().nullable(),
-    scopeText: z.string().max(200),
-    teamsText: z.array(z.string().min(1)),
-    windowStart: IsoDateTimeSchema.nullable(),
-    windowEnd: IsoDateTimeSchema.nullable(),
-    expiresAt: IsoDateTimeSchema.nullable(),
-    eligibleMarketTypes: z.array(z.enum(PROMO_MARKET_TYPES)).min(1),
-    pinned: PinnedSchema.nullable(),
-    boostPercent: MoneyStringSchema.nullable(),
-    boostedOddsAmerican: AmericanOddsSchema.nullable(),
-    baseOddsAmerican: AmericanOddsSchema.nullable(),
-    bonusAmount: MoneyStringSchema.nullable(),
-    maxStake: MoneyStringSchema.nullable(),
-    maxWinnings: MaxWinningsSchema.nullable(),
-    winningsCapKind: z.enum(WINNINGS_CAP_KINDS).nullable().optional(),
-    minOddsAmerican: AmericanOddsSchema.nullable(),
-    unparsedCapFields: z.array(z.enum(CAP_FIELDS)),
-    claimRequired: z.enum(["opt_in", "claim_token"]).nullable(),
-    finePrintNote: z.string().max(160).nullable(),
-  })
+/**
+ * quick-260928-it1: the same strictObject field shape, exported on its own
+ * with no cross-field superRefine, so buildClassifyDraft (reviewTriage.ts)
+ * can validate each partial field independently (an unparsed/malformed
+ * field drops to null or its default rather than failing the whole draft).
+ * ScrapedPromoSchema below is this schema PLUS the cross-field refinement --
+ * every member-completed promo must still pass the full schema before it is
+ * written.
+ */
+export const ScrapedPromoFieldsSchema = z.strictObject({
+  bookKey: z.string().min(1),
+  externalId: z.string().max(200).nullable(),
+  promoType: z.enum(PROMO_TYPES),
+  title: z.string().min(1).max(200),
+  rawText: z.string().max(2000),
+  sourceUrl: z.string().min(1),
+  sportKeyHint: z.string().nullable(),
+  scopeText: z.string().max(200),
+  teamsText: z.array(z.string().min(1)),
+  windowStart: IsoDateTimeSchema.nullable(),
+  windowEnd: IsoDateTimeSchema.nullable(),
+  expiresAt: IsoDateTimeSchema.nullable(),
+  eligibleMarketTypes: z.array(z.enum(PROMO_MARKET_TYPES)).min(1),
+  pinned: PinnedSchema.nullable(),
+  boostPercent: MoneyStringSchema.nullable(),
+  boostedOddsAmerican: AmericanOddsSchema.nullable(),
+  baseOddsAmerican: AmericanOddsSchema.nullable(),
+  bonusAmount: MoneyStringSchema.nullable(),
+  maxStake: MoneyStringSchema.nullable(),
+  maxWinnings: MaxWinningsSchema.nullable(),
+  winningsCapKind: z.enum(WINNINGS_CAP_KINDS).nullable().optional(),
+  minOddsAmerican: AmericanOddsSchema.nullable(),
+  unparsedCapFields: z.array(z.enum(CAP_FIELDS)),
+  claimRequired: z.enum(["opt_in", "claim_token"]).nullable(),
+  finePrintNote: z.string().max(160).nullable(),
+});
+
+export const ScrapedPromoSchema = ScrapedPromoFieldsSchema
   .superRefine((promo, ctx) => {
     if (promo.teamsText.length !== 0 && promo.teamsText.length !== 2) {
       ctx.addIssue({

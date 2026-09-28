@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideScrapedWrite, statusAfterMatch, type ExistingPromoState } from "./lifecycle";
+import { decideClassifyWrite, decideScrapedWrite, statusAfterMatch, type ExistingPromoState } from "./lifecycle";
 import type { MatchResult } from "./matcher";
 import type { ScrapedPromo } from "./scraped";
 import type { ScopeGuess } from "./scope";
@@ -385,5 +385,136 @@ describe("decideScrapedWrite", () => {
     const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: null });
     const decision = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT, NOW);
     expect(decision).toMatchObject({ kind: "write", status: "pending_review", reviewReason: "match", autoMatched: false });
+  });
+
+  it("quick-260928-it1: existing pending_review/classify -- the parser now understands the entry -- gives writeForMatch, not the defensive touch", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "classify" });
+    const decision = decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT, NOW);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "active",
+      reviewReason: null,
+      autoMatched: true,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "parsed",
+    });
+  });
+});
+
+describe("decideClassifyWrite (quick-260928-it1)", () => {
+  it("null existing -> write pending_review/classify, scope/pinned/bestGuess null, capsFrom parsed", () => {
+    expect(decideClassifyWrite(null, NOW)).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "classify",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "parsed",
+    });
+  });
+
+  it("existing dismissed -> skip", () => {
+    const existing = baseExisting({ status: "dismissed", reviewReason: null });
+    expect(decideClassifyWrite(existing, NOW)).toEqual({ kind: "skip" });
+  });
+
+  it("existing pending_review/classify -> refresh-draft (status kept)", () => {
+    const existing = baseExisting({ status: "pending_review", reviewReason: "classify" });
+    expect(decideClassifyWrite(existing, NOW)).toEqual({ kind: "refresh-draft" });
+  });
+
+  it.each(["active", "pending_review"] as const)(
+    "existing %s (caps/match owns the row) -> touch",
+    (status) => {
+      const existingActive = baseExisting({ status: "active", reviewReason: null });
+      expect(decideClassifyWrite(existingActive, NOW)).toEqual({ kind: "touch" });
+
+      const existingCaps = baseExisting({ status: "pending_review", reviewReason: "caps" });
+      expect(decideClassifyWrite(existingCaps, NOW)).toEqual({ kind: "touch" });
+
+      const existingMatch = baseExisting({ status: "pending_review", reviewReason: "match" });
+      expect(decideClassifyWrite(existingMatch, NOW)).toEqual({ kind: "touch" });
+      void status;
+    },
+  );
+
+  it("expired with a human scope not yet over -> revives exactly like decideScrapedWrite's D-19 revival (existing caps, statusAfterMatch)", () => {
+    const existing = baseExisting({
+      status: "expired",
+      reviewReason: null,
+      humanScope: MATCHED_SCOPE,
+      humanPinned: null,
+      maxStake: "20.00",
+    });
+    const decision = decideClassifyWrite(existing, NOW);
+    expect(decision).toEqual({
+      kind: "write",
+      status: "active",
+      reviewReason: null,
+      autoMatched: false,
+      scope: MATCHED_SCOPE,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "existing",
+    });
+  });
+
+  it("expired with a human scope whose game already started -> pending_review/match, capsFrom existing", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: MATCHED_SCOPE });
+    const afterKickoff = new Date("2026-09-27T22:00:00Z");
+    expect(decideClassifyWrite(existing, afterKickoff)).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "existing",
+    });
+  });
+
+  it("expired with member-entered caps and no human scope -> pending_review/match, capsFrom existing", () => {
+    const existing = baseExisting({
+      status: "expired",
+      reviewReason: null,
+      humanScope: null,
+      capsEnteredByMember: true,
+      unparsedCapFields: [],
+    });
+    expect(decideClassifyWrite(existing, NOW)).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "existing",
+    });
+  });
+
+  it("expired with neither a human scope nor member caps -> pending_review/classify with the fresh draft", () => {
+    const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: null, capsEnteredByMember: false });
+    expect(decideClassifyWrite(existing, NOW)).toEqual({
+      kind: "write",
+      status: "pending_review",
+      reviewReason: "classify",
+      autoMatched: false,
+      scope: null,
+      pinned: null,
+      bestGuess: null,
+      unparsedCapFields: [],
+      capsFrom: "parsed",
+    });
   });
 });

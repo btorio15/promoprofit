@@ -17,8 +17,14 @@ export type PromoType = (typeof PROMO_TYPES)[number];
 export const PROMO_STATUSES = ["active", "pending_review", "dismissed", "expired"] as const;
 export type PromoStatus = (typeof PROMO_STATUSES)[number];
 
-/** Why a promo sits in pending_review (D-10/D-18): match = event/market confidence too low, caps = a stake/winnings/odds cap couldn't be parsed. */
-export const REVIEW_REASONS = ["match", "caps"] as const;
+/**
+ * Why a promo sits in pending_review (D-10/D-18/quick-260928-it1): match =
+ * event/market confidence too low, caps = a stake/winnings/odds cap couldn't
+ * be parsed, classify = the scraper couldn't tell what this entry is; a
+ * member classifies it (into a profit boost or bonus bet) before it can be
+ * matched or capped at all.
+ */
+export const REVIEW_REASONS = ["match", "caps", "classify"] as const;
 export type ReviewReason = (typeof REVIEW_REASONS)[number];
 
 export const PROMO_MARKET_TYPES = ["moneyline", "spread", "total"] as const;
