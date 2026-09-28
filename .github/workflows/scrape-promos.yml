@@ -38,8 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: "npm"
@@ -54,7 +54,13 @@ jobs:
       # `--force` (workflow_dispatch input) bypasses the Denver-hour gate
       # for manual testing. Never the spreads/totals extended refresh here
       # (3x the credit cost would blow the 500-credit monthly budget).
-      - run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
+      # quick-260927-ov2: runs even when the scrape step above fails (a
+      # flaky/all-excluded book must not block the once-daily moneyline
+      # refresh), but not when the run is cancelled -- the script's own
+      # 8am-Denver gate still makes noon/5pm runs no-op, so no extra credit
+      # spend either way.
+      - if: ${{ !cancelled() }}
+        run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
