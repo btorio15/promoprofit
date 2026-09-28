@@ -1,11 +1,17 @@
 /**
  * Per-book promo scrape orchestrator (PROMO-03; D-06, D-08, D-09, Design
- * Implication 7; quick-260928-it1). Runs SCRAPE_TARGET_BOOK_KEYS sequentially,
- * one book at a time, each in its own try/catch so one book's exception,
- * timeout, or malformed JSON can never stop another book's run or corrupt
- * its status (D-08). Every HTTP request across the whole run (list + detail,
- * across every book) is spaced at least `minGapMs` apart -- polite cadence,
- * not just "polite per book" (Design Implication 7, PITFALLS Pitfall 8).
+ * Implication 7; quick-260928-it1; quick-260928-kc5). Runs
+ * SCRAPE_TARGET_BOOK_KEYS sequentially, one book at a time, each in its own
+ * try/catch so one book's exception, timeout, or malformed JSON can never
+ * stop another book's run or corrupt its status (D-08). Every HTTP request
+ * across the whole run (list + detail, across every book) is spaced at least
+ * `minGapMs` apart -- polite cadence, not just "polite per book" (Design
+ * Implication 7, PITFALLS Pitfall 8).
+ *
+ * quick-260928-kc5: when `opts.reader` is set, applyPromoReader runs after a
+ * successful parse and before every later use of parseResult -- its own
+ * try/catch means a reader-pass exception degrades to the unmodified pattern
+ * parser result for that book, never fails the run (OD-3).
  */
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
@@ -15,6 +21,8 @@ import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { buildClassifyDraft, isReviewWorthySkip } from "./reviewTriage";
 import { fetchRequest, type FetchRequest } from "./fetchPage";
+import type { PromoReader } from "./promoReader";
+import { applyPromoReader, type ReaderBookStats } from "./readerPass";
 import { promoStore, type ClassifyWrite, type PromoStore, type PromoWrite, type ScrapeRunRow } from "./store";
 import { BOOK_SCRAPERS } from "./books";
 
@@ -37,6 +45,8 @@ export interface BookRunOutcome {
   /** quick-260928-it1: count of classify writes committed (or attempted, for a book whose only skips are review-worthy). */
   sentToReview: number;
   errorMessage: string | null;
+  /** quick-260928-kc5: present only on an "ok" outcome when a reader was configured for this run. */
+  reader?: ReaderBookStats;
 }
 
 /** Design Implication 7: a handful of requests per book, >= 2s apart. */
@@ -100,7 +110,10 @@ function buildClassifyWrites(
   const classifyByKey = new Map<string, ClassifyWrite>();
   for (const skip of skipped.filter(isReviewWorthySkip)) {
     const draft = buildClassifyDraft(bookKey, skip, fallbackSourceUrl);
-    const dedupeKey = promoDedupeKey(draft);
+    // quick-260928-kc5: a demoted candidate carries its own dedupe key
+    // (reconcile.ts) so this write touches that candidate's existing live
+    // row instead of expiring it or creating a duplicate.
+    const dedupeKey = skip.evidence?.dedupeKey ?? promoDedupeKey(draft);
     if (candidateDedupeKeys.has(dedupeKey)) continue;
     classifyByKey.set(dedupeKey, { dedupeKey, draft });
   }
@@ -116,6 +129,8 @@ export async function runPromoScrape(opts?: {
   sleep?: (ms: number) => Promise<void>;
   minGapMs?: number;
   loadEvents?: LoadPromoMatchEvents;
+  /** quick-260928-kc5: no reader by default -- every existing test/caller behaves exactly as today. */
+  reader?: PromoReader | null;
 }): Promise<BookRunOutcome[]> {
   const now = opts?.now ?? new Date();
   const targets = opts?.targets ?? SCRAPE_TARGET_BOOK_KEYS;
@@ -125,6 +140,7 @@ export async function runPromoScrape(opts?: {
   const sleep = opts?.sleep ?? defaultSleep;
   const minGapMs = opts?.minGapMs ?? DEFAULT_MIN_GAP_MS;
   const loadEventsFn = opts?.loadEvents ?? defaultLoadEvents;
+  const reader = opts?.reader ?? null;
 
   const outcomes: BookRunOutcome[] = [];
 
@@ -267,6 +283,40 @@ export async function runPromoScrape(opts?: {
         continue;
       }
 
+      // quick-260928-kc5: every later use of parseResult.candidates/skipped
+      // in this book's block reads the effective (possibly reader-updated)
+      // result. A reader-pass exception degrades to the unmodified pattern
+      // parser result -- it never fails this book's run (OD-3).
+      let readerStats: ReaderBookStats | undefined;
+      if (reader) {
+        try {
+          const applied = await applyPromoReader({
+            bookKey,
+            parseResult,
+            reader,
+            fallbackSourceUrl: scraper.listRequest.url,
+          });
+          parseResult = applied.parseResult;
+          readerStats = applied.stats;
+        } catch (err) {
+          console.warn(
+            `runPromoScrape: promo reader pass failed for ${bookKey}, using pattern parsers: ${errorMessageFrom(err)}`,
+          );
+          readerStats = {
+            calls: 0,
+            cacheHits: 0,
+            fallbacks: parseResult.candidates.length + parseResult.skipped.length,
+            disagreements: 0,
+            guardDrops: 0,
+            rescues: 0,
+            reviewRouted: 0,
+            skippedByReader: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+          };
+        }
+      }
+
       const skippedByReason = skippedByReasonOf(parseResult.skipped);
 
       if (parseResult.candidates.length === 0) {
@@ -298,6 +348,7 @@ export async function runPromoScrape(opts?: {
           skippedByReason,
           sentToReview: classifyWrites.length,
           errorMessage: null,
+          ...(reader ? { reader: readerStats } : {}),
         };
         outcomes.push(outcome);
         await safeRecordScrapeRun(store, {
@@ -345,6 +396,7 @@ export async function runPromoScrape(opts?: {
         skippedByReason,
         sentToReview: classifyWrites.length,
         errorMessage: null,
+        ...(reader ? { reader: readerStats } : {}),
       });
       await safeRecordScrapeRun(store, {
         bookKey,
