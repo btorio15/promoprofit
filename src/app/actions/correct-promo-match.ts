@@ -6,11 +6,10 @@ import { CorrectMatchInputSchema } from "@/domain/promos/reviewInput";
 import { getPendingPromo, applyCorrectedMatch } from "@/db/promoReview";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { resolveSelection } from "@/domain/promos/selection";
-import { etDayBounds } from "@/domain/promos/etTime";
-import { DEFAULT_WINDOW_DAYS } from "@/domain/promos/correctionOptions";
+import { resolveMemberScope } from "@/domain/promos/memberScope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
-import type { ScopeGuess } from "@/domain/promos/scope";
 import type { PromoSelection } from "@/domain/promos/types";
+import type { OddsEvent } from "@/domain/odds/schemas";
 import type { PromoReviewResponse } from "./confirm-promo-match";
 
 const CONFLICT: PromoReviewResponse = { status: "conflict", message: "Someone else already handled this promo." };
@@ -24,11 +23,14 @@ const SELECTION_INVALID: PromoReviewResponse = {
  * pinning a market/side) or sport+ET-day window (D-14, ARCHITECTURE.md
  * Pattern 1 "dropdown-first"). requireUser() is the literal first statement
  * (T-03-09-01) -- a logged-out call redirects before any read/write. The
- * client's dropdown values are never trusted as-is (T-03-09-02): an event
- * must still exist in the current cached odds with a future commence time,
- * a pin must still resolve to real book quotes AND belong to the promo's
- * own eligibleMarketTypes, and a sport-day's ET bounds are always
- * recomputed server-side from its date string, never taken from the client.
+ * client's dropdown values are never trusted as-is (T-03-09-02): the scope
+ * itself is resolved by resolveMemberScope (memberScope.ts, shared with
+ * classifyPromo, quick-260928-it1) -- an event must still exist in the
+ * current cached odds with a future commence time, and a sport-day's ET
+ * bounds are always recomputed server-side from its date string, never
+ * taken from the client. The pin resolution stays here (it needs the
+ * promo's own eligibleMarketTypes): a pin must still resolve to real book
+ * quotes AND belong to that set.
  */
 export async function correctPromoMatch(input: unknown): Promise<PromoReviewResponse> {
   const user = await requireUser();
@@ -46,68 +48,51 @@ export async function correctPromoMatch(input: unknown): Promise<PromoReviewResp
   }
 
   const now = new Date();
-  let scope: ScopeGuess;
+
+  let moneylineEvents: OddsEvent[] = [];
+  let extendedEvents: OddsEvent[] = [];
+  if (scopeInput.kind === "event") {
+    const [moneyline, extended] = await Promise.all([getCachedEvents(), getCachedExtendedEvents()]);
+    moneylineEvents = moneyline.events;
+    extendedEvents = extended.events;
+  }
+
+  const scopeResult = resolveMemberScope(
+    scopeInput.kind === "event"
+      ? { kind: "event", eventId: scopeInput.eventId }
+      : { kind: "sport_day", sportKey: scopeInput.sportKey, etDate: scopeInput.etDate },
+    { moneyline: moneylineEvents, extended: extendedEvents },
+    now,
+  );
+
+  if (scopeResult.status === "stale") {
+    return { status: "stale", message: scopeResult.message };
+  }
+  if (scopeResult.status === "invalid") {
+    return { status: "invalid" };
+  }
+
+  const { scope, event } = scopeResult;
   let pinned: PromoSelection | null = null;
 
-  if (scopeInput.kind === "event") {
-    const [{ events: moneylineEvents }, { events: extendedEvents }] = await Promise.all([
-      getCachedEvents(),
-      getCachedExtendedEvents(),
-    ]);
-    const event = [...moneylineEvents, ...extendedEvents].find((ev) => ev.id === scopeInput.eventId);
+  if (scopeInput.kind === "event" && scopeInput.pinned && event) {
+    const { marketType, line, side } = scopeInput.pinned;
 
-    if (!event || new Date(event.commence_time).getTime() <= now.getTime()) {
-      return { status: "stale", message: "That game is no longer in the cached odds. Pick another." };
+    if (!row.parsed.eligibleMarketTypes.includes(marketType)) {
+      return SELECTION_INVALID;
     }
 
-    if (scopeInput.pinned) {
-      const { marketType, line, side } = scopeInput.pinned;
+    const sel: PromoSelection = { eventId: event.id, marketType, line, side };
+    const resolved =
+      marketType === "moneyline"
+        ? (resolveSelection(moneylineEvents, sel) ?? resolveSelection(extendedEvents, sel))
+        : resolveSelection(extendedEvents, sel);
 
-      if (!row.parsed.eligibleMarketTypes.includes(marketType)) {
-        return SELECTION_INVALID;
-      }
-
-      const sel: PromoSelection = { eventId: event.id, marketType, line, side };
-      const resolved =
-        marketType === "moneyline"
-          ? (resolveSelection(moneylineEvents, sel) ?? resolveSelection(extendedEvents, sel))
-          : resolveSelection(extendedEvents, sel);
-
-      if (!resolved) {
-        return SELECTION_INVALID;
-      }
-
-      pinned = sel;
+    if (!resolved) {
+      return SELECTION_INVALID;
     }
 
-    scope = {
-      kind: "event",
-      eventId: event.id,
-      sportKey: event.sport_key,
-      homeTeam: event.home_team,
-      awayTeam: event.away_team,
-      commenceTime: event.commence_time,
-    };
-  } else {
-    const bounds = etDayBounds(scopeInput.etDate);
-    // WR-12: an impossible calendar date (e.g. 2026-02-31) is rejected, never rolled over.
-    if (!bounds) {
-      return { status: "invalid" };
-    }
-    if (new Date(bounds.end).getTime() <= now.getTime()) {
-      return { status: "stale", message: "That day has already passed. Pick another." };
-    }
-    // ...and a day beyond the correction window the dropdown offers is refused.
-    if (new Date(bounds.start).getTime() > now.getTime() + DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000) {
-      return { status: "invalid" };
-    }
-
-    scope = {
-      kind: "sport_window",
-      sportKey: scopeInput.sportKey,
-      windowStart: bounds.start,
-      windowEnd: bounds.end,
-    };
+    pinned = sel;
   }
 
   const next = statusAfterMatch({
