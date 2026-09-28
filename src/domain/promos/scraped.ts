@@ -105,6 +105,14 @@ export interface SkipEvidence {
   expiresAt: string | null;
   /** The candidate the parser built before validation failed (schema_invalid), or a partial guess; null when nothing was built. */
   partial: Partial<ScrapedPromo> | null;
+  /**
+   * quick-260928-kc5: when set, run.ts's buildClassifyWrites uses this as the
+   * classify write's dedupe key instead of deriving one from the draft --
+   * used when the promo reader demotes an already-kept candidate to review
+   * (reconcile.ts), so the write touches that candidate's own existing live
+   * row (keeping it live) rather than expiring it or creating a duplicate.
+   */
+  dedupeKey?: string;
 }
 
 export interface SkippedEntry {
