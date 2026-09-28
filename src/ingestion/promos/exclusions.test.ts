@@ -62,6 +62,55 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     expect(classify(title, text)).not.toBe("prop");
   });
 
+  it.each([
+    ["MLB HR Bet and Get", ""],
+    ["Super Boost", "Bet a HR, get a Bonus Bet for HRs hit in that game!"],
+    ["Super Boost", "Place a pre-game Home Run bet (Under Batter > Home Runs)"],
+    ["Super Boost", "every home run hit in the game"],
+    ["Super Boost", "Batter > Hits"],
+  ])("classifies HR / home run / batter-prop wording as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).toBe("prop");
+  });
+
+  it.each([
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Offer runs through 9/28.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Thursday Night Football special.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Prices may shrink as running total updates.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Bonus bet issued within 24 hr window.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. Reward issued within 48 hrs of settlement.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. View in Chrome for best results.",
+    ],
+    [
+      "NFL 50% Profit Boost",
+      "Opt-in and get One (1) Profit Boost for all NFL games. Profit Boost: 50% Max betting limits apply. This offer runs the promo through 9/28.",
+    ],
+  ])("does not classify lowercase hr/run-containing boilerplate words as prop: %s / %s", (title, text) => {
+    expect(classify(title, text)).not.toBe("prop");
+  });
+
+  it("the case-sensitive HRs? boundary does not match inside 'through', 'Thursday', or '3hrs'", () => {
+    expect(classify("NFL Boost", "Offer runs through 9/28.")).not.toBe("prop");
+    expect(classify("NFL Boost", "Thursday Night special.")).not.toBe("prop");
+    expect(classify("NFL Boost", "Reward issued within 3hrs.")).not.toBe("prop");
+  });
+
   it("classifies futures/outright titles", () => {
     expect(classify("50% Stanley Cup Champion Profit Boost")).toBe("futures");
     expect(classify("NHL Futures 25% Profit Boost")).toBe("futures");

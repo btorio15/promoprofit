@@ -58,8 +58,28 @@ const OUTRIGHT_RE =
 // alternative requires a trailing "N+" for the same reason: bare "record"
 // appears in generic legal boilerplate ("keep a record of your bets"),
 // and Bally/FanDuel copy is not boilerplate-stripped the way DK's is.
+//
+// "home runs?" and "batter\s*>" cover real fixture 1127668 "MLB HR Bet
+// and Get" (2026-09-28): a player-prop, variable-Bonus-Bet-reward promo
+// ("get rewarded for every Home Run hit", "Under Batter > Home Runs")
+// that cannot be hedged like a fixed profit-boost. A fixture sweep across
+// every existing Bally, FanDuel, and DraftKings fixture found no other
+// matches for these two alternatives, so they're safe to add here.
 const PROP_RE =
-  /\bscorer\b|\bplayer prop\b|\banytime touchdown\b|\b(?:receiving|rushing|passing) yards\b|\breceptions?\b|\bstrikeouts?\b|\brebounds\b|\bassists\b|\bto (?:each )?(?:record|have)\s+\d+\+/i;
+  /\bscorer\b|\bplayer prop\b|\banytime touchdown\b|\b(?:receiving|rushing|passing) yards\b|\breceptions?\b|\bstrikeouts?\b|\brebounds\b|\bassists\b|\bto (?:each )?(?:record|have)\s+\d+\+|\bhome runs?\b|\bbatter\s*>/i;
+
+// "HR"/"HRs" (real fixture 1127668's own title "MLB HR Bet and Get" and
+// text "Bonus Bet for HRs hit in that game") is deliberately its own
+// CASE-SENSITIVE regex, kept separate from the case-insensitive PROP_RE
+// above. DraftKings/Bally/FanDuel boilerplate routinely uses lowercase
+// "hr"/"hrs" as a time-duration abbreviation ("24 hr window", "issued
+// within 48 hrs") that has nothing to do with home runs -- matching those
+// case-insensitively would false-positive real profit-boost promos out of
+// the feed. Real HR-promo copy always capitalizes "HR"/"HRs" as the stat
+// abbreviation, so requiring exact-case protects against that collision
+// while still catching the real fixture. Word-bounded so it can't match
+// inside "through", "Thursday", or "3hrs" either.
+const PROP_HR_RE = /\bHRs?\b/;
 
 const SGP_RE = /\bsgp\s*\(?x?\)?\b|\bsame game parlay\b/i;
 const PARLAY_RE = /\bparlay\b/i;
@@ -95,7 +115,7 @@ export function classifyExclusion(input: {
   if (FUTURES_RE.test(combined)) return "futures";
   if (FUTURES_TITLE_RE.test(title)) return "futures";
 
-  if (PROP_RE.test(combined)) return "prop";
+  if (PROP_RE.test(combined) || PROP_HR_RE.test(combined)) return "prop";
 
   // Otherwise, only exclude when the terms restrict eligible bet types to
   // Parlay/SGP with no "Single"/"any wager" escape hatch (D-15, keeps the

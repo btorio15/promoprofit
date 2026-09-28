@@ -16,12 +16,21 @@ const FIXTURE_PATH_20260927 = join(
   "src/test/fixtures/promos/draftkings-promos-2026-09-27.json",
 );
 
+const FIXTURE_PATH_20260928 = join(
+  process.cwd(),
+  "src/test/fixtures/promos/draftkings-promos-2026-09-28.json",
+);
+
 function loadFixture(): string {
   return readFileSync(FIXTURE_PATH, "utf-8");
 }
 
 function loadFixture20260927(): string {
   return readFileSync(FIXTURE_PATH_20260927, "utf-8");
+}
+
+function loadFixture20260928(): string {
+  return readFileSync(FIXTURE_PATH_20260928, "utf-8");
 }
 
 function parseFixture() {
@@ -50,6 +59,13 @@ function findCandidate20260927(id: string): ScrapedPromo {
   const candidate = result.candidates.find((c) => c.externalId === id);
   if (!candidate) throw new Error(`candidate ${id} not found`);
   return candidate;
+}
+
+function parseFixture20260928() {
+  return draftkingsScraper.parse(
+    { listBody: loadFixture20260928(), detailBodies: {} },
+    { now: new Date("2026-09-28T12:00:00.000Z"), sourceUrl: "https://api.draftkings.com/en/api/promotions/v3/promotions/query" },
+  );
 }
 
 /** A single-zone, single-promotion body shaped like the real Contract
@@ -288,7 +304,7 @@ describe("draftkingsScraper — structured fields for the kept boosts (Task 2)",
     expect(candidate.windowEnd).toBe("2026-09-28T03:00:00.000Z");
   });
 
-  it("a forced-invalid candidate (no boost percent, no boosted odds) is skipped as schema_invalid with a console.warn", () => {
+  it("a candidate with no parseable 'Profit Boost: N%' is skipped as unrecognized before any candidate is built (no console.warn)", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     try {
       const body = buildSyntheticBody({
@@ -301,11 +317,80 @@ describe("draftkingsScraper — structured fields for the kept boosts (Task 2)",
       );
       expect(result.candidates).toEqual([]);
       expect(result.skipped).toHaveLength(1);
-      expect(result.skipped[0].reason).toBe("schema_invalid");
-      expect(warnSpy).toHaveBeenCalled();
+      expect(result.skipped[0].reason).toBe("unrecognized");
+      expect(warnSpy).not.toHaveBeenCalled();
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it("a genuine schema failure (mocked safeParse) is still skipped as schema_invalid with a console.warn", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const schemaSpy = vi
+      .spyOn(ScrapedPromoSchema, "safeParse")
+      .mockReturnValueOnce({ success: false, error: { issues: [] } } as unknown as ReturnType<
+        typeof ScrapedPromoSchema.safeParse
+      >);
+    try {
+      // Default synthetic body DOES include "Profit Boost: 50%", so it
+      // clears the new missing-boost-% guard and reaches ScrapedPromoSchema,
+      // whose mocked failure is what produces schema_invalid here.
+      const body = buildSyntheticBody({});
+      const result = draftkingsScraper.parse(
+        { listBody: body, detailBodies: {} },
+        { now: new Date("2026-09-27T12:00:00.000Z"), sourceUrl: "x" },
+      );
+      expect(result.candidates).toEqual([]);
+      expect(result.skipped).toHaveLength(1);
+      expect(result.skipped[0].reason).toBe("schema_invalid");
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      schemaSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+});
+
+describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668) classified as prop", () => {
+  it("found is 23, candidates [] (the honest kept set), and no unrecognized or schema_invalid skips", () => {
+    const result = parseFixture20260928();
+    expect(result.found).toBe(23);
+    expect(result.candidates).toEqual([]);
+  });
+
+  it("pins the full skip map -- 1127668 is prop, every other id unchanged from before the fix", () => {
+    const result = parseFixture20260928();
+    const reasonById: Record<string, string> = {};
+    for (const s of result.skipped) {
+      reasonById[s.externalId as string] = s.reason;
+    }
+    expect(reasonById).toEqual({
+      "600295": "not_a_promo",
+      "779769": "new_customer",
+      "782037": "new_customer",
+      "861287": "not_a_promo",
+      "882364": "new_customer",
+      "1001646": "not_a_promo",
+      "1020206": "not_a_promo",
+      "1098873": "new_customer",
+      "1098879": "not_a_promo",
+      "1107235": "new_customer",
+      "1114582": "not_a_promo",
+      "1116571": "not_a_promo",
+      "1118611": "new_customer",
+      "1119017": "not_a_promo",
+      "1119078": "futures",
+      "1120652": "not_a_promo",
+      "1125873": "unsupported_sport",
+      "1126077": "sgp",
+      "1126078": "futures",
+      "1127118": "prop",
+      "1127122": "not_a_promo",
+      "1127668": "prop",
+      "1127861": "not_a_promo",
+    });
+    expect(Object.values(reasonById)).not.toContain("unrecognized");
+    expect(Object.values(reasonById)).not.toContain("schema_invalid");
   });
 });
 
