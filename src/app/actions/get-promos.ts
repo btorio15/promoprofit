@@ -6,6 +6,7 @@ import { COLORADO_BOOKS } from "@/config/books";
 import { SCRAPE_TARGET_BOOK_KEYS } from "@/config/scrapeTargets";
 import { PromosInputSchema } from "@/domain/promos/promosInput";
 import type {
+  ClassifyQueueItemDTO,
   CorrectionOptions,
   GetPromosResponse,
   PromoRowDTO,
@@ -62,20 +63,22 @@ function ownBooksFirst<T extends { hasPromoBook: boolean }>(rows: T[]): T[] {
 }
 
 /**
- * Correct sub-panel dropdown data (T-03-09-06): built ONLY when the queue
- * actually has a match-kind item -- there's no correction UI to populate
- * otherwise, so skip the extra cache reads entirely on every other visit.
- * Reuses an already-fetched cache when the caller has one (the
+ * Correct/classify sub-panel dropdown data (T-03-09-06; quick-260928-it1
+ * extends the gate to classify items too -- ClassifyQueueCard's "Game or
+ * day" selector reuses the same CorrectionScopeSelect data). Built ONLY when
+ * the queue actually has a match or classify item -- there's no correction
+ * UI to populate otherwise, so skip the extra cache reads entirely on every
+ * other visit. Reuses an already-fetched cache when the caller has one (the
  * activePromos-present branch below already fetched both caches for hedge
  * math); otherwise fetches them itself (the activePromos-empty branch never
  * would have otherwise).
  */
 async function correctionOptionsFor(
-  hasMatchItem: boolean,
+  needsCorrectionOptions: boolean,
   now: Date,
   cached?: { moneylineEvents: OddsEvent[]; extendedEvents: OddsEvent[] },
 ): Promise<CorrectionOptions> {
-  if (!hasMatchItem) return EMPTY_CORRECTION_OPTIONS;
+  if (!needsCorrectionOptions) return EMPTY_CORRECTION_OPTIONS;
 
   const { moneylineEvents, extendedEvents } =
     cached ??
@@ -136,7 +139,11 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   ]);
   const userBookSet = new Set(userBookKeys);
   const queue = queueRows.map(toQueueItemDTO);
-  const hasMatchItem = queueRows.some((row) => row.reviewReason === "match");
+  // quick-260928-it1: classify items also need correctionOptions (their
+  // "Game or day" selector reuses the same CorrectionScopeSelect data).
+  const needsCorrectionOptions = queueRows.some(
+    (row) => row.reviewReason === "match" || row.reviewReason === "classify",
+  );
 
   /**
    * quick-260927-n12: records today's GROUP-level profit observations
@@ -151,7 +158,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
 
   if (activePromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
-    const correctionOptions = await correctionOptionsFor(hasMatchItem, now);
+    const correctionOptions = await correctionOptionsFor(needsCorrectionOptions, now);
     return {
       status: "ok",
       scrapeStatus,
@@ -173,7 +180,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       getCachedExtendedEvents(),
     ]);
 
-  const correctionOptions = await correctionOptionsFor(hasMatchItem, now, { moneylineEvents, extendedEvents });
+  const correctionOptions = await correctionOptionsFor(needsCorrectionOptions, now, { moneylineEvents, extendedEvents });
 
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
     return {
@@ -279,12 +286,54 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   };
 }
 
+const EXCERPT_MAX_CHARS = 280;
+
+/** Whitespace-collapsed, <= 280 chars, ending in "…" when trimmed (T-it1-06: rendered as React text only, never HTML). */
+function buildClassifyExcerpt(rawText: string): string {
+  const collapsed = rawText.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= EXCERPT_MAX_CHARS) return collapsed;
+  return `${collapsed.slice(0, EXCERPT_MAX_CHARS - 1)}…`;
+}
+
+/** T-it1-06: allowlists a classify draft's sourceUrl to http:/https: only -- javascript:/data:/any other scheme becomes null. */
+function safeHttpUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function toClassifyQueueItemDTO(row: QueueRow): ClassifyQueueItemDTO {
+  return {
+    title: row.parsed.title,
+    excerpt: buildClassifyExcerpt(row.parsed.rawText),
+    sourceUrl: safeHttpUrl(row.parsed.sourceUrl),
+    expiresAt: row.parsed.expiresAt,
+    suggested: {
+      promoType: row.promoType,
+      boostPercent: row.parsed.boostPercent,
+      bonusAmount: row.bonusAmount,
+      maxStake: row.maxStake,
+      maxWinnings: row.maxWinnings,
+      minOdds: row.minOddsAmerican,
+      sportKey: row.parsed.sportKeyHint,
+    },
+    maxWinningsKindKnown: row.maxWinningsKind !== null,
+  };
+}
+
 /**
  * Maps one pending_review row to its queue-card DTO (03-UI-SPEC.md "Queue
- * item card"). kind mirrors review_reason: "match" rows only get a
- * bestGuessLabel (when a guess exists, D-10 -- presentational only, never
- * auto-activated); "caps" rows only get matchedLabel (the already-confirmed
- * scope) and capRecap (D-18 -- null fields render as "not found" in the UI).
+ * item card"; quick-260928-it1 for "classify"). kind mirrors review_reason:
+ * "match" rows only get a bestGuessLabel (when a guess exists, D-10 --
+ * presentational only, never auto-activated); "caps" rows only get
+ * matchedLabel (the already-confirmed scope) and capRecap (D-18 -- null
+ * fields render as "not found" in the UI); "classify" rows get the
+ * ClassifyQueueItemDTO instead of describePromo's scope-based description
+ * (the scraper doesn't even know the promo type yet, so there's no scope to
+ * describe) -- description falls back to the draft's own title.
  */
 function toQueueItemDTO(row: QueueRow): QueueItemDTO {
   const bookName = COLORADO_BOOKS.find((b) => b.key === row.bookKey)?.displayName ?? row.bookKey;
@@ -295,7 +344,7 @@ function toQueueItemDTO(row: QueueRow): QueueItemDTO {
     kind: row.reviewReason,
     bookName,
     promoTypeLabel,
-    description: describePromo(row.parsed),
+    description: row.reviewReason === "classify" ? row.parsed.title : describePromo(row.parsed),
     bestGuessLabel:
       row.reviewReason === "match" && row.bestGuess ? `Best guess: ${scopeGuessLabel(row.bestGuess)}.` : null,
     matchedLabel: row.reviewReason === "caps" && row.scope ? scopeGuessLabel(row.scope) : null,
@@ -304,6 +353,7 @@ function toQueueItemDTO(row: QueueRow): QueueItemDTO {
         ? { maxStake: row.maxStake, maxWinnings: row.maxWinnings, minOdds: row.minOddsAmerican }
         : null,
     unparsedCapFields: row.unparsedCapFields,
+    classify: row.reviewReason === "classify" ? toClassifyQueueItemDTO(row) : null,
   };
 }
 

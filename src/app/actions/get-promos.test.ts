@@ -237,6 +237,34 @@ function capsQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
   };
 }
 
+function classifyQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
+  return {
+    id: 20,
+    bookKey: "draftkings",
+    promoType: "profit_boost",
+    reviewReason: "classify",
+    parsed: baseParsed({
+      promoType: "profit_boost",
+      boostPercent: null,
+      title: "Mystery Promo",
+      rawText: "  Mystery Promo   raw   text  ",
+      sourceUrl: "https://sportsbook.draftkings.com/promo/1",
+      expiresAt: null,
+      sportKeyHint: null,
+    }),
+    bestGuess: null,
+    flagged: false,
+    scope: null,
+    maxStake: null,
+    maxWinnings: null,
+    maxWinningsKind: null,
+    minOddsAmerican: null,
+    bonusAmount: null,
+    unparsedCapFields: [],
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockRequireUser.mockResolvedValue({ userId: 1, email: "friend@example.com", displayName: "Friend" });
@@ -761,6 +789,75 @@ describe("getPromos review queue mapping (PROMO-04, D-13)", () => {
     expect(result.emptyVariant).toBe("no-odds");
     expect(result.queue).toHaveLength(1);
   });
+
+  it("maps a classify-kind item's title/excerpt/sourceUrl/suggested fields, classify non-null only for classify kind", async () => {
+    mockGetReviewQueue.mockResolvedValue([classifyQueueRow(), matchQueueRow()]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    const classifyItem = result.queue.find((q) => q.promoId === 20);
+    const matchItem = result.queue.find((q) => q.promoId === 10);
+    expect(classifyItem?.kind).toBe("classify");
+    expect(classifyItem?.description).toBe("Mystery Promo");
+    expect(classifyItem?.classify).toEqual({
+      title: "Mystery Promo",
+      excerpt: "Mystery Promo raw text",
+      sourceUrl: "https://sportsbook.draftkings.com/promo/1",
+      expiresAt: null,
+      suggested: {
+        promoType: "profit_boost",
+        boostPercent: null,
+        bonusAmount: null,
+        maxStake: null,
+        maxWinnings: null,
+        minOdds: null,
+        sportKey: null,
+      },
+      maxWinningsKindKnown: false,
+    });
+    expect(matchItem?.classify).toBeNull();
+  });
+
+  it("classify excerpt collapses whitespace and truncates at 280 chars with an ellipsis", async () => {
+    const longText = "A".repeat(300);
+    mockGetReviewQueue.mockResolvedValue([
+      classifyQueueRow({ parsed: baseParsed({ promoType: "profit_boost", boostPercent: null, rawText: longText }) }),
+    ]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    const excerpt = result.queue[0].classify?.excerpt ?? "";
+    expect(excerpt.length).toBe(280);
+    expect(excerpt.endsWith("…")).toBe(true);
+  });
+
+  it("classify sourceUrl becomes null for a non-http(s) scheme", async () => {
+    mockGetReviewQueue.mockResolvedValue([
+      classifyQueueRow({
+        parsed: baseParsed({ promoType: "profit_boost", boostPercent: null, sourceUrl: "javascript:alert(1)" }),
+      }),
+    ]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue[0].classify?.sourceUrl).toBeNull();
+  });
+
+  it("classify maxWinningsKindKnown is true when the row's maxWinningsKind is set", async () => {
+    mockGetReviewQueue.mockResolvedValue([classifyQueueRow({ maxWinningsKind: "net_winnings" })]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue[0].classify?.maxWinningsKindKnown).toBe(true);
+  });
 });
 
 describe("getPromos correction options (Plan 09, T-03-09-06)", () => {
@@ -774,6 +871,26 @@ describe("getPromos correction options (Plan 09, T-03-09-06)", () => {
     expect(result.correctionOptions).toEqual({ events: [], sportDays: [] });
     expect(mockGetCachedEvents).not.toHaveBeenCalled();
     expect(mockGetCachedExtendedEvents).not.toHaveBeenCalled();
+  });
+
+  it("quick-260928-it1: fetches cached events and builds correctionOptions when a classify-kind item exists and no match item", async () => {
+    const event = moneylineEvent({
+      id: "nfl-9",
+      homeTeam: "Denver Broncos",
+      awayTeam: "Los Angeles Rams",
+      commenceTime: plusHours(6),
+      quotes: [{ bookKey: "draftkings", homePrice: -180, awayPrice: 150 }],
+    });
+    mockGetActivePromos.mockResolvedValue([]);
+    mockGetReviewQueue.mockResolvedValue([classifyQueueRow()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(mockGetCachedEvents).toHaveBeenCalledTimes(1);
+    expect(result.correctionOptions.events.map((e) => e.eventId)).toEqual(["nfl-9"]);
   });
 
   it("fetches cached events and builds correctionOptions when a match-kind item exists, even with zero active promos", async () => {

@@ -131,6 +131,33 @@ export interface UnprofitablePromoRowDTO {
  * be parsed (matchedLabel + capRecap, unparsedCapFields names which of the
  * three recap fields still need a human-entered value).
  */
+/**
+ * quick-260928-it1: a "classify" queue card's data -- non-null only when
+ * `kind` is "classify". `suggested` prefills the ClassifyQueueCard's
+ * boost/bonus sub-panel fields from whatever buildClassifyDraft could
+ * infer; every field is presentational only, never trusted server-side
+ * (classifyPromo re-validates everything the member actually submits).
+ */
+export interface ClassifyQueueItemDTO {
+  title: string;
+  /** Whitespace-collapsed, <= 280 chars, ending in "…" when trimmed. */
+  excerpt: string;
+  /** Allowlisted to http:/https: (T-it1-06) -- null for any other scheme, or when absent. */
+  sourceUrl: string | null;
+  expiresAt: string | null;
+  suggested: {
+    promoType: PromoType;
+    boostPercent: string | null;
+    bonusAmount: string | null;
+    maxStake: string | null;
+    maxWinnings: string | null;
+    minOdds: number | null;
+    sportKey: string | null;
+  };
+  /** Whether the book's winnings-cap KIND is already known (independent of whether an amount parsed) -- the Max winnings field is hidden client-side when false (D-18). */
+  maxWinningsKindKnown: boolean;
+}
+
 export interface QueueItemDTO {
   promoId: number;
   kind: ReviewReason;
@@ -141,6 +168,7 @@ export interface QueueItemDTO {
   matchedLabel: string | null;
   capRecap: { maxStake: string | null; maxWinnings: string | null; minOdds: number | null } | null;
   unparsedCapFields: CapField[];
+  classify: ClassifyQueueItemDTO | null;
 }
 
 export type GetPromosResponse =
