@@ -2,7 +2,7 @@ import { z } from "zod";
 import { and, asc, eq, gt, isNull, ne, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
-import { ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
+import { ScrapedPromoFieldsSchema, ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
 import { ScopeGuessSchema, type ScopeGuess } from "@/domain/promos/scope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import {
@@ -12,6 +12,7 @@ import {
   WINNINGS_CAP_KINDS,
   type CapField,
   type PromoSelection,
+  type PromoStatus,
   type PromoType,
   type ReviewReason,
   type WinningsCapKind,
@@ -123,10 +124,24 @@ function scopeGuessFromColumns(row: PendingPromoRow): ScopeGuess | null {
 
 /**
  * Drizzle `.set()` columns for a scope write, shared by applyConfirmedMatch
- * (Plan 07) and applyCorrectedMatch (Plan 09) -- both write the exact same
- * scope-column shape, just from a different source ScopeGuess.
+ * (Plan 07), applyCorrectedMatch (Plan 09) and applyClassification
+ * (quick-260928-it1) -- all three write the exact same scope-column shape,
+ * just from a different source ScopeGuess (or null, for classifyPromo's
+ * "no scope chosen" path -- clears every scope column).
  */
-function scopeColumnsFrom(scope: ScopeGuess) {
+function scopeColumnsFrom(scope: ScopeGuess | null) {
+  if (scope === null) {
+    return {
+      scopeKind: null,
+      sportKey: null,
+      eventId: null,
+      eventCommenceTime: null,
+      homeTeam: null,
+      awayTeam: null,
+      windowStart: null,
+      windowEnd: null,
+    };
+  }
   return scope.kind === "event"
     ? {
         scopeKind: "event" as const,
@@ -169,7 +184,17 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
     return null;
   }
 
-  const parsedResult = ScrapedPromoSchema.safeParse(row.parsed);
+  // quick-260928-it1: a classify row's parsed payload is a deliberately
+  // incomplete draft (buildClassifyDraft) -- it never passes the full
+  // cross-field ScrapedPromoSchema (a profit_boost with no boostPercent, for
+  // instance, always fails ScrapedPromoSchema's own refinement). Validate it
+  // against the lenient ScrapedPromoFieldsSchema instead; every other
+  // review_reason still requires the full schema, since those rows are only
+  // ever written from a validated candidate/member-completed promo.
+  const parsedResult =
+    row.reviewReason === "classify"
+      ? ScrapedPromoFieldsSchema.safeParse(row.parsed)
+      : ScrapedPromoSchema.safeParse(row.parsed);
   if (!parsedResult.success) {
     console.warn(`promoReview: dropping promo ${row.id}, invalid parsed payload`);
     return null;
@@ -410,6 +435,95 @@ export async function applyCapEntry(args: {
         maxStake === null ? ne(promos.promoType, "profit_boost") : undefined,
       ),
     )
+    .returning({ id: promos.id });
+
+  return rows.length === 1;
+}
+
+/**
+ * Writes a member's completed classification (T-it1-03, CR-03, CR-04) in one
+ * conditional UPDATE gated on status = 'pending_review' AND review_reason =
+ * 'classify', so a concurrent classify/dismiss on the same row affects at
+ * most one caller (T-it1-05). Sets the completed promoType/parsed/cap
+ * columns from the member's input, the scope columns from `scope` (or all-
+ * null when the member chose no game/day), clears marketType/line/side/
+ * bestGuess (a classify card never pins a market), and records BOTH
+ * correctedByUserId and capEnteredByUserId as the acting member (CR-03: a
+ * later scrape must never overwrite either the scope OR the caps this
+ * member just entered). Defense in depth for CR-04: refuses (returns false,
+ * no write) when `next.status` is "active" for a profit_boost with no
+ * maxStake -- the caller (classify-promo.ts) must never reach this with
+ * that combination, but this is the same belt-and-braces guard
+ * applyCapEntry's WHERE clause applies.
+ */
+export async function applyClassification(args: {
+  promoId: number;
+  userId: number;
+  promoType: PromoType;
+  parsed: ScrapedPromo;
+  boostPercent: string | null;
+  bonusAmount: string | null;
+  maxStake: string | null;
+  maxWinnings: string | null;
+  maxWinningsKind: WinningsCapKind | null;
+  minOddsAmerican: number | null;
+  scope: ScopeGuess | null;
+  next: { status: PromoStatus; reviewReason: ReviewReason | null; unparsedCapFields: CapField[] };
+  now: Date;
+}): Promise<boolean> {
+  const {
+    promoId,
+    userId,
+    promoType,
+    parsed,
+    boostPercent,
+    bonusAmount,
+    maxStake,
+    maxWinnings,
+    maxWinningsKind,
+    minOddsAmerican,
+    scope,
+    next,
+    now,
+  } = args;
+
+  if (next.status === "active" && promoType === "profit_boost" && maxStake === null) {
+    return false;
+  }
+
+  const db = getDb();
+
+  const rows = await db
+    .update(promos)
+    .set({
+      promoType,
+      parsed,
+      boostPercent,
+      boostedOddsAmerican: parsed.boostedOddsAmerican,
+      baseOddsAmerican: parsed.baseOddsAmerican,
+      bonusAmount,
+      maxStake,
+      maxWinnings,
+      maxWinningsKind,
+      minOddsAmerican,
+      unparsedCapFields: next.unparsedCapFields,
+      finePrintNote: parsed.finePrintNote,
+      rawText: parsed.rawText,
+      sourceUrl: parsed.sourceUrl,
+      expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null,
+      ...scopeColumnsFrom(scope),
+      marketType: null,
+      line: null,
+      side: null,
+      bestGuess: null,
+      status: next.status,
+      reviewReason: next.reviewReason,
+      correctedByUserId: userId,
+      capEnteredByUserId: userId,
+      reviewedAt: now,
+      autoMatched: false,
+    })
+    .where(and(eq(promos.id, promoId), eq(promos.status, "pending_review"), eq(promos.reviewReason, "classify")))
     .returning({ id: promos.id });
 
   return rows.length === 1;
