@@ -311,6 +311,8 @@ export async function runPromoScrape(opts?: {
             rescues: 0,
             reviewRouted: 0,
             skippedByReader: 0,
+            clearSkipOverrides: 0,
+            rescuesWithoutAmount: 0,
             inputTokens: 0,
             outputTokens: 0,
           };

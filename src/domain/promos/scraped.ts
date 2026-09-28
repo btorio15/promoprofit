@@ -120,6 +120,16 @@ export interface SkippedEntry {
   externalId: string | null;
   title: string;
   evidence?: SkipEvidence;
+  /**
+   * quick-260928-mgi: set when the promo reader tried to rescue this skip
+   * (an unrecognized/unsupported_sport/schema_invalid reason, or a
+   * concrete-offer not_a_promo) without any guard-backed amount
+   * (boostPercent/bonusAmount) to back it up. reviewTriage.ts's
+   * isReviewWorthySkip honors this flag first, so a suppressed rescue can
+   * never become a classify review row -- even though its own reason would
+   * otherwise be review-worthy (e.g. unrecognized).
+   */
+  reviewSuppressed?: "reader_rescue_without_amount";
 }
 
 export interface ParseResult {
