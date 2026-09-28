@@ -55,6 +55,8 @@ jobs:
       - run: npm run scrape:promos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # quick-260928-kc5: optional -- absent means the pattern parsers only (no Claude Haiku promo reader this run).
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       # quick-260927-n12 (owner scope change B): moneyline-only odds refresh
       # + profit-observation recording, gated to the 8:07am Denver run inside
       # the script itself (isMorningObservationWindow) -- the 12:07/5:07pm

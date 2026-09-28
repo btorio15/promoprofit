@@ -801,7 +801,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
     expect(outcomes[0]).not.toHaveProperty("reader");
 
     expect(store.commitScrapedPromos).toHaveBeenCalledTimes(1);
-    const [, writesArg, , optsArg] = store.commitScrapedPromos.mock.calls[0] as [
+    const [, writesArg] = store.commitScrapedPromos.mock.calls[0] as [
       string,
       PromoWrite[],
       Date,
