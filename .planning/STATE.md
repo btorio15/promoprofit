@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 11 of 15 (03-11 go-live checkpoint, the only plan without a SUMMARY)
 Status: Executing Phase 3
-Last activity: 2026-09-28 - Completed quick task 260928-mgi: reader review tightening, Sign-up offers tab
+Last activity: 2026-09-29 - Completed quick task 260929-gcn: multi-day promo windows (FanDuel date parsing + review date range)
 
 Progress: [██████████] 100%
 
@@ -158,6 +158,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260928-mgi | reader review tightening (clear skips win, rescue needs amount); Sign-up offers tab | 2026-09-28 | 9121429 | Verified | [260928-mgi-reader-review-tightening-and-new-custome](./quick/260928-mgi-reader-review-tightening-and-new-custome/) |
 | fast | Sign-up offers: 'Show books I already have' checkbox | 2026-09-28 | df1e868 |  | — |
 | fast | scrape cron switched to plain UTC 7 14,18,23 (timezone key never fired) | 2026-09-28 | c9eb35b |  | — |
+| 260929-gcn | multi-day promo windows: FanDuel date parsing + review-queue date range | 2026-09-29 | 549284d | Verified | [260929-gcn-multi-day-promo-windows-fanduel-date-par](./quick/260929-gcn-multi-day-promo-windows-fanduel-date-par/) |
 
 ## Deferred Items
 
