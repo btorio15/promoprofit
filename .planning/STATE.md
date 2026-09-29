@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 4
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-09-29
+Last activity: 2026-09-29 - Completed quick task 260929-igk: mark-done snapshots, Done tab, total profit extracted
 
 Progress: [██████████] 100%
 
@@ -162,6 +162,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | fast | scrape cron switched to plain UTC 7 14,18,23 (timezone key never fired) | 2026-09-28 | c9eb35b |  | — |
 | 260929-gcn | multi-day promo windows: FanDuel date parsing + review-queue date range | 2026-09-29 | 549284d | Verified | [260929-gcn-multi-day-promo-windows-fanduel-date-par](./quick/260929-gcn-multi-day-promo-windows-fanduel-date-par/) |
 | 260929-hht | review game picker: search box for one game, league + From/Through date range (replaces the single dropdown) | 2026-09-29 | b52bdbb | Needs Review | [260929-hht-review-game-picker-searchable-multi-game](./quick/260929-hht-review-game-picker-searchable-multi-game/) |
+| 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
 
 ## Deferred Items
 
