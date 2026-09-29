@@ -1,7 +1,8 @@
 ---
 phase: 4
 slug: opportunities-feed
-status: draft
+status: approved
+reviewed_at: 2026-09-29
 shadcn_initialized: true
 preset: "base-nova / neutral / css-variables (components.json unchanged; no re-init, no new tokens, no new shadcn blocks: toggle-group, badge, collapsible, table, tooltip, alert-dialog, button already exist in src/components/ui/)"
 created: 2026-09-29
@@ -35,11 +36,12 @@ Phone-first. Content column is the existing `max-w-[1080px]` main. Everything is
 
 ### Top-level tabs (D-01, D-06)
 
-- Order: **Opportunities | Bonus bets | Arbitrage | Promos | Review | Sign-up offers** (Review sits right after Promos because it is Promos' review queue; defaulted).
-- `AppShell.tsx`: `ActiveTab` becomes `"opportunities" | "bonus" | "arbitrage" | "promos" | "review" | "signup"`; initial `activeTab` = `"opportunities"`. Same `TabsList variant="line"` and `keepMounted` contents.
-- Six tabs do not fit 360px. The `TabsList` gets `overflow-x-auto` with `whitespace-nowrap` triggers (no wrapping, no truncation, each trigger min-h 44px). The active trigger scrolls into view on change. No new component.
-- Review trigger shows a live count when the queue is non-empty: `Review (3)` with the count in `.num`. Plain text only, no colored badge (keeps accent reserved). Zero shows plain `Review`.
-- Shared `OddsStatusBar` and `CreditBanner` stay above the tabs unchanged. Opportunities depends on cached odds, so `showExtendedAge` stays tied to the Arbitrage tab only.
+- Order: **Opportunities | Arbitrage | Promos | Tools** (four tabs, fits 360px without scrolling; owner decision 2026-09-29). Tab triggers keep min-h 44px, `whitespace-nowrap`; no horizontal scroll.
+- `AppShell.tsx`: `ActiveTab` becomes `"opportunities" | "arbitrage" | "promos" | "tools"`; initial `activeTab` = `"opportunities"`. Same `TabsList variant="line"` and `keepMounted` contents.
+- **Tools tab:** a second-level `Tabs` (`TabsList variant="line"`, same component) with two sub-tabs: **Bonus bets** (existing `FinderScreen`) and **Sign-up offers** (existing `SignupOffersScreen`). Default sub-tab Bonus bets. Sub-tab contents stay `keepMounted` so the finder's results survive switching. Panel header "Tools" + Label description "Calculators and extras."
+- **Promos tab sub-tabs (D-06):** second-level `Tabs` with **Active | Done | Review**. Default Active. `PromosScreen` keeps `keepMounted`. Review sub-tab holds `ScrapeStatusPanel` then `ReviewQueueSection`. Second-level tab triggers are min-h 44px.
+- **Review count visibility:** when the queue count N > 0 the sub-tab reads `Review (N)` (count in `.num`) AND the top-level Promos trigger reads `Promos (N)` with the same count in `.num`, so members notice queued items without opening Promos. When N is 0 both show plain text. Plain text only, no colored badge (keeps accent reserved). "Needs a look" items count toward N.
+- Shared `OddsStatusBar` and `CreditBanner` stay above the tabs unchanged. `showExtendedAge` stays tied to the Arbitrage tab only.
 
 ### Opportunities panel, top to bottom
 
@@ -51,6 +53,8 @@ Phone-first. Content column is the existing `max-w-[1080px]` main. Everything is
 6. Section-level empty state and a whole-screen empty state (see Empty states).
 
 Sections are built from a `sources` array (D-02) so a future source (Kalshi/Polymarket) adds one entry and one component with no layout rework. Each section = `SectionHeader` + up to 5 rows in a `flex flex-col gap-3` stack.
+
+**Focal point:** the Total profit available figure in the profit summary is the first thing the eye lands on (largest, accent, top of screen); the #1 row of the first non-empty section (guaranteed profit in accent Heading) is second.
 
 ### Section header
 
@@ -65,7 +69,7 @@ Sections are built from a `sources` array (D-02) so a future source (Kalshi/Poly
 - Placed under the profit summary, left-aligned, with a Label prefix "Sort by". Same control and copy on Promos, placed in the Promos header area above the active list.
 - Changing it re-picks the top 5 in every section immediately (client-side re-rank from the same payload; no spinner, no refetch).
 - Persisted per device in localStorage under one key shared by both screens' switches, in a try/catch wrapper that falls back to Profit ($) (follows `FinderForm.tsx` pattern). Both screens stay in sync via a single lifted state in `AppShell` (defaulted).
-- Bonus-bet promos have conversion % instead of ROI. When sorted by "ROI %", the measure for a bonus-bet row is its conversion % (same slot the Phase 3 row already uses). Caption on the row stays "Conversion".
+- Bonus-bet promos have conversion % instead of ROI. When sorted by "ROI %", the measure for a bonus-bet row is its conversion % (same slot the Phase 3 row already uses). Caption on the row stays "Conversion" and boost/arb/pair rows say "ROI", so every row labels which percentage it shows (owner-confirmed, D-06b).
 
 ### Promo rows (Best promos section)
 
@@ -82,7 +86,7 @@ A single `Collapsible` card (`rounded-lg border border-border bg-secondary`), wh
 Collapsed (mobile stack, `flex flex-col gap-3 p-4`):
 
 1. **Caption line** (Label, muted): `{sport} · {kickoff}` then market badge (`Badge variant="outline"`, e.g. "Moneyline", "Spread +3.5", "Total O/U 44.5") then pair-type badge `Badge variant="outline"`: **Boost + Boost** or **Boost + Bonus bet**.
-2. **Two leg lines** stacked (`gap-2`), each Body 16px: `{Book} {promo-type badge}: {side} {odds} - stake {formatUsd}`. Odds and stake in `.num`. A subtle `border-l-2 border-border pl-3` on each leg separates the two legs visually (no color coding, so accent stays reserved).
+2. **Two leg lines** stacked (`gap-2`), each Body 16px: `{Book} {promo-type badge}: {side} {odds} - stake {formatUsd}`. Odds and stake in `.num`. A subtle `border-l-2 border-border pl-4` on each leg separates the two legs visually (no color coding, so accent stays reserved).
 3. **Result line:** Guaranteed profit `.num text-xl font-semibold text-primary` (Heading 20px), ROI caption "ROI" with `formatPct` beside it in Label.
 4. **Comparison line** (D-07, always visible, Label 14px muted): `vs. {$X} + {$Y} hedging each separately` with both amounts in `.num`, followed by a positive delta phrase `+{$Z} more together` (Label, `.num` on the amount, text-foreground weight 400; not accent).
 
@@ -103,11 +107,11 @@ Pair card never shows "Same book" (pairs require two different books by nature).
 
 No new UI element. Opportunities silently omits anything involving a book the member does not have. Its section empty states explain this and link to `/settings` ("Manage your books"). Promos keeps dimmed/last rule unchanged.
 
-### Review tab (D-06)
+### Review sub-tab inside Promos (D-06)
 
-- Contains, in order: panel header **"Review"** + Label description, then existing `ScrapeStatusPanel`, then existing `ReviewQueueSection` ("Needs review (N)" and "Needs a look"). Components move as-is; their contracts are 03-UI-SPEC's.
-- Because the "Needs review" section is entirely absent when empty (Phase 3 rule), Review needs its own empty state (below) when the queue is empty and nothing needs a look. Scrape status lines are always shown.
-- Promos panel after the move: header, sort switch, `RiskAdvisory`, active list, Done list. No review queue, no scrape status, no profit summary.
+- Contains, in order: Label description "Scraped promos we couldn't confidently match, and when each sportsbook was last checked.", then existing `ScrapeStatusPanel`, then existing `ReviewQueueSection` ("Needs review (N)" and "Needs a look"). Components move as-is; their contracts are 03-UI-SPEC's.
+- Because "Needs review" is entirely absent when empty (Phase 3 rule), the sub-tab has its own empty state (below). Scrape status lines are always shown.
+- Promos after the move: header, sub-tabs. **Active** = sort switch, `RiskAdvisory`, active list. **Done** = existing Done list. **Review** = as above. No profit summary on Promos.
 
 ### Loading, staleness, and odds-changed
 
@@ -151,7 +155,7 @@ Unchanged; reused verbatim.
 | 2xl | 48px | Page top margin |
 | 3xl | 64px | Page bottom margin |
 
-Exceptions: 44px tap targets (tab triggers, sort items, row triggers, See all). Row stack `gap-3` (12px) is inherited from Phase 3 and is the single existing non-scale exception; no new ones.
+Exceptions: 44px tap targets (tab triggers, sub-tab triggers, sort items, row triggers, See all). Row stack `gap-3` (12px) is inherited from Phase 3 and is the single existing non-scale exception; no new ones.
 
 ---
 
@@ -169,7 +173,7 @@ Unchanged: exactly 4 sizes, 2 weights.
 - Label: section captions, "Sort by", comparison line, badges, See all, stale-odds line, empty-state sub-copy.
 - Body: pair leg lines, empty-state body, dialog body.
 - Heading: panel title, section titles, each row's collapsed guaranteed profit (accent, Geist Mono).
-- Display: expanded-panel profit restatement only (one at a time). The `ProfitSummary` `text-3xl`/`text-lg` figures are existing behavior carried from 260927-n12 / 260929-igk and are not re-specified here.
+- Display: expanded-panel profit restatement only (one at a time). The `ProfitSummary` `text-3xl`/`text-lg` figures are a scoped, inherited exception (existing behavior from 260927-n12 / 260929-igk, ProfitSummary only). Mapping for new work: the headline figures render at Display role (36px is the nearest declared size; `text-3xl` 30px is retained only inside the unchanged component), and the today/week/month figures at Heading role. No new component may use these sizes.
 
 ---
 
@@ -194,7 +198,7 @@ Unchanged palette; reserved-for lists extended only where noted.
 
 **Destructive reserved for:** validation errors, refresh/search failures, and the odds-changed rejection alert on a row. No new destructive buttons this phase (nothing is irreversible: Mark done has Undo).
 
-Explicitly NOT accent: section titles, "See all", pair-type/market badges, the comparison "+$Z more together" delta, tab Review count, leg separators.
+Explicitly NOT accent: section titles, "See all", pair-type/market badges, the comparison "+$Z more together" delta, tab/sub-tab count, leg separators.
 
 ---
 
@@ -202,7 +206,10 @@ Explicitly NOT accent: section titles, "See all", pair-type/market badges, the c
 
 | Element | Copy |
 |---------|------|
-| Tabs | **Opportunities** · **Bonus bets** · **Arbitrage** · **Promos** · **Review** (`Review (N)` when N > 0) · **Sign-up offers** |
+| Top-level tabs | **Opportunities** · **Arbitrage** · **Promos** (`Promos (N)` when N > 0) · **Tools** |
+| Promos sub-tabs | **Active** · **Done** · **Review** (`Review (N)` when N > 0) |
+| Tools sub-tabs | **Bonus bets** · **Sign-up offers** |
+| Tools description | "Calculators and extras." |
 | Panel heading | **Opportunities** |
 | Panel description | "The best money available right now at your books." |
 | Primary CTA | No new page-level CTA. The row-level primary action is **Mark pair done** (pairs) / existing **Mark used** wording on single promos |
@@ -219,7 +226,7 @@ Explicitly NOT accent: section titles, "See all", pair-type/market badges, the c
 | Mark pair done button | **Mark pair done** |
 | Mark pair done confirm heading | "Mark both promos done?" |
 | Mark pair done confirm body | "This records both bets at these stakes and odds, adds {$profit} to your Total profit extracted, and moves both promos to Done. You can undo it from the Done list." |
-| Mark pair done confirm buttons | **Mark both done** (accent) / **Cancel** (ghost) |
+| Mark pair done confirm buttons | **Mark both done** (accent) / **Not yet** (ghost) |
 | Odds changed error | "The odds moved since this loaded, so the stakes changed. Nothing was saved. Check the new numbers and try again." |
 | Save failed error | "Couldn't save that. Check your connection and try again." |
 | Load error (screen) | Heading "Couldn't load opportunities", body "Something went wrong reading the latest data. Refresh the page, and if it keeps happening let the person who set this up know." |
@@ -229,8 +236,8 @@ Explicitly NOT accent: section titles, "See all", pair-type/market badges, the c
 | Empty: promos section | "No promo hedges right now." |
 | Empty: pairs section | "No pairs right now. A pair only shows up when two promos on opposite sides beat hedging each one separately." |
 | Empty: arbs section | "No arbitrage bets at your books right now." |
-| Empty: Review tab | "Nothing to review. New scraped promos that need a human look will show up here." |
-| Review tab heading / description | **Review** / "Scraped promos we couldn't confidently match, and when each sportsbook was last checked." |
+| Empty: Review sub-tab | "Nothing to review. New scraped promos that need a human look will show up here." |
+| Review sub-tab description | "Scraped promos we couldn't confidently match, and when each sportsbook was last checked." |
 | Destructive actions this phase | **None.** Mark pair done is reversible (Undo) and is gated by a confirm dialog only because it changes two promos and the profit total at once |
 
 Plain-English rule (owner preference): no jargon such as "tandem", "leg", "hedge book" in user copy beyond words already used in prior tabs. UI copy says "pair", "both bets", "Bet at {Book}". Internal names may use "leg".
@@ -241,7 +248,7 @@ Plain-English rule (owner preference): no jargon such as "tandem", "leg", "hedge
 
 | Component | shadcn/ui block | Used for | Status |
 |-----------|-----------------|----------|--------|
-| Tabs | `tabs` | Opportunities and Review tabs (scrollable list) | Reused, `TabsList` gets overflow-x-auto |
+| Tabs | `tabs` | Top-level tabs plus second-level Promos (Active/Done/Review) and Tools (Bonus bets/Sign-up offers) sub-tabs | Reused, no changes |
 | ToggleGroup | `toggle-group` | Profit ($) / ROI % sort switch | Reused (exists in repo) |
 | Collapsible | `collapsible` | PairCard expand | Reused |
 | Table | `table` | Pair payout table | Reused |
@@ -252,7 +259,7 @@ Plain-English rule (owner preference): no jargon such as "tandem", "leg", "hedge
 | Skeleton | `skeleton` | Loading shells | Reused |
 | Tooltip | `tooltip` | Tie risk, fine print (from PromoRow) | Reused |
 
-New app components (not shadcn): `OpportunitiesScreen`, `OpportunitySection` (generic source section shell), `PairCard`, `PairDetails`, `DonePairRow`, `SortSwitch` (shared by Opportunities and Promos), `ReviewScreen` (wraps moved `ScrapeStatusPanel` + `ReviewQueueSection`). No new shadcn blocks.
+New app components (not shadcn): `OpportunitiesScreen`, `OpportunitySection` (generic source section shell), `PairCard`, `PairDetails`, `DonePairRow`, `ToolsScreen` (sub-tabs wrapping FinderScreen + SignupOffersScreen), `SortSwitch` (shared by Opportunities and Promos), `ReviewPanel` (wraps moved `ScrapeStatusPanel` + `ReviewQueueSection`). No new shadcn blocks.
 
 ---
 
@@ -267,23 +274,23 @@ New app components (not shadcn): `OpportunitiesScreen`, `OpportunitySection` (ge
 
 ## Open questions for owner
 
-None block planning; each has a default already used above.
+All resolved 2026-09-29 (04-CONTEXT.md D-01, D-06, D-06a, D-06b).
 
-1. **Where does the Review tab sit?** Default: right after Promos, with a plain-text count "Review (3)" when something needs attention. Alternative: last, after Sign-up offers.
-2. **Should the profit summary stay on Promos too?** Default: no, Opportunities only (avoids showing the same big numbers twice on adjacent tabs).
-3. **"See all" links:** Default: included on Best promos and Best arbs, switching tabs in place. Alternative: omit.
-4. **When sorted by ROI %, bonus-bet promos rank by their conversion %.** Default: yes. This mixes two percentages in one ordering; confirm the owner is fine with it (alternative: rank bonus bets after boosts, or hide them under ROI sort).
-5. **Six tabs on a phone scroll sideways.** Default: horizontal scroll. Alternative: shorten labels (for example "Bonus", "Arbs") or move Sign-up offers into the account menu.
+1. Tab strip: RESOLVED. Top-level Opportunities | Arbitrage | Promos | Tools; Bonus bets and Sign-up offers live under Tools; Review lives under Promos (Active | Done | Review).
+2. Review count visibility: RESOLVED. `Review (N)` on the sub-tab and `Promos (N)` on the top tab.
+3. ROI sort mixes conversion % with ROI: RESOLVED, confirmed; each row labels which percentage it shows.
+4. "See all" links on Best promos and Best arbs: RESOLVED, confirmed.
+5. Profit summary on Opportunities only: RESOLVED, default kept.
 
 ---
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-29 (checker APPROVED; 4 non-blocking flags resolved in revision)
