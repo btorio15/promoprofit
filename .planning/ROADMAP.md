@@ -216,7 +216,35 @@ Plans:
   3. Feed opportunities on both the promo side and hedge side are filtered to the user's selected books
   4. When two books have promos on opposite outcomes of the same game/market, the feed shows the tandem opportunity and its profit next to the profit from hedging each separately, with each leg's promo mechanics and caps applied
 
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Opportunities tab (first/default): profit summary, Profit/ROI switch, Best promos at your books, See all
+- [ ] 04-02-PLAN.md — Pair solver (TDD): boost+boost and boost+bonus stakes/profit, oracle-tested to the cent
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-03-PLAN.md — Pair discovery + exact non-conflicting matching (TDD), beats-separate gate
+- [ ] 04-04-PLAN.md — Tab restructure: Opportunities | Arbitrage | Promos (Active/Done/Review) | Tools; sort on Promos
+- [ ] 04-05-PLAN.md — Best arbs at a fixed $100 stake, member books only, See all arbs
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-06-PLAN.md — Best pairs section: pair card, details, pair-aware Total profit available
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-07-PLAN.md — Mark pair done: server recompute, odds-changed check, one atomic write
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-08-PLAN.md — Done list shows the pair once; Undo from either promo
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04-09-PLAN.md — Phase gate: full suite/typecheck/lint + owner phone check
 **UI hint**: yes
 
 ### Phase 5: Group-Added Promos
