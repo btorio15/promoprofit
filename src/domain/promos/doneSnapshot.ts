@@ -61,8 +61,8 @@ const SnapshotRowSchema = z.object({
 
 export type SnapshotRow = z.infer<typeof SnapshotRowSchema>;
 
-/** Compile-time guard: the stored row shape must stay assignable to the live row DTO (minus `used`). */
-export const _rowShapeGuard = (r: SnapshotRow): Omit<PromoRowDTO, "used"> => r;
+/** Compile-time guard: the stored row shape must stay assignable to the live row DTO. */
+export const _rowShapeGuard = (r: SnapshotRow): PromoRowDTO => r;
 
 export const DonePromoSnapshotSchema = z.object({
   version: z.literal(1),
@@ -144,9 +144,7 @@ export function buildDoneSnapshot(
 
   if (input.kind === "hedge") {
     const { row } = input;
-    // Strip `used` (while it still exists on the live DTO) so it is never stored.
-    const { used: _used, ...stored } = row as PromoRowDTO & { used?: boolean };
-    void _used;
+    const stored: SnapshotRow = { ...row };
     return {
       snapshot: {
         ...common,

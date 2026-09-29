@@ -7,6 +7,7 @@ import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
 import { ReviewQueueSection } from "./ReviewQueueSection";
@@ -14,6 +15,7 @@ import { PromosEmptyState } from "./PromosEmptyState";
 import { ProfitSummary } from "./ProfitSummary";
 import { PromoRow } from "./PromoRow";
 import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
+import { DonePromoRow } from "./DonePromoRow";
 
 export interface PromosScreenProps {
   /** Reserved for Plan 04's "no-odds" empty-state gating; unused until that plan wires odds-dependent hedge math. */
@@ -35,6 +37,7 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
 
   const [response, setResponse] = useState<GetPromosResponse | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [view, setView] = useState<"active" | "done">("active");
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
@@ -98,7 +101,11 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
           empty-state variant, so the headline/period numbers never
           disappear just because the live feed is momentarily empty. */}
       {response?.status === "ok" ? (
-        <ProfitSummary totalProfit={response.totalProfit} availableProfit={response.availableProfit} />
+        <ProfitSummary
+          totalProfit={response.totalProfit}
+          totalExtracted={response.totalExtracted}
+          availableProfit={response.availableProfit}
+        />
       ) : null}
 
       {response?.status === "ok" ? (
@@ -109,36 +116,67 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
         />
       ) : null}
 
-      {showSkeleton ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
-      ) : loadFailed && !isPending ? (
-        <Alert variant="destructive">
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            <span>Couldn&apos;t load promos. Try again in a moment.</span>
-            <Button type="button" variant="secondary" size="sm" onClick={runGetPromos}>
-              Try again
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : response?.status === "ok" && response.emptyVariant !== null ? (
-        <PromosEmptyState variant={response.emptyVariant} />
-      ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
-        <>
-          <RiskAdvisory />
-          <div className="flex flex-col gap-2">
-            {response.rows.map((row) => (
-              <PromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
-            ))}
-            {response.unprofitableRows.map((row) => (
-              <UnprofitablePromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
-            ))}
-          </div>
-        </>
-      ) : null}
+      <Tabs value={view} onValueChange={(v: string) => setView(v === "done" ? "done" : "active")}>
+        <TabsList variant="line" aria-label="Show active or done promos">
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="done">
+            Done
+            {response?.status === "ok" ? (
+              <>
+                {" "}
+                <span className="num text-muted-foreground">({response.doneRows.length})</span>
+              </>
+            ) : null}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="active" className="flex flex-col gap-8 pt-2">
+          {showSkeleton ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : loadFailed && !isPending ? (
+            <Alert variant="destructive">
+              <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                <span>Couldn&apos;t load promos. Try again in a moment.</span>
+                <Button type="button" variant="secondary" size="sm" onClick={runGetPromos}>
+                  Try again
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : response?.status === "ok" && response.emptyVariant !== null ? (
+            <PromosEmptyState variant={response.emptyVariant} />
+          ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
+            <>
+              <RiskAdvisory />
+              <div className="flex flex-col gap-2">
+                {response.rows.map((row) => (
+                  <PromoRow key={row.rowKey} row={row} precision={precision} onChanged={runGetPromos} />
+                ))}
+                {response.unprofitableRows.map((row) => (
+                  <UnprofitablePromoRow key={row.rowKey} row={row} precision={precision} onChanged={runGetPromos} />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="done" className="pt-2">
+          {response?.status === "ok" && response.doneRows.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {response.doneRows.map((row) => (
+                <DonePromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Nothing marked done yet. Promos you mark done show here with the profit recorded at that moment.
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

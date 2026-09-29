@@ -74,7 +74,7 @@ export async function computeMemberPromoState(args: {
 
   const opportunity = rankPromoHedges([promo], rankOpts)[0];
   if (opportunity) {
-    return { kind: "hedge", terms, row: toPromoRowDTO(opportunity, bookNames, userBookSet, new Set()), oddsFetchedAt };
+    return { kind: "hedge", terms, row: toPromoRowDTO(opportunity, bookNames, userBookSet), oddsFetchedAt };
   }
 
   const unprofitable = findUnprofitablePromos([promo], rankOpts)[0];
@@ -82,7 +82,7 @@ export async function computeMemberPromoState(args: {
   return {
     kind: "no_hedge",
     terms,
-    row: toUnprofitablePromoRowDTO(unprofitable, bookNames, userBookSet, new Set()),
+    row: toUnprofitablePromoRowDTO(unprofitable, bookNames, userBookSet),
     oddsFetchedAt,
   };
 }

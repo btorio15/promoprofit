@@ -60,7 +60,6 @@ function makeRow(over: Partial<PromoRowDTO> = {}): PromoRowDTO {
     attribution: null,
     worstCase: true,
     hasPromoBook: true,
-    used: false,
     ...over,
   };
 }
@@ -73,10 +72,7 @@ describe("buildDoneSnapshot", () => {
     const { snapshot, profitExtracted } = buildDoneSnapshot({ kind: "hedge", terms, row }, ctx);
     expect(snapshot.kind).toBe("hedge");
     expect(snapshot.version).toBe(1);
-    const { used, ...expectedRow } = row;
-    void used;
-    expect(snapshot.row).toEqual(expectedRow);
-    expect(snapshot.row).not.toHaveProperty("used");
+    expect(snapshot.row).toEqual(row);
     expect(snapshot.promo.boostPercent).toBe("10.00");
     expect(snapshot.promo.maxStake).toBe("50.00");
     expect(snapshot.promo.winningsCap).toEqual({ kind: "extra_winnings", amount: "25.00" });
@@ -107,7 +103,6 @@ describe("buildDoneSnapshot", () => {
       bestGuaranteedProfit: "-0.65",
       note: "No profitable hedge right now (best: −$0.65)",
       hasPromoBook: true,
-      used: false,
     };
     const { snapshot, profitExtracted } = buildDoneSnapshot({ kind: "no_hedge", terms, row }, ctx);
     expect(snapshot.kind).toBe("no_hedge");
@@ -149,7 +144,7 @@ describe("toDonePromoDTO", () => {
     const row: UnprofitablePromoRowDTO = {
       rowKey: "x", promoId: 5, promoType: "profit_boost", promoTypeLabel: "Boost", bookKey: "draftkings",
       bookName: "DraftKings", title: "t", scopeLabel: "s", autoMatched: false, bestGuaranteedProfit: null,
-      note: "No eligible bets right now", hasPromoBook: true, used: false,
+      note: "No eligible bets right now", hasPromoBook: true,
     };
     const { snapshot } = buildDoneSnapshot({ kind: "no_hedge", terms, row }, ctx);
     const dto = toDonePromoDTO({ ...completion, profitExtracted: "0.00", snapshot: JSON.parse(JSON.stringify(snapshot)) }, names);

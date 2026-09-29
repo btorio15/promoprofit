@@ -86,15 +86,6 @@ export interface PromoRowDTO {
    * still shown, but dimmed and sorted after every own-book row.
    */
   hasPromoBook: boolean;
-  /**
-   * quick-260927-n12 (owner scope change A): whether THIS member has marked
-   * this promo used. A used row stays in its normal feed position (never
-   * removed, never moved) but is excluded from totalProfit and rendered
-   * with a distinct "marked used" treatment plus an Undo action. Marking
-   * used is per-member -- other members' `used` value for the same promo
-   * can differ.
-   */
-  used: boolean;
 }
 
 /**
@@ -121,8 +112,6 @@ export interface UnprofitablePromoRowDTO {
   note: string;
   /** WR-07: same meaning as PromoRowDTO.hasPromoBook -- false rows are sorted last. */
   hasPromoBook: boolean;
-  /** quick-260927-n12: same meaning as PromoRowDTO.used. */
-  used: boolean;
 }
 
 /**

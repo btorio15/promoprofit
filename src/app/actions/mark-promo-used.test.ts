@@ -70,7 +70,6 @@ const hedgeRow = {
   attribution: null,
   worstCase: true,
   hasPromoBook: true,
-  used: false,
 } as PromoRowDTO;
 
 const noHedgeRow: UnprofitablePromoRowDTO = {
@@ -86,7 +85,6 @@ const noHedgeRow: UnprofitablePromoRowDTO = {
   bestGuaranteedProfit: "-0.65",
   note: "No profitable hedge right now (best: −$0.65)",
   hasPromoBook: true,
-  used: false,
 };
 
 const hedgeState = { kind: "hedge", terms, row: hedgeRow, oddsFetchedAt };

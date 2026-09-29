@@ -210,7 +210,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const opportunities = rankPromoHedges(feedPromos, rankOpts);
   const unprofitable = findUnprofitablePromos(feedPromos, rankOpts);
   const unprofitableRows = ownBooksFirst(
-    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet, doneIds)),
+    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet)),
   );
 
   if (opportunities.length === 0) {
@@ -268,7 +268,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   }
 
   const rows = ownBooksFirst(
-    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, doneIds)),
+    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet)),
   );
   // quick-260927-n12 (owner decision 1): own-book rows only. Done promos are
   // already filtered out of the feed (quick-260929-igk); doneIds stays as a

@@ -642,7 +642,6 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         note: "No profitable hedge right now (best: −$0.65)",
         // The member only has BetMGM, not the promo's own book (WR-07).
         hasPromoBook: false,
-        used: false,
       },
     ]);
   });

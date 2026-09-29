@@ -44,7 +44,6 @@ export function toPromoRowDTO<P extends PresentablePromo>(
   opportunity: PromoOpportunity<P>,
   bookNames: Map<string, string>,
   userBookSet: ReadonlySet<string>,
-  usedPromoIds: ReadonlySet<number>,
 ): PromoRowDTO {
   const { promo, selection, hedge, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
 
@@ -136,7 +135,6 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     attribution: attributionLineFor(promo),
     worstCase: netIfPromoWins !== netIfHedgeWins,
     hasPromoBook: userBookSet.has(promo.bookKey),
-    used: usedPromoIds.has(promo.id),
   };
 }
 
@@ -176,7 +174,6 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
   entry: UnprofitablePromo<P>,
   bookNames: Map<string, string>,
   userBookSet: ReadonlySet<string>,
-  usedPromoIds: ReadonlySet<number>,
 ): UnprofitablePromoRowDTO {
   const { promo, bestGuaranteedProfit } = entry;
 
@@ -193,6 +190,5 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),
     hasPromoBook: userBookSet.has(promo.bookKey),
-    used: usedPromoIds.has(promo.id),
   };
 }
