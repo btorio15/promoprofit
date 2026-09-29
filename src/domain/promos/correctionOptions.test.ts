@@ -243,6 +243,23 @@ describe("listCorrectionOptions (D-14, T-03-09-06)", () => {
     expect(result.sportDays[2].label).toBe(`Any NBA game · ${etDayLabel(nba.commence_time)} (ET)`);
   });
 
+  it("fills homeTeam, awayTeam, etDate and searchText (team names, aliases, league label) on event options (quick-260929-hht)", () => {
+    const ev = fullEvent({
+      id: "nfl-canonical",
+      commence_time: plusHours(6),
+      home_team: "Denver Broncos",
+      away_team: "Los Angeles Rams",
+    });
+
+    const [option] = listCorrectionOptions({ moneyline: [ev], extended: [ev] }, { now: NOW }).events;
+
+    expect(option.homeTeam).toBe("Denver Broncos");
+    expect(option.awayTeam).toBe("Los Angeles Rams");
+    expect(option.etDate).toBe("2026-09-27");
+    const words = option.searchText.split(" ");
+    for (const w of ["broncos", "den", "denver", "rams", "lar", "nfl"]) expect(words).toContain(w);
+  });
+
   it("returns empty lists when there are no cached events at all", () => {
     const result = listCorrectionOptions({ moneyline: [], extended: [] }, { now: NOW });
 
