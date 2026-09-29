@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Bonus Bet Finder** - Scaffold, verified book config, odds ingestion/cache/refresh, fixture-tested bonus-bet hedge engine, finder screen (completed 2026-09-25)
 - [x] **Phase 01.1: Arbitrage Tab** (INSERTED) - Moneyline arbs from cached odds, opt-in spreads/totals refresh, odds-age + account-risk advisory (completed 2026-09-26)
 - [x] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books (completed 2026-09-26)
-- [ ] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches
+- [x] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches (completed 2026-09-29)
 - [ ] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection
 - [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a promo, shared or private, feeding the same feed
 
@@ -160,7 +160,7 @@ Plans:
   4. A scraped promo whose event or market can't be matched with certainty is held in a review queue and excluded from hedge math until confirmed
   5. User can confirm or correct a queued match from a review screen, after which it becomes an active promo usable in hedge calculations
 
-**Plans:** 14/15 plans executed
+**Plans:** 15/15 plans complete
 
 Plans:
 **Wave 1**
@@ -197,7 +197,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified for three books, owner end-to-end walkthrough
+- [x] 03-11-PLAN.md — Go live: push + DATABASE_URL secret, workflow dispatch verified for three books, owner end-to-end walkthrough
 
 **UI hint**: yes
 
@@ -244,6 +244,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Bonus Bet Finder | 5/5 | Complete   | 2026-09-25 |
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
-| 3. Promo Scraping & Review | 14/15 | In Progress|  |
+| 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 0/? | Not started | - |
 | 5. Group-Added Promos | 0/? | Not started | - |

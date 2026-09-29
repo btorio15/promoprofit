@@ -10,8 +10,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Hedge Engine
 
 - [x] **CALC-01**: System computes bonus-bet (stake-not-returned) hedges: exact stakes for both legs, guaranteed profit, and conversion % of the bonus amount
-- [ ] **CALC-02**: System computes profit-boost hedges from either a boost % applied to profit or a book-published boosted price: exact stakes, guaranteed profit, and ROI % on cash risked
-- [ ] **CALC-03**: Profit-boost calculations respect the promo's max-stake and max-winnings caps, choosing the optimal stake when a cap binds
+- [x] **CALC-02**: System computes profit-boost hedges from either a boost % applied to profit or a book-published boosted price: exact stakes, guaranteed profit, and ROI % on cash risked
+- [x] **CALC-03**: Profit-boost calculations respect the promo's max-stake and max-winnings caps, choosing the optimal stake when a cap binds
 - [x] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
 - [x] **CALC-05**: Hedges only use markets with no push/void outcome (e.g. 2-way moneylines, half-point lines)
 - [x] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
@@ -34,8 +34,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **PROMO-01**: Any group member can add a promo they see in their app (book, type, boost % or boosted price, market, max stake, max winnings, expiry) by picking a real upcoming event, and it feeds the opportunities feed
 - [ ] **PROMO-02**: User can mark an added promo as shared (visible to everyone with that book) or private (visible only to them)
-- [ ] **PROMO-03**: System scrapes publicly accessible (no-login) promo pages for Colorado books on a schedule and adds discovered promos automatically
-- [ ] **PROMO-04**: Scraped promos whose event/market can't be matched with certainty go to a review queue where a user confirms or corrects the match before it's used
+- [x] **PROMO-03**: System scrapes publicly accessible (no-login) promo pages for Colorado books on a schedule and adds discovered promos automatically
+- [x] **PROMO-04**: Scraped promos whose event/market can't be matched with certainty go to a review queue where a user confirms or corrects the match before it's used
 - [ ] **PROMO-05**: User can edit, expire, or delete promos they added
 
 ### Opportunities Feed & Access
@@ -97,8 +97,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CALC-01 | Phase 1 | Complete |
-| CALC-02 | Phase 3 | Pending |
-| CALC-03 | Phase 3 | Pending |
+| CALC-02 | Phase 3 | Complete |
+| CALC-03 | Phase 3 | Complete |
 | CALC-04 | Phase 1 | Complete |
 | CALC-05 | Phase 1 | Complete |
 | CALC-06 | Phase 2 | Complete |
@@ -112,8 +112,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BONUS-02 | Phase 2 | Complete |
 | PROMO-01 | Phase 5 | Pending |
 | PROMO-02 | Phase 5 | Pending |
-| PROMO-03 | Phase 3 | Pending |
-| PROMO-04 | Phase 3 | Pending |
+| PROMO-03 | Phase 3 | Complete (scheduled trigger pending — manual dispatch only; see STATE blockers) |
+| PROMO-04 | Phase 3 | Complete |
 | PROMO-05 | Phase 5 | Pending |
 | DASH-01 | Phase 4 | Pending |
 | DASH-02 | Phase 2 | Complete |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 3 plan 11 (go-live) — scheduled-run check + owner walkthrough remaining
-last_updated: "2026-09-29T01:49:22.190Z"
+status: ready_to_plan
+stopped_at: Phase 3 complete (15/15) — ready to discuss Phase 4
+last_updated: 2026-09-29T19:14:42.869Z
 last_activity: 2026-09-28 -- cron switched to plain UTC; session paused
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 37
-  completed_plans: 36
+  completed_plans: 37
   percent: 50
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 3 — promo-scraping-review
+**Current focus:** Phase 4 — opportunities feed
 
 ## Current Position
 
-Phase: 3 (promo-scraping-review) — EXECUTING
-Plan: 11 of 15 (03-11 go-live checkpoint, the only plan without a SUMMARY)
-Status: Executing Phase 3
-Last activity: 2026-09-29 - Completed quick task 260929-hht: searchable review game picker + league date range
+Phase: 4
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-29
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 22
+- Total plans completed: 37
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -47,6 +47,7 @@ Progress: [██████████] 100%
 | 01 | 5 | - | - |
 | 01.1 | 8 | - | - |
 | 2 | 9 | - | - |
+| 3 | 15 | - | - |
 
 **Recent Trend:**
 
@@ -140,7 +141,8 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 - Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
 - Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
-- Phase 3 plan 03-11 (go-live) paused by owner 2026-09-27: GitHub repo btorio15/promoprofit is PUBLIC and never pushed; owner chose not to push or set the DATABASE_URL secret yet. Resume with /gsd:execute-phase 3 (only 03-11 remains).
+- Scheduled scrape never fires (tracked open item, owner decision 2026-09-29): GitHub has never created a `schedule` run for Scrape promos (cron `7 14,18,23 * * *`; timezone key, minute shifts and disable/re-enable all tried). Manual dispatch works. Next: external trigger of workflow_dispatch or GitHub support — do not reshuffle cron. Fix alongside Phase 4.
+- Phase 3 deferred walkthrough steps (owner: "approved, queue steps later"): Confirm, Correct (new search/date-range picker, check on phone), Enter cap details, Dismiss, Needs a look card, Auto-matched flag — check on the next scrape that queues a promo.
 
 ### Quick Tasks Completed
 
