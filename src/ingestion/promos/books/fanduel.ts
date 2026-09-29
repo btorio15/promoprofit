@@ -12,7 +12,7 @@ import type {
 } from "@/domain/promos/scraped";
 import { ScrapedPromoSchema } from "@/domain/promos/scraped";
 import { PROMO_MARKET_TYPES, type CapField, type WinningsCapKind } from "@/domain/promos/types";
-import { slateWindow } from "@/domain/promos/etTime";
+import { etDayBounds, extendToExpiry, parseEtDateSpan, slateWindow } from "@/domain/promos/etTime";
 import {
   extractFinePrintNote,
   htmlToText,
@@ -235,7 +235,10 @@ function planDetails(listBody: string): DetailPlan[] {
 
 /** "for any College Football Games on September 26th, 2026" -> scope
  * phrase + the raw date text for slateWindow. Same shape appears in both
- * FanDuel's list `.name` one-liner and detail `.description` prose. */
+ * FanDuel's list `.name` one-liner and detail `.description` prose.
+ * Multi-date phrasing ("for any NHL Games on September 29th and September
+ * 30th, 2026") is handled by SPAN_SCOPE_RE + parseEtDateSpan below, which
+ * takes precedence in buildCandidate. */
 const SCOPE_PHRASE_RE =
   /for\s+any\s+(.+?)\s+Games?\s+on\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})/i;
 
@@ -245,6 +248,40 @@ function extractScope(text: string): { scopeText: string; dateText: string } | n
   const sportWords = match[1].trim();
   const dateText = match[2].trim();
   return { scopeText: `${sportWords} Games on ${dateText}`, dateText };
+}
+
+/** Sport-wide scope whose date part is a run of date tokens joined by list
+ * or range connectors ("for any NHL Games on September 29th and September
+ * 30th, 2026!"). The span vocabulary is closed (month word + day + optional
+ * year, and a fixed connector set), so it stops at the first character that
+ * is not part of a date list ("!", ", up to a maximum wager"). Bounded
+ * pieces, no nested unbounded quantifiers (T-pcc-02 / T-gcn-02 discipline).
+ * parseEtDateSpan does the real validation and fails closed. */
+const SPAN_DATE_SRC = String.raw`[A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?`;
+const SPAN_CONNECTOR_SRC = String.raw`\s*(?:,\s*and|,|&|and|-|–|—|through|thru|to|until)\s*`;
+const SPAN_SCOPE_RE = new RegExp(
+  String.raw`for\s+any\s+(.+?)\s+Games?\s+on\s+(${SPAN_DATE_SRC}(?:${SPAN_CONNECTOR_SRC}${SPAN_DATE_SRC})*)`,
+  "i",
+);
+
+interface FanduelSpanScope {
+  scopeText: string;
+  startEtDate: string;
+  endEtDate: string;
+  dayCount: number;
+}
+
+function parseSpanScope(text: string, expiresAt: string | null): FanduelSpanScope | null {
+  const match = SPAN_SCOPE_RE.exec(text);
+  if (!match) return null;
+  const sportWords = match[1].trim();
+  const spanText = match[2].trim();
+  const span = parseEtDateSpan(spanText, expiresAt);
+  if (!span) return null;
+  return {
+    scopeText: truncate(`${sportWords} Games on ${spanText}`, MAX_SCOPE_TEXT_CHARS),
+    ...span,
+  };
 }
 
 /** "for the Eagles @ Bears NFL Game on September 28" (real fixture
@@ -359,20 +396,37 @@ function buildCandidate(params: {
     finePrintNote,
   } = params;
 
-  const scope = extractScope(text);
-  // SCOPE_PHRASE_RE (sport-wide, has its own year) wins when both phrases
-  // match -- only look for the single-game team-pair phrase when the
-  // sport-wide one isn't present.
-  const gameScope = scope ? null : parseGameScope(text);
+  const spanScope = parseSpanScope(text, expiresAt);
+  const multiDay = spanScope !== null && spanScope.dayCount >= 2 ? spanScope : null;
+  const scope = multiDay ? null : extractScope(text);
+  // Precedence: multi-date span > SCOPE_PHRASE_RE (sport-wide, has its own
+  // year) > single yearless span date > single-game team-pair phrase.
+  const yearlessSpan = !multiDay && !scope && spanScope !== null ? spanScope : null;
+  const gameScope = multiDay || scope || yearlessSpan ? null : parseGameScope(text);
   const boostPercent = extractBoostPercent(text);
 
   let window: { start: string; end: string } | null = null;
   let scopeText: string;
   let teamsText: string[] = [];
 
-  if (scope) {
+  if (multiDay) {
+    // Every named ET day, no expiry extension (the window is the days the
+    // promo names, not the token's post-midnight expiry).
+    scopeText = multiDay.scopeText;
+    const startBounds = etDayBounds(multiDay.startEtDate);
+    const endBounds = etDayBounds(multiDay.endEtDate);
+    window = startBounds && endBounds ? { start: startBounds.start, end: endBounds.end } : null;
+    const teamPair = splitTeams(scopeText);
+    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+  } else if (scope) {
     scopeText = scope.scopeText;
     window = slateWindow(scope.dateText, expiresAt);
+    const teamPair = splitTeams(scopeText);
+    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+  } else if (yearlessSpan) {
+    scopeText = yearlessSpan.scopeText;
+    const dayBounds = etDayBounds(yearlessSpan.startEtDate);
+    window = dayBounds ? extendToExpiry(dayBounds, expiresAt) : null;
     const teamPair = splitTeams(scopeText);
     if (teamPair) teamsText = [teamPair[0], teamPair[1]];
   } else if (gameScope) {

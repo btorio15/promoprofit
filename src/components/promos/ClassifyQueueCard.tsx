@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { etDayLabel } from "@/domain/promos/etTime";
-import { CorrectionScopeSelect, scopeInputFromValue } from "./CorrectionScopeSelect";
+import { prefillSportDay } from "@/domain/promos/correctionOptions";
+import {
+  CorrectionScopeSelect,
+  DAY_PREFIX,
+  ThroughDaySelect,
+  dayEtDateFromValue,
+  scopeInputFromValue,
+} from "./CorrectionScopeSelect";
 import { DismissPromoDialog } from "./DismissPromoDialog";
 
 interface ClassifyQueueCardProps {
@@ -38,6 +45,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
   const [dismissOpen, setDismissOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<"boost" | "bonus" | null>(null);
   const [eventValue, setEventValue] = useState<string | null>(null);
+  const [throughValue, setThroughValue] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [boostValues, setBoostValues] = useState<Partial<Record<BoostFieldKey, string>>>({});
@@ -53,12 +61,52 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
   function resetPanels() {
     setOpenPanel(null);
     setEventValue(null);
+    setThroughValue(null);
     setBoostValues({});
     setBoostErrors({});
     setBonusValues({});
   }
 
+  function handleScopeChange(value: string | null) {
+    setEventValue(value);
+    setThroughValue(dayEtDateFromValue(value));
+  }
+
+  /** Prefill the day pickers from the promo's scraped window (presentational; the server re-validates). */
+  function applyScrapedWindowPrefill() {
+    if (eventValue !== null || !item.scrapedWindow) return;
+    const prefill = prefillSportDay(item.scrapedWindow, correctionOptions.sportDays, new Date());
+    if (prefill) {
+      setEventValue(`${DAY_PREFIX}${prefill.value}`);
+      setThroughValue(prefill.throughEtDate);
+    }
+  }
+
+  function scopeControls(idPrefix: string) {
+    const startEtDate = dayEtDateFromValue(eventValue);
+    return (
+      <div className={startEtDate ? "grid gap-3 sm:grid-cols-2" : "flex flex-col gap-3"}>
+        <CorrectionScopeSelect
+          id={`${idPrefix}-${item.promoId}`}
+          value={eventValue}
+          onValueChange={handleScopeChange}
+          options={correctionOptions}
+          label="Game or day"
+        />
+        {startEtDate ? (
+          <ThroughDaySelect
+            id={`${idPrefix.replace("scope", "through")}-${item.promoId}`}
+            startEtDate={startEtDate}
+            value={throughValue}
+            onValueChange={setThroughValue}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   function openBoostPanel() {
+    if (openPanel !== "boost") applyScrapedWindowPrefill();
     setOpenPanel((current) => (current === "boost" ? null : "boost"));
     setBoostValues({
       boostPercent: classify.suggested.boostPercent ?? "",
@@ -69,6 +117,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
   }
 
   function openBonusPanel() {
+    if (openPanel !== "bonus") applyScrapedWindowPrefill();
     setOpenPanel((current) => (current === "bonus" ? null : "bonus"));
     setBonusValues({
       bonusAmount: classify.suggested.bonusAmount ?? "",
@@ -108,7 +157,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
       const parsedOdds = Number.parseInt(boostValues.minOdds, 10);
       if (!Number.isNaN(parsedOdds)) payload.minOddsAmerican = parsedOdds;
     }
-    payload.scope = eventValue ? scopeInputFromValue(eventValue) : null;
+    payload.scope = eventValue ? scopeInputFromValue(eventValue, throughValue) : null;
 
     startTransition(async () => {
       const outcome = await classifyPromo(payload);
@@ -128,7 +177,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
       const parsedOdds = Number.parseInt(bonusValues.minOdds, 10);
       if (!Number.isNaN(parsedOdds)) payload.minOddsAmerican = parsedOdds;
     }
-    payload.scope = eventValue ? scopeInputFromValue(eventValue) : null;
+    payload.scope = eventValue ? scopeInputFromValue(eventValue, throughValue) : null;
 
     startTransition(async () => {
       const outcome = await classifyPromo(payload);
@@ -240,13 +289,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
             </div>
           ) : null}
 
-          <CorrectionScopeSelect
-            id={`classify-scope-boost-${item.promoId}`}
-            value={eventValue}
-            onValueChange={setEventValue}
-            options={correctionOptions}
-            label="Game or day"
-          />
+          {scopeControls("classify-scope-boost")}
 
           <div className="flex flex-wrap gap-2">
             <Button className="h-10" disabled={!boostValues.boostPercent || isPending} onClick={saveBoost}>
@@ -284,13 +327,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
             />
           </div>
 
-          <CorrectionScopeSelect
-            id={`classify-scope-bonus-${item.promoId}`}
-            value={eventValue}
-            onValueChange={setEventValue}
-            options={correctionOptions}
-            label="Game or day"
-          />
+          {scopeControls("classify-scope-bonus")}
 
           <div className="flex flex-wrap gap-2">
             <Button className="h-10" disabled={!bonusValues.bonusAmount || isPending} onClick={saveBonus}>

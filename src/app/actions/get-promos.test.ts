@@ -765,6 +765,31 @@ describe("getPromos review queue mapping (PROMO-04, D-13)", () => {
     expect(item.unparsedCapFields).toEqual(["maxStake", "minOdds"]);
   });
 
+  it("maps a scraped multi-day window to scrapedWindow ET days; null window -> null", async () => {
+    mockGetReviewQueue.mockResolvedValue([
+      matchQueueRow({
+        id: 30,
+        parsed: baseParsed({
+          sportKeyHint: "icehockey_nhl",
+          windowStart: "2026-09-29T04:00:00.000Z",
+          windowEnd: "2026-10-01T03:59:59.999Z",
+        }),
+      }),
+      matchQueueRow({ id: 31, parsed: baseParsed({ windowStart: null, windowEnd: null }) }),
+    ]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.queue[0].scrapedWindow).toEqual({
+      sportKey: "icehockey_nhl",
+      startEtDate: "2026-09-29",
+      endEtDate: "2026-09-30",
+    });
+    expect(result.queue[1].scrapedWindow).toBeNull();
+  });
+
   it("returns the queue even when emptyVariant is 'none-scraped'", async () => {
     mockGetReviewQueue.mockResolvedValue([matchQueueRow()]);
 

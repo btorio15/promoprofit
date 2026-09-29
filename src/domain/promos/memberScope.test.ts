@@ -99,4 +99,52 @@ describe("resolveMemberScope", () => {
     );
     expect(result).toEqual({ status: "invalid" });
   });
+
+  describe("sport_day ranges (etEndDate)", () => {
+    const none = { moneyline: [], extended: [] };
+    const range = (etDate: string, etEndDate: string) =>
+      resolveMemberScope({ kind: "sport_day", sportKey: "icehockey_nhl", etDate, etEndDate }, none, NOW);
+
+    it.each([
+      ["2026-09-28", "2026-09-29", "2026-09-28T04:00:00.000Z", "2026-09-30T03:59:59.999Z"],
+      // start already over but the end day is still ahead
+      ["2026-09-26", "2026-09-28", "2026-09-26T04:00:00.000Z", "2026-09-29T03:59:59.999Z"],
+    ])("ok: %s..%s", (start, end, windowStart, windowEnd) => {
+      const result = range(start, end);
+      expect(result.status).toBe("ok");
+      if (result.status !== "ok") throw new Error("unreachable");
+      expect(result.scope).toEqual({ kind: "sport_window", sportKey: "icehockey_nhl", windowStart, windowEnd });
+      expect(result.event).toBeNull();
+    });
+
+    it.each([
+      ["end before start", "2026-09-29", "2026-09-28"],
+      ["impossible end", "2026-09-28", "2026-09-31"],
+      ["impossible start", "2026-02-31", "2026-09-28"],
+      ["end beyond correction window", "2026-09-28", "2026-10-06"],
+      ["start beyond correction window", "2026-10-06", "2026-10-07"],
+    ])("invalid: %s", (_name, start, end) => {
+      expect(range(start, end)).toEqual({ status: "invalid" });
+    });
+
+    it("stale when the END day is over", () => {
+      expect(range("2026-09-20", "2026-09-25")).toEqual({
+        status: "stale",
+        message: "Those days have already passed. Pick another.",
+      });
+    });
+
+    it("etEndDate === etDate behaves exactly like a single day", () => {
+      const single = resolveMemberScope(
+        { kind: "sport_day", sportKey: "icehockey_nhl", etDate: "2026-09-28" },
+        none,
+        NOW,
+      );
+      expect(range("2026-09-28", "2026-09-28")).toEqual(single);
+      expect(range("2020-01-01", "2020-01-01")).toEqual({
+        status: "stale",
+        message: "That day has already passed. Pick another.",
+      });
+    });
+  });
 });

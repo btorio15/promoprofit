@@ -60,7 +60,12 @@ export async function correctPromoMatch(input: unknown): Promise<PromoReviewResp
   const scopeResult = resolveMemberScope(
     scopeInput.kind === "event"
       ? { kind: "event", eventId: scopeInput.eventId }
-      : { kind: "sport_day", sportKey: scopeInput.sportKey, etDate: scopeInput.etDate },
+      : {
+          kind: "sport_day",
+          sportKey: scopeInput.sportKey,
+          etDate: scopeInput.etDate,
+          ...(scopeInput.etEndDate !== undefined ? { etEndDate: scopeInput.etEndDate } : {}),
+        },
     { moneyline: moneylineEvents, extended: extendedEvents },
     now,
   );

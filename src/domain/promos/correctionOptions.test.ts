@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { formatKickoff } from "@/lib/format";
-import { listCorrectionOptions } from "./correctionOptions";
+import {
+  listCorrectionOptions,
+  prefillSportDay,
+  scrapedWindowEtDays,
+  throughDayOptions,
+  type CorrectionSportDayOption,
+} from "./correctionOptions";
 import { etDayLabel } from "./etTime";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
@@ -241,5 +247,81 @@ describe("listCorrectionOptions (D-14, T-03-09-06)", () => {
     const result = listCorrectionOptions({ moneyline: [], extended: [] }, { now: NOW });
 
     expect(result).toEqual({ events: [], sportDays: [] });
+  });
+});
+
+describe("throughDayOptions", () => {
+  const now = new Date("2026-09-27T12:00:00Z");
+
+  it("lists consecutive ET days up to the last day starting within now + 7 days", () => {
+    const options = throughDayOptions("2026-09-28", now);
+    expect(options[0].etDate).toBe("2026-09-28");
+    expect(options[options.length - 1].etDate).toBe("2026-10-04");
+    expect(options).toHaveLength(7);
+    expect(options[0].label).toBe("Mon, Sep 28");
+    expect(options[1].label).toBe("Tue, Sep 29");
+  });
+
+  it("returns [] for an invalid or too-far start", () => {
+    expect(throughDayOptions("2026-02-31", now)).toEqual([]);
+    expect(throughDayOptions("nope", now)).toEqual([]);
+    expect(throughDayOptions("2026-10-20", now)).toEqual([]);
+  });
+});
+
+describe("scrapedWindowEtDays", () => {
+  it.each([
+    ["multi-day", "2026-09-29T04:00:00.000Z", "2026-10-01T03:59:59.999Z", "2026-09-29", "2026-09-30"],
+    ["CFB after-midnight extension", "2026-09-26T04:00:00.000Z", "2026-09-27T06:00:00.000Z", "2026-09-26", "2026-09-26"],
+    ["single day", "2026-09-28T04:00:00.000Z", "2026-09-29T03:59:59.999Z", "2026-09-28", "2026-09-28"],
+  ])("%s", (_name, start, end, startEtDate, endEtDate) => {
+    expect(scrapedWindowEtDays(start, end)).toEqual({ startEtDate, endEtDate });
+  });
+
+  it("null on invalid input", () => {
+    expect(scrapedWindowEtDays("garbage", "2026-09-29T04:00:00.000Z")).toBeNull();
+  });
+});
+
+describe("prefillSportDay", () => {
+  const now = new Date("2026-09-27T12:00:00Z");
+  const day = (sportKey: string, etDate: string): CorrectionSportDayOption => ({
+    value: `${sportKey}|${etDate}`,
+    sportKey,
+    sportLabel: sportKey,
+    etDate,
+    label: `${sportKey} ${etDate}`,
+  });
+  const days = [
+    day("icehockey_nhl", "2026-09-30"),
+    day("icehockey_nhl", "2026-10-01"),
+    day("americanfootball_nfl", "2026-09-29"),
+  ];
+
+  it("uses the window's first day when offered", () => {
+    expect(
+      prefillSportDay({ sportKey: "icehockey_nhl", startEtDate: "2026-09-30", endEtDate: "2026-10-01" }, days, now),
+    ).toEqual({ value: "icehockey_nhl|2026-09-30", throughEtDate: "2026-10-01" });
+  });
+
+  it("falls back to the earliest same-sport day inside the window", () => {
+    expect(
+      prefillSportDay({ sportKey: "icehockey_nhl", startEtDate: "2026-09-29", endEtDate: "2026-10-01" }, days, now),
+    ).toEqual({ value: "icehockey_nhl|2026-09-30", throughEtDate: "2026-10-01" });
+  });
+
+  it("null when no same-sport day falls in the window", () => {
+    expect(
+      prefillSportDay({ sportKey: "icehockey_nhl", startEtDate: "2026-09-27", endEtDate: "2026-09-29" }, days, now),
+    ).toBeNull();
+    expect(
+      prefillSportDay({ sportKey: "basketball_nba", startEtDate: "2026-09-29", endEtDate: "2026-10-01" }, days, now),
+    ).toBeNull();
+  });
+
+  it("clamps the through day to the last offered day", () => {
+    expect(
+      prefillSportDay({ sportKey: "icehockey_nhl", startEtDate: "2026-09-30", endEtDate: "2026-12-01" }, days, now),
+    ).toEqual({ value: "icehockey_nhl|2026-09-30", throughEtDate: "2026-10-04" });
   });
 });

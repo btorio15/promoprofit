@@ -156,25 +156,174 @@ export function etDayWindow(dateText: string): { start: string; end: string } | 
 
 const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
+/** Extends an ET day window's end to expiresAt when expiresAt is later than
+ * the window end by at most 12h (a "9/26 college football" slate includes
+ * late West-coast kickoffs after midnight ET, and the book's token stays
+ * valid until expiresAt). Otherwise returns the window unchanged. */
+export function extendToExpiry(
+  window: { start: string; end: string },
+  expiresAt: string | null,
+): { start: string; end: string } {
+  if (expiresAt === null) return window;
+
+  const dayEndMs = new Date(window.end).getTime();
+  const expiresMs = new Date(expiresAt).getTime();
+  const diffMs = expiresMs - dayEndMs;
+
+  if (diffMs > 0 && diffMs <= TWELVE_HOURS_MS) {
+    return { start: window.start, end: expiresAt };
+  }
+
+  return window;
+}
+
 /** ET day window, but the end extends to expiresAt when expiresAt is later
- * than the ET-day end by at most 12h (a "9/26 college football" slate
- * includes late West-coast kickoffs after midnight ET, and the book's
- * token stays valid until expiresAt). */
+ * than the ET-day end by at most 12h (see extendToExpiry). */
 export function slateWindow(
   dateText: string,
   expiresAt: string | null,
 ): { start: string; end: string } | null {
   const dayWindow = etDayWindow(dateText);
   if (!dayWindow) return null;
-  if (expiresAt === null) return dayWindow;
+  return extendToExpiry(dayWindow, expiresAt);
+}
 
-  const dayEndMs = new Date(dayWindow.end).getTime();
-  const expiresMs = new Date(expiresAt).getTime();
-  const diffMs = expiresMs - dayEndMs;
+// ---------------------------------------------------------------------------
+// Multi-date phrases ("September 29th and September 30th, 2026")
+// ---------------------------------------------------------------------------
 
-  if (diffMs > 0 && diffMs <= TWELVE_HOURS_MS) {
-    return { start: dayWindow.start, end: expiresAt };
+/** Longest span a promo phrase may cover: 7 calendar days (last - first = 6).
+ * Mirrors correctionOptions' DEFAULT_WINDOW_DAYS (7) locally -- importing it
+ * would create an import cycle (correctionOptions imports this module). */
+const MAX_SPAN_DAYS = 6;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const SPAN_DATE_RE = /([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?/y;
+const SPAN_CONNECTOR_RE =
+  /\s*(,\s*and\b|,|&|\band\b|-|–|—|\bthrough\b|\bthru\b|\bto\b|\buntil\b)\s*/y;
+const TRAILING_JUNK_RE = /(?:[\s,.;:!?&\-–—]+|\s+(?:and|to|until|through|thru))$/i;
+
+const ET_YEAR_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+});
+
+interface SpanDate {
+  month: number;
+  day: number;
+  year: number | null;
+  /** Connector that joined this date to the previous one. */
+  connector: "list" | "range" | null;
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function etDateString(year: number, month: number, day: number): string {
+  return `${String(year).padStart(4, "0")}-${pad2(month)}-${pad2(day)}`;
+}
+
+/**
+ * "September 29th and September 30th, 2026" -> first/last ET calendar day.
+ * Accepts date lists ("," / "and" / "&") of CONSECUTIVE days and ranges
+ * ("-", en/em dash, through, thru, to, until) with end > start. Fails closed
+ * (null) on anything else: other words, gaps in a list, descending dates,
+ * impossible dates (WR-12), a yearless date with no year source, or a span
+ * longer than 7 days -- a wrong window would over-reach onto unnamed days.
+ * A yearless date takes the year of the next explicit-year date in the phrase
+ * (minus 1 if its month is later), else the ET year of expiresAt.
+ */
+export function parseEtDateSpan(
+  spanText: string,
+  expiresAt: string | null,
+): { startEtDate: string; endEtDate: string; dayCount: number } | null {
+  let text = spanText.trim();
+  for (let prev = ""; prev !== text; ) {
+    prev = text;
+    text = text.replace(TRAILING_JUNK_RE, "");
+  }
+  if (text.length === 0) return null;
+
+  const dates: SpanDate[] = [];
+  let pos = 0;
+  let connector: SpanDate["connector"] = null;
+  while (pos < text.length) {
+    SPAN_DATE_RE.lastIndex = pos;
+    const m = SPAN_DATE_RE.exec(text);
+    if (!m) return null;
+    const month = MONTH_NAMES[m[1].toLowerCase()];
+    if (month === undefined) return null;
+    dates.push({
+      month,
+      day: parseInt(m[2], 10),
+      year: m[3] !== undefined ? parseInt(m[3], 10) : null,
+      connector,
+    });
+    pos = SPAN_DATE_RE.lastIndex;
+    if (pos >= text.length) break;
+
+    SPAN_CONNECTOR_RE.lastIndex = pos;
+    const c = SPAN_CONNECTOR_RE.exec(text);
+    if (!c) return null;
+    const word = c[1].toLowerCase();
+    connector = /^(?:-|–|—|through|thru|to|until)$/.test(word) ? "range" : "list";
+    pos = SPAN_CONNECTOR_RE.lastIndex;
+    if (pos >= text.length) return null;
+  }
+  if (dates.length === 0) return null;
+
+  // Resolve years right to left so a yearless date can borrow from the next
+  // explicit-year date in the phrase.
+  let expiresYear: number | null = null;
+  let expiresMs: number | null = null;
+  if (expiresAt !== null) {
+    const t = new Date(expiresAt);
+    if (!Number.isNaN(t.getTime())) {
+      expiresYear = parseInt(ET_YEAR_FORMATTER.format(t), 10);
+      expiresMs = t.getTime();
+    }
+  }
+  const years: number[] = new Array<number>(dates.length).fill(0);
+  let nextExplicit: { year: number; month: number } | null = null;
+  for (let i = dates.length - 1; i >= 0; i--) {
+    const d = dates[i];
+    if (d.year !== null) {
+      years[i] = d.year;
+      nextExplicit = { year: d.year, month: d.month };
+    } else if (nextExplicit !== null) {
+      years[i] = d.month > nextExplicit.month ? nextExplicit.year - 1 : nextExplicit.year;
+    } else {
+      if (expiresYear === null || expiresMs === null) return null;
+      let year = expiresYear;
+      if (isRealCalendarDate(year, d.month, d.day)) {
+        const bounds = computeEtDayBounds(year, d.month, d.day);
+        if (new Date(bounds.start).getTime() > expiresMs) year -= 1;
+      }
+      years[i] = year;
+    }
   }
 
-  return dayWindow;
+  const dayNumbers: number[] = [];
+  for (let i = 0; i < dates.length; i++) {
+    const d = dates[i];
+    if (!isRealCalendarDate(years[i], d.month, d.day)) return null;
+    dayNumbers.push(Date.UTC(years[i], d.month - 1, d.day) / DAY_MS);
+  }
+  for (let i = 1; i < dates.length; i++) {
+    const gap = dayNumbers[i] - dayNumbers[i - 1];
+    if (gap <= 0) return null;
+    if (dates[i].connector === "list" && gap !== 1) return null;
+  }
+  const spanDays = dayNumbers[dayNumbers.length - 1] - dayNumbers[0];
+  if (spanDays > MAX_SPAN_DAYS) return null;
+
+  const first = dates[0];
+  const last = dates[dates.length - 1];
+  return {
+    startEtDate: etDateString(years[0], first.month, first.day),
+    endEtDate: etDateString(years[dates.length - 1], last.month, last.day),
+    dayCount: spanDays + 1,
+  };
 }

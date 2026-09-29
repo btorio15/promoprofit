@@ -2,7 +2,7 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 import { SPORTS, SPORT_KEYS, getSportLabel } from "@/config/sports";
 import { formatKickoff } from "@/lib/format";
 import { enumerateScopeSelections, type ResolvedSelection } from "./selection";
-import { etDayLabel } from "./etTime";
+import { etDayBounds, etDayLabel } from "./etTime";
 import { PROMO_MARKET_TYPES, type PromoMarketType, type PromoSide } from "./types";
 
 /**
@@ -75,6 +75,84 @@ const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
 /** ISO instant -> its ET calendar day as "YYYY-MM-DD" (en-CA formats that way natively). */
 function etDateKey(iso: string): string {
   return ET_DAY_KEY_FORMATTER.format(new Date(iso));
+}
+
+/**
+ * quick-260929-gcn: the "Through" day choices for a multi-day sport window --
+ * consecutive ET calendar dates from startEtDate while the day still STARTS
+ * within now + windowDays (the same bound resolveMemberScope enforces, so the
+ * UI never offers a day the server rejects). [] when startEtDate is invalid or
+ * itself beyond the bound.
+ */
+export function throughDayOptions(
+  startEtDate: string,
+  now: Date,
+  windowDays = DEFAULT_WINDOW_DAYS,
+): { etDate: string; label: string }[] {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startEtDate);
+  if (!match || !etDayBounds(startEtDate)) return [];
+
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const limitMs = now.getTime() + windowDays * ONE_DAY_MS;
+  const options: { etDate: string; label: string }[] = [];
+
+  // windowDays + 2 is a hard ceiling on the loop; the limit check breaks first.
+  for (let i = 0; i <= windowDays + 2; i++) {
+    const etDate = new Date(Date.UTC(year, month - 1, day + i)).toISOString().slice(0, 10);
+    const bounds = etDayBounds(etDate);
+    if (!bounds || new Date(bounds.start).getTime() > limitMs) break;
+    options.push({ etDate, label: etDayLabel(bounds.start) });
+  }
+  return options;
+}
+
+/**
+ * quick-260929-gcn: a scraped window's first and last ET days. The end maps
+ * back through 12h so slateWindow's after-midnight extension (a CFB slate
+ * ending 06:00Z the next day) still names the slate's own day. null on
+ * unparseable input or an end before the start.
+ */
+export function scrapedWindowEtDays(
+  windowStart: string,
+  windowEnd: string,
+): { startEtDate: string; endEtDate: string } | null {
+  const startMs = new Date(windowStart).getTime();
+  const endMs = new Date(windowEnd).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
+
+  const startEtDate = etDateKey(windowStart);
+  const endEtDate = etDateKey(new Date(Math.max(startMs, endMs - 12 * 60 * 60 * 1000)).toISOString());
+  if (endEtDate < startEtDate) return null;
+  return { startEtDate, endEtDate };
+}
+
+/**
+ * quick-260929-gcn: prefill for the review UI's day pickers from a queued
+ * promo's scraped window. Picks the same-sport day option on the window's
+ * first day, else the earliest same-sport option inside the window; null when
+ * none. `value` is the option's value (caller adds its own prefix);
+ * throughEtDate is the window's last day clamped into what the Through
+ * selector actually offers. Presentational only -- the server re-validates.
+ */
+export function prefillSportDay(
+  window: { sportKey: string; startEtDate: string; endEtDate: string },
+  sportDays: CorrectionSportDayOption[],
+  now: Date,
+): { value: string; throughEtDate: string } | null {
+  const sameSport = sportDays.filter((d) => d.sportKey === window.sportKey);
+  const chosen =
+    sameSport.find((d) => d.etDate === window.startEtDate) ??
+    sameSport
+      .filter((d) => d.etDate >= window.startEtDate && d.etDate <= window.endEtDate)
+      .sort((a, b) => (a.etDate < b.etDate ? -1 : a.etDate > b.etDate ? 1 : 0))[0];
+  if (!chosen) return null;
+
+  const offered = throughDayOptions(chosen.etDate, now);
+  const last = offered.length > 0 ? offered[offered.length - 1].etDate : chosen.etDate;
+  let through = window.endEtDate;
+  if (through > last) through = last;
+  if (through < chosen.etDate) through = chosen.etDate;
+  return { value: chosen.value, throughEtDate: through };
 }
 
 /**

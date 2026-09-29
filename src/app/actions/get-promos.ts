@@ -24,7 +24,7 @@ import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
 import { describePromo, formatBoostPercent, scopeGuessLabel } from "@/domain/promos/describe";
-import { listCorrectionOptions } from "@/domain/promos/correctionOptions";
+import { listCorrectionOptions, scrapedWindowEtDays } from "@/domain/promos/correctionOptions";
 import {
   findUnprofitablePromos,
   rankPromoHedges,
@@ -354,7 +354,18 @@ function toQueueItemDTO(row: QueueRow): QueueItemDTO {
         : null,
     unparsedCapFields: row.unparsedCapFields,
     classify: row.reviewReason === "classify" ? toClassifyQueueItemDTO(row) : null,
+    scrapedWindow: scrapedWindowFor(row),
   };
+}
+
+/** Partial drafts may carry undefined (not null) fields, so guard by type. */
+function scrapedWindowFor(row: QueueRow): QueueItemDTO["scrapedWindow"] {
+  const { sportKeyHint, windowStart, windowEnd } = row.parsed;
+  if (typeof sportKeyHint !== "string" || typeof windowStart !== "string" || typeof windowEnd !== "string") {
+    return null;
+  }
+  const days = scrapedWindowEtDays(windowStart, windowEnd);
+  return days ? { sportKey: sportKeyHint, ...days } : null;
 }
 
 function capNoteFor(promo: ActivePromo, capBound: "max_stake" | "max_winnings", bookNames: Map<string, string>): string | null {

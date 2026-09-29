@@ -241,3 +241,84 @@ describe("fanduelScraper — 2026-09-28 fixture: 'pre-live wager' no longer fals
     expect(promo!.windowEnd).toBe("2026-09-29T03:59:59.999Z");
   });
 });
+
+describe("fanduelScraper — multi-day windows (quick-260929-gcn)", () => {
+  const nhlDetailFixture = readFixture("src/test/fixtures/promos/fanduel-promo-detail-nhl-boost-0929.json");
+  const nhlDetail = (JSON.parse(nhlDetailFixture) as Array<Record<string, unknown>>)[0];
+  const SOURCE = "https://api.sportsbook.fanduel.com/promos/api/promotions";
+
+  function listBodyFor(entry: {
+    promoCode: string;
+    title: string;
+    name: string;
+    tags?: unknown;
+    combinedEndDate?: unknown;
+  }): string {
+    return JSON.stringify({ promoPlacements: [{ placementId: "SBK_PROMOHUB", promotions: [entry] }] });
+  }
+
+  it("LONHLPBT0929 (live capture) gets a window covering both named ET days; maxStake stays unparsed", () => {
+    const result = fanduelScraper.parse(
+      {
+        listBody: listBodyFor({
+          promoCode: nhlDetail.promoCode as string,
+          title: nhlDetail.title as string,
+          name: nhlDetail.name as string,
+          tags: nhlDetail.tags,
+          combinedEndDate: nhlDetail.combinedEndDate,
+        }),
+        detailBodies: { LONHLPBT0929: nhlDetailFixture },
+      },
+      { now: new Date("2026-09-29T17:34:00Z"), sourceUrl: SOURCE },
+    );
+
+    expect(result.candidates).toHaveLength(1);
+    const promo = result.candidates[0];
+    expect(promo.externalId).toBe("LONHLPBT0929");
+    expect(promo.windowStart).toBe("2026-09-29T04:00:00.000Z");
+    expect(promo.windowEnd).toBe("2026-10-01T03:59:59.999Z");
+    expect(promo.sportKeyHint).toBe("icehockey_nhl");
+    expect(promo.boostPercent).toBe("50.00");
+    expect(promo.minOddsAmerican).toBe(-200);
+    expect(promo.maxStake).toBeNull();
+    expect(promo.unparsedCapFields).toContain("maxStake");
+    expect(promo.scopeText).toContain("NHL Games on September 29th and September 30th, 2026");
+  });
+
+  it("list-only 'for any NFL Games this week' keeps a null window", () => {
+    const result = fanduelScraper.parse(
+      {
+        listBody: listBodyFor({
+          promoCode: "SYNWEEK1",
+          title: "20% Profit Boost",
+          name: "Get a 20% Profit Boost Token to use on ANY wager for any NFL Games this week!",
+          tags: ["nfl", "american-football"],
+        }),
+        detailBodies: {},
+      },
+      { now: new Date("2026-10-01T12:00:00Z"), sourceUrl: SOURCE },
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].windowStart).toBeNull();
+    expect(result.candidates[0].windowEnd).toBeNull();
+  });
+
+  it("list-only 'for any NFL Games on October 3rd and October 4th, 2026' spans both ET days", () => {
+    const result = fanduelScraper.parse(
+      {
+        listBody: listBodyFor({
+          promoCode: "SYNTWO1",
+          title: "20% Profit Boost",
+          name: "Get a 20% Profit Boost Token to use on ANY wager for any NFL Games on October 3rd and October 4th, 2026!",
+          tags: ["nfl", "american-football"],
+          combinedEndDate: "2026-10-05T06:00:00.000Z",
+        }),
+        detailBodies: {},
+      },
+      { now: new Date("2026-10-01T12:00:00Z"), sourceUrl: SOURCE },
+    );
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].windowStart).toBe("2026-10-03T04:00:00.000Z");
+    expect(result.candidates[0].windowEnd).toBe("2026-10-05T03:59:59.999Z");
+  });
+});

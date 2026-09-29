@@ -17,7 +17,7 @@ import type { ScopeGuess } from "./scope";
 
 export type MemberScopeInput =
   | { kind: "event"; eventId: string }
-  | { kind: "sport_day"; sportKey: string; etDate: string };
+  | { kind: "sport_day"; sportKey: string; etDate: string; etEndDate?: string };
 
 export type MemberScopeResult =
   | { status: "ok"; scope: ScopeGuess; event: OddsEvent | null }
@@ -31,7 +31,9 @@ export type MemberScopeResult =
  * recomputed server-side from its date string (never trusted from the
  * client), rejected outright when the calendar date is impossible (WR-12),
  * stale when its ET day has already ended, and invalid when it's beyond the
- * DEFAULT_WINDOW_DAYS correction window.
+ * DEFAULT_WINDOW_DAYS correction window. An optional etEndDate makes it a
+ * multi-day range (start day's start .. end day's end): end-before-start is
+ * invalid, and it is stale only once the END day is over.
  */
 export function resolveMemberScope(
   input: MemberScopeInput,
@@ -59,16 +61,33 @@ export function resolveMemberScope(
     };
   }
 
-  const bounds = etDayBounds(input.etDate);
+  const endEtDate = input.etEndDate ?? input.etDate;
+  const startBounds = etDayBounds(input.etDate);
+  const endBounds = etDayBounds(endEtDate);
   // WR-12: an impossible calendar date (e.g. 2026-02-31) is rejected, never rolled over.
-  if (!bounds) {
+  if (!startBounds || !endBounds) {
     return { status: "invalid" };
   }
-  if (new Date(bounds.end).getTime() <= now.getTime()) {
-    return { status: "stale", message: "That day has already passed. Pick another." };
+  // Both are validated YYYY-MM-DD strings here, so a string compare orders them.
+  if (endEtDate < input.etDate) {
+    return { status: "invalid" };
+  }
+  // Stale only when the END day is over (a range may already be under way).
+  if (new Date(endBounds.end).getTime() <= now.getTime()) {
+    return {
+      status: "stale",
+      message:
+        endEtDate === input.etDate
+          ? "That day has already passed. Pick another."
+          : "Those days have already passed. Pick another.",
+    };
   }
   // ...and a day beyond the correction window the dropdown offers is refused.
-  if (new Date(bounds.start).getTime() > now.getTime() + DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000) {
+  const windowLimitMs = now.getTime() + DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  if (
+    new Date(startBounds.start).getTime() > windowLimitMs ||
+    new Date(endBounds.start).getTime() > windowLimitMs
+  ) {
     return { status: "invalid" };
   }
 
@@ -77,8 +96,8 @@ export function resolveMemberScope(
     scope: {
       kind: "sport_window",
       sportKey: input.sportKey,
-      windowStart: bounds.start,
-      windowEnd: bounds.end,
+      windowStart: startBounds.start,
+      windowEnd: endBounds.end,
     },
     event: null,
   };
