@@ -27,14 +27,10 @@ export function ProfitSummary({ totalProfit, totalExtracted, availableProfit }: 
         <div className="flex flex-col gap-1">
           <span className="text-sm text-muted-foreground">Total profit possible</span>
           <span className="num text-3xl font-semibold text-primary">{formatUsd(totalProfit)}</span>
-          <span className="text-sm text-muted-foreground">
-            At your books, not counting promos you&apos;ve marked done
-          </span>
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-sm text-muted-foreground">Total profit extracted</span>
           <span className="num text-3xl font-semibold text-primary">{formatUsd(totalExtracted)}</span>
-          <span className="text-sm text-muted-foreground">Recorded when you marked promos done</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-4">
