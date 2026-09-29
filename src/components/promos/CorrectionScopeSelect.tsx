@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { throughDayOptions } from "@/domain/promos/correctionOptions";
 import type { CorrectionOptions } from "@/domain/promos/dto";
 
 /**
@@ -63,15 +64,60 @@ function groupCorrectionOptions(options: CorrectionOptions): SportGroup[] {
 
 export type ScopeSelectionInput =
   | { kind: "event"; eventId: string }
-  | { kind: "sport_day"; sportKey: string; etDate: string };
+  | { kind: "sport_day"; sportKey: string; etDate: string; etEndDate?: string };
 
-/** Turns a CorrectionScopeSelect's raw string value into the shape correctPromoMatch/classifyPromo's scope input expects. */
-export function scopeInputFromValue(value: string): ScopeSelectionInput {
+/**
+ * Turns a CorrectionScopeSelect's raw string value into the shape
+ * correctPromoMatch/classifyPromo's scope input expects. etEndDate is only
+ * included for a day value whose "Through" day differs from its start day, so
+ * single-day payloads stay identical to before.
+ */
+export function scopeInputFromValue(value: string, throughEtDate?: string | null): ScopeSelectionInput {
   if (value.startsWith(EVENT_PREFIX)) {
     return { kind: "event", eventId: value.slice(EVENT_PREFIX.length) };
   }
   const [sportKey, etDate] = value.slice(DAY_PREFIX.length).split("|");
+  if (typeof throughEtDate === "string" && throughEtDate !== "" && throughEtDate !== etDate) {
+    return { kind: "sport_day", sportKey, etDate, etEndDate: throughEtDate };
+  }
   return { kind: "sport_day", sportKey, etDate };
+}
+
+/** The etDate part of a `day:${sportKey}|${etDate}` value; null for anything else. */
+export function dayEtDateFromValue(value: string | null): string | null {
+  if (value === null || !value.startsWith(DAY_PREFIX)) return null;
+  return value.slice(DAY_PREFIX.length).split("|")[1] ?? null;
+}
+
+interface ThroughDaySelectProps {
+  id: string;
+  startEtDate: string;
+  value: string | null;
+  onValueChange: (etDate: string) => void;
+  disabled?: boolean;
+}
+
+/** "Through" day picker for a multi-day sport window; the first item is the start day itself (same day). */
+export function ThroughDaySelect({ id, startEtDate, value, onValueChange, disabled }: ThroughDaySelectProps) {
+  const options = throughDayOptions(startEtDate, new Date());
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>Through</Label>
+      <Select value={value ?? startEtDate} onValueChange={(v) => onValueChange(v ?? startEtDate)}>
+        <SelectTrigger id={id} className="h-10 w-full" disabled={disabled}>
+          <SelectValue placeholder="Same day" />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option, index) => (
+            <SelectItem key={option.etDate} value={option.etDate}>
+              {index === 0 ? `${option.label} (same day)` : option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }
 
 interface CorrectionScopeSelectProps {

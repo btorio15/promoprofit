@@ -169,6 +169,12 @@ export interface QueueItemDTO {
   capRecap: { maxStake: string | null; maxWinnings: string | null; minOdds: number | null } | null;
   unparsedCapFields: CapField[];
   classify: ClassifyQueueItemDTO | null;
+  /**
+   * quick-260929-gcn: the promo's scraped sport window as first/last ET days,
+   * used only to prefill the review pickers ("Game or day" + "Through").
+   * Presentational -- the server re-validates whatever the member submits.
+   */
+  scrapedWindow: { sportKey: string; startEtDate: string; endEtDate: string } | null;
 }
 
 export type GetPromosResponse =

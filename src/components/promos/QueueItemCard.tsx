@@ -12,7 +12,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { DismissPromoDialog } from "./DismissPromoDialog";
-import { CorrectionScopeSelect, EVENT_PREFIX, DAY_PREFIX, scopeInputFromValue } from "./CorrectionScopeSelect";
+import { prefillSportDay } from "@/domain/promos/correctionOptions";
+import {
+  CorrectionScopeSelect,
+  EVENT_PREFIX,
+  DAY_PREFIX,
+  ThroughDaySelect,
+  dayEtDateFromValue,
+  scopeInputFromValue,
+} from "./CorrectionScopeSelect";
 
 interface QueueItemCardProps {
   item: QueueItemDTO;
@@ -52,6 +60,7 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
   const [isCorrectPending, startCorrectTransition] = useTransition();
   const [eventValue, setEventValue] = useState<string | null>(null);
   const [marketValue, setMarketValue] = useState<string>("best");
+  const [throughValue, setThroughValue] = useState<string | null>(null);
 
   const [capsOpen, setCapsOpen] = useState(false);
   const [isCapsPending, startCapsTransition] = useTransition();
@@ -82,11 +91,25 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
     ? correctionOptions.events.find((e) => e.eventId === eventValue.slice(EVENT_PREFIX.length))
     : undefined;
   const isSportDaySelected = eventValue?.startsWith(DAY_PREFIX) ?? false;
+  const startEtDate = dayEtDateFromValue(eventValue);
+
+  function toggleCorrect() {
+    // Opening with nothing chosen yet: prefill the day pickers from the
+    // promo's scraped window (presentational; the server re-validates).
+    if (!correctOpen && eventValue === null && item.scrapedWindow) {
+      const prefill = prefillSportDay(item.scrapedWindow, correctionOptions.sportDays, new Date());
+      if (prefill) {
+        setEventValue(`${DAY_PREFIX}${prefill.value}`);
+        setThroughValue(prefill.throughEtDate);
+      }
+    }
+    setCorrectOpen((open) => !open);
+  }
 
   function saveMatch() {
     if (!eventValue) return;
 
-    const scopeInput = scopeInputFromValue(eventValue);
+    const scopeInput = scopeInputFromValue(eventValue, throughValue);
     const scope =
       scopeInput.kind === "event"
         ? {
@@ -101,6 +124,7 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
       if (outcome.status === "ok") {
         setCorrectOpen(false);
         setEventValue(null);
+        setThroughValue(null);
         setMarketValue("best");
       }
       handleOutcome(outcome);
@@ -196,7 +220,7 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
             variant="outline"
             className="h-10"
             aria-label="Correct this match"
-            onClick={() => setCorrectOpen((open) => !open)}
+            onClick={toggleCorrect}
             disabled={isPending}
           >
             Correct
@@ -225,15 +249,26 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
 
       {correctOpen ? (
         <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
-          <CorrectionScopeSelect
-            id={`correct-event-${item.promoId}`}
-            value={eventValue}
-            onValueChange={(value) => {
-              setEventValue(value);
-              setMarketValue("best");
-            }}
-            options={correctionOptions}
-          />
+          <div className={isSportDaySelected ? "grid gap-3 sm:grid-cols-2" : "flex flex-col gap-3"}>
+            <CorrectionScopeSelect
+              id={`correct-event-${item.promoId}`}
+              value={eventValue}
+              onValueChange={(value) => {
+                setEventValue(value);
+                setThroughValue(dayEtDateFromValue(value));
+                setMarketValue("best");
+              }}
+              options={correctionOptions}
+            />
+            {startEtDate ? (
+              <ThroughDaySelect
+                id={`correct-through-${item.promoId}`}
+                startEtDate={startEtDate}
+                value={throughValue}
+                onValueChange={setThroughValue}
+              />
+            ) : null}
+          </div>
 
           {!isSportDaySelected ? (
             <div className="flex flex-col gap-2">
@@ -267,6 +302,7 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
               onClick={() => {
                 setCorrectOpen(false);
                 setEventValue(null);
+                setThroughValue(null);
                 setMarketValue("best");
               }}
             >
