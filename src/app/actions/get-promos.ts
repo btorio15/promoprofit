@@ -15,7 +15,8 @@ import type {
 import { getActivePromos, getScrapeStatus } from "@/db/promos";
 import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
-import { getProfitObservationsSince, getUsedPromoIds } from "@/db/promoTracking";
+import { getProfitObservationsSince, getPromoCompletions } from "@/db/promoTracking";
+import { sumProfitExtracted, toDonePromoDTO } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
@@ -121,13 +122,20 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const hasAnyOkRun = scrapeStatus.some((line) => line.lastOkAt !== null);
 
   const now = new Date();
-  const [activePromos, queueRows, usedPromoIds, userBookKeys] = await Promise.all([
+  const [activePromos, queueRows, completions, userBookKeys] = await Promise.all([
     getActivePromos(now),
     getReviewQueue(now),
-    getUsedPromoIds(user.userId),
+    getPromoCompletions(user.userId),
     getUserBookKeys(user.userId),
   ]);
   const userBookSet = new Set(userBookKeys);
+  // quick-260929-igk: done promos leave the feed and render only from their
+  // saved snapshots (never live odds); the extracted total is an exact-cent sum.
+  const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
+  const doneRows = completions.map((c) => toDonePromoDTO(c, colBookNames));
+  const doneIds = new Set(completions.map((c) => c.promoId));
+  const totalExtracted = sumProfitExtracted(doneRows);
+  const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
   const queue = queueRows.map(toQueueItemDTO);
   // quick-260928-it1: classify items also need correctionOptions (their
   // "Game or day" selector reuses the same CorrectionScopeSelect data).
@@ -146,7 +154,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   await recordCurrentProfitObservations(now, { activePromos, precision: precision as StakePrecision });
   const availableProfit = await loadAvailableProfit(now, userBookSet);
 
-  if (activePromos.length === 0) {
+  if (feedPromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
     const correctionOptions = await correctionOptionsFor(needsCorrectionOptions, now);
     return {
@@ -158,6 +166,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       queue,
       correctionOptions,
       totalProfit: "0.00",
+      doneRows,
+      totalExtracted,
       availableProfit,
     };
   }
@@ -182,6 +192,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       queue,
       correctionOptions,
       totalProfit: "0.00",
+      doneRows,
+      totalExtracted,
       availableProfit,
     };
   }
@@ -195,10 +207,10 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     now,
   };
 
-  const opportunities = rankPromoHedges(activePromos, rankOpts);
-  const unprofitable = findUnprofitablePromos(activePromos, rankOpts);
+  const opportunities = rankPromoHedges(feedPromos, rankOpts);
+  const unprofitable = findUnprofitablePromos(feedPromos, rankOpts);
   const unprofitableRows = ownBooksFirst(
-    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet, usedPromoIds)),
+    unprofitable.map((entry) => toUnprofitablePromoRowDTO(entry, bookNames, userBookSet, doneIds)),
   );
 
   if (opportunities.length === 0) {
@@ -212,7 +224,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
 
     let emptyVariant: PromosEmptyVariant = "no-active";
     if (!userHasEveryUsableBook) {
-      const everyUsableOpportunities = rankPromoHedges(activePromos, {
+      const everyUsableOpportunities = rankPromoHedges(feedPromos, {
         ...rankOpts,
         hedgeBookKeys: new Set(everyUsableBookKeys),
       });
@@ -234,6 +246,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
         queue,
         correctionOptions,
         totalProfit: "0.00",
+        doneRows,
+        totalExtracted,
         availableProfit,
       };
     }
@@ -247,20 +261,21 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       queue,
       correctionOptions,
       totalProfit: "0.00",
+      doneRows,
+      totalExtracted,
       availableProfit,
     };
   }
 
   const rows = ownBooksFirst(
-    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, usedPromoIds)),
+    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, doneIds)),
   );
-  // quick-260927-n12 (owner decision 1): own-book, not-used rows only --
-  // belt-and-braces alongside toPromoRowDTO's own `used` flag, since a used
-  // promo now stays INLINE in `rows` (owner scope change A) rather than
-  // being filtered out.
+  // quick-260927-n12 (owner decision 1): own-book rows only. Done promos are
+  // already filtered out of the feed (quick-260929-igk); doneIds stays as a
+  // belt-and-braces exclusion.
   const totalProfit = sumOwnBookProfit(
     rows.map((row) => ({ promoId: row.promoId, guaranteedProfit: row.guaranteedProfit, hasPromoBook: row.hasPromoBook })),
-    usedPromoIds,
+    doneIds,
   );
 
   return {
@@ -272,6 +287,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     queue,
     correctionOptions,
     totalProfit,
+    doneRows,
+    totalExtracted,
     availableProfit,
   };
 }
