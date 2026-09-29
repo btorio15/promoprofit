@@ -137,7 +137,7 @@ Per-section (when only that section is empty):
 - Best pairs: "No pairs right now. A pair only shows up when two promos on opposite sides beat hedging each one separately."
 - Best arbs: "No arbitrage bets at your books right now."
 
-Review tab empty (queue empty and nothing needs a look): compact block under the status panel, "Nothing to review. New scraped promos that need a human look will show up here."
+Review sub-tab empty (queue empty and nothing needs a look): compact block under the status panel, "Nothing to review. New scraped promos that need a human look will show up here."
 
 ---
 

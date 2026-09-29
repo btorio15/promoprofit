@@ -16,12 +16,14 @@ Not in this phase: new promo sources or promo entry (Phase 5), exchange / predic
 ## Implementation Decisions
 
 ### Screen layout & tabs
-- **D-01:** Opportunities is a **new, separate tab** named **"Opportunities"**. It is the **first tab and the tab the app opens on**. Tab order becomes: Opportunities | Bonus bets | Arbitrage | Promos | Review | Sign-up offers (exact placement of Review is Claude's discretion, but Opportunities is first).
+- **D-01:** Opportunities is a **new, separate tab** named **"Opportunities"**. It is the **first tab and the tab the app opens on**. Top-level tabs (updated 2026-09-29 during UI-SPEC): **Opportunities | Arbitrage | Promos | Tools** — four tabs, fits a phone without scrolling. **Tools** holds the Bonus bets finder and Sign-up offers (as sub-sections/sub-tabs).
 - **D-02:** Opportunities is the **site-wide "best money right now" view**, not a replacement for the Promos tab. Owner: "Kalshi/Polymarket arb data will come later, so Opportunities will just grab the top profit opportunities across the site." Build it as a set of **sources** so more can be added later without reworking the screen.
 - **D-03:** Phase 4 sources: **promo hedges** (each active promo's best single hedge — what the Promos tab ranks today), **paired promos** (new), and **arbitrage** (the Arbitrage tab's cached-odds arbs). Bonus-bet finder results are NOT a source (nothing is stored; it's a calculator).
 - **D-04:** Show the **top 5 per source**, as grouped sections (e.g. "Best promos", "Best pairs", "Best arbs"). Each section can link to its full tab (Promos / Arbitrage) for everything else.
 - **D-05:** The profit summary (**Total profit available**, **Total profit extracted**, today/week/month available) sits at the **top of Opportunities**. (Whether it also stays on Promos is Claude's discretion — avoid visual duplication.)
-- **D-06:** The **review queue ("Needs review", "Needs a look") and the scrape freshness lines move to their own tab** ("Review"). The Promos tab keeps the full promo list with Active/Done.
+- **D-06:** (updated 2026-09-29, supersedes "own Review tab") The **review queue ("Needs review", "Needs a look") and the scrape freshness lines live inside the Promos tab** as their own sub-section/sub-tab alongside Active and Done (e.g. Active | Done | Review (N)), not a top-level tab.
+- **D-06a:** Opportunities sections **Best promos** and **Best arbs** get **"See all"** links that switch to the Promos / Arbitrage tab.
+- **D-06b:** Under the ROI sort, bonus-bet promos rank by their **conversion %** mixed in one ordering with boosts' and arbs' ROI; each row labels which % it shows.
 
 ### Paired promos (CALC-07 / DASH-05)
 - **D-07:** A pair shows as **one combined card**: both legs (book, side, odds, stake), the paired guaranteed profit and ROI, and beneath it the comparison "vs. $X + $Y hedging each separately".
