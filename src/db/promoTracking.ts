@@ -1,4 +1,5 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
+import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
 import { getDb } from "./client";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
@@ -11,37 +12,51 @@ import type { ProfitObservation } from "@/domain/promos/profitTotals";
  * write path into either table.
  */
 
-/** Every promoId this member has marked used, for filtering/annotating getPromos' rows. */
-export async function getUsedPromoIds(userId: number): Promise<Set<number>> {
+/**
+ * quick-260929-igk: every completion THIS member has made, newest first,
+ * with the saved snapshot and the promo's identity columns (used only to
+ * label legacy rows that have no snapshot). Filtered by the session user id
+ * (T-igk-03). profit_extracted stays a string (numeric from neon-http).
+ */
+export async function getPromoCompletions(userId: number) {
   const db = getDb();
-  const rows = await db
-    .select({ promoId: promoCompletions.promoId })
+  return db
+    .select({
+      promoId: promoCompletions.promoId,
+      completedAt: promoCompletions.completedAt,
+      snapshot: promoCompletions.snapshot,
+      profitExtracted: promoCompletions.profitExtracted,
+      promoBookKey: promos.bookKey,
+      promoType: promos.promoType,
+      promoParsed: promos.parsed,
+      promoBoostPercent: promos.boostPercent,
+      promoBoostedOddsAmerican: promos.boostedOddsAmerican,
+      promoBonusAmount: promos.bonusAmount,
+    })
     .from(promoCompletions)
-    .where(eq(promoCompletions.userId, userId));
-  return new Set(rows.map((r) => r.promoId));
+    .innerJoin(promos, eq(promos.id, promoCompletions.promoId))
+    .where(eq(promoCompletions.userId, userId))
+    .orderBy(desc(promoCompletions.completedAt));
 }
 
 /**
- * Marks a promo used for this member (T-n12-03): an INSERT ... SELECT from
- * promos WHERE id = promoId so a nonexistent promoId returns false instead
- * of throwing a raw FK error, ON CONFLICT DO NOTHING so marking an
- * already-used promo again is idempotent (composite PK). Returns true when
- * the promo exists (whether this call inserted a new row or the row was
- * already there).
+ * quick-260929-igk: records a member's mark-done with its server-built
+ * snapshot. ON CONFLICT DO NOTHING keeps the FIRST snapshot on a double-tap
+ * (idempotent); the caller's recompute already proved the promo exists.
  */
-export async function markPromoUsed(args: { userId: number; promoId: number; now: Date }): Promise<boolean> {
-  const { userId, promoId, now } = args;
+export async function markPromoDone(args: {
+  userId: number;
+  promoId: number;
+  now: Date;
+  snapshot: DonePromoSnapshot;
+  profitExtracted: string;
+}): Promise<void> {
+  const { userId, promoId, now, snapshot, profitExtracted } = args;
   const db = getDb();
-
-  const exists = await db.select({ id: promos.id }).from(promos).where(eq(promos.id, promoId)).limit(1);
-  if (exists.length === 0) return false;
-
   await db
     .insert(promoCompletions)
-    .values({ userId, promoId, completedAt: now })
+    .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
     .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
-
-  return true;
 }
 
 /** Undoes a mark (idempotent -- deleting a non-existent row is a no-op). */

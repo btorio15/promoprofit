@@ -5,10 +5,14 @@ import { formatUsd } from "@/lib/format";
 
 interface ProfitSummaryProps {
   totalProfit: string;
+  totalExtracted: string;
   availableProfit: AvailableProfit;
 }
 
 /**
+ * quick-260929-igk: also shows "Total profit extracted" (the sum recorded
+ * when the member marked promos done) beside the headline.
+ *
  * quick-260927-n12: always-visible headline ("Total profit possible") plus
  * a compact today/week/month "profit available" row, shown in EVERY "ok"
  * state (including every empty-state variant) so the numbers never
@@ -16,15 +20,22 @@ interface ProfitSummaryProps {
  * Tailwind, matching ScrapeStatusPanel.tsx's card treatment -- no new UI
  * dependency.
  */
-export function ProfitSummary({ totalProfit, availableProfit }: ProfitSummaryProps) {
+export function ProfitSummary({ totalProfit, totalExtracted, availableProfit }: ProfitSummaryProps) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-secondary p-4">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm text-muted-foreground">Total profit possible</span>
-        <span className="num text-3xl font-semibold text-primary">{formatUsd(totalProfit)}</span>
-        <span className="text-sm text-muted-foreground">
-          At your books, not counting promos you&apos;ve marked used
-        </span>
+      <div className="flex flex-wrap gap-x-12 gap-y-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">Total profit possible</span>
+          <span className="num text-3xl font-semibold text-primary">{formatUsd(totalProfit)}</span>
+          <span className="text-sm text-muted-foreground">
+            At your books, not counting promos you&apos;ve marked done
+          </span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-muted-foreground">Total profit extracted</span>
+          <span className="num text-3xl font-semibold text-primary">{formatUsd(totalExtracted)}</span>
+          <span className="text-sm text-muted-foreground">Recorded when you marked promos done</span>
+        </div>
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-4">
         <div className="flex flex-col gap-0.5">

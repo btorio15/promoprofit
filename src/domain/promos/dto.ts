@@ -1,6 +1,9 @@
 import type { CapField, PromoType, ReviewReason } from "./types";
 import type { CorrectionOptions } from "./correctionOptions";
 import type { AvailableProfit } from "./profitTotals";
+import type { DonePromoDTO } from "./doneSnapshot";
+
+export type { DonePromoDTO } from "./doneSnapshot";
 
 export type {
   CorrectionEventOption,
@@ -83,15 +86,6 @@ export interface PromoRowDTO {
    * still shown, but dimmed and sorted after every own-book row.
    */
   hasPromoBook: boolean;
-  /**
-   * quick-260927-n12 (owner scope change A): whether THIS member has marked
-   * this promo used. A used row stays in its normal feed position (never
-   * removed, never moved) but is excluded from totalProfit and rendered
-   * with a distinct "marked used" treatment plus an Undo action. Marking
-   * used is per-member -- other members' `used` value for the same promo
-   * can differ.
-   */
-  used: boolean;
 }
 
 /**
@@ -118,8 +112,6 @@ export interface UnprofitablePromoRowDTO {
   note: string;
   /** WR-07: same meaning as PromoRowDTO.hasPromoBook -- false rows are sorted last. */
   hasPromoBook: boolean;
-  /** quick-260927-n12: same meaning as PromoRowDTO.used. */
-  used: boolean;
 }
 
 /**
@@ -190,11 +182,21 @@ export type GetPromosResponse =
       /**
        * quick-260927-n12: exact-cent Decimal sum of guaranteed profit across
        * `rows` at the member's own books, excluding rows they've marked
-       * used (owner decision 1). Fixed 2-dp string, "0.00" when there are no
+       * done (quick-260929-igk: done promos leave the feed). Fixed 2-dp string, "0.00" when there are no
        * eligible rows. Always present in every "ok" response, including
        * every empty-state variant, so the headline never disappears.
        */
       totalProfit: string;
+      /**
+       * quick-260929-igk: this member's done promos, newest first, rendered
+       * only from their saved snapshots (never live odds).
+       */
+      doneRows: DonePromoDTO[];
+      /**
+       * quick-260929-igk: exact-cent Decimal sum of this member's
+       * profit_extracted. "0.00" when nothing has been marked done.
+       */
+      totalExtracted: string;
       /**
        * quick-260927-n12: today/week/month best-guaranteed-profit-seen
        * totals (owner decision 3), from persisted observations at the

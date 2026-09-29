@@ -21,6 +21,24 @@ export const PromoIdInputSchema = z
 export type PromoIdInput = z.infer<typeof PromoIdInputSchema>;
 
 /**
+ * quick-260929-igk: mark-done input. No userId field (IDOR guard -- the acting
+ * user comes only from the session). expectedGuaranteedProfit is the profit
+ * the member's row displayed (2-dp string, null for a greyed row); it is only
+ * an optimistic-concurrency check against the server's recompute and is NEVER
+ * stored.
+ */
+export const MarkPromoDoneInputSchema = z.strictObject({
+  promoId: z.number().int().positive(),
+  precision: z.enum(["whole", "cents"]),
+  expectedGuaranteedProfit: z
+    .string()
+    .regex(/^-?\d+\.\d{2}$/)
+    .nullable(),
+});
+
+export type MarkPromoDoneInput = z.infer<typeof MarkPromoDoneInputSchema>;
+
+/**
  * A member-chosen pin inside the Correct sub-panel (T-03-09-02): a strict
  * shape validated the same way ScrapedPromoSchema's own `pinned` field is --
  * a moneyline pin has no line, a spread/total pin must have a half-point

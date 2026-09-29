@@ -16,7 +16,7 @@ const {
   mockGetCachedExtendedEvents,
   mockGetHedgeBookKeys,
   mockGetUserBookKeys,
-  mockGetUsedPromoIds,
+  mockGetPromoCompletions,
   mockGetProfitObservationsSince,
   mockRecordCurrentProfitObservations,
 } = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ const {
   mockGetCachedExtendedEvents: vi.fn(),
   mockGetHedgeBookKeys: vi.fn(),
   mockGetUserBookKeys: vi.fn(),
-  mockGetUsedPromoIds: vi.fn(),
+  mockGetPromoCompletions: vi.fn(),
   mockGetProfitObservationsSince: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
 }));
@@ -50,7 +50,7 @@ vi.mock("@/db/queries", () => ({
   getUserBookKeys: mockGetUserBookKeys,
 }));
 vi.mock("@/db/promoTracking", () => ({
-  getUsedPromoIds: mockGetUsedPromoIds,
+  getPromoCompletions: mockGetPromoCompletions,
   getProfitObservationsSince: mockGetProfitObservationsSince,
 }));
 vi.mock("@/db/promoObservations", () => ({
@@ -58,6 +58,9 @@ vi.mock("@/db/promoObservations", () => ({
 }));
 
 import { getPromos } from "./get-promos";
+import { computeMemberPromoState } from "@/db/memberPromoState";
+import { buildDoneSnapshot } from "@/domain/promos/doneSnapshot";
+import type { PromoRowDTO } from "@/domain/promos/dto";
 
 // get-promos.ts calls `new Date()` internally (not an injected clock), so
 // every fixture's timing is anchored to the real wall clock at test-file
@@ -279,7 +282,7 @@ beforeEach(() => {
   mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
   mockGetHedgeBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
   mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
-  mockGetUsedPromoIds.mockResolvedValue(new Set());
+  mockGetPromoCompletions.mockResolvedValue([]);
   mockGetProfitObservationsSince.mockResolvedValue([]);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
 });
@@ -639,7 +642,6 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         note: "No profitable hedge right now (best: −$0.65)",
         // The member only has BetMGM, not the promo's own book (WR-07).
         hasPromoBook: false,
-        used: false,
       },
     ]);
   });
@@ -1040,80 +1042,120 @@ describe("getPromos promo-book ordering (WR-07)", () => {
   });
 });
 
-// quick-260927-n12 owner decisions 1/2 + scope change A: a used promo stays
-// INLINE in rows/unprofitableRows (never filtered out) with a `used` flag,
-// and is excluded from totalProfit.
-describe("getPromos used-state and totalProfit (quick-260927-n12)", () => {
-  it("marks a used promo's `used` flag true, keeps it inline in rows, and excludes it from totalProfit", async () => {
-    const event = moneylineEvent({
-      id: "nfl-total",
-      homeTeam: "DEN Broncos",
-      awayTeam: "LA Rams",
-      commenceTime: plusHours(6),
-      quotes: [
-        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
-        { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
-      ],
-    });
-    const promoA = activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" });
-    const promoB = activeBoostPromo({ id: 2, bookKey: "draftkings", maxStake: "10.00" });
+// quick-260929-igk: done promos leave the feed and totalProfit, render in
+// doneRows from their saved snapshot, and sum into totalExtracted.
+function completion(over: Record<string, unknown> = {}) {
+  return {
+    promoId: 2,
+    completedAt: new Date("2026-09-28T12:00:00.000Z"),
+    snapshot: null,
+    profitExtracted: "0.00",
+    promoBookKey: "draftkings",
+    promoType: "profit_boost",
+    promoParsed: {},
+    promoBoostPercent: "50.00",
+    promoBoostedOddsAmerican: null,
+    promoBonusAmount: null,
+    ...over,
+  };
+}
 
-    mockGetActivePromos.mockResolvedValue([promoA, promoB]);
-    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
-    mockGetUsedPromoIds.mockResolvedValue(new Set([2]));
-
-    const result = await getPromos({ precision: "cents" });
-
-    expect(result.status).toBe("ok");
-    if (result.status !== "ok") throw new Error("unreachable");
-    // Both stay inline -- neither is removed or moved to a separate list.
-    expect(result.rows.map((r) => r.promoId).sort()).toEqual([1, 2]);
-    const rowA = result.rows.find((r) => r.promoId === 1);
-    const rowB = result.rows.find((r) => r.promoId === 2);
-    expect(rowA?.used).toBe(false);
-    expect(rowB?.used).toBe(true);
-    // totalProfit is exactly rowA's own guaranteed profit -- rowB is
-    // excluded even though it's also at an own book.
-    expect(result.totalProfit).toBe(rowA?.guaranteedProfit);
+describe("getPromos done-split and totalProfit (quick-260929-igk)", () => {
+  const event = moneylineEvent({
+    id: "nfl-total",
+    homeTeam: "DEN Broncos",
+    awayTeam: "LA Rams",
+    commenceTime: plusHours(6),
+    quotes: [
+      { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+      { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+    ],
   });
 
-  it("marks a used promo's `used` flag true and keeps it inline in unprofitableRows", async () => {
-    const event = moneylineEvent({
-      id: "nfl-worked-used",
-      homeTeam: "Denver Broncos",
-      awayTeam: "Los Angeles Rams",
-      commenceTime: plusHours(6),
-      quotes: [
-        { bookKey: "ballybet", homePrice: 107, awayPrice: -135 },
-        { bookKey: "betmgm", homePrice: 105, awayPrice: -125 },
-      ],
-    });
-    const negativePromo = activeBoostPromo({
-      id: 3,
-      bookKey: "ballybet",
-      boostPercent: "10.00",
-      maxStake: "20.00",
-      minOddsAmerican: 100,
-      scopeLabel: "Denver Broncos @ Los Angeles Rams",
-      autoMatched: true,
-    });
-
-    mockGetActivePromos.mockResolvedValue([negativePromo]);
+  it("removes a done promo from rows and totalProfit, and renders it in doneRows from its snapshot", async () => {
+    const promoA = activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" });
+    const promoB = activeBoostPromo({ id: 2, bookKey: "draftkings", maxStake: "10.00" });
+    mockGetActivePromos.mockResolvedValue([promoA, promoB]);
     mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
-    mockGetBonusBooks.mockResolvedValue([
-      { key: "ballybet", displayName: "Bally Bet" },
-      { key: "betmgm", displayName: "BetMGM" },
+
+    // Freeze promo B as done via the same recompute the action uses.
+    const before = await getPromos({ precision: "cents" });
+    if (before.status !== "ok") throw new Error("unreachable");
+    const rowB = before.rows.find((r) => r.promoId === 2);
+    const rowA = before.rows.find((r) => r.promoId === 1);
+    expect(rowB).toBeDefined();
+    const { snapshot, profitExtracted } = buildDoneSnapshot(
+      {
+        kind: "hedge",
+        terms: {
+          id: 2, bookKey: "draftkings", promoType: "profit_boost", title: "50% profit boost", boostPercent: "50.00",
+          boostedOddsAmerican: null, baseOddsAmerican: null, bonusAmount: null, maxStake: "10.00", winningsCap: null,
+          minOddsAmerican: null,
+        },
+        row: { ...(rowB as PromoRowDTO), guaranteedProfit: "99.99" },
+      },
+      { now: new Date(NOW_ISO), precision: "cents", oddsFetchedAt: { moneyline: new Date(NOW_ISO), spreadsTotals: null } },
+    );
+    mockGetPromoCompletions.mockResolvedValue([
+      completion({ promoId: 2, snapshot: JSON.parse(JSON.stringify(snapshot)), profitExtracted }),
     ]);
-    mockGetUserBookKeys.mockResolvedValue(["ballybet"]);
-    mockGetHedgeBookKeys.mockResolvedValue(["ballybet", "betmgm"]);
-    mockGetUsedPromoIds.mockResolvedValue(new Set([3]));
 
     const result = await getPromos({ precision: "cents" });
 
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("unreachable");
-    expect(result.unprofitableRows).toHaveLength(1);
-    expect(result.unprofitableRows[0].used).toBe(true);
+    expect(result.rows.map((r) => r.promoId)).toEqual([1]);
+    expect(result.totalProfit).toBe(rowA?.guaranteedProfit);
+    expect(result.doneRows).toHaveLength(1);
+    expect(result.doneRows[0].kind).toBe("hedge");
+    // Snapshot numbers win over what live odds now give.
+    expect(result.doneRows[0].row?.guaranteedProfit).toBe("99.99");
+    expect(result.doneRows[0].profitExtracted).toBe("99.99");
+    expect(result.totalExtracted).toBe("99.99");
+  });
+
+  it("a legacy completion (no snapshot) is a labeled $0 done row", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1 })]);
+    mockGetPromoCompletions.mockResolvedValue([completion({ promoId: 1 })]);
+
+    const result = await getPromos({ precision: "cents" });
+
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.doneRows[0]).toMatchObject({ kind: "legacy", note: "Marked done before profit tracking", profitExtracted: "0.00" });
+    expect(result.totalExtracted).toBe("0.00");
+    expect(result.rows).toEqual([]);
+    expect(result.unprofitableRows).toEqual([]);
+  });
+
+  it("returns doneRows and totalExtracted in the empty and no-odds branches", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+    mockGetPromoCompletions.mockResolvedValue([completion({ promoId: 9 })]);
+    const empty = await getPromos({ precision: "whole" });
+    if (empty.status !== "ok") throw new Error("unreachable");
+    expect(empty.doneRows).toHaveLength(1);
+    expect(empty.totalExtracted).toBe("0.00");
+
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1 })]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    const noOdds = await getPromos({ precision: "whole" });
+    if (noOdds.status !== "ok") throw new Error("unreachable");
+    expect(noOdds.emptyVariant).toBe("no-odds");
+    expect(noOdds.doneRows).toHaveLength(1);
+  });
+
+  it("recordCurrentProfitObservations still receives ALL active promos, including done ones", async () => {
+    const promoA = activeBoostPromo({ id: 1 });
+    const promoB = activeBoostPromo({ id: 2 });
+    mockGetActivePromos.mockResolvedValue([promoA, promoB]);
+    mockGetPromoCompletions.mockResolvedValue([completion({ promoId: 2 })]);
+
+    await getPromos({ precision: "cents" });
+
+    expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
+      activePromos: [promoA, promoB],
+      precision: "cents",
+    });
   });
 
   it("totalProfit is '0.00' when there are no rows", async () => {
@@ -1124,6 +1166,42 @@ describe("getPromos used-state and totalProfit (quick-260927-n12)", () => {
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.totalProfit).toBe("0.00");
+  });
+});
+
+describe("computeMemberPromoState parity with getPromos (quick-260929-igk)", () => {
+  it("recomputing one promo yields the identical feed row (hedge) and unprofitable row (no_hedge)", async () => {
+    const event = moneylineEvent({
+      id: "nfl-parity",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+        { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+      ],
+    });
+    const profitable = activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" });
+    // Requires odds far above anything offered, so nothing is eligible/profitable.
+    const greyed = activeBoostPromo({ id: 4, bookKey: "draftkings", minOddsAmerican: 100000 });
+    mockGetActivePromos.mockResolvedValue([profitable, greyed]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+
+    const feed = await getPromos({ precision: "cents" });
+    if (feed.status !== "ok") throw new Error("unreachable");
+
+    const hedge = await computeMemberPromoState({ userId: 1, promoId: 1, precision: "cents", now: new Date() });
+    expect(hedge.kind).toBe("hedge");
+    if (hedge.kind !== "hedge") throw new Error("unreachable");
+    expect(hedge.row).toEqual(feed.rows.find((r) => r.promoId === 1));
+
+    const noHedge = await computeMemberPromoState({ userId: 1, promoId: 4, precision: "cents", now: new Date() });
+    expect(noHedge.kind).toBe("no_hedge");
+    if (noHedge.kind !== "no_hedge") throw new Error("unreachable");
+    expect(noHedge.row).toEqual(feed.unprofitableRows.find((r) => r.promoId === 4));
+
+    const gone = await computeMemberPromoState({ userId: 1, promoId: 999, precision: "cents", now: new Date() });
+    expect(gone.kind).toBe("not_active");
   });
 });
 
