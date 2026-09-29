@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 4 context gathered
-last_updated: "2026-09-29T20:16:11.985Z"
+stopped_at: Phase 4 UI-SPEC approved
+last_updated: "2026-09-29T20:23:28.368Z"
 last_activity: "2026-09-29 - Completed quick task 260929-igk: mark-done snapshots, Done tab, total profit extracted"
 progress:
   total_phases: 6
@@ -176,6 +176,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-29T20:16:11.969Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-opportunities-feed/04-CONTEXT.md
+Last session: 2026-09-29T20:23:28.361Z
+Stopped at: Phase 4 UI-SPEC approved
+Resume file: .planning/phases/04-opportunities-feed/04-UI-SPEC.md
