@@ -395,16 +395,18 @@ Refactor note: get-promos.ts has non-exported helpers (`loadAvailableProfit`, do
 | A4 | Keeping promos that are inside a displayed pair also visible in Best promos | Pitfall 3 / Open Q2 | Duplicate-looking rows; alternative hides them |
 | A5 | Group-level today/week/month "available" figures stay singles-only | Pattern 6 / Open Q1 | Period numbers slightly understate pair upside; D-12 only names Total profit available |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Period figures (today/week/month) and pairs (D-12 names only "Total profit available").**
+All resolved by owner decisions recorded 2026-09-29 in 04-CONTEXT.md (D-20..D-24). Pair ROI (Assumption A2) -> RESOLVED: D-24 (profit / cash staked; bonus leg costs $0).
+
+1. **Period figures (today/week/month) and pairs (D-12 names only "Total profit available").** RESOLVED: D-22 (singles-only).
    - Known: observations are per promoId, group-level, singles.
    - Unclear: whether the owner expects pairs reflected there.
    - Recommendation: singles-only in Phase 4, documented; revisit if the owner asks. Do not add tables.
-2. **Should promos inside a displayed pair also appear in "Best promos"?**
+2. **Should promos inside a displayed pair also appear in "Best promos"?** RESOLVED: D-20 (yes, they still appear).
    - Recommendation: yes (Best promos = exactly what Promos tab ranks; See all stays consistent); the pair card's comparison line already explains why together is better. Planner may instead hide them; if so it is one filter in `getOpportunities`.
-3. **Arb stake for profit-sorted arbs** (A3): confirm "use the Arb tab's stake" vs a fixed reference stake.
-4. **Odds-changed check strictness** (Pitfall 4): recommend profit + both stakes.
+3. **Arb stake for profit-sorted arbs** (A3): confirm "use the Arb tab's stake" vs a fixed reference stake. RESOLVED: D-21 (fixed $100 total stake, owner choice; NOT the Arb tab stake).
+4. **Odds-changed check strictness** (Pitfall 4): recommend profit + both stakes. RESOLVED: D-23 (profit + both stakes).
 
 ## Validation Architecture
 
