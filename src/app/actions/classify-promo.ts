@@ -54,7 +54,12 @@ export async function classifyPromo(input: unknown): Promise<PromoReviewResponse
     const scopeResult = resolveMemberScope(
       data.scope.kind === "event"
         ? { kind: "event", eventId: data.scope.eventId }
-        : { kind: "sport_day", sportKey: data.scope.sportKey, etDate: data.scope.etDate },
+        : {
+            kind: "sport_day",
+            sportKey: data.scope.sportKey,
+            etDate: data.scope.etDate,
+            ...(data.scope.etEndDate !== undefined ? { etEndDate: data.scope.etEndDate } : {}),
+          },
       { moneyline: moneylineEvents, extended: extendedEvents },
       now,
     );

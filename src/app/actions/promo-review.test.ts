@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { QueueRow } from "@/db/promoReview";
 import type { ScrapedPromo } from "@/domain/promos/scraped";
 import type { OddsEvent } from "@/domain/odds/schemas";
+import { etDayBounds } from "@/domain/promos/etTime";
 
 const {
   mockRequireUser,
@@ -693,6 +694,43 @@ describe("correctPromoMatch server action (PROMO-04, D-14, T-03-09-01/02/06)", (
     expect(args.pinned).toBeNull();
   });
 
+  it("corrects to a multi-day sport_day range: bounds recomputed server-side from the two date strings", async () => {
+    mockGetPendingPromo.mockResolvedValue(matchQueueRow());
+    mockApplyCorrectedMatch.mockResolvedValue(true);
+
+    const startDate = etDateOf(plusHours(24));
+    const endDate = etDateOf(plusHours(48));
+    const result = await correctPromoMatch({
+      promoId: 5,
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: startDate, etEndDate: endDate },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyCorrectedMatch.mock.calls[0][0];
+    expect(args.scope).toEqual({
+      kind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: etDayBounds(startDate)!.start,
+      windowEnd: etDayBounds(endDate)!.end,
+    });
+    expect(args.pinned).toBeNull();
+  });
+
+  it("rejects a sport_day range with end before start, a malformed etEndDate, or an extra key", async () => {
+    mockGetPendingPromo.mockResolvedValue(matchQueueRow());
+    const startDate = etDateOf(plusHours(48));
+    const badScopes = [
+      { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: startDate, etEndDate: etDateOf(plusHours(24)) },
+      { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: startDate, etEndDate: "2026-9-1" },
+      { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: startDate, etEndDate: startDate, extra: 1 },
+    ];
+    for (const scope of badScopes) {
+      const result = await correctPromoMatch({ promoId: 5, scope } as never);
+      expect(result).toEqual({ status: "invalid" });
+    }
+    expect(mockApplyCorrectedMatch).not.toHaveBeenCalled();
+  });
+
   it("returns conflict when the promo is no longer pending review", async () => {
     mockGetPendingPromo.mockResolvedValue(null);
 
@@ -1263,6 +1301,30 @@ describe("classifyPromo server action (quick-260928-it1, CR-04, T-it1-01..03)", 
       sportKey: "americanfootball_nfl",
       windowStart: expect.any(String),
       windowEnd: expect.any(String),
+    });
+  });
+
+  it("boost + multi-day sport_day range: multi-day sport_window passed to applyClassification", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockApplyClassification.mockResolvedValue(true);
+
+    const startDate = etDateOf(plusHours(24));
+    const endDate = etDateOf(plusHours(48));
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: startDate, etEndDate: endDate },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyClassification.mock.calls[0][0];
+    expect(args.scope).toEqual({
+      kind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: etDayBounds(startDate)!.start,
+      windowEnd: etDayBounds(endDate)!.end,
     });
   });
 

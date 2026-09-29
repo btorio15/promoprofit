@@ -70,6 +70,11 @@ const SportDayScopeInputSchema = z.strictObject({
   kind: z.literal("sport_day"),
   sportKey: z.enum(SPORT_KEYS as [string, ...string[]]),
   etDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** Optional last ET day of a multi-day window; the server recomputes bounds (T-gcn-01). */
+  etEndDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 /**
