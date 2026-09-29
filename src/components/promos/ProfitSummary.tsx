@@ -13,7 +13,7 @@ interface ProfitSummaryProps {
  * quick-260929-igk: also shows "Total profit extracted" (the sum recorded
  * when the member marked promos done) beside the headline.
  *
- * quick-260927-n12: always-visible headline ("Total profit possible") plus
+ * quick-260927-n12: always-visible headline ("Total profit available") plus
  * a compact today/week/month "profit available" row, shown in EVERY "ok"
  * state (including every empty-state variant) so the numbers never
  * disappear just because the live feed is momentarily empty. Plain div +
@@ -25,7 +25,7 @@ export function ProfitSummary({ totalProfit, totalExtracted, availableProfit }: 
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-secondary p-4">
       <div className="flex flex-wrap gap-x-12 gap-y-4">
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-muted-foreground">Total profit possible</span>
+          <span className="text-sm text-muted-foreground">Total profit available</span>
           <span className="num text-3xl font-semibold text-primary">{formatUsd(totalProfit)}</span>
         </div>
         <div className="flex flex-col gap-1">

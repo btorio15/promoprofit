@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 
 /**
  * quick-260927-n12: pure money-sum, Denver-day bucketing, and per-period
- * dedupe/max for the Promos tab's "Total profit possible" headline and
+ * dedupe/max for the Promos tab's "Total profit available" headline and
  * today/week/month "profit available" numbers. No I/O, no imports from
  * src/db or src/ingestion (mirrors src/domain/promos/rankPromoHedges.ts's
  * pure-domain boundary). Every money value is a decimal.js Decimal or a
