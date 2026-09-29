@@ -309,6 +309,16 @@ export const promoCompletions = pgTable(
       .notNull()
       .references(() => promos.id, { onDelete: "cascade" }),
     completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    /**
+     * quick-260929-igk: frozen, server-computed snapshot of what the member's
+     * row showed when they marked the promo done (versioned JSON, see
+     * src/domain/promos/doneSnapshot.ts). NULL on legacy rows completed
+     * before profit tracking existed (shown as "Marked done before profit
+     * tracking", counted as $0).
+     */
+    snapshot: jsonb("snapshot"),
+    /** Guaranteed profit recorded at mark-done time, exact cents. Legacy rows default to 0. */
+    profitExtracted: numeric("profit_extracted", { precision: 10, scale: 2 }).notNull().default("0"),
   },
   (table) => [primaryKey({ columns: [table.userId, table.promoId] })],
 );

@@ -1,4 +1,5 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
+import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
 import { getDb } from "./client";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
@@ -42,6 +43,53 @@ export async function markPromoUsed(args: { userId: number; promoId: number; now
     .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
 
   return true;
+}
+
+/**
+ * quick-260929-igk: every completion THIS member has made, newest first,
+ * with the saved snapshot and the promo's identity columns (used only to
+ * label legacy rows that have no snapshot). Filtered by the session user id
+ * (T-igk-03). profit_extracted stays a string (numeric from neon-http).
+ */
+export async function getPromoCompletions(userId: number) {
+  const db = getDb();
+  return db
+    .select({
+      promoId: promoCompletions.promoId,
+      completedAt: promoCompletions.completedAt,
+      snapshot: promoCompletions.snapshot,
+      profitExtracted: promoCompletions.profitExtracted,
+      promoBookKey: promos.bookKey,
+      promoType: promos.promoType,
+      promoParsed: promos.parsed,
+      promoBoostPercent: promos.boostPercent,
+      promoBoostedOddsAmerican: promos.boostedOddsAmerican,
+      promoBonusAmount: promos.bonusAmount,
+    })
+    .from(promoCompletions)
+    .innerJoin(promos, eq(promos.id, promoCompletions.promoId))
+    .where(eq(promoCompletions.userId, userId))
+    .orderBy(desc(promoCompletions.completedAt));
+}
+
+/**
+ * quick-260929-igk: records a member's mark-done with its server-built
+ * snapshot. ON CONFLICT DO NOTHING keeps the FIRST snapshot on a double-tap
+ * (idempotent); the caller's recompute already proved the promo exists.
+ */
+export async function markPromoDone(args: {
+  userId: number;
+  promoId: number;
+  now: Date;
+  snapshot: DonePromoSnapshot;
+  profitExtracted: string;
+}): Promise<void> {
+  const { userId, promoId, now, snapshot, profitExtracted } = args;
+  const db = getDb();
+  await db
+    .insert(promoCompletions)
+    .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
+    .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
 }
 
 /** Undoes a mark (idempotent -- deleting a non-existent row is a no-op). */
