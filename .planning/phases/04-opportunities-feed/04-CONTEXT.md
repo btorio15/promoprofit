@@ -44,6 +44,13 @@ Not in this phase: new promo sources or promo entry (Phase 5), exchange / predic
 - **D-18:** **Pairs and arbs require both books to be the member's.**
 - **D-19:** **Promos tab keeps its current rule** (other-book promos dimmed and sorted last — WR-07, Phase 3).
 
+### Planning-time decisions (2026-09-29, after research)
+- **D-20:** A promo that is part of a displayed pair **still appears on its own in Best promos**. Marking either the pair or the single done removes the promo from both.
+- **D-21:** **Best arbs on Opportunities are ranked at a fixed $100 total stake** (owner choice), stated in the section caption; independent of the Arbitrage tab's stake setting.
+- **D-22:** Today/week/month "available" figures stay **singles-only** (pair-awareness applies only to Total profit available, D-12).
+- **D-23:** Pair odds-changed check compares **guaranteed profit and both stakes** to what the member saw.
+- **D-24:** Pair ROI = guaranteed profit / cash staked (a bonus-bet leg costs $0).
+
 ### Claude's Discretion
 - Exact card layouts, section headings, empty states per section ("No pairs right now"), and how odds age / "odds changed" is surfaced on Opportunities — follow 03-UI-SPEC patterns and the existing PromoRow / ArbRow components.
 - Whether "see all" links switch tabs in place or are omitted.
