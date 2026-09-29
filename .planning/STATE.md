@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 3 (promo-scraping-review) — EXECUTING
 Plan: 11 of 15 (03-11 go-live checkpoint, the only plan without a SUMMARY)
 Status: Executing Phase 3
-Last activity: 2026-09-29 - Completed quick task 260929-gcn: multi-day promo windows (FanDuel date parsing + review date range)
+Last activity: 2026-09-29 - Completed quick task 260929-hht: searchable review game picker + league date range
 
 Progress: [██████████] 100%
 
@@ -159,6 +159,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | fast | Sign-up offers: 'Show books I already have' checkbox | 2026-09-28 | df1e868 |  | — |
 | fast | scrape cron switched to plain UTC 7 14,18,23 (timezone key never fired) | 2026-09-28 | c9eb35b |  | — |
 | 260929-gcn | multi-day promo windows: FanDuel date parsing + review-queue date range | 2026-09-29 | 549284d | Verified | [260929-gcn-multi-day-promo-windows-fanduel-date-par](./quick/260929-gcn-multi-day-promo-windows-fanduel-date-par/) |
+| 260929-hht | review game picker: search box for one game, league + From/Through date range (replaces the single dropdown) | 2026-09-29 | b52bdbb | Needs Review | [260929-hht-review-game-picker-searchable-multi-game](./quick/260929-hht-review-game-picker-searchable-multi-game/) |
 
 ## Deferred Items
 
