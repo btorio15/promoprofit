@@ -163,6 +163,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260929-gcn | multi-day promo windows: FanDuel date parsing + review-queue date range | 2026-09-29 | 549284d | Verified | [260929-gcn-multi-day-promo-windows-fanduel-date-par](./quick/260929-gcn-multi-day-promo-windows-fanduel-date-par/) |
 | 260929-hht | review game picker: search box for one game, league + From/Through date range (replaces the single dropdown) | 2026-09-29 | b52bdbb | Needs Review | [260929-hht-review-game-picker-searchable-multi-game](./quick/260929-hht-review-game-picker-searchable-multi-game/) |
 | 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
+| fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 
 ## Deferred Items
 
