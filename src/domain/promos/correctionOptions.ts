@@ -3,6 +3,7 @@ import { SPORTS, SPORT_KEYS, getSportLabel } from "@/config/sports";
 import { formatKickoff } from "@/lib/format";
 import { enumerateScopeSelections, type ResolvedSelection } from "./selection";
 import { etDayBounds, etDayLabel } from "./etTime";
+import { eventSearchText } from "./gameSearch";
 import { PROMO_MARKET_TYPES, type PromoMarketType, type PromoSide } from "./types";
 
 /**
@@ -32,6 +33,12 @@ export interface CorrectionEventOption {
   /** "{away} @ {home} · {kickoff}". */
   label: string;
   commenceTime: string;
+  homeTeam: string;
+  awayTeam: string;
+  /** ET calendar day of commenceTime, "YYYY-MM-DD". */
+  etDate: string;
+  /** Normalized team names + aliases + league label, for client-side search. */
+  searchText: string;
   markets: CorrectionMarketOption[];
 }
 
@@ -239,6 +246,10 @@ export function listCorrectionOptions(
     sportLabel: getSportLabel(ev.sport_key),
     label: `${ev.away_team} @ ${ev.home_team} · ${formatKickoff(ev.commence_time)}`,
     commenceTime: ev.commence_time,
+    homeTeam: ev.home_team,
+    awayTeam: ev.away_team,
+    etDate: etDateKey(ev.commence_time),
+    searchText: eventSearchText(ev.sport_key, ev.home_team, ev.away_team),
     markets: marketsForEvent(events, ev, opts.now),
   }));
 

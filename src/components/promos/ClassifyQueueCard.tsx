@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { etDayLabel } from "@/domain/promos/etTime";
-import { prefillSportDay } from "@/domain/promos/correctionOptions";
 import {
-  CorrectionScopeSelect,
-  DAY_PREFIX,
-  ThroughDaySelect,
-  dayEtDateFromValue,
-  scopeInputFromValue,
-} from "./CorrectionScopeSelect";
+  EMPTY_SCOPE_DRAFT,
+  prefillScopeDraft,
+  scopeInputFromDraft,
+  type ScopeDraft,
+} from "@/domain/promos/scopeDraft";
+import { ScopePicker } from "./ScopePicker";
 import { DismissPromoDialog } from "./DismissPromoDialog";
 
 interface ClassifyQueueCardProps {
@@ -44,8 +43,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
   const [message, setMessage] = useState<string | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
   const [openPanel, setOpenPanel] = useState<"boost" | "bonus" | null>(null);
-  const [eventValue, setEventValue] = useState<string | null>(null);
-  const [throughValue, setThroughValue] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ScopeDraft>(EMPTY_SCOPE_DRAFT);
   const [isPending, startTransition] = useTransition();
 
   const [boostValues, setBoostValues] = useState<Partial<Record<BoostFieldKey, string>>>({});
@@ -60,48 +58,28 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
 
   function resetPanels() {
     setOpenPanel(null);
-    setEventValue(null);
-    setThroughValue(null);
+    setDraft(EMPTY_SCOPE_DRAFT);
     setBoostValues({});
     setBoostErrors({});
     setBonusValues({});
   }
 
-  function handleScopeChange(value: string | null) {
-    setEventValue(value);
-    setThroughValue(dayEtDateFromValue(value));
-  }
-
-  /** Prefill the day pickers from the promo's scraped window (presentational; the server re-validates). */
+  /** Prefill league mode from the promo's scraped window (presentational; the server re-validates). */
   function applyScrapedWindowPrefill() {
-    if (eventValue !== null || !item.scrapedWindow) return;
-    const prefill = prefillSportDay(item.scrapedWindow, correctionOptions.sportDays, new Date());
-    if (prefill) {
-      setEventValue(`${DAY_PREFIX}${prefill.value}`);
-      setThroughValue(prefill.throughEtDate);
-    }
+    if (draft !== EMPTY_SCOPE_DRAFT || !item.scrapedWindow) return;
+    const prefill = prefillScopeDraft(item.scrapedWindow, correctionOptions.sportDays, new Date());
+    if (prefill) setDraft(prefill);
   }
 
   function scopeControls(idPrefix: string) {
-    const startEtDate = dayEtDateFromValue(eventValue);
     return (
-      <div className={startEtDate ? "grid gap-3 sm:grid-cols-2" : "flex flex-col gap-3"}>
-        <CorrectionScopeSelect
-          id={`${idPrefix}-${item.promoId}`}
-          value={eventValue}
-          onValueChange={handleScopeChange}
-          options={correctionOptions}
-          label="Game or day"
-        />
-        {startEtDate ? (
-          <ThroughDaySelect
-            id={`${idPrefix.replace("scope", "through")}-${item.promoId}`}
-            startEtDate={startEtDate}
-            value={throughValue}
-            onValueChange={setThroughValue}
-          />
-        ) : null}
-      </div>
+      <ScopePicker
+        idPrefix={`${idPrefix}-${item.promoId}`}
+        draft={draft}
+        onDraftChange={setDraft}
+        options={correctionOptions}
+        label="Game or league"
+      />
     );
   }
 
@@ -157,7 +135,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
       const parsedOdds = Number.parseInt(boostValues.minOdds, 10);
       if (!Number.isNaN(parsedOdds)) payload.minOddsAmerican = parsedOdds;
     }
-    payload.scope = eventValue ? scopeInputFromValue(eventValue, throughValue) : null;
+    payload.scope = scopeInputFromDraft(draft);
 
     startTransition(async () => {
       const outcome = await classifyPromo(payload);
@@ -177,7 +155,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
       const parsedOdds = Number.parseInt(bonusValues.minOdds, 10);
       if (!Number.isNaN(parsedOdds)) payload.minOddsAmerican = parsedOdds;
     }
-    payload.scope = eventValue ? scopeInputFromValue(eventValue, throughValue) : null;
+    payload.scope = scopeInputFromDraft(draft);
 
     startTransition(async () => {
       const outcome = await classifyPromo(payload);
