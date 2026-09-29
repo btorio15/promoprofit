@@ -157,6 +157,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260928-kc5 | Claude Haiku promo reader with field-bound verbatim guard, reconcile, cache, fallback | 2026-09-28 | 022b8fc | Verified | [260928-kc5-claude-haiku-promo-reader-with-verbatim-](./quick/260928-kc5-claude-haiku-promo-reader-with-verbatim-/) |
 | 260928-mgi | reader review tightening (clear skips win, rescue needs amount); Sign-up offers tab | 2026-09-28 | 9121429 | Verified | [260928-mgi-reader-review-tightening-and-new-custome](./quick/260928-mgi-reader-review-tightening-and-new-custome/) |
 | fast | Sign-up offers: 'Show books I already have' checkbox | 2026-09-28 | df1e868 |  | — |
+| fast | scrape cron switched to plain UTC 7 14,18,23 (timezone key never fired) | 2026-09-28 | c9eb35b |  | — |
 
 ## Deferred Items
 
