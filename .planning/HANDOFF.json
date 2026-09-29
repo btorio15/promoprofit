@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-29T01:49:22.190Z",
+  "phase": "03",
+  "phase_name": "promo-scraping-review",
+  "phase_dir": ".planning/phases/03-promo-scraping-review",
+  "plan": 11,
+  "task": 1,
+  "total_tasks": 1,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Phase 3 code review --fix (16/17, WR-11 accepted)", "status": "done", "commit": "42125c1"},
+    {"id": 2, "name": "260927-n12 total profit, mark used, profit tracking, morning refresh", "status": "done", "commit": "8254f50"},
+    {"id": 3, "name": "260927-ov2 legit-skip ok runs, Actions v7", "status": "done", "commit": "be48e83"},
+    {"id": 4, "name": "260927-pcc DK single-game boosts, prop label", "status": "done", "commit": "fcc35c1"},
+    {"id": 5, "name": "260928-i3r DK HR prop, FanDuel pre-live fix", "status": "done", "commit": "3f429c2"},
+    {"id": 6, "name": "260928-it1 classify review queue, NHL", "status": "done", "commit": "69f47e9"},
+    {"id": 7, "name": "260928-kc5 Claude Haiku promo reader", "status": "done", "commit": "022b8fc"},
+    {"id": 8, "name": "260928-mgi reader tightening, Sign-up offers tab", "status": "done", "commit": "9121429"},
+    {"id": 9, "name": "Sign-up offers owned-books checkbox; cron to plain UTC", "status": "done", "commit": "9f9e5ab"},
+    {"id": 10, "name": "03-11 go-live: push, secrets, green manual runs writing to Neon", "status": "in_progress", "progress": "scheduled-run confirmation and owner walkthrough sign-off remain"}
+  ],
+  "remaining_tasks": [
+    {"id": 11, "name": "Confirm a scheduled run fires (first: 2026-09-29 14:07 UTC)", "status": "not_started"},
+    {"id": 12, "name": "Owner end-to-end Promos walkthrough incl. Needs a look card; write 03-11-SUMMARY.md; phase verification", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "No GitHub Actions scheduled run has ever fired for Scrape promos; switched to plain UTC cron 7 14,18,23", "type": "external", "workaround": "manual workflow_dispatch; escalate to GitHub support or external scheduler if UTC cron also fails"}
+  ],
+  "human_actions_pending": [
+    {"action": "Walk through the Promos tab end to end and sign off (03-11)", "context": "Phase 3 go-live checkpoint; the Needs a look card has never been visually checked", "blocking": true},
+    {"action": "Check whether DraftKings allows opting into both NFL 50% Profit Boost entries", "context": "decides whether near-duplicate promos get merged", "blocking": false},
+    {"action": "Decide whether to make btorio15/promoprofit private", "context": "repo is public and .planning exposes scraper details", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Profit tracking counts profit available, not realized", "rationale": "owner choice", "phase": "03"},
+    {"decision": "Mark used is per person", "rationale": "each friend places their own bets", "phase": "03"},
+    {"decision": "Other-book promos dimmed and sorted last", "rationale": "owner choice", "phase": "03"},
+    {"decision": "Scraper browser headers kept (WR-11 accepted)", "rationale": "owner: leave scrapers as they are", "phase": "03"},
+    {"decision": "Morning job does one moneyline-only odds refresh", "rationale": "~3-5 credits/day within 500/month budget", "phase": "03"},
+    {"decision": "Claude reader uses claude-haiku-4-5; clear parser skips always win", "rationale": "cost; avoid review noise", "phase": "03"},
+    {"decision": "New-customer promos go to a separate Sign-up offers tab", "rationale": "shelve for books users don't have yet", "phase": "03"},
+    {"decision": "Cron is plain UTC tuned for MDT", "rationale": "timezone key never fired; MST drift accepted", "phase": "03"}
+  ],
+  "uncommitted_files": [".planning/config.json", ".planning/phases/01.1-arbitrage-tab/.gitkeep"],
+  "next_action": "Check gh api repos/btorio15/promoprofit/actions/runs?event=schedule total_count; then resume 03-11 owner walkthrough, SUMMARY, and phase verification",
+  "context_notes": "All work committed and pushed at 9f9e5ab. Migrations 0006-0008 applied. Local .env.local lacks ANTHROPIC_API_KEY. Dev server was a background task of this session and will stop. Owner wants phone notifications when input is needed and plain-English explanations."
+}

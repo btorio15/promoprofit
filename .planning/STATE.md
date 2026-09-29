@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-09-27T07:52:00.181Z"
-last_activity: 2026-09-27 -- Phase 3 execution started
+stopped_at: Phase 3 plan 11 (go-live) — scheduled-run check + owner walkthrough remaining
+last_updated: "2026-09-29T01:49:22.190Z"
+last_activity: 2026-09-28 -- cron switched to plain UTC; session paused
 progress:
   total_phases: 6
   completed_phases: 3
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 ## Current Position
 
 Phase: 3 (promo-scraping-review) — EXECUTING
-Plan: 1 of 11
+Plan: 11 of 15 (03-11 go-live checkpoint, the only plan without a SUMMARY)
 Status: Executing Phase 3
 Last activity: 2026-09-28 - Completed quick task 260928-mgi: reader review tightening, Sign-up offers tab
 
@@ -169,6 +169,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-27T01:15:50.973Z
-Stopped at: Phase 3 UI-SPEC approved
-Resume file: .planning/phases/03-promo-scraping-review/03-UI-SPEC.md
+Last session: 2026-09-29T01:49:22.190Z
+Stopped at: Phase 3 plan 11 (go-live) — check the first scheduled run (2026-09-29 14:07 UTC), then owner walkthrough + 03-11-SUMMARY
+Resume file: .planning/phases/03-promo-scraping-review/.continue-here.md
