@@ -3,30 +3,27 @@
 # scrape step itself is a plain `npm ci` + one Node script writing straight
 # to the shared Neon Postgres DB and spends zero Odds API credits. The
 # second step (quick-260927-n12) spends ONE moneyline-only refresh, but
-# only on the 8:07am Denver run (gated inside the script) -- the 12:07/5:07pm
+# only on the 8:07am Denver (14:07 UTC) run (gated inside the script) -- the 12:07/5:07pm
 # runs of this same schedule call it too and no-op.
 #
-# `timezone` (GitHub Changelog, 2026-03-19) lets a cron schedule name an IANA
-# zone directly so 8:07am/12:07pm/5:07pm Mountain Time stays correct across
-# DST without a manual UTC-offset flip twice a year. If GitHub ever rejects
-# this field on a workflow run, the fallback is a fixed UTC schedule tuned
-# for MDT (UTC-6) -- `cron: "7 14,18,23 * * *"` -- which drifts about an
-# hour during MST (Nov-Mar), an acceptable seasonal trade-off (03-RECON.md
-# cron_hours_mountain).
+# Schedule is plain UTC, tuned for MDT (UTC-6): 14:07/18:07/23:07 UTC =
+# 8:07am/12:07pm/5:07pm Denver. During MST (early Nov to mid Mar) every run
+# lands an hour earlier (7:07/11:07/4:07pm) -- an accepted seasonal drift
+# (03-RECON.md cron_hours_mountain). The morning gate
+# (isMorningObservationWindow, Denver hour < 10) still catches the 14:07 UTC
+# run in both seasons.
 #
-# 260928-i3r: minute :07, not :00 -- GitHub's own docs note the top-of-the-
-# hour slot is the platform's most heavily loaded, so it's the most often
-# delayed and the most often dropped scheduled-run minute. No scheduled run
-# had fired yet as of 2026-09-28 under the old "0 8,12,17 * * *" schedule.
-# isMorningObservationWindow (Denver hour < 10) still covers the 8:07 run
-# with about 1h52m of scheduling-delay tolerance; the 12:07/17:07 runs are
-# outside that window regardless (same as they were at :00).
+# 2026-09-28: switched off the `timezone: "America/Denver"` key (GitHub
+# Changelog 2026-03-19). With it, no scheduled run ever fired -- not at :00
+# and not after moving to :07 -- only manual workflow_dispatch runs, matching
+# community reports of the new key silently failing scheduler registration.
+# Minute :07 (not :00) stays: the top of the hour is the most heavily
+# loaded, most often delayed/dropped scheduled slot.
 name: Scrape promos
 
 on:
   schedule:
-    - cron: "7 8,12,17 * * *"
-      timezone: "America/Denver"
+    - cron: "7 14,18,23 * * *"
   workflow_dispatch:
     inputs:
       force_morning_observe:
