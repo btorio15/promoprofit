@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5 (Group-Added Promos) — EXECUTING
 Plan: 1 of 10
 Status: Executing Phase 5
-Last activity: 2026-09-30 - Completed quick task 260930-fge: Exclude Done promos from the Available today profit counter
+Last activity: 2026-09-30 - Completed quick task 260930-gam: Add alternate spread lines for pinned promo games
 
 Progress: [██████████] 100%
 
@@ -166,6 +166,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
 | 260930-fge | Exclude Done promos from the Available today profit counter (week/month unchanged) | 2026-09-30 | 14fd59c |  | [260930-fge-exclude-done-promos-from-the-available-t](./quick/260930-fge-exclude-done-promos-from-the-available-t/) |
 | fast | Remove 'Available today' from the profit summary (headline total covers it) | 2026-09-30 | 5fb8d44 | ✅ | - |
+| 260930-gam | Alternate spread lines for pinned promo games (Refresh button only, max 5 games, exact opposite line) | 2026-09-30 | 10eb4c1 | Needs Review | [260930-gam-add-alternate-spread-lines-for-pinned-pr](./quick/260930-gam-add-alternate-spread-lines-for-pinned-pr/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
