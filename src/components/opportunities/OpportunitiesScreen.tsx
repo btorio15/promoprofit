@@ -24,6 +24,7 @@ import { ArbRow } from "@/components/arb/ArbRow";
 import { formatUsd } from "@/lib/format";
 import { describeOddsAge, STALE_AFTER_MINUTES } from "@/components/finder/oddsAge";
 import { OpportunitySection } from "./OpportunitySection";
+import { PairCard } from "./PairCard";
 import { SortSwitch } from "./SortSwitch";
 
 export interface OpportunitiesScreenProps {
@@ -218,6 +219,28 @@ export function OpportunitiesScreen({
                   >
                     {top.map((item) => (
                       <PromoRow
+                        key={item.rowKey}
+                        row={item.data}
+                        precision={precision}
+                        onChanged={onPromosChanged}
+                      />
+                    ))}
+                  </OpportunitySection>
+                );
+              }
+              case "pairs": {
+                const top = pickTop(source.items, sort, TOP_N);
+                return (
+                  <OpportunitySection
+                    key={id}
+                    title={meta.title}
+                    caption={sortCaption(sort)}
+                    seeAll={null}
+                    emptyCopy={meta.emptyCopy}
+                    isEmpty={top.length === 0}
+                  >
+                    {top.map((item) => (
+                      <PairCard
                         key={item.rowKey}
                         row={item.data}
                         precision={precision}
