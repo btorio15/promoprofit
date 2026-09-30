@@ -30,7 +30,10 @@ export interface AltSpreadTarget {
 export interface AltSpreadRequests {
   /** Line-pinned spread promos. */
   pins: AltSpreadPin[];
-  /** Single-game unpinned spread-eligible promos: fetch regardless of main line. */
+  /**
+   * Event ids fetched regardless of main line: single-game unpinned spread-eligible promos, plus
+   * league-wide top-1 picks merged in after the main fetch (leagueWideAltTargets.ts, 260930-hor).
+   */
   scopedEventIds: string[];
 }
 
@@ -46,7 +49,8 @@ export interface AltSpreadPromoInput {
 
 /**
  * Derives alt-spread fetch requests from server-loaded promos (never client
- * input). Decision A1: only event-scoped unpinned promos are "scoped".
+ * input). Event-scoped unpinned promos are "scoped" here; league-wide promos are picked
+ * after the main fetch via leagueWideAltTargets.ts (260930-hor, relaxing 260930-gyl A1).
  */
 export function buildAltSpreadRequests(promos: readonly AltSpreadPromoInput[]): AltSpreadRequests {
   const pins: AltSpreadPin[] = [];
