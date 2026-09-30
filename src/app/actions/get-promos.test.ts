@@ -128,6 +128,7 @@ function activeBoostPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
     scopeLabel: "Any NFL game · Sun, Sep 27",
     autoMatched: true,
     attribution: [],
+    addedByYou: false,
     ...overrides,
   };
 }
@@ -152,6 +153,7 @@ function activeBonusPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
     scopeLabel: "LA Rams @ DEN Broncos",
     autoMatched: false,
     attribution: [],
+    addedByYou: false,
     ...overrides,
   };
 }
