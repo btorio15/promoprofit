@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AddPromoInputSchema } from "./addedPromoInput";
+import { AddPromoInputSchema, type AddedPromoEditValues } from "./addedPromoInput";
+import { EMPTY_SCOPE_DRAFT } from "./scopeDraft";
 import {
+  draftFromEditValues,
   DEFAULT_EXPIRY_TIME,
   EMPTY_BONUS_DRAFT,
   bonusPayloadFromDraft,
@@ -15,6 +17,89 @@ import {
 } from "./addPromoDraft";
 
 const NOW = new Date("2026-10-04T15:00:00Z"); // Sun, Oct 4 in ET
+
+const baseEdit: AddedPromoEditValues = {
+  promoId: 5,
+  bookKey: "draftkings",
+  promoType: "bonus_bet",
+  bonusAmount: "50.00",
+  boostPercent: null,
+  boostedOddsAmerican: null,
+  maxStake: null,
+  maxWinnings: null,
+  maxWinningsKind: null,
+  minOddsAmerican: null,
+  scopeKind: "any",
+  eventId: null,
+  sportKey: null,
+  windowStart: null,
+  windowEnd: null,
+  marketType: null,
+  line: null,
+  side: null,
+  expiresAt: "2026-10-05T03:59:00.000Z",
+};
+
+describe("draftFromEditValues", () => {
+  it("prefills a bonus bet with any scope and an ET expiry", () => {
+    const d = draftFromEditValues(baseEdit);
+    expect(d.promoType).toBe("bonus_bet");
+    expect(d.bonusAmount).toBe("50.00");
+    expect(d.scope).toEqual(EMPTY_SCOPE_DRAFT);
+    expect(d.expiresEtDate).toBe("2026-10-04");
+    expect(d.expiresEtTime).toBe("23:59");
+  });
+
+  it("prefills a pinned boosted-odds boost on one game", () => {
+    const d = draftFromEditValues({
+      ...baseEdit,
+      promoType: "profit_boost",
+      bonusAmount: null,
+      boostedOddsAmerican: 250,
+      maxStake: "25.00",
+      scopeKind: "event",
+      eventId: "evt-1",
+      sportKey: "americanfootball_nfl",
+      marketType: "moneyline",
+      side: "home",
+      expiresAt: null,
+    });
+    expect(d.promoType).toBe("profit_boost");
+    expect(d.scope).toEqual({ ...EMPTY_SCOPE_DRAFT, mode: "game", eventId: "evt-1" });
+    expect(d.boostMode).toBe("odds");
+    expect(d.boostedOdds).toBe("+250");
+    expect(d.pinValue).toBe("moneyline|ml|home");
+    expect(d.maxStake).toBe("25.00");
+    expect(d.boostExpiresEtDate).toBeNull();
+  });
+
+  it("prefills a league window boost and a boost_extra cap kind", () => {
+    const d = draftFromEditValues({
+      ...baseEdit,
+      promoType: "profit_boost",
+      bonusAmount: null,
+      boostPercent: "30.00",
+      maxStake: "50.00",
+      maxWinnings: "100.00",
+      maxWinningsKind: "boost_extra",
+      scopeKind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: "2026-10-04T04:00:00.000Z",
+      windowEnd: "2026-10-07T03:59:59.999Z",
+      expiresAt: null,
+    });
+    expect(d.boostMode).toBe("percent");
+    expect(d.scope).toEqual({
+      ...EMPTY_SCOPE_DRAFT,
+      mode: "league",
+      sportKey: "americanfootball_nfl",
+      fromEtDate: "2026-10-04",
+      throughEtDate: "2026-10-06",
+    });
+    expect(d.maxWinningsKind).toBe("boost_extra");
+    expect(d.boostExpiresEtDate).toBeNull();
+  });
+});
 
 const complete: AddPromoDraft = {
   ...EMPTY_BONUS_DRAFT,

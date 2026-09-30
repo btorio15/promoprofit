@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { addPromo } from "@/app/actions/add-promo";
+import { editPromo } from "@/app/actions/edit-promo";
 import { getAddPromoFormOptions } from "@/app/actions/get-add-promo-options";
 import type { AddPromoFormOptions } from "@/domain/promos/addedPromoInput";
 import {
+  draftFromEditValues,
   emptyBonusDraft,
   payloadFromDraft,
   switchPromoType,
@@ -22,13 +24,19 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BonusBetFields } from "./BonusBetFields";
 import { BoostFields } from "./BoostFields";
 
+export type AddPromoFormMode = { kind: "add" } | { kind: "edit"; promoId: number };
+
 interface AddPromoFormProps {
+  mode: AddPromoFormMode;
   onSaved: (message: string) => void;
   onCancel: () => void;
 }
 
 const SUCCESS_MESSAGE = "Promo added. It's live in your Promos and Opportunities.";
 const SAVE_FAILED = "Couldn't save that promo. Check your connection and try again. Nothing was added.";
+const EDIT_SAVE_FAILED = "Couldn't save that promo. Check your connection and try again. Nothing was changed.";
+const NOT_AVAILABLE = "That promo isn't available any more.";
+const LOCKED_NOTE = "Book and type can't be changed. Delete this promo and add a new one instead.";
 const LOAD_FAILED = "Couldn't load your books. Check your connection and try again.";
 
 /** Order of fields for "first invalid field takes focus"; ids match the field components. */
@@ -51,7 +59,9 @@ const FOCUS_ORDER: { field: keyof AddPromoFieldErrors; id: string }[] = [
  * convenience: addPromo re-validates everything server-side (T-5-input), and
  * the Book list only ever contains the member's own books (D-08, T-5-08).
  */
-export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
+export function AddPromoForm({ mode, onSaved, onCancel }: AddPromoFormProps) {
+  const isEdit = mode.kind === "edit";
+  const editPromoId = mode.kind === "edit" ? mode.promoId : null;
   const [formOptions, setFormOptions] = useState<AddPromoFormOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [draft, setDraft] = useState<AddPromoDraft>(() => emptyBonusDraft(new Date()));
@@ -65,13 +75,17 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
   useEffect(() => {
     startLoad(async () => {
       try {
-        const result = await getAddPromoFormOptions({});
+        const result = await getAddPromoFormOptions(editPromoId !== null ? { promoId: editPromoId } : {});
+        if (result.status === "ok" && result.editing) {
+          setDraft(draftFromEditValues(result.editing));
+        }
         setFormOptions(result);
       } catch (err) {
         console.error("getAddPromoFormOptions failed:", err);
         setLoadFailed(true);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per mount
   }, []);
 
   // Focus the Book select once, when the form body first renders.
@@ -79,9 +93,10 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
   useEffect(() => {
     if (ready && !focusedOnOpen.current) {
       focusedOnOpen.current = true;
-      bookRef.current?.focus();
+      // Edit mode locks Book, so focus the form heading area via the first editable field instead.
+      if (!isEdit) bookRef.current?.focus();
     }
-  }, [ready]);
+  }, [ready, isEdit]);
 
   function focusFirstInvalid(errors: AddPromoFieldErrors) {
     const target = FOCUS_ORDER.find((entry) => errors[entry.field]?.length);
@@ -102,9 +117,12 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
 
     startSave(async () => {
       try {
-        const outcome = await addPromo(result.payload);
+        const outcome =
+          editPromoId !== null
+            ? await editPromo({ promoId: editPromoId, promo: result.payload })
+            : await addPromo(result.payload);
         if (outcome.status === "ok") {
-          onSaved(SUCCESS_MESSAGE);
+          onSaved(isEdit ? "Changes saved." : SUCCESS_MESSAGE);
           return;
         }
         if (outcome.status === "invalid") {
@@ -112,13 +130,17 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
           focusFirstInvalid(outcome.fieldErrors);
           return;
         }
+        if (isEdit && outcome.status === "not_found") {
+          setSaveError(outcome.message);
+          return;
+        }
         // stale / not_found: the chosen game is gone.
         const errors: AddPromoFieldErrors = { scope: [outcome.message] };
         setFieldErrors(errors);
         focusFirstInvalid(errors);
       } catch (err) {
-        console.error("addPromo failed:", err);
-        setSaveError(SAVE_FAILED);
+        console.error("addPromo/editPromo failed:", err);
+        setSaveError(isEdit ? EDIT_SAVE_FAILED : SAVE_FAILED);
       }
     });
   }
@@ -149,7 +171,22 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
     );
   }
 
-  if (formOptions.books.length === 0) {
+  if (formOptions.status === "not_found") {
+    return (
+      <div className="rounded-lg border border-border bg-secondary p-4">
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>{NOT_AVAILABLE}</span>
+            <Button type="button" variant="secondary" size="sm" className="min-h-11" onClick={onCancel}>
+              Cancel
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (formOptions.books.length === 0 && !isEdit) {
     return (
       <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border bg-background p-6">
         <h2 className="text-xl font-semibold">Pick your sportsbooks first</h2>
@@ -174,7 +211,7 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-border bg-secondary p-4">
-      <h2 className="text-xl font-semibold">Add a promo</h2>
+      <h2 className="text-xl font-semibold">{isEdit ? "Edit promo" : "Add a promo"}</h2>
 
       {saveError ? (
         <Alert variant="destructive">
@@ -194,12 +231,14 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
             id="add-book"
             ref={bookRef}
             className="h-11 w-full"
-            disabled={isSaving}
+            disabled={isSaving || isEdit}
             aria-invalid={bookError ? true : undefined}
             aria-describedby={bookError ? "add-book-error" : undefined}
           >
             <SelectValue placeholder="Pick a sportsbook">
-              {(value: string | null) => books.find((b) => b.key === value)?.displayName ?? "Pick a sportsbook"}
+              {(value: string | null) =>
+                books.find((b) => b.key === value)?.displayName ?? value ?? "Pick a sportsbook"
+              }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -219,6 +258,7 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
 
       <div className="flex flex-col gap-2">
         <Label>Type</Label>
+        {isEdit ? <p className="text-sm text-muted-foreground">{LOCKED_NOTE}</p> : null}
         <ToggleGroup
           className="w-full"
           value={[draft.promoType]}
@@ -229,7 +269,7 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
               setFieldErrors({});
             }
           }}
-          disabled={isSaving}
+          disabled={isSaving || isEdit}
         >
           <ToggleGroupItem value="profit_boost" className="min-h-11 flex-1 px-4">
             Profit boost
@@ -271,7 +311,7 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
               Saving...
             </>
           ) : (
-            "Save promo"
+            isEdit ? "Save changes" : "Save promo"
           )}
         </Button>
         <Button type="button" variant="ghost" className="min-h-11" onClick={onCancel} disabled={isSaving}>

@@ -12,7 +12,10 @@ interface UnprofitablePromoRowProps {
   precision: "whole" | "cents";
   onChanged: () => void;
   /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
-  addedActions?: { onError: (message: string) => void };
+  addedActions?: {
+    onError: (message: string) => void;
+    onEdit?: (promoId: number, trigger: HTMLElement | null) => void;
+  };
 }
 
 /**
@@ -68,6 +71,7 @@ export function UnprofitablePromoRow({ row, precision, onChanged, addedActions }
               isDone={false}
               onChanged={onChanged}
               onError={addedActions.onError}
+              onEdit={addedActions.onEdit}
             />
           </div>
         ) : null}
