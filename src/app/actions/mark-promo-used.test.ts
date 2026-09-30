@@ -82,6 +82,7 @@ const noHedgeRow: UnprofitablePromoRowDTO = {
   title: "10% profit boost",
   scopeLabel: "Away @ Home",
   autoMatched: false,
+  addedByYou: false,
   bestGuaranteedProfit: "-0.65",
   note: "No profitable hedge right now (best: −$0.65)",
   hasPromoBook: true,

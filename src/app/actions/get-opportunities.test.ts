@@ -188,6 +188,13 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(result.totals.totalProfit).toBe(item.data.guaranteedProfit);
   });
 
+  it("passes the session user id to getActivePromos and getProfitObservationsSince (T-5-visibility)", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+    await getOpportunities({ precision: "cents" });
+    expect(mockGetActivePromos).toHaveBeenCalledWith(expect.any(Date), 1);
+    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.any(String), 1);
+  });
+
   it("D-16: a promo at a non-member book is absent", async () => {
     mockGetActivePromos.mockResolvedValue([
       activeBoostPromo({ id: 1, bookKey: "draftkings" }),

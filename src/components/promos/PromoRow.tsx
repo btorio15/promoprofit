@@ -67,6 +67,7 @@ export function PromoRow({ row, precision, onChanged }: PromoRowProps) {
                 {row.awayTeam} @ {row.homeTeam}
               </span>
               <Badge variant="outline">{row.marketBadge}</Badge>
+              {row.addedByYou ? <Badge variant="outline">Added by you</Badge> : null}
               {row.autoMatched ? (
                 <>
                   <Badge variant="outline">Auto-matched</Badge>

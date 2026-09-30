@@ -18,6 +18,7 @@ export interface PresentablePromo extends RankablePromo {
   claimHint: string | null;
   scopeLabel: string;
   autoMatched: boolean;
+  addedByYou?: boolean;
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
 }
 
@@ -104,6 +105,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     scopeLabel: promo.scopeLabel,
     candidatesEvaluated,
     autoMatched: promo.autoMatched,
+    addedByYou: promo.addedByYou === true,
     finePrintNote: promo.finePrintNote,
     claimHint: promo.claimHint,
     tieRisk: selection.tieRisk,
@@ -187,6 +189,7 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
     title: promoTitle(promo),
     scopeLabel: promo.scopeLabel,
     autoMatched: promo.autoMatched,
+    addedByYou: promo.addedByYou === true,
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),
     hasPromoBook: userBookSet.has(promo.bookKey),
