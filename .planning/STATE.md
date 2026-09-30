@@ -135,7 +135,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 Plan 03 (moved to `.planning/todos/done/`).
+- Stats overhaul (ui) — `.planning/todos/pending/2026-09-30-stats-overhaul.md`
 
 ### Blockers/Concerns
 
