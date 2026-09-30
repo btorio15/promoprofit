@@ -15,34 +15,19 @@ import type {
 import { getActivePromos, getScrapeStatus } from "@/db/promos";
 import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
-import { getProfitObservationsSince, getPromoCompletions } from "@/db/promoTracking";
+import { getPromoCompletions } from "@/db/promoTracking";
+import { loadAvailableProfit } from "@/db/feedContext";
 import { sumProfitExtracted, toDonePromoDTO } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
 import { listCorrectionOptions, scrapedWindowEtDays } from "@/domain/promos/correctionOptions";
 import { findUnprofitablePromos, rankPromoHedges } from "@/domain/promos/rankPromoHedges";
-import { periodStartDates, summarizeAvailableProfit, sumOwnBookProfit, type AvailableProfit } from "@/domain/promos/profitTotals";
+import { sumOwnBookProfit } from "@/domain/promos/profitTotals";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 const EMPTY_CORRECTION_OPTIONS: CorrectionOptions = { events: [], sportDays: [] };
-
-/**
- * quick-260927-n12: the member's own-book today/week/month "profit
- * available" numbers (owner decision 3), from persisted observations --
- * independent of the live feed, so it's computed and returned in EVERY "ok"
- * branch below, including every empty-state variant, so the numbers never
- * disappear just because there are zero active promos right now. Reads
- * from the min of the week/month start (ISO date strings compare
- * correctly) so one query covers both periods.
- */
-async function loadAvailableProfit(now: Date, ownBookKeys: ReadonlySet<string>): Promise<AvailableProfit> {
-  const { weekStart, monthStart } = periodStartDates(now);
-  const sinceDate = weekStart < monthStart ? weekStart : monthStart;
-  const observations = await getProfitObservationsSince(sinceDate);
-  return summarizeAvailableProfit(observations, ownBookKeys, now);
-}
 
 /**
  * WR-07: promos at books the member has come first; promos at books they
