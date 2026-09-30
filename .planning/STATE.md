@@ -167,6 +167,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260930-fge | Exclude Done promos from the Available today profit counter (week/month unchanged) | 2026-09-30 | 14fd59c |  | [260930-fge-exclude-done-promos-from-the-available-t](./quick/260930-fge-exclude-done-promos-from-the-available-t/) |
 | fast | Remove 'Available today' from the profit summary (headline total covers it) | 2026-09-30 | 5fb8d44 | ✅ | - |
 | 260930-gam | Alternate spread lines for pinned promo games (Refresh button only, max 5 games, exact opposite line) | 2026-09-30 | 10eb4c1 | Needs Review | [260930-gam-add-alternate-spread-lines-for-pinned-pr](./quick/260930-gam-add-alternate-spread-lines-for-pinned-pr/) |
+| fast | Phone login on dev server: allowedDevOrigins for LAN IP; auth forms POST so credentials never go in the URL | 2026-09-30 | 4c5009e | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
