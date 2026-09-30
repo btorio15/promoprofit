@@ -119,6 +119,11 @@ describe("editPromo", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 
+  it("passes the stored (locked) book to the pipeline so a dropped book does not block the edit (WR-03)", async () => {
+    await editPromo({ promoId: 5, promo });
+    expect(mockPrepare).toHaveBeenCalledWith(expect.objectContaining({ userId: 7, lockedBookKey: "fanduel" }));
+  });
+
   it("returns not_found when the row changed meanwhile", async () => {
     mockUpdateOwn.mockResolvedValue(false);
     const r = await editPromo({ promoId: 5, promo });

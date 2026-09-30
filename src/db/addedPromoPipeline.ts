@@ -17,6 +17,7 @@ import { resolveMemberScope } from "@/domain/promos/memberScope";
 import { resolveSelection } from "@/domain/promos/selection";
 import type { PromoSelection } from "@/domain/promos/types";
 import type { ScopeGuess } from "@/domain/promos/scope";
+import { COLORADO_BOOKS } from "@/config/books";
 import { getCachedEvents, getCachedExtendedEvents, getUsableUserBooks } from "./queries";
 
 /**
@@ -31,11 +32,22 @@ export async function prepareAddedPromoValues(args: {
   data: AddPromoInput;
   now: Date;
   dedupeKey: string;
+  /**
+   * WR-03: editing only. The promo's own (locked) book, already validated
+   * when it was added and re-checked by the caller against the stored row.
+   * It is accepted even if the member no longer has that book, so the edit
+   * is not a dead end on a field they cannot change.
+   */
+  lockedBookKey?: string;
 }): Promise<{ ok: true; values: AddedPromoInsert } | { ok: false; response: AddedPromoResponse }> {
-  const { userId, data, now, dedupeKey } = args;
+  const { userId, data, now, dedupeKey, lockedBookKey } = args;
 
   const books = await getUsableUserBooks(userId);
-  const book = books.find((b) => b.key === data.bookKey);
+  const book =
+    books.find((b) => b.key === data.bookKey) ??
+    (lockedBookKey !== undefined && data.bookKey === lockedBookKey
+      ? COLORADO_BOOKS.find((b) => b.key === lockedBookKey)
+      : undefined);
   if (!book) {
     return { ok: false, response: { status: "invalid", fieldErrors: { bookKey: [MSG_PICK_BOOK] } } };
   }

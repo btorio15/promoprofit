@@ -38,6 +38,7 @@ export async function editPromo(input: unknown): Promise<AddedPromoResponse> {
     data: promo,
     now: new Date(),
     dedupeKey: `added:edit:${promoId}`,
+    lockedBookKey: existing.bookKey,
   });
   if (!prepared.ok) return prepared.response;
 

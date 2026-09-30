@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { COLORADO_BOOKS } from "@/config/books";
 import { requireUser } from "@/lib/session";
 import { getCachedEvents, getCachedExtendedEvents, getUsableUserBooks } from "@/db/queries";
 import { getOwnActiveAddedPromo } from "@/db/addedPromos";
@@ -61,9 +62,17 @@ export async function getAddPromoFormOptions(input: unknown): Promise<AddPromoFo
           : p.scope,
     }));
 
+  // WR-03: the edit form's Book is locked; if the member has since dropped
+  // that book, still list it so the locked field shows its name.
+  const formBooks = books.map((b) => ({ key: b.key, displayName: b.displayName }));
+  if (editing && !ownBookKeys.has(editing.bookKey)) {
+    const lockedBook = COLORADO_BOOKS.find((b) => b.key === editing.bookKey);
+    if (lockedBook) formBooks.push({ key: lockedBook.key, displayName: lockedBook.displayName });
+  }
+
   return {
     status: "ok",
-    books: books.map((b) => ({ key: b.key, displayName: b.displayName })),
+    books: formBooks,
     options: listCorrectionOptions({ moneyline, extended }, { now }),
     duplicateCandidates,
     editing,

@@ -108,3 +108,20 @@ describe("getAddPromoFormOptions duplicateCandidates", () => {
     expect(mockGetActivePromos).not.toHaveBeenCalled();
   });
 });
+
+describe("getAddPromoFormOptions edit mode (WR-03)", () => {
+  it("still lists the promo's locked book when the member no longer has it", async () => {
+    mockGetOwnActiveAddedPromo.mockResolvedValue({ promoId: 5, bookKey: "betmgm", promoType: "bonus_bet" });
+    const result = await getAddPromoFormOptions({ promoId: 5 });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.books.map((b) => b.key)).toEqual(["fanduel", "betmgm"]);
+    expect(result.books[1].displayName).toBe("BetMGM");
+  });
+
+  it("does not add the locked book when adding (no promoId)", async () => {
+    const result = await getAddPromoFormOptions({});
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.books.map((b) => b.key)).toEqual(["fanduel"]);
+  });
+});
