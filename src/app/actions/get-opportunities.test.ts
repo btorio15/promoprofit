@@ -194,7 +194,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     ]);
     const result = await getOpportunities({ precision: "cents" });
     if (result.status !== "ok") throw new Error("unreachable");
-    const ids = result.sources.flatMap((s) => s.items.map((i) => i.data.promoId));
+    const ids = result.sources.flatMap((s) => (s.id === "promos" ? s.items.map((i) => i.data.promoId) : []));
     expect(ids).toEqual([1]);
   });
 
@@ -202,13 +202,18 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     const both = await getOpportunities({ precision: "cents" });
     if (both.status !== "ok") throw new Error("unreachable");
-    expect(both.sources[0].items[0].data.hedge.bookKey).toBe("fanduel");
+    const bothPromos = both.sources.find((s) => s.id === "promos");
+    if (bothPromos?.id !== "promos") throw new Error("unreachable");
+    expect(bothPromos.items[0].data.hedge.bookKey).toBe("fanduel");
 
     mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
     const only = await getOpportunities({ precision: "cents" });
     if (only.status !== "ok") throw new Error("unreachable");
-    for (const item of only.sources.flatMap((s) => s.items)) {
-      expect(item.data.hedge.bookKey).toBe("draftkings");
+    for (const source of only.sources) {
+      if (source.id !== "promos") continue;
+      for (const item of source.items) {
+        expect(item.data.hedge.bookKey).toBe("draftkings");
+      }
     }
     expect(mockGetHedgeBookKeys).toHaveBeenCalledWith(new Set(["draftkings"]));
   });
@@ -220,7 +225,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     ]);
     const result = await getOpportunities({ precision: "cents" });
     if (result.status !== "ok") throw new Error("unreachable");
-    expect(result.sources.flatMap((s) => s.items)).toEqual([]);
+    expect(result.sources.every((s) => s.items.length === 0)).toBe(true);
     expect(result.totals.totalProfit).toBe("0.00");
   });
 
@@ -255,6 +260,88 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     const result = await getOpportunities({ precision: "whole" });
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("none-scraped");
+  });
+
+  describe("arbs source (D-18, D-21)", () => {
+    const ARB_EVENT = moneylineEvent({
+      id: "nfl-arb",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      quotes: [
+        { bookKey: "draftkings", homePrice: 120, awayPrice: -150 },
+        { bookKey: "fanduel", homePrice: -150, awayPrice: 110 },
+      ],
+    });
+
+    it("returns an arb between two member books ranked at a fixed $100 stake", async () => {
+      mockGetCachedEvents.mockResolvedValue({ events: [ARB_EVENT], fetchedAt: new Date(NOW_ISO) });
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      const arbs = result.sources.find((s) => s.id === "arbs");
+      if (arbs?.id !== "arbs") throw new Error("unreachable");
+      expect(arbs.items).toHaveLength(1);
+      const item = arbs.items[0];
+      expect(item.profit).toBe(item.data.guaranteedProfit);
+      expect(item.pct).toBe(item.data.returnPct);
+      expect(item.pctLabel).toBe("ROI");
+      // Stakes are rounded to cents, so the total laid is within a dollar of the fixed $100.
+      expect(Math.abs(Number(item.data.totalLaid) - 100)).toBeLessThan(1);
+      const legBooks = [item.data.sideA.bookKey, item.data.sideB.bookKey];
+      expect(legBooks.sort()).toEqual(["draftkings", "fanduel"]);
+      expect(result.emptyVariant).toBeNull();
+    });
+
+    it("ignores any client totalStake (strict input)", async () => {
+      expect(await getOpportunities({ precision: "cents", totalStake: "5000" })).toEqual({ status: "invalid" });
+    });
+
+    it("does not build an arb from a non-member book; classifies as 'no-books'", async () => {
+      // The only arb needs betmgm's home price, which the member lacks.
+      const event = moneylineEvent({
+        id: "nfl-arb2",
+        homeTeam: "DEN Broncos",
+        awayTeam: "LA Rams",
+        quotes: [
+          { bookKey: "betmgm", homePrice: 125, awayPrice: -160 },
+          { bookKey: "draftkings", homePrice: -140, awayPrice: 100 },
+          { bookKey: "fanduel", homePrice: -150, awayPrice: 105 },
+        ],
+      });
+      // A promo that matches nothing, so promos are empty but not "none-scraped".
+      mockGetActivePromos.mockResolvedValue([
+        activeBoostPromo({
+          scope: {
+            kind: "sport_window",
+            sportKey: "basketball_nba",
+            windowStart: new Date(NOW_ISO),
+            windowEnd: new Date(plusHours(48)),
+          },
+        }),
+      ]);
+      mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+      memberBooksAreHedgeBooks(["draftkings", "fanduel", "betmgm"]);
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      expect(result.sources.every((s) => s.items.length === 0)).toBe(true);
+      expect(result.emptyVariant).toBe("no-books");
+    });
+
+    it("'nothing-profitable' when no arb exists at any usable book", async () => {
+      mockGetActivePromos.mockResolvedValue([
+        activeBoostPromo({
+          scope: {
+            kind: "sport_window",
+            sportKey: "basketball_nba",
+            windowStart: new Date(NOW_ISO),
+            windowEnd: new Date(plusHours(48)),
+          },
+        }),
+      ]);
+      memberBooksAreHedgeBooks(["draftkings", "fanduel", "betmgm"]);
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      expect(result.emptyVariant).toBe("nothing-profitable");
+    });
   });
 
   it("spends 0 API credits: never references the odds-fetch client", () => {

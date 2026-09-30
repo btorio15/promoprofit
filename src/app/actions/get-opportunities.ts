@@ -1,21 +1,27 @@
 "use server";
 
 import { z } from "zod";
+import Decimal from "decimal.js";
 import { requireUser } from "@/lib/session";
 import { getHedgeBookKeys } from "@/db/queries";
 import { loadAvailableProfit, loadMemberFeedContext } from "@/db/feedContext";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO } from "@/domain/promos/promoRowDto";
+import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
+import { rankArbs } from "@/domain/hedge/rankArbs";
+import { SPORT_KEYS } from "@/config/sports";
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
 import { sumOwnBookProfit } from "@/domain/promos/profitTotals";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
-import type {
-  OpportunitiesEmptyVariant,
-  OpportunitiesResponse,
-  OpportunityItem,
-  OpportunitySourceDTO,
+import {
+  OPPORTUNITIES_ARB_TOTAL_STAKE,
+  type OpportunitiesEmptyVariant,
+  type OpportunitiesResponse,
+  type OpportunityItem,
+  type OpportunitySourceDTO,
 } from "@/domain/opportunities/types";
 import type { PromoRowDTO } from "@/domain/promos/dto";
+import type { ArbResultDTO } from "@/domain/arb/types";
 
 // T-04-02: strict, and no userId -- the acting user comes only from the session.
 const OpportunitiesInputSchema = z.strictObject({
@@ -61,7 +67,10 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   });
 
   if (ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null) {
-    return respond("no-odds", "0.00", [{ id: "promos", items: [] }]);
+    return respond("no-odds", "0.00", [
+      { id: "promos", items: [] },
+      { id: "arbs", items: [] },
+    ]);
   }
 
   // D-17: rankOpts.hedgeBookKeys is the member's own hedge books only.
@@ -85,7 +94,33 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     ctx.doneIds,
   );
 
-  const sources: OpportunitySourceDTO[] = [{ id: "promos", items }];
+  // D-18, D-21: cached-odds arbs at the member's hedge books only, at a fixed $100 stake.
+  const arbStake = new Decimal(OPPORTUNITIES_ARB_TOTAL_STAKE);
+  const arbMarkets = buildArbMarkets(
+    ctx.moneylineEvents,
+    ctx.extendedEvents,
+    new Set(SPORT_KEYS),
+    now,
+    new Set(ctx.hedgeBookKeys),
+  );
+  const arbItems: OpportunityItem<ArbResultDTO>[] = rankArbs(arbMarkets, {
+    totalStake: arbStake,
+    precision,
+  })
+    .map((o) => toArbResultDTO(o, ctx.bookNames))
+    .map((dto) => ({
+      rowKey: dto.rowKey,
+      profit: dto.guaranteedProfit,
+      pct: dto.returnPct,
+      pctLabel: "ROI" as const,
+      commenceTime: dto.commenceTime,
+      data: dto,
+    }));
+
+  const sources: OpportunitySourceDTO[] = [
+    { id: "promos", items },
+    { id: "arbs", items: arbItems },
+  ];
 
   if (sources.some((s) => s.items.length > 0)) {
     return respond(null, totalProfit, sources);
@@ -100,7 +135,12 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   const memberHasEveryBook = everyUsable.every((key) => ctx.userBookSet.has(key));
   if (!memberHasEveryBook) {
     const wider = rankPromoHedges(ctx.feedPromos, { ...ctx.rankOpts, hedgeBookKeys: new Set(everyUsable) });
-    if (wider.length > 0) {
+    // Only computed here (all sources empty), so the normal path pays nothing.
+    const widerArbs = rankArbs(
+      buildArbMarkets(ctx.moneylineEvents, ctx.extendedEvents, new Set(SPORT_KEYS), now, new Set(everyUsable)),
+      { totalStake: arbStake, precision },
+    );
+    if (wider.length > 0 || widerArbs.length > 0) {
       return respond("no-books", totalProfit, sources);
     }
   }
