@@ -476,6 +476,30 @@ describe("resolveSelection -- alternate spreads fallback (260930-gam)", () => {
     expect(r!.oppositeSideQuotes).toEqual([{ bookKey: "fanduel", oddsAmerican: -110 }]);
   });
 
+  it("altSpreadBookKey adds that book's half-point alt points as candidates (260930-gyl)", () => {
+    const out = enumerateScopeSelections(
+      { moneyline: [], extended: [altEvent()] },
+      { kind: "event", eventId: "alt-evt", sportKey: "americanfootball_nfl" },
+      { now: NOW, eligibleMarketTypes: ["spread"], altSpreadBookKey: "fanduel" },
+    );
+    const keys = out.map((s) => `${s.line}:${s.side}`);
+    expect(keys).toContain("-6.5:home");
+    expect(keys).toContain("6.5:away");
+    expect(keys).toContain("-5.5:home");
+    expect(keys).toContain("5.5:away");
+    expect(keys).toContain("-7.5:home");
+    expect(keys).toContain("7.5:away");
+  });
+
+  it("alt points from a book other than altSpreadBookKey are not added", () => {
+    const out = enumerateScopeSelections(
+      { moneyline: [], extended: [altEvent()] },
+      { kind: "event", eventId: "alt-evt", sportKey: "americanfootball_nfl" },
+      { now: NOW, eligibleMarketTypes: ["spread"], altSpreadBookKey: "draftkings" },
+    );
+    expect(out.map((s) => `${s.line}:${s.side}`).sort()).toEqual(["-7.5:home", "7.5:away"]);
+  });
+
   it("alt points never enter unpinned enumeration", () => {
     const out = enumerateScopeSelections(
       { moneyline: [], extended: [altEvent()] },

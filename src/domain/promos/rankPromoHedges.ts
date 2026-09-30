@@ -282,14 +282,21 @@ function isBetterCandidate(a: EvaluatedCandidate, b: EvaluatedCandidate | null):
   return SIDE_ORDER[a.selection.side] - SIDE_ORDER[b.selection.side] < 0;
 }
 
-/** Candidate selections for a promo: its single pinned selection, or every 2-way selection inside its scope. */
+/**
+ * Candidate selections for a promo: its single pinned selection, or every 2-way selection inside its scope.
+ * Only unpinned single-game promos also try the promo book's alternate spreads (260930-gyl, A1).
+ */
 export function candidatesFor(promo: RankablePromo, opts: RankOptions): ResolvedSelection[] {
   return promo.pinned
     ? getPinnedCandidates(promo, opts.moneylineEvents, opts.extendedEvents)
     : enumerateScopeSelections(
         { moneyline: opts.moneylineEvents, extended: opts.extendedEvents },
         promo.scope,
-        { now: opts.now, eligibleMarketTypes: promo.eligibleMarketTypes },
+        {
+          now: opts.now,
+          eligibleMarketTypes: promo.eligibleMarketTypes,
+          altSpreadBookKey: promo.scope.kind === "event" ? promo.bookKey : undefined,
+        },
       );
 }
 
