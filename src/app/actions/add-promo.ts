@@ -5,29 +5,19 @@ import { requireUser } from "@/lib/session";
 import {
   ADDED_PROMO_MAX_ACTIVE,
   AddPromoInputSchema,
-  MSG_EXPIRY_PASSED,
-  MSG_GAME_GONE,
-  MSG_GAME_INVALID,
-  MSG_PICK_BOOK,
-  MSG_PIN_GONE,
   MSG_TOO_MANY,
   fieldErrorsFromIssues,
   type AddedPromoResponse,
 } from "@/domain/promos/addedPromoInput";
-import { buildAddedPromoRow, etExpiryInstant, type AddedPin } from "@/domain/promos/buildAddedPromo";
-import { resolveMemberScope } from "@/domain/promos/memberScope";
-import { resolveSelection } from "@/domain/promos/selection";
-import type { PromoSelection } from "@/domain/promos/types";
-import type { ScopeGuess } from "@/domain/promos/scope";
-import { getCachedEvents, getCachedExtendedEvents, getUsableUserBooks } from "@/db/queries";
 import { countOwnActiveAddedPromos, insertAddedPromo } from "@/db/addedPromos";
+import { prepareAddedPromoValues } from "@/db/addedPromoPipeline";
 
 /**
  * Phase 5: a member adds a promo for themselves (D-07/D-09). requireUser() is
  * the literal first statement; the owner is always user.userId (the input
- * schema has no owner field). The book must be one the member actually has
- * (D-08), any chosen game/league scope is re-resolved server-side against the
- * cached odds (D-04), and the row goes live immediately as 'active' with no
+ * schema has no owner field). The validation pipeline (own book, expiry,
+ * game/league scope, boost pin) is shared with editPromo and lives in
+ * prepareAddedPromoValues; the row goes live immediately as 'active' with no
  * review queue.
  */
 export async function addPromo(input: unknown): Promise<AddedPromoResponse> {
@@ -39,91 +29,19 @@ export async function addPromo(input: unknown): Promise<AddedPromoResponse> {
   }
   const data = parsed.data;
 
-  const books = await getUsableUserBooks(user.userId);
-  const book = books.find((b) => b.key === data.bookKey);
-  if (!book) {
-    return { status: "invalid", fieldErrors: { bookKey: [MSG_PICK_BOOK] } };
-  }
-
   if ((await countOwnActiveAddedPromos(user.userId)) >= ADDED_PROMO_MAX_ACTIVE) {
     return { status: "invalid", fieldErrors: { form: [MSG_TOO_MANY] } };
   }
 
-  const now = new Date();
-  let expiresAt: Date | null = null;
-  if (data.expires) {
-    const expiresIso = etExpiryInstant(data.expires.etDate, data.expires.etTime);
-    if (expiresIso === null || new Date(expiresIso).getTime() <= now.getTime()) {
-      return { status: "invalid", fieldErrors: { expires: [MSG_EXPIRY_PASSED] } };
-    }
-    expiresAt = new Date(expiresIso);
-  }
-
-  let scope: ScopeGuess | { kind: "any" } = { kind: "any" };
-  let pinned: AddedPin | null = null;
-  if (data.scope) {
-    const [{ events: moneyline }, { events: extended }] = await Promise.all([
-      getCachedEvents(),
-      getCachedExtendedEvents(),
-    ]);
-    const scopeResult = resolveMemberScope(
-      data.scope.kind === "event"
-        ? { kind: "event", eventId: data.scope.eventId }
-        : {
-            kind: "sport_day",
-            sportKey: data.scope.sportKey,
-            etDate: data.scope.etDate,
-            ...(data.scope.etEndDate !== undefined ? { etEndDate: data.scope.etEndDate } : {}),
-          },
-      { moneyline, extended },
-      now,
-    );
-    if (scopeResult.status === "stale") {
-      return { status: "stale", message: MSG_GAME_GONE };
-    }
-    if (scopeResult.status === "invalid") {
-      return { status: "invalid", fieldErrors: { scope: [MSG_GAME_INVALID] } };
-    }
-    scope = scopeResult.scope;
-
-    // T-5-09: a boost's market/side pin is re-resolved against the cached odds.
-    if (data.promoType === "profit_boost" && data.scope.kind === "event" && data.scope.pinned && scopeResult.event) {
-      const { marketType, line, side } = data.scope.pinned;
-      const sel: PromoSelection = { eventId: scopeResult.event.id, marketType, line, side };
-      const resolved =
-        marketType === "moneyline"
-          ? (resolveSelection(moneyline, sel) ?? resolveSelection(extended, sel))
-          : resolveSelection(extended, sel);
-      if (!resolved) {
-        return { status: "invalid", fieldErrors: { pinned: [MSG_PIN_GONE] } };
-      }
-      const selectionText =
-        side === "home"
-          ? scopeResult.event.home_team
-          : side === "away"
-            ? scopeResult.event.away_team
-            : side === "over"
-              ? "Over"
-              : "Under";
-      pinned = { marketType, line, side, selectionText };
-    }
-  }
-
-  const built = buildAddedPromoRow({
-    input: data,
-    scope,
-    bookName: book.displayName,
-    now,
-    expiresAt,
-    pinned,
+  const prepared = await prepareAddedPromoValues({
     userId: user.userId,
+    data,
+    now: new Date(),
     dedupeKey: `added:${crypto.randomUUID()}`,
   });
-  if (!built.ok) {
-    return { status: "invalid", fieldErrors: { form: ["Something is off with that promo. Check the fields and try again."] } };
-  }
+  if (!prepared.ok) return prepared.response;
 
-  const promoId = await insertAddedPromo(built.values);
+  const promoId = await insertAddedPromo(prepared.values);
 
   revalidatePath("/");
   return { status: "ok", promoId };

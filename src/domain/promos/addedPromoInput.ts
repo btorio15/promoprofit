@@ -135,6 +135,14 @@ export const AddPromoInputSchema = z.discriminatedUnion("promoType", [
 
 export type AddPromoInput = z.infer<typeof AddPromoInputSchema>;
 
+export const MSG_LOCKED = "Book and type can't be changed. Delete this promo and add a new one instead.";
+export const MSG_NOT_AVAILABLE = "That promo isn't available any more.";
+
+export const EditPromoInputSchema = z.strictObject({
+  promoId: z.number().int().positive(),
+  promo: AddPromoInputSchema,
+});
+
 export type AddedPromoField =
   | "bookKey"
   | "promoType"
@@ -170,9 +178,38 @@ export type AddedPromoResponse =
   | { status: "stale"; message: string }
   | { status: "not_found"; message: string };
 
+/** A member's own stored promo, JSON-safe (dates as ISO strings), for prefilling the edit form. */
+export interface AddedPromoEditValues {
+  promoId: number;
+  bookKey: string;
+  promoType: string;
+  bonusAmount: string | null;
+  boostPercent: string | null;
+  boostedOddsAmerican: number | null;
+  maxStake: string | null;
+  maxWinnings: string | null;
+  maxWinningsKind: string | null;
+  minOddsAmerican: number | null;
+  scopeKind: string | null;
+  eventId: string | null;
+  sportKey: string | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  marketType: string | null;
+  line: number | null;
+  side: string | null;
+  expiresAt: string | null;
+}
+
 export type AddPromoFormOptions =
-  | { status: "ok"; books: { key: string; displayName: string }[]; options: CorrectionOptions }
-  | { status: "invalid" };
+  | {
+      status: "ok";
+      books: { key: string; displayName: string }[];
+      options: CorrectionOptions;
+      editing: AddedPromoEditValues | null;
+    }
+  | { status: "invalid" }
+  | { status: "not_found" };
 
 /** Maps zod issues to the form's fields; unknown keys / strict-key issues go to "form". */
 export function fieldErrorsFromIssues(
