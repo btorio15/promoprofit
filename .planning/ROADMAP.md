@@ -232,7 +232,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04-06-PLAN.md — Best pairs section: pair card, details, pair-aware Total profit available
+- [x] 04-06-PLAN.md — Best pairs section: pair card, details, pair-aware Total profit available
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -273,5 +273,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
-| 4. Opportunities Feed | 5/9 | In Progress|  |
+| 4. Opportunities Feed | 6/9 | In Progress|  |
 | 5. Group-Added Promos | 0/? | Not started | - |
