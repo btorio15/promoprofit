@@ -127,7 +127,7 @@ function getPinnedCandidates(
  * solver itself falls back on, so the rule is never skipped for a price the
  * solver actually uses.
  */
-function passesBaseMinOdds(
+export function passesBaseMinOdds(
   promo: RankablePromo,
   promoBookQuote: SelectionQuote | null,
 ): boolean {
@@ -283,7 +283,7 @@ function isBetterCandidate(a: EvaluatedCandidate, b: EvaluatedCandidate | null):
 }
 
 /** Candidate selections for a promo: its single pinned selection, or every 2-way selection inside its scope. */
-function candidatesFor(promo: RankablePromo, opts: RankOptions): ResolvedSelection[] {
+export function candidatesFor(promo: RankablePromo, opts: RankOptions): ResolvedSelection[] {
   return promo.pinned
     ? getPinnedCandidates(promo, opts.moneylineEvents, opts.extendedEvents)
     : enumerateScopeSelections(
