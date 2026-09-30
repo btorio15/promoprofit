@@ -1124,3 +1124,160 @@ describe("rankPromoHedges: member-added profit boosts", () => {
     expect(result[0].result.kind).toBe("boost");
   });
 });
+
+describe("rankPromoHedges: alternate spreads for unpinned single-game promos (260930-gyl)", () => {
+  const GAME = "pit-cle";
+  const altEvent: OddsEvent = {
+    id: GAME,
+    sport_key: "americanfootball_nfl",
+    sport_title: "NFL",
+    commence_time: plusHours(24),
+    home_team: "Cleveland Browns",
+    away_team: "Pittsburgh Steelers",
+    bookmakers: [
+      {
+        key: "fanduel",
+        title: "FanDuel",
+        markets: [
+          {
+            key: "spreads",
+            outcomes: [
+              { name: "Cleveland Browns", price: -110, point: -2.5 },
+              { name: "Pittsburgh Steelers", price: -110, point: 2.5 },
+            ],
+          },
+          {
+            key: "alternate_spreads",
+            outcomes: [
+              { name: "Cleveland Browns", price: 200, point: -6.5 },
+              { name: "Pittsburgh Steelers", price: 150, point: -3.5 },
+              { name: "Pittsburgh Steelers", price: -250, point: 7.5 },
+              { name: "Cleveland Browns", price: 180, point: -5.5 },
+              { name: "Cleveland Browns", price: 120, point: -3 },
+              { name: "Pittsburgh", price: 500, point: 4.5 },
+            ],
+          },
+        ],
+      },
+      {
+        key: "draftkings",
+        title: "DraftKings",
+        markets: [
+          {
+            key: "spreads",
+            outcomes: [
+              { name: "Cleveland Browns", price: -110, point: -2.5 },
+              { name: "Pittsburgh Steelers", price: -110, point: 2.5 },
+            ],
+          },
+          {
+            key: "alternate_spreads",
+            outcomes: [
+              { name: "Pittsburgh Steelers", price: -230, point: 6.5 },
+              { name: "Cleveland Browns", price: -170, point: 3.5 },
+              { name: "Cleveland Browns", price: 400, point: -7.5 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  const base: RankablePromo = {
+    ...defaultPromo,
+    bookKey: "fanduel",
+    scope: eventScope(GAME),
+    pinned: null,
+    eligibleMarketTypes: ["spread"],
+    boostPercent: "50",
+    maxStake: "25",
+    minOddsAmerican: -200,
+  };
+
+  const opts = {
+    moneylineEvents: [] as OddsEvent[],
+    extendedEvents: [altEvent],
+    hedgeBookKeys: new Set(["fanduel", "draftkings"]),
+    precision: "cents" as const,
+    now: NOW,
+  };
+
+  it("boost: picks Browns -6.5 alt pair, hedge 69.69, profit 5.30 (main line is 3.13)", () => {
+    const [o] = rankPromoHedges([base], opts);
+    expect(o.selection.line).toBe(-6.5);
+    expect(o.selection.side).toBe("home");
+    expect(o.hedge).toEqual({ bookKey: "draftkings", oddsAmerican: -230 });
+    if (o.result.kind !== "boost") throw new Error("expected boost");
+    expect(o.result.boost.hedgeStake.toFixed(2)).toBe("69.69");
+    expect(o.result.boost.guaranteedProfit.toFixed(2)).toBe("5.30");
+  });
+
+  it("min odds gate: -200 blocks the -250 deep favorite; null min odds picks Steelers +7.5 at 7.00", () => {
+    const [gated] = rankPromoHedges([base], opts);
+    expect(gated.selection.line).not.toBe(7.5);
+    const [o] = rankPromoHedges([{ ...base, minOddsAmerican: null }], opts);
+    expect(o.selection.line).toBe(7.5);
+    expect(o.selection.side).toBe("away");
+    expect(o.hedge).toEqual({ bookKey: "draftkings", oddsAmerican: 400 });
+    if (o.result.kind !== "boost") throw new Error("expected boost");
+    expect(o.result.boost.hedgeStake.toFixed(2)).toBe("8.00");
+    expect(o.result.boost.guaranteedProfit.toFixed(2)).toBe("7.00");
+  });
+
+  it("bonus bet: picks Browns -6.5 alt, hedge 69.69, profit 30.30 (main line is 21.64)", () => {
+    const bonus: RankablePromo = {
+      ...base,
+      promoType: "bonus_bet",
+      boostPercent: null,
+      bonusAmount: "50",
+      maxStake: null,
+      minOddsAmerican: null,
+    };
+    const [o] = rankPromoHedges([bonus], opts);
+    expect(o.selection.line).toBe(-6.5);
+    if (o.result.kind !== "bonus") throw new Error("expected bonus");
+    expect(o.result.bonus.hedgeStake.toFixed(2)).toBe("69.69");
+    expect(o.result.bonus.guaranteedProfit.toFixed(2)).toBe("30.30");
+  });
+
+  it("exact opposite only: Browns -5.5 (no Steelers +5.5 anywhere) is never chosen", () => {
+    const all = rankPromoHedges(
+      [
+        { ...base, minOddsAmerican: null },
+        { ...base, id: 2, minOddsAmerican: -200 },
+      ],
+      opts,
+    );
+    for (const o of all) expect(o.selection.line).not.toBe(-5.5);
+  });
+
+  it("A1: sport_window boost and any-scope bonus stay on the main line", () => {
+    const windowBoost: RankablePromo = {
+      ...base,
+      scope: {
+        kind: "sport_window",
+        sportKey: "americanfootball_nfl",
+        windowStart: NOW,
+        windowEnd: new Date(plusHours(48)),
+      },
+    };
+    const anyBonus: RankablePromo = {
+      ...base,
+      id: 3,
+      promoType: "bonus_bet",
+      scope: { kind: "any" },
+      boostPercent: null,
+      bonusAmount: "50",
+      maxStake: null,
+      minOddsAmerican: null,
+    };
+    const out = rankPromoHedges([windowBoost, anyBonus], opts);
+    const boost = out.find((o) => o.promo.id === 1)!;
+    const bonus = out.find((o) => o.promo.id === 3)!;
+    expect(Math.abs(boost.selection.line!)).toBe(2.5);
+    expect(Math.abs(bonus.selection.line!)).toBe(2.5);
+    if (boost.result.kind !== "boost" || bonus.result.kind !== "bonus") throw new Error("kind");
+    expect(boost.result.boost.guaranteedProfit.toFixed(2)).toBe("3.13");
+    expect(bonus.result.bonus.guaranteedProfit.toFixed(2)).toBe("21.64");
+  });
+});

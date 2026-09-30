@@ -225,6 +225,29 @@ function collectSpreadHomePoints(event: OddsEvent): number[] {
   return [...points];
 }
 
+/**
+ * Half-point home-team points quoted in one book's alternate_spreads market
+ * (quick 260930-gyl). Outcome names must equal home/away team exactly;
+ * anything else is ignored, never guessed. Whole numbers are skipped (push).
+ */
+function collectAltSpreadHomePoints(event: OddsEvent, bookKey: string): number[] {
+  const points = new Map<number, number>();
+  for (const bookmaker of event.bookmakers) {
+    if (bookmaker.key !== bookKey) continue;
+    const alt = bookmaker.markets.find((m) => m.key === ALT_SPREADS_MARKET);
+    if (!alt) continue;
+    for (const o of alt.outcomes) {
+      if (!isHalfPoint(o.point)) continue;
+      let home: number;
+      if (o.name === event.home_team) home = o.point;
+      else if (o.name === event.away_team) home = -o.point;
+      else continue;
+      points.set(Math.round(home * 2), home);
+    }
+  }
+  return [...points.values()];
+}
+
 function collectTotalPoints(event: OddsEvent): number[] {
   const points = new Set<number>();
   for (const bookmaker of event.bookmakers) {
@@ -267,11 +290,16 @@ function compareResolvedSelections(a: ResolvedSelection, b: ResolvedSelection): 
  * extended cache when the event is absent there; spread/total candidates
  * come from the extended cache only. Events whose commence_time is not
  * strictly in the future are excluded.
+ *
+ * Alternate spreads are OPT-IN via `altSpreadBookKey` (quick 260930-gyl):
+ * when set, that book's half-point alternate_spreads points are added to
+ * the main-line points. Default off so the market-correction dropdown
+ * (correctionOptions.ts) keeps listing main lines only.
  */
 export function enumerateScopeSelections(
   events: { moneyline: OddsEvent[]; extended: OddsEvent[] },
   scope: PromoScope,
-  opts: { now: Date; eligibleMarketTypes: readonly PromoMarketType[] },
+  opts: { now: Date; eligibleMarketTypes: readonly PromoMarketType[]; altSpreadBookKey?: string },
 ): ResolvedSelection[] {
   const eligibleSet = new Set(opts.eligibleMarketTypes);
 
@@ -311,7 +339,14 @@ export function enumerateScopeSelections(
     const extEvent = extendedById.get(eventId);
     if (extEvent) {
       if (eligibleSet.has("spread")) {
-        for (const homePoint of collectSpreadHomePoints(extEvent)) {
+        const homePoints = new Map<number, number>();
+        for (const p of collectSpreadHomePoints(extEvent)) homePoints.set(Math.round(p * 2), p);
+        if (opts.altSpreadBookKey) {
+          for (const p of collectAltSpreadHomePoints(extEvent, opts.altSpreadBookKey)) {
+            homePoints.set(Math.round(p * 2), p);
+          }
+        }
+        for (const homePoint of homePoints.values()) {
           candidates.push({ eventId, marketType: "spread", line: homePoint, side: "home" });
           candidates.push({ eventId, marketType: "spread", line: -homePoint, side: "away" });
         }

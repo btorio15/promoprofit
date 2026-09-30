@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { runSpreadsTotalsRefresh, type ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import { getActivePromos } from "@/db/promos";
-import type { AltSpreadPin } from "@/domain/promos/altSpreads";
+import { buildAltSpreadRequests, NO_ALT_SPREAD_REQUESTS, type AltSpreadRequests } from "@/domain/promos/altSpreads";
 
 const RefreshSpreadsTotalsInputSchema = z.object({ confirmed: z.boolean() });
 
@@ -27,33 +27,23 @@ export async function refreshSpreadsTotals(input: unknown): Promise<ExtendedRefr
     return { status: "error", message: "Invalid refresh request" };
   }
 
-  // Alt-line pins come only from the member's own visible promos, loaded
-  // server-side (never from client input, T-gam-01), and only on a
-  // confirmed press. A load failure must not block the main refresh.
-  let altSpreadPins: AltSpreadPin[] = [];
+  // Alt-line requests (line pins and single-game promo games) come only from
+  // the member's own visible promos, loaded server-side (never from client
+  // input, T-gam-01/T-gyl-01), and only on a confirmed press. A load failure
+  // must not block the main refresh.
+  let altSpreads: AltSpreadRequests = NO_ALT_SPREAD_REQUESTS;
   if (parsed.data.confirmed) {
     try {
-      const promos = await getActivePromos(new Date(), user.userId);
-      for (const promo of promos) {
-        const pinned = promo.pinned;
-        if (
-          pinned &&
-          pinned.marketType === "spread" &&
-          pinned.line !== null &&
-          (pinned.side === "home" || pinned.side === "away")
-        ) {
-          altSpreadPins.push({ eventId: pinned.eventId, line: pinned.line, side: pinned.side });
-        }
-      }
+      altSpreads = buildAltSpreadRequests(await getActivePromos(new Date(), user.userId));
     } catch {
-      altSpreadPins = [];
+      altSpreads = NO_ALT_SPREAD_REQUESTS;
     }
   }
 
   const outcome = await runSpreadsTotalsRefresh({
     confirmed: parsed.data.confirmed,
     triggeredByUserId: user.userId,
-    altSpreadPins,
+    altSpreads,
   });
 
   if (outcome.status === "ok") {

@@ -104,6 +104,28 @@ function wholeNumberLinesEvent(overrides: Partial<OddsEvent> = {}): OddsEvent {
 }
 
 describe("listCorrectionOptions (D-14, T-03-09-06)", () => {
+  it("never lists alternate-spread lines (260930-gyl)", () => {
+    const plain = fullEvent();
+    const withAlt = fullEvent({
+      bookmakers: plain.bookmakers.map((b) => ({
+        ...b,
+        markets: [
+          ...b.markets,
+          {
+            key: "alternate_spreads",
+            outcomes: [
+              { name: "DEN Broncos", price: 200, point: -6.5 },
+              { name: "LA Rams", price: -230, point: 6.5 },
+            ],
+          },
+        ],
+      })),
+    });
+    const a = listCorrectionOptions({ moneyline: [plain], extended: [plain] }, { now: NOW });
+    const b = listCorrectionOptions({ moneyline: [withAlt], extended: [withAlt] }, { now: NOW });
+    expect(b.events[0].markets.map((m) => m.label)).toEqual(a.events[0].markets.map((m) => m.label));
+  });
+
   it("builds best-first market options for a full 2-way event, sourced only from the cache", () => {
     const event = fullEvent();
     const result = listCorrectionOptions({ moneyline: [event], extended: [event] }, { now: NOW });
