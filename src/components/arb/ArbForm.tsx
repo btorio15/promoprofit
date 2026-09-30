@@ -9,6 +9,7 @@ import type { FindArbsResponse } from "@/domain/arb/types";
 import type { ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,8 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
 
   const [response, setResponse] = useState<FindArbsResponse | null>(null);
   const [serverFieldError, setServerFieldError] = useState<string | null>(null);
+  // quick-260930-iaw: a thrown findArbs (e.g. DB hiccup) shows inline instead of blanking the page.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
@@ -75,8 +78,16 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
   function runFindArbs(input: ArbInput) {
     const requestId = ++requestIdRef.current;
     startTransition(async () => {
-      const result = await findArbs(input);
+      const call = await safeAction(() => findArbs(input), "findArbs");
       if (requestId !== requestIdRef.current) return; // stale response, out of order (T-01.1-26)
+      if (!call.ok) {
+        // No stale stakes next to an error (01.1 review WR-02b).
+        setResponse(null);
+        setLoadError(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const result = call.value;
+      setLoadError(null);
       if (result.status === "invalid") {
         setServerFieldError(
           result.fieldErrors.totalStake?.[0] ?? "Enter a total stake greater than $0.",
@@ -187,8 +198,16 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
   function startSearch() {
     setSearchBanner(null);
     startSearchTransition(async () => {
-      const outcome = await refreshSpreadsTotals({ confirmed: false });
-      handleSearchOutcome(outcome);
+      const call = await safeAction(
+        () => refreshSpreadsTotals({ confirmed: false }),
+        "refreshSpreadsTotals",
+      );
+      if (!call.ok) {
+        router.refresh();
+        setSearchBanner({ kind: "error", message: ACTION_FAILED_MESSAGE });
+        return;
+      }
+      handleSearchOutcome(call.value);
     });
   }
 
@@ -305,7 +324,11 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
 
       <RiskAdvisory />
 
-      {!canShowResults ? null : showSkeleton || (response === null && hasCachedOdds) ? (
+      {!canShowResults ? null : loadError && !isPending ? (
+        <Alert variant="destructive">
+          <AlertDescription>{loadError}</AlertDescription>
+        </Alert>
+      ) : showSkeleton || (response === null && hasCachedOdds) ? (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />

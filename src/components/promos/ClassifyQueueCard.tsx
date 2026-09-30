@@ -16,6 +16,7 @@ import {
 } from "@/domain/promos/scopeDraft";
 import { ScopePicker } from "./ScopePicker";
 import { DismissPromoDialog } from "./DismissPromoDialog";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 interface ClassifyQueueCardProps {
   item: QueueItemDTO;
@@ -138,7 +139,12 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
     payload.scope = scopeInputFromDraft(draft);
 
     startTransition(async () => {
-      const outcome = await classifyPromo(payload);
+      const call = await safeAction(() => classifyPromo(payload), "classifyPromo");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       handleOutcome(outcome);
     });
   }
@@ -158,7 +164,12 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
     payload.scope = scopeInputFromDraft(draft);
 
     startTransition(async () => {
-      const outcome = await classifyPromo(payload);
+      const call = await safeAction(() => classifyPromo(payload), "classifyPromo");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       handleOutcome(outcome);
     });
   }

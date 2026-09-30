@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { CheckCheck, Undo2 } from "lucide-react";
 import { markPromoUsedAction, unmarkPromoUsedAction } from "@/app/actions/mark-promo-used";
 import { Button } from "@/components/ui/button";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 type MarkUsedButtonProps =
   | {
@@ -36,7 +37,12 @@ export function MarkUsedButton(props: MarkUsedButtonProps) {
     event.stopPropagation();
     startTransition(async () => {
       if (props.mode === "undo") {
-        const outcome = await unmarkPromoUsedAction({ promoId: props.promoId });
+        const call = await safeAction(() => unmarkPromoUsedAction({ promoId: props.promoId }), "unmarkPromoUsedAction");
+        if (!call.ok) {
+          setErrorMessage(ACTION_FAILED_MESSAGE);
+          return;
+        }
+        const outcome = call.value;
         if (outcome.status === "ok") {
           setErrorMessage(null);
           props.onChanged();
@@ -46,11 +52,16 @@ export function MarkUsedButton(props: MarkUsedButtonProps) {
         return;
       }
 
-      const outcome = await markPromoUsedAction({
+      const call = await safeAction(() => markPromoUsedAction({
         promoId: props.promoId,
         precision: props.precision,
         expectedGuaranteedProfit: props.expectedGuaranteedProfit,
-      });
+      }), "markPromoUsedAction");
+      if (!call.ok) {
+        setErrorMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       if (outcome.status === "ok") {
         setErrorMessage(null);
         props.onChanged();

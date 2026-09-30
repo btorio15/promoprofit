@@ -6,6 +6,7 @@ import { Flag } from "lucide-react";
 import { flagPromoMatch } from "@/app/actions/flag-promo-match";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 interface FlagMatchButtonProps {
   promoId: number;
@@ -31,7 +32,12 @@ export function FlagMatchButton({ promoId, onChanged }: FlagMatchButtonProps) {
   function flagMatch(event: MouseEvent) {
     event.stopPropagation();
     startFlagTransition(async () => {
-      const outcome = await flagPromoMatch({ promoId });
+      const call = await safeAction(() => flagPromoMatch({ promoId }), "flagPromoMatch");
+      if (!call.ok) {
+        setFlagMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       if (outcome.status === "ok") {
         setFlagMessage(null);
         onChanged();

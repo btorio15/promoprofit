@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 export interface MarkPairDoneButtonProps {
   promoIdA: number;
@@ -47,14 +48,20 @@ export function MarkPairDoneButton(props: MarkPairDoneButtonProps) {
 
   function confirm() {
     startTransition(async () => {
-      const outcome = await markPairDoneAction({
+      const call = await safeAction(() => markPairDoneAction({
         promoIdA: props.promoIdA,
         promoIdB: props.promoIdB,
         precision: props.precision,
         expectedGuaranteedProfit: props.expectedGuaranteedProfit,
         expectedStakeA: props.expectedStakeA,
         expectedStakeB: props.expectedStakeB,
-      });
+      }), "markPairDoneAction");
+      if (!call.ok) {
+        setOpen(false);
+        setErrorMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       setOpen(false);
       if (outcome.status === "ok") {
         setErrorMessage(null);

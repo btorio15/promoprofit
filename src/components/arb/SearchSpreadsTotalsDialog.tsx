@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { refreshSpreadsTotals } from "@/app/actions/refresh-spreads-totals";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 import type { ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import {
   AlertDialog,
@@ -43,8 +44,11 @@ export function SearchSpreadsTotalsDialog({
 
   function confirmSearch() {
     startTransition(async () => {
-      const outcome = await refreshSpreadsTotals({ confirmed: true });
-      onOutcome(outcome);
+      const call = await safeAction(
+        () => refreshSpreadsTotals({ confirmed: true }),
+        "refreshSpreadsTotals",
+      );
+      onOutcome(call.ok ? call.value : { status: "error", message: ACTION_FAILED_MESSAGE });
     });
   }
 
