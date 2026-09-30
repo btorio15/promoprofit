@@ -226,9 +226,9 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-03-PLAN.md — Pair discovery + exact non-conflicting matching (TDD), beats-separate gate
-- [ ] 04-04-PLAN.md — Tab restructure: Opportunities | Arbitrage | Promos (Active/Done/Review) | Tools; sort on Promos
-- [ ] 04-05-PLAN.md — Best arbs at a fixed $100 stake, member books only, See all arbs
+- [x] 04-03-PLAN.md — Pair discovery + exact non-conflicting matching (TDD), beats-separate gate
+- [x] 04-04-PLAN.md — Tab restructure: Opportunities | Arbitrage | Promos (Active/Done/Review) | Tools; sort on Promos
+- [x] 04-05-PLAN.md — Best arbs at a fixed $100 stake, member books only, See all arbs
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -273,5 +273,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
-| 4. Opportunities Feed | 2/9 | In Progress|  |
+| 4. Opportunities Feed | 5/9 | In Progress|  |
 | 5. Group-Added Promos | 0/? | Not started | - |
