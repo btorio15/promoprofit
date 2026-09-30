@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { PromosEmptyVariant } from "@/domain/promos/dto";
 
+const ADD_YOURSELF = "Seeing a promo in your app that isn't here? Add it yourself.";
+
 // "no-books" renders a "Manage your books" link -- handled by an early
 // return below rather than a static COPY entry, mirroring
 // src/components/finder/EmptyState.tsx's "no-books-covered" branch.
@@ -34,6 +36,7 @@ export function PromosEmptyState({ variant }: PromosEmptyStateProps) {
           None of the currently active promos are hedgeable at the sportsbooks you&apos;ve selected. Add
           more books to see more opportunities.
         </p>
+        <p className="max-w-prose text-sm text-muted-foreground">{ADD_YOURSELF}</p>
         <div>
           <Button variant="outline" nativeButton={false} render={<Link href="/settings" />}>
             Manage your books
@@ -48,6 +51,7 @@ export function PromosEmptyState({ variant }: PromosEmptyStateProps) {
     <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border bg-background p-6">
       <h3 className="text-xl font-semibold">{heading}</h3>
       <p className="max-w-prose text-sm text-muted-foreground">{body}</p>
+      <p className="max-w-prose text-sm text-muted-foreground">{ADD_YOURSELF}</p>
     </div>
   );
 }
