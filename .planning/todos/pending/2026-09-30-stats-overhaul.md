@@ -8,6 +8,8 @@ files:
   - src/db/promoTracking.ts
   - src/app/actions/get-promos.ts
   - src/app/actions/get-opportunities.ts
+  - src/db/schema.ts:307-330
+  - src/domain/promos/doneSnapshot.ts
 ---
 
 ## Problem
@@ -17,3 +19,5 @@ Owner wants a stats overhaul (captured 2026-09-30, no details given yet). Today'
 ## Solution
 
 TBD — scope with the owner first (e.g. via /gsd-discuss-phase or /gsd-quick --discuss): which numbers matter (extracted vs available, by book / promo type / week), where they live (Promos tab vs own tab), and history/charts.
+
+Owner wants a **profit graph** (2026-09-30). Data already exists — no schema change needed: `promo_completions.completed_at` (timestamptz, NOT NULL, every row incl. legacy), `profit_extracted` (numeric 10,2), and the snapshot's `commenceTime` (game start) for rows since 260929-igk. Graph cumulative extracted profit per member by Denver day (completed_at or game day). Note: undo deletes the completion row, so undone promos leave no history.
