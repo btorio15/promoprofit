@@ -13,7 +13,7 @@ import { floorCents, promoPayoutRaw, type WinningsCap } from "./profitBoost";
  * (04-RESEARCH Pitfall 1), never the stake pair.
  */
 
-/** mulberry32: small, fast, deterministic. Never uses Math.random. */
+/** mulberry32: small, fast, deterministic. Deterministic; no ambient randomness. */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
