@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,7 +9,8 @@ import { OddsStatusBar } from "@/components/finder/OddsStatusBar";
 import { CreditBanner } from "@/components/finder/CreditBanner";
 import { ArbScreen } from "@/components/arb/ArbScreen";
 import { OpportunitiesScreen } from "@/components/opportunities/OpportunitiesScreen";
-import { PromosScreen } from "@/components/promos/PromosScreen";
+import { countLabel } from "@/lib/sortPreference";
+import { PromosScreen, type PromosView } from "@/components/promos/PromosScreen";
 import { ToolsScreen } from "@/components/tools/ToolsScreen";
 
 export interface AppShellProps {
@@ -36,6 +37,9 @@ type ActiveTab = "opportunities" | "arbitrage" | "promos" | "tools";
 export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: AppShellProps) {
   const [recomputeKey, setRecomputeKey] = useState(0);
   const [activeTab, setActiveTab] = useState<ActiveTab>("opportunities");
+  const [promosView, setPromosView] = useState<PromosView>("active");
+  const [reviewCount, setReviewCount] = useState(0);
+  const handleReviewCount = useCallback((n: number) => setReviewCount(n), []);
   const [promosVersion, setPromosVersion] = useState(0);
   const bumpRecompute = () => setRecomputeKey((key) => key + 1);
   const bumpPromos = () => setPromosVersion((v) => v + 1);
@@ -64,8 +68,18 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
             <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap">
               Arbitrage
             </TabsTrigger>
-            <TabsTrigger value="promos" className="min-h-11 whitespace-nowrap">
+            <TabsTrigger
+              value="promos"
+              className="min-h-11 whitespace-nowrap"
+              aria-label={countLabel("Promos", reviewCount)}
+            >
               Promos
+              {reviewCount > 0 ? (
+                <>
+                  {" "}
+                  <span className="num">({reviewCount})</span>
+                </>
+              ) : null}
             </TabsTrigger>
             <TabsTrigger value="tools" className="min-h-11 whitespace-nowrap">
               Tools
@@ -78,7 +92,10 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
               recomputeKey={recomputeKey}
               promosVersion={promosVersion}
               onPromosChanged={bumpPromos}
-              onNavigate={(tab) => setActiveTab(tab)}
+              onNavigate={(tab) => {
+                if (tab === "promos") setPromosView("active");
+                setActiveTab(tab);
+              }}
             />
           </TabsContent>
 
@@ -92,7 +109,15 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
           </TabsContent>
 
           <TabsContent value="promos" keepMounted>
-            <PromosScreen hasCachedOdds={hasCachedOdds} recomputeKey={recomputeKey} />
+            <PromosScreen
+              hasCachedOdds={hasCachedOdds}
+              recomputeKey={recomputeKey}
+              promosVersion={promosVersion}
+              onPromosChanged={bumpPromos}
+              view={promosView}
+              onViewChange={setPromosView}
+              onReviewCount={handleReviewCount}
+            />
           </TabsContent>
 
           <TabsContent value="tools" keepMounted>

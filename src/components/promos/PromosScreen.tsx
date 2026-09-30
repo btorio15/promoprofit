@@ -9,10 +9,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
-import { ScrapeStatusPanel } from "./ScrapeStatusPanel";
-import { ReviewQueueSection } from "./ReviewQueueSection";
+import { SortSwitch } from "@/components/opportunities/SortSwitch";
+import { sortByMeasure } from "@/domain/opportunities/pick";
+import { parseSortMode } from "@/lib/sortPreference";
+import type { PromoRowDTO } from "@/domain/promos/dto";
+import { ReviewPanel } from "./ReviewPanel";
 import { PromosEmptyState } from "./PromosEmptyState";
-import { ProfitSummary } from "./ProfitSummary";
 import { PromoRow } from "./PromoRow";
 import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
 import { DonePromoRow } from "./DonePromoRow";
@@ -22,6 +24,32 @@ export interface PromosScreenProps {
   hasCachedOdds: boolean;
   /** Bumped by AppShell after a refresh (SC1/SC2 parity with the other two tabs). */
   recomputeKey: number;
+  /** Bumped by AppShell after any Mark done / Undo on either tab. */
+  promosVersion: number;
+  /** Tells AppShell a promo changed so Opportunities refetches too. */
+  onPromosChanged: () => void;
+  /** Sub-tab lifted to AppShell so "See all promos" can land on Active. */
+  view: PromosView;
+  onViewChange: (view: PromosView) => void;
+  /** Review queue size, for the "Promos (N)" top-level label. */
+  onReviewCount: (n: number) => void;
+}
+
+export type PromosView = "active" | "done" | "review";
+
+function rankPromoRows(rows: PromoRowDTO[], sort: "profit" | "roi"): PromoRowDTO[] {
+  const key = (r: PromoRowDTO) => ({
+    rowKey: r.rowKey,
+    profit: r.guaranteedProfit,
+    pct: r.ratePct,
+    pctLabel: r.rateLabel,
+    commenceTime: r.commenceTime,
+  });
+  // D-19: other-book promos stay dimmed and last.
+  return [
+    ...sortByMeasure(rows.filter((r) => r.hasPromoBook), sort, key),
+    ...sortByMeasure(rows.filter((r) => !r.hasPromoBook), sort, key),
+  ];
 }
 
 /**
@@ -31,16 +59,25 @@ export interface PromosScreenProps {
  * Fetches getPromos on mount, on precision change, and on recomputeKey
  * change, mirroring ArbForm.tsx's requestId stale-response guard.
  */
-export function PromosScreen({ recomputeKey }: PromosScreenProps) {
+export function PromosScreen({
+  recomputeKey,
+  promosVersion,
+  onPromosChanged,
+  view,
+  onViewChange,
+  onReviewCount,
+}: PromosScreenProps) {
   const [precisionStored] = usePersistentString(STORAGE_KEYS.arbPrecision, "whole");
   const precision: "whole" | "cents" = precisionStored === "cents" ? "cents" : "whole";
 
   const [response, setResponse] = useState<GetPromosResponse | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [view, setView] = useState<"active" | "done">("active");
+  const [sortStored, setSortStored] = usePersistentString(STORAGE_KEYS.sortMode, "profit");
+  const sort = parseSortMode(sortStored);
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
+  const isFirstVersion = useRef(true);
 
   function runGetPromos() {
     const requestId = ++requestIdRef.current;
@@ -84,6 +121,27 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only recomputeKey should re-trigger this
   }, [recomputeKey]);
 
+  // promosVersion fires after Mark done / Undo anywhere (never on mount).
+  useEffect(() => {
+    if (isFirstVersion.current) {
+      isFirstVersion.current = false;
+      return;
+    }
+    runGetPromos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only promosVersion should re-trigger this
+  }, [promosVersion]);
+
+  const queueCount = response?.status === "ok" ? response.queue.length : null;
+  useEffect(() => {
+    if (queueCount !== null) onReviewCount(queueCount);
+  }, [queueCount, onReviewCount]);
+
+  // Any row mutation refreshes this tab and tells AppShell to refresh Opportunities.
+  function handleChanged() {
+    runGetPromos();
+    onPromosChanged();
+  }
+
   const showSkeleton = isPending && response === null;
 
   return (
@@ -95,36 +153,26 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
         </p>
       </header>
 
-      {response?.status === "ok" ? <ScrapeStatusPanel scrapeStatus={response.scrapeStatus} /> : null}
-
-      {/* quick-260927-n12: shown in EVERY "ok" state, including every
-          empty-state variant, so the headline/period numbers never
-          disappear just because the live feed is momentarily empty. */}
-      {response?.status === "ok" ? (
-        <ProfitSummary
-          totalProfit={response.totalProfit}
-          totalExtracted={response.totalExtracted}
-          availableProfit={response.availableProfit}
-        />
-      ) : null}
-
-      {response?.status === "ok" ? (
-        <ReviewQueueSection
-          queue={response.queue}
-          correctionOptions={response.correctionOptions}
-          onChanged={runGetPromos}
-        />
-      ) : null}
-
-      <Tabs value={view} onValueChange={(v: string) => setView(v === "done" ? "done" : "active")}>
-        <TabsList variant="line" aria-label="Show active or done promos">
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="done">
+      <Tabs value={view} onValueChange={(v: string) => onViewChange(v === "done" ? "done" : v === "review" ? "review" : "active")}>
+        <TabsList variant="line" aria-label="Show active, done or review promos">
+          <TabsTrigger value="active" className="min-h-11">
+            Active
+          </TabsTrigger>
+          <TabsTrigger value="done" className="min-h-11">
             Done
             {response?.status === "ok" ? (
               <>
                 {" "}
                 <span className="num text-muted-foreground">({response.doneRows.length})</span>
+              </>
+            ) : null}
+          </TabsTrigger>
+          <TabsTrigger value="review" className="min-h-11">
+            Review
+            {queueCount !== null && queueCount > 0 ? (
+              <>
+                {" "}
+                <span className="num">({queueCount})</span>
               </>
             ) : null}
           </TabsTrigger>
@@ -150,13 +198,14 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
             <PromosEmptyState variant={response.emptyVariant} />
           ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
             <>
+              <SortSwitch value={sort} onChange={setSortStored} />
               <RiskAdvisory />
               <div className="flex flex-col gap-2">
-                {response.rows.map((row) => (
-                  <PromoRow key={row.rowKey} row={row} precision={precision} onChanged={runGetPromos} />
+                {rankPromoRows(response.rows, sort).map((row) => (
+                  <PromoRow key={row.rowKey} row={row} precision={precision} onChanged={handleChanged} />
                 ))}
                 {response.unprofitableRows.map((row) => (
-                  <UnprofitablePromoRow key={row.rowKey} row={row} precision={precision} onChanged={runGetPromos} />
+                  <UnprofitablePromoRow key={row.rowKey} row={row} precision={precision} onChanged={handleChanged} />
                 ))}
               </div>
             </>
@@ -167,7 +216,7 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
           {response?.status === "ok" && response.doneRows.length > 0 ? (
             <div className="flex flex-col gap-2">
               {response.doneRows.map((row) => (
-                <DonePromoRow key={row.rowKey} row={row} onChanged={runGetPromos} />
+                <DonePromoRow key={row.rowKey} row={row} onChanged={handleChanged} />
               ))}
             </div>
           ) : (
@@ -175,6 +224,17 @@ export function PromosScreen({ recomputeKey }: PromosScreenProps) {
               Nothing marked done yet. Promos you mark done show here with the profit recorded at that moment.
             </p>
           )}
+        </TabsContent>
+
+        <TabsContent value="review" className="pt-2">
+          {response?.status === "ok" ? (
+            <ReviewPanel
+              scrapeStatus={response.scrapeStatus}
+              queue={response.queue}
+              correctionOptions={response.correctionOptions}
+              onChanged={handleChanged}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>
