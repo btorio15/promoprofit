@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
+import type { DonePairSnapshot, PairMemberSnapshot } from "@/domain/promos/pairSnapshot";
 import { getDb } from "./client";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
@@ -57,6 +58,27 @@ export async function markPromoDone(args: {
     .insert(promoCompletions)
     .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
     .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
+}
+
+/**
+ * Phase 4 Plan 07: records BOTH promos of a pair in ONE multi-row INSERT
+ * (atomic on neon-http, which has no interactive transactions). Deliberately
+ * no ON CONFLICT clause: a half-written pair must never happen, so a unique
+ * violation throws and nothing is saved. The caller pre-checks both promos
+ * are active and not done. Always keyed by the session user id.
+ */
+export async function markPairDone(args: {
+  userId: number;
+  now: Date;
+  primary: { promoId: number; snapshot: DonePairSnapshot; profitExtracted: string };
+  member: { promoId: number; snapshot: PairMemberSnapshot; profitExtracted: string };
+}): Promise<void> {
+  const { userId, now, primary, member } = args;
+  const db = getDb();
+  await db.insert(promoCompletions).values([
+    { userId, promoId: primary.promoId, completedAt: now, snapshot: primary.snapshot, profitExtracted: primary.profitExtracted },
+    { userId, promoId: member.promoId, completedAt: now, snapshot: member.snapshot, profitExtracted: member.profitExtracted },
+  ]);
 }
 
 /** Undoes a mark (idempotent -- deleting a non-existent row is a no-op). */
