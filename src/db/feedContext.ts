@@ -2,7 +2,7 @@ import { COLORADO_BOOKS } from "@/config/books";
 import { getActivePromos } from "@/db/promos";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { getProfitObservationsSince, getPromoCompletions } from "@/db/promoTracking";
-import { sumProfitExtracted, toDonePromoDTO } from "@/domain/promos/doneSnapshot";
+import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
 import { periodStartDates, summarizeAvailableProfit, type AvailableProfit } from "@/domain/promos/profitTotals";
 import type { RankOptions } from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
@@ -57,7 +57,7 @@ export async function loadMemberFeedContext({
   const hedgeBookKeys = await getHedgeBookKeys(userBookSet);
 
   const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
-  const doneRows = completions.map((c) => toDonePromoDTO(c, colBookNames));
+  const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
   const totalExtracted = sumProfitExtracted(doneRows);
   const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));

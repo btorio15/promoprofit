@@ -1,6 +1,11 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
-import type { DonePairSnapshot, PairMemberSnapshot } from "@/domain/promos/pairSnapshot";
+import {
+  DonePairSnapshotSchema,
+  PairMemberSnapshotSchema,
+  type DonePairSnapshot,
+  type PairMemberSnapshot,
+} from "@/domain/promos/pairSnapshot";
 import { getDb } from "./client";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
@@ -81,13 +86,41 @@ export async function markPairDone(args: {
   ]);
 }
 
-/** Undoes a mark (idempotent -- deleting a non-existent row is a no-op). */
-export async function unmarkPromoUsed(args: { userId: number; promoId: number }): Promise<void> {
+/**
+ * Phase 4 Plan 08: undoes a mark. Pair-aware: if this member's row for
+ * `promoId` is a pair snapshot or a pair_member marker, BOTH promos' rows are
+ * removed in ONE DELETE (atomic; a pair is never half-undone). Otherwise just
+ * that row. Idempotent (a missing row is a no-op). Every read and the delete
+ * are filtered by the session user id (T-04-25); the partner id comes only
+ * from this member's own row.
+ */
+export async function unmarkPairDone(args: { userId: number; promoId: number }): Promise<void> {
   const { userId, promoId } = args;
   const db = getDb();
+  const [own] = await db
+    .select({ snapshot: promoCompletions.snapshot })
+    .from(promoCompletions)
+    .where(and(eq(promoCompletions.userId, userId), eq(promoCompletions.promoId, promoId)))
+    .limit(1);
+  if (!own) return;
+
+  const ids = new Set<number>([promoId]);
+  const pair = DonePairSnapshotSchema.safeParse(own.snapshot);
+  if (pair.success) {
+    for (const id of pair.data.pairPromoIds) ids.add(id);
+  } else {
+    const member = PairMemberSnapshotSchema.safeParse(own.snapshot);
+    if (member.success) ids.add(member.data.pairedWithPromoId);
+  }
+
   await db
     .delete(promoCompletions)
-    .where(and(eq(promoCompletions.userId, userId), eq(promoCompletions.promoId, promoId)));
+    .where(and(eq(promoCompletions.userId, userId), inArray(promoCompletions.promoId, [...ids])));
+}
+
+/** Undoes a mark (idempotent). Routes through the pair-aware path so a pair is never half-undone. */
+export async function unmarkPromoUsed(args: { userId: number; promoId: number }): Promise<void> {
+  await unmarkPairDone(args);
 }
 
 /**

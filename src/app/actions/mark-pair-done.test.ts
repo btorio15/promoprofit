@@ -2,19 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { DonePromoTerms } from "@/domain/promos/doneSnapshot";
 
-const { mockRequireUser, mockMarkPairDone, mockComputeMemberPairState } = vi.hoisted(() => ({
+const { mockRequireUser, mockMarkPairDone, mockUnmarkPairDone, mockComputeMemberPairState } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
   mockMarkPairDone: vi.fn(),
+  mockUnmarkPairDone: vi.fn(),
   mockComputeMemberPairState: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
-vi.mock("@/db/promoTracking", () => ({ markPairDone: mockMarkPairDone }));
+vi.mock("@/db/promoTracking", () => ({ markPairDone: mockMarkPairDone, unmarkPairDone: mockUnmarkPairDone }));
 vi.mock("@/db/memberPairState", () => ({ computeMemberPairState: mockComputeMemberPairState }));
 
 import { revalidatePath } from "next/cache";
-import { markPairDoneAction } from "./mark-pair-done";
+import { markPairDoneAction, unmarkPairDoneAction } from "./mark-pair-done";
 
 const mockRevalidatePath = vi.mocked(revalidatePath);
 
@@ -93,6 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRequireUser.mockResolvedValue({ userId: 7, email: "f@example.com", displayName: "F" });
   mockMarkPairDone.mockResolvedValue(undefined);
+  mockUnmarkPairDone.mockResolvedValue(undefined);
   mockComputeMemberPairState.mockResolvedValue(pairState());
 });
 
@@ -159,5 +161,25 @@ describe("markPairDoneAction", () => {
     mockComputeMemberPairState.mockResolvedValue({ kind: "already_done_pair", profitExtracted: "22.73" });
     expect(await markPairDoneAction(input)).toEqual({ status: "ok", profitExtracted: "22.73" });
     expect(mockMarkPairDone).not.toHaveBeenCalled();
+  });
+});
+
+describe("unmarkPairDoneAction", () => {
+  it("calls requireUser first: a rejection means nothing is deleted", async () => {
+    mockRequireUser.mockRejectedValue(new Error("unauthorized"));
+    await expect(unmarkPairDoneAction({ promoId: 1 })).rejects.toThrow("unauthorized");
+    expect(mockUnmarkPairDone).not.toHaveBeenCalled();
+  });
+
+  it("returns invalid for bad input (including a client-supplied userId)", async () => {
+    expect(await unmarkPairDoneAction({ promoId: 1, userId: 3 })).toEqual({ status: "invalid" });
+    expect(await unmarkPairDoneAction({ promoId: "x" })).toEqual({ status: "invalid" });
+    expect(mockUnmarkPairDone).not.toHaveBeenCalled();
+  });
+
+  it("undoes with the session user id and that promo id", async () => {
+    expect(await unmarkPairDoneAction({ promoId: 2 })).toEqual({ status: "ok" });
+    expect(mockUnmarkPairDone).toHaveBeenCalledWith({ userId: 7, promoId: 2 });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 });

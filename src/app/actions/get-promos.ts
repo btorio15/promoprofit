@@ -17,7 +17,7 @@ import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { getPromoCompletions } from "@/db/promoTracking";
 import { loadAvailableProfit } from "@/db/feedContext";
-import { sumProfitExtracted, toDonePromoDTO } from "@/domain/promos/doneSnapshot";
+import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
@@ -117,7 +117,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   // quick-260929-igk: done promos leave the feed and render only from their
   // saved snapshots (never live odds); the extracted total is an exact-cent sum.
   const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
-  const doneRows = completions.map((c) => toDonePromoDTO(c, colBookNames));
+  const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
   const totalExtracted = sumProfitExtracted(doneRows);
   const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));

@@ -3,6 +3,9 @@ import Decimal from "decimal.js";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
 import { PROMO_TYPES, type PromoType } from "./types";
 import { promoTitle } from "./promoRowDto";
+import { DonePairSnapshotSchema, isPairMemberSnapshot, toDonePairDTO, type DonePairDTO } from "./pairSnapshot";
+
+export type { DonePairDTO } from "./pairSnapshot";
 
 /**
  * quick-260929-igk: the frozen "mark done" snapshot. Pure module (no src/db
@@ -188,7 +191,7 @@ export interface DonePromoDTO {
   promoId: number;
   /** ISO timestamp of when the member marked it done. */
   completedAt: string;
-  kind: "hedge" | "no_hedge" | "legacy";
+  kind: "hedge" | "no_hedge" | "legacy" | "pair";
   bookName: string;
   promoTypeLabel: "Boost" | "Bonus bet";
   title: string;
@@ -197,6 +200,8 @@ export interface DonePromoDTO {
   row: SnapshotRow | null;
   note: string | null;
   recordedPrecision: "whole" | "cents" | null;
+  /** Set only for kind "pair" (both legs, stakes and the paired profit). */
+  pair: DonePairDTO | null;
 }
 
 export interface DoneCompletionInput {
@@ -247,10 +252,29 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     row: null,
     note,
     recordedPrecision: null,
+    pair: null,
   });
 
   if (c.snapshot === null || c.snapshot === undefined) {
     return legacy("Marked done before profit tracking", "0.00");
+  }
+
+  const pairParsed = DonePairSnapshotSchema.safeParse(c.snapshot);
+  if (pairParsed.success) {
+    const pair = toDonePairDTO(pairParsed.data);
+    return {
+      ...base,
+      kind: "pair",
+      bookName: `${pair.legA.bookName} + ${pair.legB.bookName}`,
+      promoTypeLabel: pair.legA.promoTypeLabel,
+      title: pair.pairTypeLabel,
+      scopeLabel: `${pair.awayTeam} @ ${pair.homeTeam}`,
+      profitExtracted: c.profitExtracted,
+      row: null,
+      note: null,
+      recordedPrecision: pairParsed.data.precision,
+      pair,
+    };
   }
 
   const parsed = DonePromoSnapshotSchema.safeParse(c.snapshot);
@@ -270,7 +294,16 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     row: snap.row,
     note: snap.note,
     recordedPrecision: snap.precision,
+    pair: null,
   };
+}
+
+/**
+ * Done-tab rows: a marked pair is ONE entry (from its pair snapshot); the
+ * partner's "pair_member" marker row is dropped so it never shows or counts.
+ */
+export function toDoneRows(completions: DoneCompletionInput[], bookNames: ReadonlyMap<string, string>): DonePromoDTO[] {
+  return completions.filter((c) => !isPairMemberSnapshot(c.snapshot)).map((c) => toDonePromoDTO(c, bookNames));
 }
 
 /** Exact-cent sum (decimal.js, never float). */
