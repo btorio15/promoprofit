@@ -410,6 +410,36 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     expect(row.hedge.bookName).toBe("FanDuel");
   });
 
+  it("passes the session user id to getActivePromos and getProfitObservationsSince (T-5-visibility)", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+    await getPromos({ precision: "cents" });
+    expect(mockGetActivePromos).toHaveBeenCalledWith(expect.any(Date), 1);
+    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.any(String), 1);
+  });
+
+  it("maps addedByYou onto the row DTO (true for own added promo, false for scraped)", async () => {
+    const event = moneylineEvent({
+      id: "nfl-a",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+        { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+      ],
+    });
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ addedByYou: true })]);
+    const own = await getPromos({ precision: "cents" });
+    if (own.status !== "ok") throw new Error("unreachable");
+    expect(own.rows[0].addedByYou).toBe(true);
+
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ addedByYou: false })]);
+    const scraped = await getPromos({ precision: "cents" });
+    if (scraped.status !== "ok") throw new Error("unreachable");
+    expect(scraped.rows[0].addedByYou).toBe(false);
+  });
+
   it("returns a mapped row for an event-scope bonus bet with scopeLabel '{away} @ {home}'", async () => {
     const event = moneylineEvent({
       id: "nfl-1",

@@ -4,7 +4,7 @@ const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("./client", () => ({ getDb: mockGetDb }));
 
 import { buildPairSnapshot } from "@/domain/promos/pairSnapshot";
-import { unmarkPairDone, unmarkPromoUsed } from "./promoTracking";
+import { getProfitObservationsSince, unmarkPairDone, unmarkPromoUsed } from "./promoTracking";
 
 /** Chainable drizzle stub: select().from().where().limit() resolves to `rows`; delete().where() is recorded. */
 function makeDb(rows: { snapshot: unknown }[]) {
@@ -144,5 +144,22 @@ describe("unmarkPairDone", () => {
     expect(db.delete).toHaveBeenCalledTimes(1);
     const params = paramsOf(deleteWhere.mock.calls[0][0]);
     expect(params).toEqual(expect.arrayContaining([7, 1, 2]));
+  });
+});
+
+describe("getProfitObservationsSince (T-5-04 visibility)", () => {
+  it("inner-joins promos and binds the viewer id and since date", async () => {
+    const innerJoin = vi.fn();
+    const where = vi.fn().mockResolvedValue([]);
+    innerJoin.mockReturnValue({ where });
+    const db = { select: vi.fn(() => ({ from: () => ({ innerJoin }) })) };
+    mockGetDb.mockReturnValue(db);
+
+    await getProfitObservationsSince("2026-09-01", 7);
+
+    expect(innerJoin).toHaveBeenCalledTimes(1);
+    const params = paramsOf(where.mock.calls[0][0]);
+    expect(params).toContain(7);
+    expect(params).toContain("2026-09-01");
   });
 });
