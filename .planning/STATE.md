@@ -165,6 +165,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260929-hht | review game picker: search box for one game, league + From/Through date range (replaces the single dropdown) | 2026-09-29 | b52bdbb | Needs Review | [260929-hht-review-game-picker-searchable-multi-game](./quick/260929-hht-review-game-picker-searchable-multi-game/) |
 | 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
 | 260930-fge | Exclude Done promos from the Available today profit counter (week/month unchanged) | 2026-09-30 | 14fd59c |  | [260930-fge-exclude-done-promos-from-the-available-t](./quick/260930-fge-exclude-done-promos-from-the-available-t/) |
+| fast | Remove 'Available today' from the profit summary (headline total covers it) | 2026-09-30 | 5fb8d44 | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
