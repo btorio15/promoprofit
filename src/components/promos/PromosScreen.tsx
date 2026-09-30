@@ -83,6 +83,7 @@ export function PromosScreen({
   const isFirstVersion = useRef(true);
   const [formOpen, setFormOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
   function runGetPromos() {
@@ -144,6 +145,7 @@ export function PromosScreen({
 
   // Any row mutation refreshes this tab and tells AppShell to refresh Opportunities.
   function handleChanged() {
+    setActionError(null);
     runGetPromos();
     onPromosChanged();
   }
@@ -224,6 +226,11 @@ export function PromosScreen({
               {confirmation}
             </p>
           ) : null}
+          {actionError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{actionError}</AlertDescription>
+            </Alert>
+          ) : null}
           {showSkeleton ? (
             <div className="flex flex-col gap-2">
               <Skeleton className="h-14 w-full" />
@@ -247,10 +254,22 @@ export function PromosScreen({
               <RiskAdvisory />
               <div className="flex flex-col gap-2">
                 {rankPromoRows(response.rows, sort).map((row) => (
-                  <PromoRow key={row.rowKey} row={row} precision={precision} onChanged={handleChanged} />
+                  <PromoRow
+                    key={row.rowKey}
+                    row={row}
+                    precision={precision}
+                    onChanged={handleChanged}
+                    addedActions={{ onError: setActionError }}
+                  />
                 ))}
                 {response.unprofitableRows.map((row) => (
-                  <UnprofitablePromoRow key={row.rowKey} row={row} precision={precision} onChanged={handleChanged} />
+                  <UnprofitablePromoRow
+                    key={row.rowKey}
+                    row={row}
+                    precision={precision}
+                    onChanged={handleChanged}
+                    addedActions={{ onError: setActionError }}
+                  />
                 ))}
               </div>
             </>

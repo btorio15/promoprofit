@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { AddedPromoActions } from "./AddedPromoActions";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { MarkUsedButton } from "./MarkUsedButton";
 import { PromoDetails } from "./PromoDetails";
@@ -18,6 +19,8 @@ interface PromoRowProps {
   row: PromoRowDTO;
   precision: "whole" | "cents";
   onChanged: () => void;
+  /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
+  addedActions?: { onError: (message: string) => void };
 }
 
 /**
@@ -36,7 +39,7 @@ interface PromoRowProps {
  * belt-and-braces alongside the overlay/content split, so tapping it never
  * also toggles the row.
  */
-export function PromoRow({ row, precision, onChanged }: PromoRowProps) {
+export function PromoRow({ row, precision, onChanged, addedActions }: PromoRowProps) {
   // WR-07: a promo at a book the member doesn't have stays visible but uses
   // the same muted styling as UnprofitablePromoRow, with a short hint.
   // quick-260929-igk: done promos never appear here -- they live in the
@@ -157,6 +160,17 @@ export function PromoRow({ row, precision, onChanged }: PromoRowProps) {
       </div>
       <CollapsibleContent>
         <PromoDetails row={row} />
+        {row.addedByYou && addedActions ? (
+          <div className="px-4 pb-4">
+            <AddedPromoActions
+              promoId={row.promoId}
+              canExpire
+              isDone={false}
+              onChanged={onChanged}
+              onError={addedActions.onError}
+            />
+          </div>
+        ) : null}
       </CollapsibleContent>
     </Collapsible>
   );
