@@ -32,7 +32,7 @@ export async function flagPromoMatch(input: unknown): Promise<PromoReviewRespons
 
   const { promoId } = parsed.data;
 
-  const row = await getActivePromoForFlag(promoId);
+  const row = await getActivePromoForFlag(promoId, user.userId);
   if (!row) {
     return CONFLICT;
   }

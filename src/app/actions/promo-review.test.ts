@@ -966,6 +966,8 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
     const result = await flagPromoMatch({ promoId: 5 });
 
     expect(result).toEqual({ status: "ok" });
+    // WR-05: the lookup is viewer-scoped so other members' added promos stay invisible.
+    expect(mockGetActivePromoForFlag).toHaveBeenCalledWith(5, 7);
     expect(mockApplyFlag).toHaveBeenCalledWith({
       promoId: 5,
       userId: 7,

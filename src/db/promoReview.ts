@@ -2,6 +2,7 @@ import { z } from "zod";
 import { and, asc, eq, gt, isNull, ne, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
+import { promoVisibilityCondition } from "./promos";
 import { ScrapedPromoFieldsSchema, ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
 import { ScopeGuessSchema, type ScopeGuess } from "@/domain/promos/scope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
@@ -587,8 +588,18 @@ function activeScopeGuessFromRow(row: ActivePromoScopeRow): ScopeGuess | null {
  * "someone else already handled this promo" (the row moved on, or its data
  * is unexpectedly inconsistent, either way there's nothing safe to flag).
  */
+/**
+ * WR-05 / T-5-14: the flag lookup only sees promos visible to the viewer, so
+ * another member's personal added promo looks exactly like an unknown id and
+ * the response never reveals that it exists.
+ */
+export function activePromoForFlagWhere(id: number, viewerUserId: number) {
+  return and(eq(promos.id, id), eq(promos.status, "active"), promoVisibilityCondition(viewerUserId));
+}
+
 export async function getActivePromoForFlag(
   id: number,
+  viewerUserId: number,
 ): Promise<{ id: number; autoMatched: boolean; guess: ScopeGuess } | null> {
   const db = getDb();
   const rows = await db
@@ -605,7 +616,7 @@ export async function getActivePromoForFlag(
       windowEnd: promos.windowEnd,
     })
     .from(promos)
-    .where(and(eq(promos.id, id), eq(promos.status, "active")))
+    .where(activePromoForFlagWhere(id, viewerUserId))
     .limit(1);
 
   const row = rows[0];
