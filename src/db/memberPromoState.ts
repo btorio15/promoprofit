@@ -40,7 +40,7 @@ export async function computeMemberPromoState(args: {
 }): Promise<MemberPromoState> {
   const { userId, promoId, precision, now } = args;
 
-  const activePromos = await getActivePromos(now);
+  const activePromos = await getActivePromos(now, userId);
   const promo = activePromos.find((p) => p.id === promoId);
   if (!promo) return { kind: "not_active" };
 

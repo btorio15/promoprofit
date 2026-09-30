@@ -1,9 +1,22 @@
 import { COLORADO_BOOKS } from "@/config/books";
 import { getActivePromos } from "@/db/promos";
-import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
-import { getProfitObservationsSince, getPromoCompletions } from "@/db/promoTracking";
+import {
+  getBonusBooks,
+  getCachedEvents,
+  getCachedExtendedEvents,
+  getHedgeBookKeys,
+  getUserBookKeys,
+} from "@/db/queries";
+import {
+  getProfitObservationsSince,
+  getPromoCompletions,
+} from "@/db/promoTracking";
 import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
-import { periodStartDates, summarizeAvailableProfit, type AvailableProfit } from "@/domain/promos/profitTotals";
+import {
+  periodStartDates,
+  summarizeAvailableProfit,
+  type AvailableProfit,
+} from "@/domain/promos/profitTotals";
 import type { RankOptions } from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 
@@ -15,10 +28,17 @@ import type { StakePrecision } from "@/domain/hedge/arbMath";
  * from the min of the week/month start (ISO date strings compare
  * correctly) so one query covers both periods.
  */
-export async function loadAvailableProfit(now: Date, ownBookKeys: ReadonlySet<string>): Promise<AvailableProfit> {
+export async function loadAvailableProfit(
+  now: Date,
+  ownBookKeys: ReadonlySet<string>,
+  viewerUserId: number,
+): Promise<AvailableProfit> {
   const { weekStart, monthStart } = periodStartDates(now);
   const sinceDate = weekStart < monthStart ? weekStart : monthStart;
-  const observations = await getProfitObservationsSince(sinceDate);
+  const observations = await getProfitObservationsSince(
+    sinceDate,
+    viewerUserId,
+  );
   return summarizeAvailableProfit(observations, ownBookKeys, now);
 }
 
@@ -45,7 +65,7 @@ export async function loadMemberFeedContext({
     { events: moneylineEvents, fetchedAt: oddsFetchedAt },
     { events: extendedEvents, fetchedAt: extendedOddsFetchedAt },
   ] = await Promise.all([
-    getActivePromos(now),
+    getActivePromos(now, userId),
     getPromoCompletions(userId),
     getUserBookKeys(userId),
     getBonusBooks(),
@@ -56,7 +76,9 @@ export async function loadMemberFeedContext({
   const userBookSet = new Set(userBookKeys);
   const hedgeBookKeys = await getHedgeBookKeys(userBookSet);
 
-  const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
+  const colBookNames = new Map<string, string>(
+    COLORADO_BOOKS.map((b) => [b.key, b.displayName]),
+  );
   const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
   const totalExtracted = sumProfitExtracted(doneRows);
