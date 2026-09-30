@@ -6,6 +6,7 @@ import type { GetPromosResponse } from "@/domain/promos/dto";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
@@ -14,6 +15,7 @@ import { sortByMeasure } from "@/domain/opportunities/pick";
 import { parseSortMode } from "@/lib/sortPreference";
 import type { PromoRowDTO } from "@/domain/promos/dto";
 import { ReviewPanel } from "./ReviewPanel";
+import { AddPromoForm } from "./AddPromoForm";
 import { PromosEmptyState } from "./PromosEmptyState";
 import { PromoRow } from "./PromoRow";
 import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
@@ -79,6 +81,9 @@ export function PromosScreen({
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
   const isFirstVersion = useRef(true);
+  const [formOpen, setFormOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const addButtonRef = useRef<HTMLButtonElement | null>(null);
 
   function runGetPromos() {
     const requestId = ++requestIdRef.current;
@@ -143,6 +148,19 @@ export function PromosScreen({
     onPromosChanged();
   }
 
+  // D-09: a saved promo shows at once in Promos (refetch) and Opportunities (onPromosChanged).
+  function handleAdded(message: string) {
+    setFormOpen(false);
+    setConfirmation(message);
+    handleChanged();
+  }
+
+  function handleAddCancel() {
+    setFormOpen(false);
+    // The button is unmounted while the form is open; refocus it once it is back.
+    setTimeout(() => addButtonRef.current?.focus(), 0);
+  }
+
   const showSkeleton = isPending && response === null;
 
   return (
@@ -180,6 +198,32 @@ export function PromosScreen({
         </TabsList>
 
         <TabsContent value="active" className="flex flex-col gap-8 pt-2">
+          {formOpen ? (
+            <AddPromoForm onSaved={handleAdded} onCancel={handleAddCancel} />
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-muted-foreground">
+                Promos you spot in your own sportsbook apps that we missed. Only you can see them.
+              </p>
+              <Button
+                ref={addButtonRef}
+                type="button"
+                className="min-h-11 w-full sm:w-auto"
+                onClick={() => {
+                  setConfirmation(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="size-4" />
+                Add promo
+              </Button>
+            </div>
+          )}
+          {confirmation ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {confirmation}
+            </p>
+          ) : null}
           {showSkeleton ? (
             <div className="flex flex-col gap-2">
               <Skeleton className="h-14 w-full" />
