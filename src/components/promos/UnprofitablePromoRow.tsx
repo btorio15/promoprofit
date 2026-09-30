@@ -2,6 +2,7 @@
 
 import type { UnprofitablePromoRowDTO } from "@/domain/promos/dto";
 import { Badge } from "@/components/ui/badge";
+import { AddedPromoActions } from "./AddedPromoActions";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { MarkUsedButton } from "./MarkUsedButton";
 import { NO_PROMO_BOOK_HINT } from "./PromoRow";
@@ -10,6 +11,8 @@ interface UnprofitablePromoRowProps {
   row: UnprofitablePromoRowDTO;
   precision: "whole" | "cents";
   onChanged: () => void;
+  /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
+  addedActions?: { onError: (message: string) => void };
 }
 
 /**
@@ -24,7 +27,7 @@ interface UnprofitablePromoRowProps {
  * quick-260929-igk: a greyed row can still be marked done (recorded at
  * $0.00 with a "no hedge" snapshot); done promos move to the Done tab.
  */
-export function UnprofitablePromoRow({ row, precision, onChanged }: UnprofitablePromoRowProps) {
+export function UnprofitablePromoRow({ row, precision, onChanged, addedActions }: UnprofitablePromoRowProps) {
   return (
     <div
       className="rounded-lg border border-border bg-secondary/40 p-4 opacity-60"
@@ -57,6 +60,17 @@ export function UnprofitablePromoRow({ row, precision, onChanged }: Unprofitable
         <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
         <span className="text-sm text-muted-foreground">{row.note}</span>
         {row.hasPromoBook ? null : <span className="text-sm text-muted-foreground">{NO_PROMO_BOOK_HINT}</span>}
+        {row.addedByYou && addedActions ? (
+          <div className="pt-2">
+            <AddedPromoActions
+              promoId={row.promoId}
+              canExpire
+              isDone={false}
+              onChanged={onChanged}
+              onError={addedActions.onError}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
