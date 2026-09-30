@@ -20,7 +20,10 @@ interface PromoRowProps {
   precision: "whole" | "cents";
   onChanged: () => void;
   /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
-  addedActions?: { onError: (message: string) => void };
+  addedActions?: {
+    onError: (message: string) => void;
+    onEdit?: (promoId: number, trigger: HTMLElement | null) => void;
+  };
 }
 
 /**
@@ -168,6 +171,7 @@ export function PromoRow({ row, precision, onChanged, addedActions }: PromoRowPr
               isDone={false}
               onChanged={onChanged}
               onError={addedActions.onError}
+              onEdit={addedActions.onEdit}
             />
           </div>
         ) : null}

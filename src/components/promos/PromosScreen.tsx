@@ -38,6 +38,8 @@ export interface PromosScreenProps {
   onReviewCount: (n: number) => void;
 }
 
+type FormState = { kind: "closed" } | { kind: "add" } | { kind: "edit"; promoId: number };
+
 export type PromosView = "active" | "done" | "review";
 
 function rankPromoRows(rows: PromoRowDTO[], sort: "profit" | "roi"): PromoRowDTO[] {
@@ -81,10 +83,12 @@ export function PromosScreen({
   const requestIdRef = useRef(0);
   const isFirstRecompute = useRef(true);
   const isFirstVersion = useRef(true);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formState, setFormState] = useState<FormState>({ kind: "closed" });
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const addButtonRef = useRef<HTMLButtonElement | null>(null);
+  const editTriggerRef = useRef<HTMLElement | null>(null);
+  const formPanelRef = useRef<HTMLDivElement | null>(null);
 
   function runGetPromos() {
     const requestId = ++requestIdRef.current;
@@ -151,16 +155,37 @@ export function PromosScreen({
   }
 
   // D-09: a saved promo shows at once in Promos (refetch) and Opportunities (onPromosChanged).
-  function handleAdded(message: string) {
-    setFormOpen(false);
-    setConfirmation(message);
-    handleChanged();
+  function returnFocus(wasEdit: boolean) {
+    // The trigger may be unmounted while the form is open; refocus it once it is back.
+    setTimeout(() => {
+      const trigger = editTriggerRef.current;
+      if (wasEdit && trigger && trigger.isConnected) trigger.focus();
+      else addButtonRef.current?.focus();
+    }, 0);
   }
 
-  function handleAddCancel() {
-    setFormOpen(false);
-    // The button is unmounted while the form is open; refocus it once it is back.
-    setTimeout(() => addButtonRef.current?.focus(), 0);
+  function handleSaved(message: string) {
+    const wasEdit = formState.kind === "edit";
+    setFormState({ kind: "closed" });
+    setConfirmation(message);
+    handleChanged();
+    returnFocus(wasEdit);
+  }
+
+  function handleFormCancel() {
+    const wasEdit = formState.kind === "edit";
+    setFormState({ kind: "closed" });
+    returnFocus(wasEdit);
+  }
+
+  // Edit opens the same form prefilled, at the top of Promos > Active (one form at a time).
+  function handleEdit(promoId: number, trigger: HTMLElement | null) {
+    editTriggerRef.current = trigger;
+    setConfirmation(null);
+    setActionError(null);
+    onViewChange("active");
+    setFormState({ kind: "edit", promoId });
+    setTimeout(() => formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
   }
 
   const showSkeleton = isPending && response === null;
@@ -200,8 +225,15 @@ export function PromosScreen({
         </TabsList>
 
         <TabsContent value="active" className="flex flex-col gap-8 pt-2">
-          {formOpen ? (
-            <AddPromoForm onSaved={handleAdded} onCancel={handleAddCancel} />
+          {formState.kind !== "closed" ? (
+            <div ref={formPanelRef}>
+              <AddPromoForm
+                key={formState.kind === "edit" ? `edit-${formState.promoId}` : "add"}
+                mode={formState.kind === "edit" ? { kind: "edit", promoId: formState.promoId } : { kind: "add" }}
+                onSaved={handleSaved}
+                onCancel={handleFormCancel}
+              />
+            </div>
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4">
               <p className="text-sm text-muted-foreground">
@@ -213,7 +245,7 @@ export function PromosScreen({
                 className="min-h-11 w-full sm:w-auto"
                 onClick={() => {
                   setConfirmation(null);
-                  setFormOpen(true);
+                  setFormState({ kind: "add" });
                 }}
               >
                 <Plus className="size-4" />
@@ -259,7 +291,7 @@ export function PromosScreen({
                     row={row}
                     precision={precision}
                     onChanged={handleChanged}
-                    addedActions={{ onError: setActionError }}
+                    addedActions={{ onError: setActionError, onEdit: handleEdit }}
                   />
                 ))}
                 {response.unprofitableRows.map((row) => (
@@ -268,7 +300,7 @@ export function PromosScreen({
                     row={row}
                     precision={precision}
                     onChanged={handleChanged}
-                    addedActions={{ onError: setActionError }}
+                    addedActions={{ onError: setActionError, onEdit: handleEdit }}
                   />
                 ))}
               </div>

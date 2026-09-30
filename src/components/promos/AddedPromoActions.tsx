@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Clock, Trash2 } from "lucide-react";
+import { Clock, Pencil, Trash2 } from "lucide-react";
 import type { AddedPromoResponse } from "@/domain/promos/addedPromoInput";
 import { Button } from "@/components/ui/button";
 import { ExpirePromoDialog } from "./ExpirePromoDialog";
@@ -12,6 +12,8 @@ interface AddedPromoActionsProps {
   canExpire: boolean;
   isDone: boolean;
   onChanged: () => void;
+  /** Owner Edit (active rows only): opens the prefilled form; the trigger element is passed for focus return. */
+  onEdit?: (promoId: number, trigger: HTMLElement | null) => void;
   onError: (message: string) => void;
 }
 
@@ -20,7 +22,7 @@ interface AddedPromoActionsProps {
  * and "Delete", each behind a confirm dialog. Failures (including a promo
  * that is no longer available) surface through onError as an inline alert.
  */
-export function AddedPromoActions({ promoId, canExpire, isDone, onChanged, onError }: AddedPromoActionsProps) {
+export function AddedPromoActions({ promoId, canExpire, isDone, onChanged, onEdit, onError }: AddedPromoActionsProps) {
   const [dialog, setDialog] = useState<"expire" | "delete" | null>(null);
 
   function handleOutcome(kind: "expire" | "delete", outcome: AddedPromoResponse) {
@@ -34,6 +36,17 @@ export function AddedPromoActions({ promoId, canExpire, isDone, onChanged, onErr
 
   return (
     <div className="flex flex-wrap gap-2">
+      {onEdit ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11"
+          onClick={(e) => onEdit(promoId, e.currentTarget)}
+        >
+          <Pencil aria-hidden="true" />
+          Edit
+        </Button>
+      ) : null}
       {canExpire ? (
         <Button type="button" variant="outline" className="min-h-11" onClick={() => setDialog("expire")}>
           <Clock aria-hidden="true" />
