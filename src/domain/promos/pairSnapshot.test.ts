@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PairRowDTO } from "./pairRowDto";
-import type { DonePromoTerms } from "./doneSnapshot";
+import { sumProfitExtracted, toDonePromoDTO, toDoneRows, type DonePromoTerms } from "./doneSnapshot";
 import { MarkPairDoneInputSchema } from "./reviewInput";
 import {
   DonePairSnapshotSchema,
@@ -138,5 +138,67 @@ describe("isSamePairDisplay (D-23)", () => {
     expect(isSamePairDisplay(expected, { ...row, legB: { ...row.legB, stake: "51.00" } })).toBe(false);
     expect(isSamePairDisplay(expected, { ...row, guaranteedProfit: "22.74" })).toBe(false);
     expect(isSamePairDisplay(expected, null)).toBe(false);
+  });
+});
+
+describe("Done read side (D-11)", () => {
+  const names = new Map([["draftkings", "DraftKings"]]);
+  const at = new Date("2026-09-29T16:00:00.000Z");
+  const now = new Date("2026-09-29T15:00:00.000Z");
+  const built = buildPairSnapshot(
+    { row, termsA: termsFor(1, "draftkings"), termsB: termsFor(2, "fanduel") },
+    { now, precision: "cents", oddsFetchedAt: { moneyline: now, spreadsTotals: null } },
+  );
+  const base = { completedAt: at, promoType: "profit_boost", promoParsed: {} };
+  const primary = {
+    ...base,
+    promoId: 1,
+    promoBookKey: "draftkings",
+    snapshot: JSON.parse(JSON.stringify(built.primary.snapshot)),
+    profitExtracted: built.primary.profitExtracted,
+  };
+  const member = {
+    ...base,
+    promoId: 2,
+    promoBookKey: "fanduel",
+    snapshot: JSON.parse(JSON.stringify(built.member.snapshot)),
+    profitExtracted: "0.00",
+  };
+
+  it("maps a pair snapshot to a kind pair DTO carrying both legs and the pair profit", () => {
+    const dto = toDonePromoDTO(primary, names);
+    expect(dto.kind).toBe("pair");
+    expect(dto.profitExtracted).toBe("22.73");
+    expect(dto.pair?.legA.stake).toBe("50.00");
+    expect(dto.pair?.legB.bookName).toBe("FanDuel");
+    expect(dto.pair?.guaranteedProfit).toBe("22.73");
+    expect(dto.pair?.pairPromoIds).toEqual([1, 2]);
+  });
+
+  it("toDoneRows lists the pair once and drops the partner marker", () => {
+    const single = { ...base, promoId: 9, promoBookKey: "draftkings", snapshot: null, profitExtracted: "0.00" };
+    const rows = toDoneRows([primary, member, single], names);
+    expect(rows.map((r) => r.promoId)).toEqual([1, 9]);
+    expect(rows.filter((r) => r.promoId === 2)).toHaveLength(0);
+  });
+
+  it("the total counts the pair once", () => {
+    const rows = toDoneRows(
+      [primary, member, { ...base, promoId: 9, promoBookKey: "draftkings", snapshot: null, profitExtracted: "12.50" }],
+      names,
+    );
+    // legacy null-snapshot rows are $0; use an unreadable snapshot to keep the column amount
+    expect(sumProfitExtracted(rows)).toBe("22.73");
+    const withSingle = toDoneRows(
+      [primary, member, { ...base, promoId: 9, promoBookKey: "draftkings", snapshot: { version: 99 }, profitExtracted: "12.50" }],
+      names,
+    );
+    expect(sumProfitExtracted(withSingle)).toBe("35.23");
+  });
+
+  it("unknown or unreadable snapshots still render as legacy (no crash)", () => {
+    const dto = toDonePromoDTO({ ...primary, snapshot: { version: 1, kind: "pair", junk: true } }, names);
+    expect(dto.kind).toBe("legacy");
+    expect(dto.pair).toBeNull();
   });
 });

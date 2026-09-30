@@ -97,6 +97,73 @@ export const PairMemberSnapshotSchema = z.object({
 
 export type PairMemberSnapshot = z.infer<typeof PairMemberSnapshotSchema>;
 
+/** One Done-tab pair entry, built only from the saved pair snapshot (never live odds). */
+export interface DonePairLegDTO {
+  promoId: number;
+  bookName: string;
+  promoTypeLabel: "Boost" | "Bonus bet";
+  promoTitle: string;
+  selectionLabel: string;
+  oddsAmerican: number;
+  stake: string;
+  payout: string;
+}
+
+export interface DonePairDTO {
+  pairPromoIds: [number, number];
+  pairTypeLabel: "Boost + Boost" | "Boost + Bonus bet";
+  marketBadge: string;
+  sportLabel: string;
+  commenceTime: string;
+  homeTeam: string;
+  awayTeam: string;
+  legA: DonePairLegDTO;
+  legB: DonePairLegDTO;
+  guaranteedProfit: string;
+  roiPct: string;
+  separateProfitA: string;
+  separateProfitB: string;
+  gain: string;
+}
+
+function toDoneLeg(leg: DonePairSnapshot["row"]["legA"]): DonePairLegDTO {
+  return {
+    promoId: leg.promoId,
+    bookName: leg.bookName,
+    promoTypeLabel: leg.promoTypeLabel,
+    promoTitle: leg.promoTitle,
+    selectionLabel: leg.selectionLabel,
+    oddsAmerican: leg.oddsAmerican,
+    stake: leg.stake,
+    payout: leg.payout,
+  };
+}
+
+export function toDonePairDTO(snapshot: DonePairSnapshot): DonePairDTO {
+  const r = snapshot.row;
+  return {
+    pairPromoIds: [snapshot.pairPromoIds[0], snapshot.pairPromoIds[1]],
+    pairTypeLabel: r.pairTypeLabel,
+    marketBadge: r.marketBadge,
+    sportLabel: r.sportLabel,
+    commenceTime: r.commenceTime,
+    homeTeam: r.homeTeam,
+    awayTeam: r.awayTeam,
+    legA: toDoneLeg(r.legA),
+    legB: toDoneLeg(r.legB),
+    guaranteedProfit: r.guaranteedProfit,
+    roiPct: r.roiPct,
+    separateProfitA: r.separateProfitA,
+    separateProfitB: r.separateProfitB,
+    gain: r.gain,
+  };
+}
+
+/** True when a stored snapshot is the partner marker of a marked pair (never listed on its own). */
+export function isPairMemberSnapshot(snapshot: unknown): boolean {
+  return PairMemberSnapshotSchema.safeParse(snapshot).success;
+}
+
 export interface PairCompletionRow<S> {
   promoId: number;
   snapshot: S;
