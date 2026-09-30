@@ -10,6 +10,7 @@ import {
   MSG_PICK_EXACT_BET,
   fieldErrorsFromIssues,
   type AddPromoInput,
+  type AddedPromoEditValues,
   type AddedPromoField,
 } from "./addedPromoInput";
 import { EMPTY_SCOPE_DRAFT, scopeInputFromDraft, type ScopeDraft } from "./scopeDraft";
@@ -157,6 +158,74 @@ export const EMPTY_BONUS_DRAFT: AddPromoDraft = {
   minOdds: "",
   ...BOOST_DEFAULTS,
 };
+
+const ET_PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/** A stored UTC instant -> its ET calendar day (YYYY-MM-DD) and 24h wall time (HH:MM). */
+function etDateAndTime(iso: string): { date: string; time: string } {
+  const parts = ET_PARTS_FORMATTER.formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${hour}:${get("minute")}` };
+}
+
+function signedOdds(value: number | null): string {
+  if (value === null) return "";
+  return value > 0 ? `+${value}` : String(value);
+}
+
+/** Draft prefilled from a member's own stored promo (edit mode). Money stays the stored 2-dp strings. */
+export function draftFromEditValues(values: AddedPromoEditValues): AddPromoDraft {
+  const expires = values.expiresAt ? etDateAndTime(values.expiresAt) : null;
+  const isBoost = values.promoType === "profit_boost";
+
+  let scope: ScopeDraft = EMPTY_SCOPE_DRAFT;
+  if (values.scopeKind === "event" && values.eventId) {
+    scope = { ...EMPTY_SCOPE_DRAFT, mode: "game", eventId: values.eventId };
+  } else if (values.scopeKind === "sport_window" && values.sportKey && values.windowStart && values.windowEnd) {
+    scope = {
+      ...EMPTY_SCOPE_DRAFT,
+      mode: "league",
+      sportKey: values.sportKey,
+      fromEtDate: etDateAndTime(values.windowStart).date,
+      throughEtDate: etDateAndTime(values.windowEnd).date,
+    };
+  }
+
+  const pinValue =
+    isBoost && values.marketType && values.side
+      ? `${values.marketType}|${values.marketType === "moneyline" || values.line === null ? "ml" : String(values.line)}|${values.side}`
+      : null;
+
+  return {
+    ...BOOST_DEFAULTS,
+    promoType: isBoost ? "profit_boost" : "bonus_bet",
+    bookKey: values.bookKey,
+    bonusAmount: values.bonusAmount ?? "",
+    // Bonus bets always carry an expiry; a boost's expiry is optional (null = default).
+    expiresEtDate: isBoost ? null : (expires?.date ?? null),
+    expiresEtTime: !isBoost && expires ? expires.time : DEFAULT_EXPIRY_TIME,
+    scope,
+    minOdds: signedOdds(values.minOddsAmerican),
+    boostMode: values.boostedOddsAmerican !== null ? "odds" : "percent",
+    boostPercent: values.boostPercent ?? "",
+    boostedOdds: signedOdds(values.boostedOddsAmerican),
+    pinValue,
+    maxStake: values.maxStake ?? "",
+    maxWinnings: values.maxWinnings ?? "",
+    maxWinningsKind: values.maxWinningsKind === "boost_extra" ? "boost_extra" : "total_payout",
+    boostExpiresEtDate: isBoost && expires ? expires.date : null,
+    boostExpiresEtTime: isBoost && expires ? expires.time : BOOST_DEFAULTS.boostExpiresEtTime,
+  };
+}
 
 /** "+250" / "-110" / "250" -> integer; anything else -> null. Regex + parseInt only. */
 export function parseOddsText(text: string): number | null {
