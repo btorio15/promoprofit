@@ -117,13 +117,17 @@ export interface ExpiryTimeOption {
   label: string;
 }
 
+/**
+ * WR-04: the time is read as an Eastern Time wall clock (etExpiryInstant),
+ * and the members are in Colorado, so every label says "ET" explicitly.
+ */
 function timeLabel(hour: number, minute: number): string {
   const suffix = hour >= 12 ? "PM" : "AM";
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:${pad(minute)} ${suffix}`;
+  return `${h12}:${pad(minute)} ${suffix} ET`;
 }
 
-/** Every 30 minutes 12:00 AM..11:30 PM, plus 11:59 PM (end of day). */
+/** Every 30 minutes 12:00 AM ET..11:30 PM ET, plus 11:59 PM ET (end of day). */
 export function expiryTimeOptions(): ExpiryTimeOption[] {
   const out: ExpiryTimeOption[] = [];
   for (let hour = 0; hour < 24; hour++) {

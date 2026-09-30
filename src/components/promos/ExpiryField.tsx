@@ -62,7 +62,7 @@ export function ExpiryField({ idPrefix, etDate, etTime, onChange, helper, error,
         </Select>
         {allowDefault && etDate === null ? null : (
         <Select value={etTime} onValueChange={(v) => onChange({ etDate, etTime: v ?? etTime })}>
-          <SelectTrigger id={timeId} className="h-11 w-full" disabled={disabled} aria-label="Expiry time">
+          <SelectTrigger id={timeId} className="h-11 w-full" disabled={disabled} aria-label="Expiry time (Eastern Time)">
             <SelectValue>
               {(value: string | null) => times.find((t) => t.value === value)?.label ?? ""}
             </SelectValue>

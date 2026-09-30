@@ -131,13 +131,13 @@ describe("expiryDayOptions", () => {
 
 describe("expiryTimeOptions", () => {
   it("includes 11:59 PM as the default", () => {
-    expect(expiryTimeOptions()).toContainEqual({ value: "23:59", label: "11:59 PM" });
+    expect(expiryTimeOptions()).toContainEqual({ value: "23:59", label: "11:59 PM ET" });
     expect(DEFAULT_EXPIRY_TIME).toBe("23:59");
   });
   it("has half-hour steps with 12-hour labels", () => {
     const opts = expiryTimeOptions();
-    expect(opts[0]).toEqual({ value: "00:00", label: "12:00 AM" });
-    expect(opts).toContainEqual({ value: "12:30", label: "12:30 PM" });
+    expect(opts[0]).toEqual({ value: "00:00", label: "12:00 AM ET" });
+    expect(opts).toContainEqual({ value: "12:30", label: "12:30 PM ET" });
   });
 });
 
