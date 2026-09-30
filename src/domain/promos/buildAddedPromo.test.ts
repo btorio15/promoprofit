@@ -184,3 +184,110 @@ describe("buildAddedPromoRow", () => {
     }
   });
 });
+
+describe("buildAddedPromoRow (profit boost)", () => {
+  const eventScope = {
+    kind: "event" as const,
+    eventId: "evt-1",
+    sportKey: "americanfootball_nfl",
+    homeTeam: "DEN Broncos",
+    awayTeam: "LA Rams",
+    commenceTime: "2026-10-03T17:00:00.000Z",
+  };
+  const boostBase = {
+    promoType: "profit_boost" as const,
+    bookKey: "fanduel",
+    maxStake: "25",
+  };
+
+  function buildBoost(
+    boostInput: AddPromoInput,
+    scope: Parameters<typeof buildAddedPromoRow>[0]["scope"],
+    pinned?: Parameters<typeof buildAddedPromoRow>[0]["pinned"],
+  ) {
+    return buildAddedPromoRow({
+      input: boostInput,
+      scope,
+      bookName: "FanDuel",
+      now: NOW,
+      expiresAt: null,
+      userId: 7,
+      dedupeKey: "added:test",
+      pinned,
+    });
+  }
+
+  it("pinned boosted odds: pin columns, odds set, percent null, round-trips with pinned", () => {
+    const result = buildBoost(
+      {
+        ...boostBase,
+        boost: { mode: "odds", boostedOddsAmerican: 250 },
+        scope: { kind: "event", eventId: "evt-1", pinned: { marketType: "moneyline", line: null, side: "home" } },
+      },
+      eventScope,
+      { marketType: "moneyline", line: null, side: "home", selectionText: "DEN Broncos" },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.values;
+    expect(v).toMatchObject({
+      promoType: "profit_boost",
+      marketType: "moneyline",
+      line: null,
+      side: "home",
+      boostedOddsAmerican: 250,
+      boostPercent: null,
+      maxStake: "25.00",
+      expiresAt: null,
+    });
+    const parsed = v.parsed as { pinned: { selectionText: string }; eligibleMarketTypes: string[] };
+    expect(parsed.pinned.selectionText).toBe("DEN Broncos");
+    expect(parsed.eligibleMarketTypes).toEqual(["moneyline"]);
+    const mapped = mapActivePromoRow(toActiveRow(v), 7);
+    expect(mapped).not.toBeNull();
+    expect(mapped?.pinned).not.toBeNull();
+  });
+
+  it("boost %, unpinned: 2dp strings, cap kind stored, no expiry", () => {
+    const result = buildBoost(
+      {
+        ...boostBase,
+        boost: { mode: "percent", boostPercent: "50" },
+        scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: "2026-10-04" },
+        maxWinnings: { amount: "100", kind: "total_payout" },
+      },
+      {
+        kind: "sport_window",
+        sportKey: "americanfootball_nfl",
+        windowStart: "2026-10-04T04:00:00.000Z",
+        windowEnd: "2026-10-06T03:59:59.999Z",
+      },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values).toMatchObject({
+      boostPercent: "50.00",
+      maxStake: "25.00",
+      maxWinnings: "100.00",
+      maxWinningsKind: "total_payout",
+      marketType: null,
+      side: null,
+      expiresAt: null,
+      scopeKind: "sport_window",
+    });
+    expect(mapActivePromoRow(toActiveRow(result.values), 7)?.addedByYou).toBe(true);
+  });
+
+  it("spread pin keeps the half-point line", () => {
+    const result = buildBoost(
+      {
+        ...boostBase,
+        boost: { mode: "percent", boostPercent: "30" },
+        scope: { kind: "event", eventId: "evt-1", pinned: { marketType: "spread", line: -3.5, side: "away" } },
+      },
+      eventScope,
+      { marketType: "spread", line: -3.5, side: "away", selectionText: "LA Rams" },
+    );
+    expect(result.ok && result.values.line).toBe(-3.5);
+  });
+});
