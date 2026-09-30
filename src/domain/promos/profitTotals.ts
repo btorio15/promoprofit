@@ -138,18 +138,26 @@ export interface AvailableProfit {
  * decision 3 -- each promo counts at most once per period, at its highest
  * observed profit), then sum across promos. ISO "YYYY-MM-DD" strings sort
  * correctly with plain string comparison.
+ *
+ * quick-260930-fge: promos in `excludeFromToday` (the viewer's Done ids --
+ * both halves of a Done pair, since each has its own completion row) are
+ * dropped from the TODAY bucket only, matching how the headline total skips
+ * Done promos. Week and month are unchanged.
  */
 export function summarizeAvailableProfit(
   observations: ProfitObservation[],
   ownBookKeys: ReadonlySet<string>,
   now: Date,
+  excludeFromToday: ReadonlySet<number>,
 ): AvailableProfit {
   const { today, weekStart, monthStart } = periodStartDates(now);
 
   const ownBookObservations = observations.filter((o) => ownBookKeys.has(o.bookKey) && o.denverDate <= today);
 
   return {
-    today: sumMaxPerPromo(ownBookObservations.filter((o) => o.denverDate >= today)),
+    today: sumMaxPerPromo(
+      ownBookObservations.filter((o) => o.denverDate >= today && !excludeFromToday.has(o.promoId)),
+    ),
     week: sumMaxPerPromo(ownBookObservations.filter((o) => o.denverDate >= weekStart)),
     month: sumMaxPerPromo(ownBookObservations.filter((o) => o.denverDate >= monthStart)),
   };
