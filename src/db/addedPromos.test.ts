@@ -9,7 +9,9 @@ import {
   buildCountOwnLiveAddedPromosQuery,
   buildExpireOwnStatement,
   buildSoftDeleteStatements,
+  buildUpdateOwnStatements,
 } from "./addedPromos";
+import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
 
 const db = drizzle({ client: neon("postgresql://u:p@db.invalid/x"), schema });
 
@@ -55,5 +57,32 @@ describe("buildCountOwnLiveAddedPromosQuery (CR-01)", () => {
     expect(sql).toContain('"event_commence_time" > $');
     expect(sql).toContain('"window_end" > $');
     expect(params).toEqual(expect.arrayContaining([7, "active"]));
+  });
+});
+
+describe("buildUpdateOwnStatements (WR-01)", () => {
+  const values = {
+    dedupeKey: "added:edit:5",
+    bookKey: "fanduel",
+    promoType: "bonus_bet",
+    bonusAmount: "10",
+    addedByUserId: 7,
+    status: "active",
+  } as unknown as AddedPromoInsert;
+  const [update, del] = buildUpdateOwnStatements(db, { promoId: 5, userId: 7, values });
+  it("updates in place with owner, active status and locked book/type in WHERE", () => {
+    const { sql, params } = update.toSQL();
+    expect(sql).toMatch(/^update "promos" set/);
+    expect(sql).toContain('"added_by_user_id" = $');
+    expect(sql).not.toMatch(/set[^]*"dedupe_key"[^]*where/);
+    expect(params).toEqual(expect.arrayContaining([5, 7, "active", "fanduel", "bonus_bet", "10"]));
+  });
+  it("clears the promo's stale profit observations, scoped by an ownership subquery", () => {
+    const { sql, params } = del.toSQL();
+    expect(sql).toMatch(/^delete from "promo_profit_observations"/);
+    expect(sql).toContain('"promo_id" in (select "id" from "promos"');
+    expect(sql).toContain('"added_by_user_id" = $');
+    expect(params).toEqual(expect.arrayContaining([5, 7, "active"]));
+    expect(sql).not.toMatch(/delete from "promos"/);
   });
 });

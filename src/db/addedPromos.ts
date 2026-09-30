@@ -118,14 +118,14 @@ export async function getOwnActiveAddedPromo(promoId: number, userId: number): P
 
 /**
  * Updates the member's own active promo in place (same id). Owner, status and
- * the locked book/type are all in the WHERE (T-5-idor, T-5-17). False when no
- * row matched.
+ * the locked book/type are all in the WHERE (T-5-idor, T-5-17). The promo's
+ * profit observations are removed in the same batch (WR-01): they were
+ * recorded for the pre-edit terms, and recordProfitObservations can only
+ * raise a day's value, so a lowered amount would otherwise leave an inflated
+ * "available profit". The delete is scoped by an ownership subquery (T-5-16);
+ * the next Promos load records the corrected value.
  */
-export async function updateOwnAddedPromo(args: {
-  promoId: number;
-  userId: number;
-  values: AddedPromoInsert;
-}): Promise<boolean> {
+export function buildUpdateOwnStatements(db: Db, args: { promoId: number; userId: number; values: AddedPromoInsert }) {
   const { promoId, userId, values } = args;
   const editable: Partial<AddedPromoInsert> = { ...values };
   delete editable.id;
@@ -135,8 +135,7 @@ export async function updateOwnAddedPromo(args: {
   delete editable.status;
   delete editable.bookKey;
   delete editable.promoType;
-  const db = getDb();
-  const rows = await db
+  const update = db
     .update(promos)
     .set({ ...editable, lastSeenAt: new Date() })
     .where(
@@ -149,7 +148,30 @@ export async function updateOwnAddedPromo(args: {
       ),
     )
     .returning({ id: promos.id });
-  return rows.length === 1;
+  const deleteObservations = db.delete(promoProfitObservations).where(
+    and(
+      eq(promoProfitObservations.promoId, promoId),
+      inArray(
+        promoProfitObservations.promoId,
+        db
+          .select({ id: promos.id })
+          .from(promos)
+          .where(and(eq(promos.id, promoId), eq(promos.addedByUserId, userId), eq(promos.status, "active"))),
+      ),
+    ),
+  );
+  return [update, deleteObservations] as const;
+}
+
+/** Applies buildUpdateOwnStatements in one batch. False when no row matched. */
+export async function updateOwnAddedPromo(args: {
+  promoId: number;
+  userId: number;
+  values: AddedPromoInsert;
+}): Promise<boolean> {
+  const db = getDb();
+  const [updated] = await db.batch(buildUpdateOwnStatements(db, args));
+  return updated.length === 1;
 }
 
 /** True when this member's promo was soft-deleted; false for any other id. */
