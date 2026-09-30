@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,9 @@ export function BonusBetFields({ draft, onDraftChange, options, fieldErrors, dis
   const amountError = fieldErrors.bonusAmount?.[0];
   const oddsError = fieldErrors.minOddsAmerican?.[0];
   const scopeError = fieldErrors.scope?.[0];
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Errors inside the collapsed section must never stay hidden.
+  const open = moreOpen || Boolean(oddsError) || Boolean(scopeError);
 
   return (
     <>
@@ -66,7 +70,7 @@ export function BonusBetFields({ draft, onDraftChange, options, fieldErrors, dis
         disabled={disabled}
       />
 
-      <Collapsible className="flex flex-col gap-4">
+      <Collapsible className="flex flex-col gap-4" open={open} onOpenChange={setMoreOpen}>
         <CollapsibleTrigger className="group flex min-h-11 w-full items-center justify-between gap-2 rounded-md text-left text-sm">
           <span>More details (optional)</span>
           <ChevronDown className="size-4 transition-transform group-data-[panel-open]:rotate-180" />
