@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5 (Group-Added Promos) — EXECUTING
 Plan: 1 of 10
 Status: Executing Phase 5
-Last activity: 2026-09-30 -- Phase 5 execution started
+Last activity: 2026-09-30 - Completed quick task 260930-fge: Exclude Done promos from the Available today profit counter
 
 Progress: [██████████] 100%
 
@@ -164,6 +164,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260929-gcn | multi-day promo windows: FanDuel date parsing + review-queue date range | 2026-09-29 | 549284d | Verified | [260929-gcn-multi-day-promo-windows-fanduel-date-par](./quick/260929-gcn-multi-day-promo-windows-fanduel-date-par/) |
 | 260929-hht | review game picker: search box for one game, league + From/Through date range (replaces the single dropdown) | 2026-09-29 | b52bdbb | Needs Review | [260929-hht-review-game-picker-searchable-multi-game](./quick/260929-hht-review-game-picker-searchable-multi-game/) |
 | 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
+| 260930-fge | Exclude Done promos from the Available today profit counter (week/month unchanged) | 2026-09-30 | 14fd59c |  | [260930-fge-exclude-done-promos-from-the-available-t](./quick/260930-fge-exclude-done-promos-from-the-available-t/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
