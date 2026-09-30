@@ -578,6 +578,60 @@ describe("rankPromoHedges", () => {
     expect(opportunity.selection.eventId).toBe("nba-bonus-b");
   });
 
+  it("bonus_bet with scope any searches every cached game across sports and picks the single best conversion (D-07/A2)", () => {
+    const nba = moneylineEvent({
+      id: "any-nba",
+      homeTeam: "Lakers",
+      awayTeam: "Celtics",
+      sportKey: "basketball_nba",
+      commenceTime: plusHours(6),
+      quotes: [
+        { bookKey: "fanduel", homePrice: 150, awayPrice: -180 },
+        { bookKey: "betmgm", homePrice: 140, awayPrice: -170 },
+      ],
+    });
+    const nfl = moneylineEvent({
+      id: "any-nfl",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      sportKey: "americanfootball_nfl",
+      commenceTime: plusHours(30),
+      quotes: [
+        { bookKey: "fanduel", homePrice: 300, awayPrice: -400 },
+        { bookKey: "betmgm", homePrice: 280, awayPrice: -380 },
+      ],
+    });
+
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      promoType: "bonus_bet",
+      scope: { kind: "any" },
+      bookKey: "fanduel",
+      bonusAmount: "25.00",
+      maxStake: null,
+    };
+
+    const opportunities = rankPromoHedges([promo], {
+      moneylineEvents: [nba, nfl],
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["betmgm"]),
+      precision: "cents",
+      now: NOW,
+    });
+
+    expect(opportunities).toHaveLength(1);
+    const [opportunity] = opportunities;
+    // Both sports were evaluated as candidates, and the longer +300 NFL price wins.
+    expect(opportunity.candidatesEvaluated).toBeGreaterThanOrEqual(4);
+    expect(opportunity.selection.eventId).toBe("any-nfl");
+    expect(opportunity.result.kind).toBe("bonus");
+    if (opportunity.result.kind === "bonus") {
+      const { hedgeStake, guaranteedProfit } = opportunity.result.bonus;
+      expect(hedgeStake.gt(0)).toBe(true);
+      expect(guaranteedProfit.gt(0)).toBe(true);
+    }
+  });
+
   it("sameBook true when the promo's own book also has the best hedge price (D-04)", () => {
     const event = moneylineEvent({
       id: "nba-samebook",
