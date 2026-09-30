@@ -315,7 +315,12 @@ export function PromosScreen({
                 row.kind === "pair" ? (
                   <DonePairRow key={row.rowKey} row={row} onChanged={handleChanged} />
                 ) : (
-                  <DonePromoRow key={row.rowKey} row={row} onChanged={handleChanged} />
+                  <DonePromoRow
+                    key={row.rowKey}
+                    row={row}
+                    onChanged={handleChanged}
+                    addedActions={{ onError: setActionError }}
+                  />
                 ),
               )}
             </div>

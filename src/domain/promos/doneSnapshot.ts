@@ -202,6 +202,10 @@ export interface DonePromoDTO {
   recordedPrecision: "whole" | "cents" | null;
   /** Set only for kind "pair" (both legs, stakes and the paired profit). */
   pair: DonePairDTO | null;
+  /** True when the member added the source promo (any source state). */
+  addedByYou: boolean;
+  /** Source promo state for added promos: "gone" = deleted; null = scraped promo. */
+  addedPromoStatus: "active" | "expired" | "gone" | null;
 }
 
 export interface DoneCompletionInput {
@@ -216,6 +220,17 @@ export interface DoneCompletionInput {
   promoBoostPercent?: string | null;
   promoBoostedOddsAmerican?: number | null;
   promoBonusAmount?: string | null;
+  /** Owner of the source promo when a member added it (null for scraped). */
+  promoAddedByUserId?: number | null;
+  promoStatus?: string;
+}
+
+function addedState(c: DoneCompletionInput): Pick<DonePromoDTO, "addedByYou" | "addedPromoStatus"> {
+  if (c.promoAddedByUserId === null || c.promoAddedByUserId === undefined) {
+    return { addedByYou: false, addedPromoStatus: null };
+  }
+  const status = c.promoStatus === "active" || c.promoStatus === "expired" ? c.promoStatus : "gone";
+  return { addedByYou: true, addedPromoStatus: status };
 }
 
 function legacyTitle(c: DoneCompletionInput): string {
@@ -240,7 +255,12 @@ function legacyTitle(c: DoneCompletionInput): string {
 }
 
 export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<string, string>): DonePromoDTO {
-  const base = { rowKey: `done-${c.promoId}`, promoId: c.promoId, completedAt: c.completedAt.toISOString() };
+  const base = {
+    rowKey: `done-${c.promoId}`,
+    promoId: c.promoId,
+    completedAt: c.completedAt.toISOString(),
+    ...addedState(c),
+  };
   const legacy = (note: string, profitExtracted: string): DonePromoDTO => ({
     ...base,
     kind: "legacy",
