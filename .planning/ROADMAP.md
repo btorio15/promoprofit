@@ -236,7 +236,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04-07-PLAN.md — Mark pair done: server recompute, odds-changed check, one atomic write
+- [x] 04-07-PLAN.md — Mark pair done: server recompute, odds-changed check, one atomic write
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -273,5 +273,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
-| 4. Opportunities Feed | 6/9 | In Progress|  |
+| 4. Opportunities Feed | 7/9 | In Progress|  |
 | 5. Group-Added Promos | 0/? | Not started | - |
