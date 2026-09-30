@@ -204,3 +204,42 @@ describe("isSameDisplayedProfit", () => {
     expect(isSameDisplayedProfit(a, b)).toBe(expected);
   });
 });
+
+describe("Done DTO source state (D-11)", () => {
+  const names = new Map([["draftkings", "DraftKings"]]);
+  const base = {
+    promoId: 5,
+    completedAt: new Date("2026-09-29T16:00:00.000Z"),
+    profitExtracted: "12.34",
+    promoBookKey: "draftkings",
+    promoType: "profit_boost",
+    promoParsed: {},
+  };
+  const snap = () =>
+    JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx).snapshot));
+
+  it("a deleted source keeps its row and profit, flagged gone", () => {
+    const deleted = toDonePromoDTO({ ...base, snapshot: snap(), promoAddedByUserId: 7, promoStatus: "deleted" }, names);
+    const scraped = toDonePromoDTO({ ...base, promoId: 6, snapshot: snap(), profitExtracted: "1.01" }, names);
+    expect(deleted.kind).toBe("hedge");
+    expect(deleted.addedByYou).toBe(true);
+    expect(deleted.addedPromoStatus).toBe("gone");
+    expect(sumProfitExtracted([deleted, scraped])).toBe("13.35");
+  });
+
+  it.each([
+    ["active", "active"],
+    ["expired", "expired"],
+  ] as const)("status %s maps to %s", (status, expected) => {
+    const dto = toDonePromoDTO({ ...base, snapshot: snap(), promoAddedByUserId: 7, promoStatus: status }, names);
+    expect(dto.addedPromoStatus).toBe(expected);
+  });
+
+  it("scraped or missing fields give no added state", () => {
+    for (const extra of [{ promoAddedByUserId: null, promoStatus: "active" }, {}]) {
+      const dto = toDonePromoDTO({ ...base, snapshot: snap(), ...extra }, names);
+      expect(dto.addedByYou).toBe(false);
+      expect(dto.addedPromoStatus).toBeNull();
+    }
+  });
+});

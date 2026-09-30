@@ -39,6 +39,8 @@ export async function getPromoCompletions(userId: number) {
       promoBoostPercent: promos.boostPercent,
       promoBoostedOddsAmerican: promos.boostedOddsAmerican,
       promoBonusAmount: promos.bonusAmount,
+      promoAddedByUserId: promos.addedByUserId,
+      promoStatus: promos.status,
     })
     .from(promoCompletions)
     .innerJoin(promos, eq(promos.id, promoCompletions.promoId))
