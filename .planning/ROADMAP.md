@@ -286,7 +286,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 05-08-PLAN.md — Edit own added promos (same form prefilled, owner-only, in place)
+- [x] 05-08-PLAN.md — Edit own added promos (same form prefilled, owner-only, in place)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
@@ -306,4 +306,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 7/10 | In Progress|  |
+| 5. Group-Added Promos | 8/10 | In Progress|  |
