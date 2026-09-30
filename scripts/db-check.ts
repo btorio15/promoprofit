@@ -4,8 +4,9 @@
  *
  * Usage: npm run db:check
  */
+import { isNotNull, count } from "drizzle-orm";
 import { getDb } from "../src/db/client";
-import { books as booksTable, users, invites, userBooks } from "../src/db/schema";
+import { books as booksTable, users, invites, userBooks, promos } from "../src/db/schema";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents } from "../src/db/queries";
 
 async function main() {
@@ -46,6 +47,18 @@ async function main() {
 
   const userBookRows = await getDb().select({ userId: userBooks.userId }).from(userBooks);
   console.log(`User books: ${userBookRows.length}`);
+
+  // Phase 5: proves the 0010 migration's promos.added_by_user_id column exists.
+  await getDb()
+    .select({ id: promos.id, addedByUserId: promos.addedByUserId })
+    .from(promos)
+    .limit(1);
+  console.log("promos.added_by_user_id: ok");
+  const [owned] = await getDb()
+    .select({ n: count() })
+    .from(promos)
+    .where(isNotNull(promos.addedByUserId));
+  console.log(`Promos with added_by_user_id set: ${owned?.n ?? 0}`);
 }
 
 main().catch((err) => {
