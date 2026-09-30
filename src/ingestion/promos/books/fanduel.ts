@@ -22,7 +22,7 @@ import {
 } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromTags, sportFromText } from "@/ingestion/promos/sportHints";
-import { splitTeams } from "@/ingestion/promos/promoText";
+import { isPlausibleTeamName, splitTeams } from "@/ingestion/promos/promoText";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
 const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
@@ -299,7 +299,7 @@ function parseSpanScope(text: string, expiresAt: string | null): FanduelSpanScop
  * "team" text that included unrelated words either side of "@" -- this
  * regex isolates the real team pair before that fallback ever runs. */
 const GAME_SCOPE_RE =
-  /for the ([^\n@]+?) @ ([^\n@]+?)(?:\s+[A-Z]{2,6})?\s+Games?\s+on\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?)\b/i;
+  /(?:for|on)\s+the\s+([^\n@!?;:]{1,40}?)\s+@\s+([^\n@!?;:]{1,40}?)(?:\s+[A-Z]{2,6})?\s+Games?\s+on\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)/gi;
 
 interface FanduelGameScope {
   teams: [string, string];
@@ -309,13 +309,20 @@ interface FanduelGameScope {
 
 /** Pure helper: parses the GAME_SCOPE_RE phrase, or null when absent. */
 function parseGameScope(text: string): FanduelGameScope | null {
-  const match = GAME_SCOPE_RE.exec(text);
-  if (!match) return null;
+  // Promo text often names the game twice (short nicknames in the headline,
+  // full names in the fine print); prefer the most specific (longest) pair.
+  let best: RegExpExecArray | null = null;
+  for (const match of text.matchAll(GAME_SCOPE_RE)) {
+    if (best === null || match[1].length + match[2].length > best[1].length + best[2].length) {
+      best = match;
+    }
+  }
+  if (!best) return null;
 
-  const away = match[1].trim();
-  const home = match[2].trim();
-  const dateText = match[3].trim();
-  if (away.length === 0 || home.length === 0) return null;
+  const away = best[1].trim();
+  const home = best[2].trim();
+  const dateText = best[3].trim();
+  if (!isPlausibleTeamName(away) || !isPlausibleTeamName(home)) return null;
 
   return {
     teams: [away, home],
@@ -337,6 +344,7 @@ const EXPIRES_AT_YEAR_RE = /^(\d{4})-/;
  * which case slateWindow will simply fail closed (null window) exactly as
  * it does for any other unparseable date. */
 function withInferredYear(dateText: string, expiresAt: string | null): string {
+  if (/\d{4}/.test(dateText)) return dateText;
   const yearMatch = expiresAt ? EXPIRES_AT_YEAR_RE.exec(expiresAt) : null;
   return yearMatch ? `${dateText}, ${yearMatch[1]}` : dateText;
 }

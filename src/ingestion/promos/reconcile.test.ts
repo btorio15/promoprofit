@@ -331,3 +331,86 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome.skip.evidence?.rawText).toContain("dropped: maxStake");
   });
 });
+
+describe("reconcileEntry reader-teams override (FanDuel Steelers @ Browns)", () => {
+  const RAW =
+    "YOU CAN CHOOSE between a 50% Profit Boost Token OR an Up-7 Early Win Token to use on the Steelers @ Browns NFL Game on October 1st, 2026!\nNFL Choose Your Own Reward\nRegardless of which option you select, your Reward is eligible for use on the Pittsburgh Steelers @ Cleveland Browns NFL Game on October 1st, 2026, up to a maximum wager. Reward expires at 8:15 PM ET on Thursday, October 1st, 2026.";
+  const BAD_TEAMS = [
+    "YOU CAN CHOOSE between a 50% Profit Boost Token OR an Up-7 Early Win Token to use on the Steelers",
+    "Browns NFL Game on October 1st, 2026!",
+  ];
+
+  function candidate(teamsText: string[]): ScrapedPromo {
+    return {
+      bookKey: "fanduel",
+      externalId: "CYORNFL1001",
+      promoType: "profit_boost",
+      title: "NFL Choose Your Own Reward",
+      rawText: RAW,
+      sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions/CYORNFL1001",
+      sportKeyHint: "americanfootball_nfl",
+      scopeText: RAW.split("\n")[0],
+      teamsText,
+      windowStart: null,
+      windowEnd: null,
+      expiresAt: "2026-10-02T00:15:00.000Z",
+      eligibleMarketTypes: ["moneyline", "spread", "total"],
+      pinned: null,
+      boostPercent: "50.00",
+      boostedOddsAmerican: null,
+      baseOddsAmerican: null,
+      bonusAmount: null,
+      maxStake: null,
+      maxWinnings: null,
+      winningsCapKind: "boost_extra",
+      minOddsAmerican: -200,
+      unparsedCapFields: ["maxStake", "maxWinnings"],
+      claimRequired: "claim_token",
+      finePrintNote: null,
+    };
+  }
+
+  const reading = (o: Partial<GuardedReading> = {}) =>
+    guardedReading({
+      boostPercent: "50",
+      minOddsAmerican: -200,
+      sport: "americanfootball_nfl",
+      teams: ["Pittsburgh Steelers", "Cleveland Browns"],
+      singleGame: true,
+      eventDateText: "October 1st, 2026",
+      ...o,
+    });
+
+  it("replaces sentence-half parser teams with the reader's teams and fills the window", () => {
+    const out = reconcileEntry("fanduel", { kind: "candidate", candidate: candidate(BAD_TEAMS) }, reading(), "u");
+    expect(out.kind).toBe("candidate");
+    if (out.kind !== "candidate") return;
+    expect(out.candidate.teamsText).toEqual(["Pittsburgh Steelers", "Cleveland Browns"]);
+    expect(out.candidate.windowStart).not.toBeNull();
+    expect(out.candidate.boostPercent).toBe("50.00");
+    expect(out.candidate.maxStake).toBeNull();
+  });
+
+  it("does not override when reader confidence is not high", () => {
+    const out = reconcileEntry("fanduel", { kind: "candidate", candidate: candidate(BAD_TEAMS) }, reading({ confidence: "medium" }), "u");
+    if (out.kind !== "candidate") throw new Error("expected candidate");
+    expect(out.candidate.teamsText).toEqual(BAD_TEAMS);
+  });
+
+  it("does not override when a reader team is not verbatim in the promo text", () => {
+    const out = reconcileEntry(
+      "fanduel",
+      { kind: "candidate", candidate: candidate(BAD_TEAMS) },
+      reading({ teams: ["Pittsburgh Steelers", "Cincinnati Bengals"] }),
+      "u",
+    );
+    if (out.kind !== "candidate") throw new Error("expected candidate");
+    expect(out.candidate.teamsText).toEqual(BAD_TEAMS);
+  });
+
+  it("leaves plausible parser teams alone", () => {
+    const out = reconcileEntry("fanduel", { kind: "candidate", candidate: candidate(["Steelers", "Browns"]) }, reading(), "u");
+    if (out.kind !== "candidate") throw new Error("expected candidate");
+    expect(out.candidate.teamsText).toEqual(["Steelers", "Browns"]);
+  });
+});

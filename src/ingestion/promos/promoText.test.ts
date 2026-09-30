@@ -14,6 +14,12 @@ describe("splitTeams", () => {
     expect(result).toEqual(["BAL Ravens", "DAL Cowboys"]);
   });
 
+  it("never splits a whole sentence on ' @ ' into teams", () => {
+    const sentence =
+      "YOU CAN CHOOSE between a 50% Profit Boost Token OR an Up-7 Early Win Token to use on the Steelers @ Browns NFL Game on October 1st, 2026!";
+    expect(splitTeams(sentence)).toBeNull();
+  });
+
   it("returns null for sport-wide scope text with no named game", () => {
     expect(splitTeams("any WNBA playoff game")).toBeNull();
   });

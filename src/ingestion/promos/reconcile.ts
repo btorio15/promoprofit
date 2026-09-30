@@ -1,7 +1,9 @@
 import Decimal from "decimal.js";
+import { slateWindow } from "@/domain/promos/etTime";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
 import { ScrapedPromoSchema, type ScrapedPromo, type SkippedEntry } from "@/domain/promos/scraped";
 import type { CapField, PromoType } from "@/domain/promos/types";
+import { isPlausibleTeamName } from "./promoText";
 import { buildClassifyDraft, CLEAR_SKIP_REASONS, REVIEW_SKIP_REASONS } from "./reviewTriage";
 import type { GuardedReading } from "./verbatimGuard";
 
@@ -107,6 +109,40 @@ function buildReviewSkip(
   };
 }
 
+function includesVerbatim(haystack: string, needle: string): boolean {
+  const n = needle.trim().toLowerCase();
+  return n.length > 0 && haystack.toLowerCase().includes(n);
+}
+
+/**
+ * Replaces implausible or missing parser teams (e.g. a whole sentence split
+ * on " @ ") with the reader's teams, and fills a missing window from the
+ * reader's event date. Guarded: reader confidence must be "high", it must
+ * name exactly two teams, both must appear verbatim (case-insensitive) in the
+ * promo text, and the parser's own teams must be empty or implausible -- a
+ * plausible parser pair is left for the matcher's alias logic. Never touches
+ * money fields. Mutates `merged`; returns true when teams were replaced.
+ */
+function applyReaderTeams(merged: ScrapedPromo, reading: GuardedReading): boolean {
+  if (reading.confidence !== "high" || reading.teams.length !== 2) return false;
+  const [away, home] = reading.teams;
+  if (!isPlausibleTeamName(away) || !isPlausibleTeamName(home)) return false;
+  if (!includesVerbatim(merged.rawText, away) || !includesVerbatim(merged.rawText, home)) return false;
+
+  const parserPlausible = merged.teamsText.length === 2 && merged.teamsText.every(isPlausibleTeamName);
+  if (parserPlausible) return false;
+
+  merged.teamsText = [away, home];
+  if (merged.windowStart === null && merged.windowEnd === null && reading.eventDateText !== null) {
+    const window = slateWindow(reading.eventDateText, merged.expiresAt);
+    if (window) {
+      merged.windowStart = window.start;
+      merged.windowEnd = window.end;
+    }
+  }
+  return true;
+}
+
 /**
  * Rule order (candidate entry): reader unusable -> guard drops -> promoType/
  * money disagreement -> otherwise fill nulls from the reader and try a
@@ -153,6 +189,7 @@ function reconcileCandidate(
   }
 
   const merged: ScrapedPromo = { ...candidate, unparsedCapFields: [...candidate.unparsedCapFields] };
+  const teamsOverridden = applyReaderTeams(merged, reading);
   const unparsed = new Set<CapField>(candidate.unparsedCapFields);
   let filled = false;
 
@@ -177,7 +214,7 @@ function reconcileCandidate(
   }
   merged.unparsedCapFields = [...unparsed];
 
-  if (filled) {
+  if (filled || teamsOverridden) {
     const validated = ScrapedPromoSchema.safeParse(merged);
     if (validated.success) {
       return { kind: "candidate", candidate: validated.data, via: "merged" };

@@ -322,3 +322,56 @@ describe("fanduelScraper — multi-day windows (quick-260929-gcn)", () => {
     expect(result.candidates[0].windowEnd).toBe("2026-10-05T03:59:59.999Z");
   });
 });
+
+const CYOR_NAME =
+  "YOU CAN CHOOSE between a 50% Profit Boost Token OR an Up-7 Early Win Token to use on the Steelers @ Browns NFL Game on October 1st, 2026!";
+const CYOR_DESCRIPTION =
+  "Regardless of which option you select, your Reward is eligible for use on the Pittsburgh Steelers @ Cleveland Browns NFL Game on October 1st, 2026, up to a maximum wager. Reward expires at 8:15 PM ET on Thursday, October 1st, 2026.";
+const CYOR_EXPIRES = "2026-10-02T00:15:00.000Z";
+
+function parseCyor(withDetail: boolean) {
+  const list = JSON.stringify({
+    promoPlacements: [
+      {
+        placementId: "SBK_PROMOHUB",
+        promotions: [
+          {
+            promoCode: "CYORNFL1001",
+            title: "NFL Choose Your Own Reward",
+            name: CYOR_NAME,
+            tags: ["nfl", "american-football"],
+            combinedEndDate: CYOR_EXPIRES,
+          },
+        ],
+      },
+    ],
+  });
+  const detail = JSON.stringify([
+    {
+      promoCode: "CYORNFL1001",
+      title: "NFL Choose Your Own Reward",
+      description: CYOR_DESCRIPTION,
+      combinedEndDate: CYOR_EXPIRES,
+    },
+  ]);
+  const result = fanduelScraper.parse(
+    { listBody: list, detailBodies: withDetail ? { CYORNFL1001: detail } : {} },
+    { now: new Date("2026-09-30T16:36:59Z"), sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions" },
+  );
+  return result.candidates[0];
+}
+
+describe("fanduelScraper -- 'on the <team> @ <team> NFL Game on <date>' scope (Steelers @ Browns)", () => {
+  it("with detail: takes the full-name pair from the fine print, never sentence halves", () => {
+    const promo = parseCyor(true);
+    expect(promo.teamsText).toEqual(["Pittsburgh Steelers", "Cleveland Browns"]);
+    expect(promo.windowStart).not.toBeNull();
+    expect(promo.windowEnd).not.toBeNull();
+  });
+
+  it("list-only: takes the nicknames from the headline, never sentence halves", () => {
+    const promo = parseCyor(false);
+    expect(promo.teamsText).toEqual(["Steelers", "Browns"]);
+    expect(promo.windowStart).not.toBeNull();
+  });
+});
