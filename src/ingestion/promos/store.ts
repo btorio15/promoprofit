@@ -538,6 +538,26 @@ async function buildUpsertStatements(
 }
 
 /**
+ * Expire-unseen UPDATE for one book. Excludes hand-added promos
+ * (added_by_user_id set): they share book_key but are never in a scrape
+ * run's keys, so a run must never expire them (Research Pitfall 4).
+ */
+export function buildExpireUnseenStatement(db: ReturnType<typeof getDb>, bookKey: string, allDedupeKeys: string[]) {
+  return db
+    .update(promos)
+    .set({ status: "expired" })
+    .where(
+      and(
+        eq(promos.bookKey, bookKey),
+        inArray(promos.status, ["active", "pending_review"]),
+        notInArray(promos.dedupeKey, allDedupeKeys),
+        isNull(promos.addedByUserId),
+      ),
+    )
+    .returning({ id: promos.id });
+}
+
+/**
  * Upserts one book's scrape (candidate AND classify writes together) and,
  * when expireUnseen (default true), expires every live (active/
  * pending_review) row of that book NOT among either set, in a single
@@ -577,17 +597,7 @@ export async function commitScrapedPromos(
   // only touches rows NOT in this run's writes (candidate or classify), so
   // it is independent of the upsert statements' order within the batch.
   const allDedupeKeys = [...writes.map((w) => w.dedupeKey), ...classify.map((c) => c.dedupeKey)];
-  const expireStatement = db
-    .update(promos)
-    .set({ status: "expired" })
-    .where(
-      and(
-        eq(promos.bookKey, bookKey),
-        inArray(promos.status, ["active", "pending_review"]),
-        notInArray(promos.dedupeKey, allDedupeKeys),
-      ),
-    )
-    .returning({ id: promos.id });
+  const expireStatement = buildExpireUnseenStatement(db, bookKey, allDedupeKeys);
 
   const [expiredRows] = await db.batch([expireStatement, ...statements]);
   return { ...outcome, expired: expiredRows.length };

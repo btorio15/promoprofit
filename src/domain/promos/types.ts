@@ -14,7 +14,7 @@ export type PromoType = (typeof PROMO_TYPES)[number];
  * dismissed: a member rejected it -- never re-queued (D-14). expired: past
  * expires_at or event commence_time.
  */
-export const PROMO_STATUSES = ["active", "pending_review", "dismissed", "expired"] as const;
+export const PROMO_STATUSES = ["active", "pending_review", "dismissed", "expired", "deleted"] as const;
 export type PromoStatus = (typeof PROMO_STATUSES)[number];
 
 /**

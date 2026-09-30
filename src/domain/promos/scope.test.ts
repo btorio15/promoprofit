@@ -134,3 +134,15 @@ describe("eventInScope", () => {
     ).toBe(false);
   });
 });
+
+describe("eventInScope: any scope (D-07)", () => {
+  it("is true for events of different sports", () => {
+    const scope = { kind: "any" } as const;
+    expect(
+      eventInScope({ id: "a", sport_key: "americanfootball_nfl", commence_time: "2026-09-27T12:00:00Z" }, scope),
+    ).toBe(true);
+    expect(
+      eventInScope({ id: "b", sport_key: "basketball_nba", commence_time: "2027-01-01T12:00:00Z" }, scope),
+    ).toBe(true);
+  });
+});

@@ -11,13 +11,15 @@ import { SPORT_KEYS } from "@/config/sports";
  * DB or the clock.
  */
 
-export const PROMO_SCOPE_KINDS = ["event", "sport_window"] as const;
+export const PROMO_SCOPE_KINDS = ["event", "sport_window", "any"] as const;
 export type PromoScopeKind = (typeof PROMO_SCOPE_KINDS)[number];
 
 /** Resolved scope with Date objects, ready for eventInScope/enumeration. */
 export type PromoScope =
   | { kind: "event"; eventId: string; sportKey: string }
-  | { kind: "sport_window"; sportKey: string; windowStart: Date; windowEnd: Date };
+  | { kind: "sport_window"; sportKey: string; windowStart: Date; windowEnd: Date }
+  // Unrestricted bonus bet (D-07): usable on any upcoming game.
+  | { kind: "any" };
 
 /**
  * jsonb-safe scope shape (ISO strings) as stored in promos.best_guess and
@@ -91,6 +93,7 @@ export function eventInScope(
   ev: { id: string; sport_key: string; commence_time: string },
   scope: PromoScope,
 ): boolean {
+  if (scope.kind === "any") return true;
   if (scope.kind === "event") {
     return ev.id === scope.eventId;
   }

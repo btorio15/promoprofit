@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "./client";
 import { promos, scrapeRuns, users } from "./schema";
@@ -76,6 +76,8 @@ export interface ActivePromo extends RankablePromo {
   scopeLabel: string;
   autoMatched: boolean;
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
+  /** True when the viewer hand-added this promo (personal, D-01). */
+  addedByYou: boolean;
 }
 
 const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
@@ -138,6 +140,7 @@ interface ActivePromoRow {
   minOddsAmerican: number | null;
   finePrintNote: string | null;
   autoMatched: boolean;
+  addedByUserId: number | null;
   confirmedByName: string | null;
   correctedByName: string | null;
   capEnteredByName: string | null;
@@ -149,7 +152,7 @@ interface ActivePromoRow {
  * govern it (T-03-15-01) -- this must never throw into the caller, since a
  * single malformed row must not take down the whole Promos tab.
  */
-function mapActivePromoRow(row: ActivePromoRow): ActivePromo | null {
+export function mapActivePromoRow(row: ActivePromoRow, viewerUserId?: number): ActivePromo | null {
   if (!(PROMO_TYPES as readonly string[]).includes(row.promoType)) {
     console.warn(`getActivePromos: dropping promo ${row.id}, unknown promo_type=${row.promoType}`);
     return null;
@@ -173,6 +176,9 @@ function mapActivePromoRow(row: ActivePromoRow): ActivePromo | null {
     }
     scope = { kind: "sport_window", sportKey: row.sportKey, windowStart: row.windowStart, windowEnd: row.windowEnd };
     scopeLabel = sportWindowScopeLabel(row.sportKey, row.windowStart, row.windowEnd);
+  } else if (row.scopeKind === "any") {
+    scope = { kind: "any" };
+    scopeLabel = "Any game";
   } else {
     console.warn(`getActivePromos: dropping promo ${row.id}, unknown scope_kind=${row.scopeKind}`);
     return null;
@@ -240,7 +246,32 @@ function mapActivePromoRow(row: ActivePromoRow): ActivePromo | null {
     scopeLabel,
     autoMatched: row.autoMatched,
     attribution,
+    addedByYou: viewerUserId !== undefined && row.addedByUserId === viewerUserId,
   };
+}
+
+/**
+ * The single visibility rule for personal promos (D-01, T-5-visibility).
+ * Secure by default: no viewer means scraped/group promos only.
+ */
+export function promoVisibilityCondition(viewerUserId?: number): SQL {
+  if (viewerUserId === undefined) return isNull(promos.addedByUserId);
+  return or(isNull(promos.addedByUserId), eq(promos.addedByUserId, viewerUserId)) as SQL;
+}
+
+/** WHERE clause for every promo currently hedgeable and visible to the viewer. */
+export function activePromoWhere(now: Date, viewerUserId?: number): SQL {
+  return and(
+    eq(promos.status, "active"),
+    sql`${promos.scopeKind} is not null`,
+    or(isNull(promos.expiresAt), gt(promos.expiresAt, now)),
+    or(
+      and(eq(promos.scopeKind, "event"), sql`${promos.eventId} is not null`, gt(promos.eventCommenceTime, now)),
+      and(eq(promos.scopeKind, "sport_window"), gt(promos.windowEnd, now)),
+      and(eq(promos.scopeKind, "any"), sql`${promos.expiresAt} is not null`, gt(promos.expiresAt, now)),
+    ),
+    promoVisibilityCondition(viewerUserId),
+  ) as SQL;
 }
 
 /**
@@ -250,7 +281,7 @@ function mapActivePromoRow(row: ActivePromoRow): ActivePromo | null {
  * D-16). pending_review promos never reach this query -- they have no
  * resolved scope_kind until a reviewer or the auto-matcher sets one.
  */
-export async function getActivePromos(now: Date): Promise<ActivePromo[]> {
+export async function getActivePromos(now: Date, viewerUserId?: number): Promise<ActivePromo[]> {
   const confirmedByUsers = alias(users, "confirmed_by_users");
   const correctedByUsers = alias(users, "corrected_by_users");
   const capEnteredByUsers = alias(users, "cap_entered_by_users");
@@ -282,6 +313,7 @@ export async function getActivePromos(now: Date): Promise<ActivePromo[]> {
       minOddsAmerican: promos.minOddsAmerican,
       finePrintNote: promos.finePrintNote,
       autoMatched: promos.autoMatched,
+      addedByUserId: promos.addedByUserId,
       confirmedByName: confirmedByUsers.displayName,
       correctedByName: correctedByUsers.displayName,
       capEnteredByName: capEnteredByUsers.displayName,
@@ -290,21 +322,11 @@ export async function getActivePromos(now: Date): Promise<ActivePromo[]> {
     .leftJoin(confirmedByUsers, eq(promos.confirmedByUserId, confirmedByUsers.id))
     .leftJoin(correctedByUsers, eq(promos.correctedByUserId, correctedByUsers.id))
     .leftJoin(capEnteredByUsers, eq(promos.capEnteredByUserId, capEnteredByUsers.id))
-    .where(
-      and(
-        eq(promos.status, "active"),
-        sql`${promos.scopeKind} is not null`,
-        or(isNull(promos.expiresAt), gt(promos.expiresAt, now)),
-        or(
-          and(eq(promos.scopeKind, "event"), sql`${promos.eventId} is not null`, gt(promos.eventCommenceTime, now)),
-          and(eq(promos.scopeKind, "sport_window"), gt(promos.windowEnd, now)),
-        ),
-      ),
-    );
+    .where(activePromoWhere(now, viewerUserId));
 
   const activePromos: ActivePromo[] = [];
   for (const row of rows) {
-    const mapped = mapActivePromoRow(row);
+    const mapped = mapActivePromoRow(row, viewerUserId);
     if (mapped) activePromos.push(mapped);
   }
   return activePromos;
