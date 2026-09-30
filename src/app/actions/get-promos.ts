@@ -140,7 +140,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
    * so the period numbers are present in every "ok" response.
    */
   await recordCurrentProfitObservations(now, { activePromos, precision: precision as StakePrecision });
-  const availableProfit = await loadAvailableProfit(now, userBookSet, user.userId);
+  const availableProfit = await loadAvailableProfit(now, userBookSet, user.userId, doneIds);
 
   if (feedPromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";

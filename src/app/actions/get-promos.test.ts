@@ -1302,6 +1302,23 @@ describe("getPromos profit observation recording + availableProfit (quick-260927
     expect(result.availableProfit).toEqual({ today: "12.34", week: "12.34", month: "12.34" });
   });
 
+  it("excludes the viewer's Done promos from availableProfit.today only (quick-260930-fge)", async () => {
+    const today = denverDate(new Date());
+    mockGetActivePromos.mockResolvedValue([]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
+    mockGetPromoCompletions.mockResolvedValue([completion({ promoId: 1 })]);
+    mockGetProfitObservationsSince.mockResolvedValue([
+      { promoId: 1, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "12.34" },
+      { promoId: 2, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "5.00" },
+    ]);
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.availableProfit).toEqual({ today: "5.00", week: "17.34", month: "17.34" });
+  });
+
   it("queries getProfitObservationsSince with an ISO date string covering both week and month starts", async () => {
     mockGetActivePromos.mockResolvedValue([]);
 
