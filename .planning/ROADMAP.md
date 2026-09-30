@@ -268,8 +268,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02-PLAN.md — Session user through every promo read (Promos, Opportunities, pairs, mark done), observation leak closed, "Added by you" badge
-- [ ] 05-03-PLAN.md — [BLOCKING, owner OK] Apply migration 0010 to live Neon + db:check
+- [x] 05-02-PLAN.md — Session user through every promo read (Promos, Opportunities, pairs, mark done), observation leak closed, "Added by you" badge
+- [x] 05-03-PLAN.md — [BLOCKING, owner OK] Apply migration 0010 to live Neon + db:check
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -306,4 +306,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 1/10 | In Progress|  |
+| 5. Group-Added Promos | 3/10 | In Progress|  |
