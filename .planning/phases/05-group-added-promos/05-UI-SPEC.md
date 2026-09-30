@@ -1,7 +1,8 @@
 ---
 phase: 5
 slug: group-added-promos
-status: draft
+status: approved
+reviewed_at: 2026-09-29
 shadcn_initialized: true
 preset: "base-nova / neutral / css-variables (components.json unchanged; no re-init, no new tokens, no new shadcn blocks: input, label, select, toggle-group, badge, button, alert-dialog, alert, collapsible, tooltip, popover already exist in src/components/ui/)"
 created: 2026-09-29
@@ -33,6 +34,8 @@ Unchanged from Phases 1 to 4; confirmed against `components.json` and `src/compo
 
 Phone-first, designed at 360px. Content stays in the existing `max-w-[1080px]` main. No new top-level tab or sub-tab: everything lives in Promos > Active.
 
+**Focal point:** on the Active screen, the accent "Add promo" button is the primary visual anchor; while the form is open, the panel heading plus the accent Save button take over as the anchor.
+
 ### Add promo entry point (D-02)
 
 - At the top of **Promos > Active**, above the sort switch, a header row: Label description on the left, **Add promo** button on the right (`Button`, accent fill, `Plus` icon size-4, min-h 44px). On 360px the row wraps and the button goes full width under the description.
@@ -52,7 +55,7 @@ One screen. Fields change with type; switching type keeps Book and any shared va
 3. **Boost as** (`ToggleGroup`, D-06): **Boost %** | **Boosted odds**. Default Boost %. Shows one `Input` below: "Boost %" (numeric, suffix "%") or "Boosted odds" (American odds, e.g. "+250").
 4. **Game(s)** (required): `ScopePicker` reused as-is (D-04): "One game" search box, or "All {league} games" with From / Through days. Never a long dropdown.
 5. **Max stake** (required, `Input`, money, prefix "$"). Helper (Label, muted): "Every boost needs a max stake so the math never guesses."
-6. **More details (optional)** `Collapsible` closed by default (trigger min-h 44px, chevron): Max winnings (`Input`, money) plus its kind (`ToggleGroup`: "Total payout" | "Extra winnings", reusing the cap-kind meaning the scraped boost model already stores), Min odds (`Input`, American), Market / side pin (`Select`, disabled until One game is chosen; same vocabulary as Phase 3: "Moneyline - {team}", "Spread +3.5 - {team}", "Total O/U 44.5"), Expires (`Select` or date-time as the existing scope tools provide; see below).
+6. **More details (optional)** `Collapsible` closed by default (trigger min-h 44px, chevron): Max winnings (`Input`, money) plus its kind (`ToggleGroup`: "Total payout" | "Extra winnings", reusing the cap-kind meaning the scraped boost model already stores), Min odds (`Input`, American), Market / side pin (`Select`, disabled until One game is chosen; same vocabulary as Phase 3: "Moneyline - {team}", "Spread +3.5 - {team}", "Total O/U 44.5"), Expires (same control as the bonus-bet Expires: next-30-days `Select` plus a time defaulting to 11:59 PM ET).
 
 **Bonus bet fields**:
 3. **Bonus amount** (required, `Input`, money, prefix "$").
@@ -252,11 +255,11 @@ New app components (not shadcn): `AddPromoForm` (type-switching fields, used for
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS (FLAG: minor label wording, non-blocking)
+- [x] Dimension 2 Visuals: PASS (focal point added after review)
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-09-29
