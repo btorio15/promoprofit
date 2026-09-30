@@ -1,4 +1,5 @@
 import type { PromoRowDTO } from "@/domain/promos/dto";
+import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
 import type { AvailableProfit } from "@/domain/promos/profitTotals";
 
@@ -20,9 +21,10 @@ export type OpportunityItem<T> = RankKey & { data: T };
 
 export type SourceId = "promos" | "pairs" | "arbs";
 
-/** D-02: later plans add "arbs" and "pairs" members to this union. */
+/** D-02: one member per source. */
 export type OpportunitySourceDTO =
   | { id: "promos"; items: OpportunityItem<PromoRowDTO>[] }
+  | { id: "pairs"; items: OpportunityItem<PairRowDTO>[] }
   | { id: "arbs"; items: OpportunityItem<ArbResultDTO>[] };
 
 /** D-21: Best arbs are always ranked at a fixed $100 total stake, independent of the Arbitrage tab. */
