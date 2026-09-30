@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 01.1: Arbitrage Tab** (INSERTED) - Moneyline arbs from cached odds, opt-in spreads/totals refresh, odds-age + account-risk advisory (completed 2026-09-26)
 - [x] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books (completed 2026-09-26)
 - [x] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches (completed 2026-09-29)
-- [ ] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection
+- [x] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection (completed 2026-09-30)
 - [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a promo, shared or private, feeding the same feed
 
 ## Phase Details
@@ -244,7 +244,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04-09-PLAN.md — Phase gate: full suite/typecheck/lint + owner phone check
+- [x] 04-09-PLAN.md — Phase gate: full suite/typecheck/lint + owner phone check
 **UI hint**: yes
 
 ### Phase 5: Group-Added Promos
@@ -273,5 +273,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
-| 4. Opportunities Feed | 8/9 | In Progress|  |
+| 4. Opportunities Feed | 9/9 | Complete   | 2026-09-30 |
 | 5. Group-Added Promos | 0/? | Not started | - |
