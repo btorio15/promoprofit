@@ -17,6 +17,7 @@ import { ReviewPanel } from "./ReviewPanel";
 import { PromosEmptyState } from "./PromosEmptyState";
 import { PromoRow } from "./PromoRow";
 import { UnprofitablePromoRow } from "./UnprofitablePromoRow";
+import { DonePairRow } from "./DonePairRow";
 import { DonePromoRow } from "./DonePromoRow";
 
 export interface PromosScreenProps {
@@ -215,9 +216,13 @@ export function PromosScreen({
         <TabsContent value="done" className="pt-2">
           {response?.status === "ok" && response.doneRows.length > 0 ? (
             <div className="flex flex-col gap-2">
-              {response.doneRows.map((row) => (
-                <DonePromoRow key={row.rowKey} row={row} onChanged={handleChanged} />
-              ))}
+              {response.doneRows.map((row) =>
+                row.kind === "pair" ? (
+                  <DonePairRow key={row.rowKey} row={row} onChanged={handleChanged} />
+                ) : (
+                  <DonePromoRow key={row.rowKey} row={row} onChanged={handleChanged} />
+                ),
+              )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
