@@ -221,8 +221,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Opportunities tab (first/default): profit summary, Profit/ROI switch, Best promos at your books, See all
-- [ ] 04-02-PLAN.md — Pair solver (TDD): boost+boost and boost+bonus stakes/profit, oracle-tested to the cent
+- [x] 04-01-PLAN.md — Opportunities tab (first/default): profit summary, Profit/ROI switch, Best promos at your books, See all
+- [x] 04-02-PLAN.md — Pair solver (TDD): boost+boost and boost+bonus stakes/profit, oracle-tested to the cent
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -273,5 +273,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 01.1. Arbitrage Tab (INSERTED) | 8/8 | Complete    | 2026-09-26 |
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
-| 4. Opportunities Feed | 0/? | Not started | - |
+| 4. Opportunities Feed | 2/9 | In Progress|  |
 | 5. Group-Added Promos | 0/? | Not started | - |

@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-09-29T20:58:27.476Z"
-last_activity: 2026-09-29 -- Phase 4 planning complete
+last_updated: "2026-09-30T00:15:52.566Z"
+last_activity: 2026-09-30 -- Phase 4 execution started
 progress:
   total_phases: 6
   completed_phases: 4
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 4 — opportunities feed
+**Current focus:** Phase 4 — Opportunities Feed
 
 ## Current Position
 
-Phase: 4
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-09-29 -- Phase 4 planning complete
+Phase: 4 (Opportunities Feed) — EXECUTING
+Plan: 1 of 9
+Status: Executing Phase 4
+Last activity: 2026-09-30 -- Phase 4 execution started
 
 Progress: [██████████] 100%
 
