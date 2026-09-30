@@ -32,6 +32,33 @@ export function sumOwnBookProfit(rows: OwnBookProfitRow[], usedPromoIds: Readonl
 }
 
 /**
+ * D-12: pair-aware "Total profit available". Each chosen pair contributes its
+ * paired guaranteed profit once, in place of its two promos' single profits
+ * (both singles are excluded). Done promos are excluded like sumOwnBookProfit.
+ */
+export function sumPortfolioProfit(
+  singles: OwnBookProfitRow[],
+  pairs: { promoIdA: number; promoIdB: number; guaranteedProfit: string }[],
+  usedPromoIds: ReadonlySet<number>,
+): string {
+  const paired = new Set<number>();
+  let total = new Decimal(0);
+  for (const pair of pairs) {
+    if (usedPromoIds.has(pair.promoIdA) || usedPromoIds.has(pair.promoIdB)) continue;
+    paired.add(pair.promoIdA);
+    paired.add(pair.promoIdB);
+    total = total.plus(new Decimal(pair.guaranteedProfit));
+  }
+  for (const row of singles) {
+    if (!row.hasPromoBook) continue;
+    if (usedPromoIds.has(row.promoId)) continue;
+    if (paired.has(row.promoId)) continue;
+    total = total.plus(new Decimal(row.guaranteedProfit));
+  }
+  return total.toFixed(2);
+}
+
+/**
  * "YYYY-MM-DD" in America/Denver for the given instant, DST-safe because
  * Intl.DateTimeFormat resolves the real MST/MDT offset for that instant
  * (mirrors src/domain/promos/etTime.ts's "no new dependency" approach).

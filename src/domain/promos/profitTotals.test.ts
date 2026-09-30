@@ -4,8 +4,42 @@ import {
   periodStartDates,
   summarizeAvailableProfit,
   sumOwnBookProfit,
+  sumPortfolioProfit,
   type ProfitObservation,
 } from "./profitTotals";
+
+describe("sumPortfolioProfit (D-12: a pair counts once)", () => {
+  const singles = [
+    { promoId: 1, guaranteedProfit: "20.00", hasPromoBook: true },
+    { promoId: 2, guaranteedProfit: "15.00", hasPromoBook: true },
+    { promoId: 3, guaranteedProfit: "5.00", hasPromoBook: true },
+  ];
+
+  it("with no pairs equals sumOwnBookProfit", () => {
+    expect(sumPortfolioProfit(singles, [], new Set())).toBe(sumOwnBookProfit(singles, new Set()));
+  });
+
+  it("counts a pair once in place of its two singles", () => {
+    const pairs = [{ promoIdA: 1, promoIdB: 2, guaranteedProfit: "60.00" }];
+    expect(sumPortfolioProfit(singles, pairs, new Set())).toBe("65.00");
+  });
+
+  it("excludes done promos", () => {
+    expect(sumPortfolioProfit(singles, [], new Set([3]))).toBe("35.00");
+  });
+
+  it("returns 0.00 when empty", () => {
+    expect(sumPortfolioProfit([], [], new Set())).toBe("0.00");
+  });
+
+  it("sums exactly", () => {
+    const rows = [
+      { promoId: 1, guaranteedProfit: "0.10", hasPromoBook: true },
+      { promoId: 2, guaranteedProfit: "0.20", hasPromoBook: true },
+    ];
+    expect(sumPortfolioProfit(rows, [], new Set())).toBe("0.30");
+  });
+});
 
 describe("sumOwnBookProfit (quick-260927-n12, owner decision 1)", () => {
   it("sums only own-book, not-used rows", () => {

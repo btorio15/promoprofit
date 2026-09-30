@@ -21,7 +21,7 @@ export interface PresentablePromo extends RankablePromo {
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
 }
 
-function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max_winnings", bookNames: Map<string, string>): string | null {
+export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max_winnings", bookNames: Map<string, string>): string | null {
   const bookName = bookNames.get(promo.bookKey) ?? promo.bookKey;
 
   if (capBound === "max_stake" && promo.maxStake !== null) {
