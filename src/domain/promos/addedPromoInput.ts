@@ -17,9 +17,12 @@ import {
  */
 
 export const ADDED_PROMO_MAX_ACTIVE = 100;
+/** How many ET days ahead an expiry may be picked (the form's day list; WR-06: the server enforces it too). */
+export const ADDED_PROMO_EXPIRY_DAYS = 30;
 
 export const MSG_PICK_BOOK = "Pick a sportsbook.";
 export const MSG_EXPIRY_PASSED = "Pick an expiry that hasn't passed.";
+export const MSG_EXPIRY_TOO_FAR = `Pick a day in the next ${ADDED_PROMO_EXPIRY_DAYS} days.`;
 export const MSG_GAME_GONE = "That game isn't available any more. Pick another game.";
 export const MSG_GAME_INVALID = "Pick a game or a league and days.";
 export const MSG_TOO_MANY = "You have 100 active promos you added. Delete some before adding more.";

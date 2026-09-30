@@ -1,5 +1,7 @@
 import {
+  ADDED_PROMO_EXPIRY_DAYS,
   MSG_EXPIRY_PASSED,
+  MSG_EXPIRY_TOO_FAR,
   MSG_GAME_GONE,
   MSG_GAME_INVALID,
   MSG_PICK_BOOK,
@@ -19,6 +21,8 @@ import type { PromoSelection } from "@/domain/promos/types";
 import type { ScopeGuess } from "@/domain/promos/scope";
 import { COLORADO_BOOKS } from "@/config/books";
 import { getCachedEvents, getCachedExtendedEvents, getUsableUserBooks } from "./queries";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Shared server validation for adding and editing a member promo (T-5-input):
@@ -59,6 +63,12 @@ export async function prepareAddedPromoValues(args: {
       return { ok: false, response: { status: "invalid", fieldErrors: { expires: [MSG_EXPIRY_PASSED] } } };
     }
     expiresAt = new Date(expiresIso);
+    // WR-06: match the form's next-30-ET-days list; one extra day of slack
+    // covers the ET/UTC day edge. Stops a crafted far-future expiry from
+    // keeping an "any game" promo live (and counted toward the cap) forever.
+    if (expiresAt.getTime() > now.getTime() + (ADDED_PROMO_EXPIRY_DAYS + 1) * MS_PER_DAY) {
+      return { ok: false, response: { status: "invalid", fieldErrors: { expires: [MSG_EXPIRY_TOO_FAR] } } };
+    }
   }
 
   let scope: ScopeGuess | { kind: "any" } = { kind: "any" };

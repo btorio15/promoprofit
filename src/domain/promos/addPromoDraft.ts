@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
 import {
+  ADDED_PROMO_EXPIRY_DAYS,
   AddPromoInputSchema,
   MSG_BOOSTED_ODDS,
   MSG_BOOST_REQUIRED,
@@ -66,7 +67,7 @@ const BOOST_DEFAULTS = {
 
 export const DEFAULT_EXPIRY_TIME = "23:59";
 export const DEFAULT_EXPIRY_DAYS_AHEAD = 7;
-export const EXPIRY_DAY_COUNT = 30;
+export const EXPIRY_DAY_COUNT = ADDED_PROMO_EXPIRY_DAYS;
 
 const MSG_BONUS_REQUIRED = "Enter the bonus amount.";
 const MSG_ODDS = "Enter odds like +250 or -110.";

@@ -60,3 +60,26 @@ describe("prepareAddedPromoValues book check", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("prepareAddedPromoValues expiry bounds (WR-06)", () => {
+  const bonusAtFanduel = (etDate: string) =>
+    ({ ...bonusAtMgm, bookKey: "fanduel", expires: { etDate, etTime: "23:59" } }) as unknown as AddPromoInput;
+
+  it("accepts the last day the form offers (29 ET days ahead)", async () => {
+    const r = await prepareAddedPromoValues({ userId: 7, data: bonusAtFanduel("2026-10-30"), now: NOW, dedupeKey: "a" });
+    expect(r.ok).toBe(true);
+  });
+
+  it("rejects an expiry far beyond the form's 30-day list", async () => {
+    const r = await prepareAddedPromoValues({ userId: 7, data: bonusAtFanduel("2099-12-31"), now: NOW, dedupeKey: "a" });
+    expect(r).toEqual({
+      ok: false,
+      response: { status: "invalid", fieldErrors: { expires: ["Pick a day in the next 30 days."] } },
+    });
+  });
+
+  it("rejects an expiry just past the 30-day window plus slack", async () => {
+    const r = await prepareAddedPromoValues({ userId: 7, data: bonusAtFanduel("2026-11-02"), now: NOW, dedupeKey: "a" });
+    expect(r.ok).toBe(false);
+  });
+});
