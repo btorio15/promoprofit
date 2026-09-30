@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 5 executed and verified (human_needed); owner chose to fix code-review findings before closing
-last_updated: "2026-09-30T07:04:08.639Z"
+stopped_at: Phase 5 code-review fixes applied (7/7); awaiting owner hands-on checks before closing
+last_updated: "2026-09-30T07:13:41.362Z"
 last_activity: 2026-09-30 -- Phase 5 execution started
 progress:
   total_phases: 6
@@ -177,6 +177,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-30T07:04:08.628Z
-Stopped at: Phase 5 executed and verified (human_needed); owner chose to fix code-review findings before closing
-Resume file: .planning/phases/05-group-added-promos/05-REVIEW.md
+Last session: 2026-09-30T07:13:41.354Z
+Stopped at: Phase 5 code-review fixes applied (7/7); awaiting owner hands-on checks before closing
+Resume file: .planning/phases/05-group-added-promos/05-HUMAN-UAT.md
