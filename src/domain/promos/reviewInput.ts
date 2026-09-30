@@ -39,6 +39,25 @@ export const MarkPromoDoneInputSchema = z.strictObject({
 export type MarkPromoDoneInput = z.infer<typeof MarkPromoDoneInputSchema>;
 
 /**
+ * Phase 4 Plan 07: mark-pair-done input. No userId (IDOR guard). The expected
+ * numbers are only compared against the server's recompute (D-23), never
+ * stored. promoIdA/promoIdB are the pair row's own A/B order.
+ */
+const Money2dp = z.string().regex(/^-?\d+\.\d{2}$/);
+export const MarkPairDoneInputSchema = z
+  .strictObject({
+    promoIdA: z.number().int().positive(),
+    promoIdB: z.number().int().positive(),
+    precision: z.enum(["whole", "cents"]),
+    expectedGuaranteedProfit: Money2dp,
+    expectedStakeA: Money2dp,
+    expectedStakeB: Money2dp,
+  })
+  .refine((v) => v.promoIdA !== v.promoIdB);
+
+export type MarkPairDoneInput = z.infer<typeof MarkPairDoneInputSchema>;
+
+/**
  * A member-chosen pin inside the Correct sub-panel (T-03-09-02): a strict
  * shape validated the same way ScrapedPromoSchema's own `pinned` field is --
  * a moneyline pin has no line, a spread/total pin must have a half-point
