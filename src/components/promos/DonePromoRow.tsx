@@ -5,12 +5,15 @@ import type { DonePromoDTO } from "@/domain/promos/dto";
 import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { AddedPromoActions } from "./AddedPromoActions";
 import { MarkUsedButton } from "./MarkUsedButton";
 import { PromoDetails } from "./PromoDetails";
 
 interface DonePromoRowProps {
   row: DonePromoDTO;
   onChanged: () => void;
+  /** Owner Expire/Delete for promos the member added (Done rows have no Edit). */
+  addedActions?: { onError: (message: string) => void };
 }
 
 /**
@@ -22,9 +25,21 @@ interface DonePromoRowProps {
  * PromoDetails panel. "No hedge" and legacy rows are plain, non-expandable
  * divs with the note they were saved with.
  */
-export function DonePromoRow({ row, onChanged }: DonePromoRowProps) {
+export function DonePromoRow({ row, onChanged, addedActions }: DonePromoRowProps) {
   const done = row.row;
   const doneOn = `Marked done ${formatKickoff(row.completedAt)}`;
+  const addedBadge = row.addedByYou ? <Badge variant="outline">Added by you</Badge> : null;
+  const manageable = row.addedPromoStatus === "active" || row.addedPromoStatus === "expired";
+  const actions =
+    addedActions && manageable ? (
+      <AddedPromoActions
+        promoId={row.promoId}
+        canExpire={row.addedPromoStatus === "active"}
+        isDone
+        onChanged={onChanged}
+        onError={addedActions.onError}
+      />
+    ) : null;
 
   if (row.kind !== "hedge" || done === null) {
     return (
@@ -38,6 +53,7 @@ export function DonePromoRow({ row, onChanged }: DonePromoRowProps) {
               <Badge variant="outline">{row.promoTypeLabel}</Badge>
               <span>{row.title}</span>
               <span className="text-sm text-muted-foreground">{row.bookName}</span>
+              {addedBadge}
             </span>
             {row.scopeLabel ? <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span> : null}
             {row.note ? <span className="text-sm text-muted-foreground">{row.note}</span> : null}
@@ -48,6 +64,7 @@ export function DonePromoRow({ row, onChanged }: DonePromoRowProps) {
             <MarkUsedButton mode="undo" promoId={row.promoId} onChanged={onChanged} />
           </div>
         </div>
+        {actions ? <div className="mt-3">{actions}</div> : null}
       </div>
     );
   }
@@ -69,6 +86,7 @@ export function DonePromoRow({ row, onChanged }: DonePromoRowProps) {
                 {done.awayTeam} @ {done.homeTeam}
               </span>
               <Badge variant="outline">{done.marketBadge}</Badge>
+              {addedBadge}
               <MarkUsedButton mode="undo" promoId={row.promoId} onChanged={onChanged} />
             </span>
             <span className="text-sm text-muted-foreground">Promo: {done.scopeLabel}</span>
@@ -106,6 +124,7 @@ export function DonePromoRow({ row, onChanged }: DonePromoRowProps) {
       </div>
       <CollapsibleContent>
         <PromoDetails row={done} />
+        {actions ? <div className="px-4 pb-4">{actions}</div> : null}
       </CollapsibleContent>
     </Collapsible>
   );
