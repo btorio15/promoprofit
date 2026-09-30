@@ -57,7 +57,7 @@ export function LoginForm() {
   });
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4">
       {form.formState.errors.root ? (
         <Alert variant="destructive">
           <AlertDescription>{form.formState.errors.root.message}</AlertDescription>

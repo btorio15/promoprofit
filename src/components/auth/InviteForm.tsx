@@ -59,7 +59,7 @@ export function InviteForm({ token }: InviteFormProps) {
   const isEmailTaken = emailError === EMAIL_TAKEN_MESSAGE;
 
   return (
-    <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-4">
+    <form method="post" onSubmit={onSubmit} className="mt-4 flex flex-col gap-4">
       {form.formState.errors.root ? (
         <Alert variant="destructive">
           <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
