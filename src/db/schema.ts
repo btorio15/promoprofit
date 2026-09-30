@@ -239,11 +239,16 @@ export const promos = pgTable(
     capEnteredByUserId: integer("cap_entered_by_user_id").references(() => users.id, { onDelete: "set null" }),
     dismissedByUserId: integer("dismissed_by_user_id").references(() => users.id, { onDelete: "set null" }),
     flaggedByUserId: integer("flagged_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    // null = scraped/group promo; set = personal hand-added promo visible only
+    // to that user (D-01). Cascade (NOT set null): set null would turn a
+    // private promo into a visible-to-everyone promo when its owner is deleted.
+    addedByUserId: integer("added_by_user_id").references(() => users.id, { onDelete: "cascade" }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
   },
   (table) => [
     index("promos_status_idx").on(table.status),
     index("promos_book_key_idx").on(table.bookKey),
+    index("promos_added_by_user_id_idx").on(table.addedByUserId),
   ],
 );
 
