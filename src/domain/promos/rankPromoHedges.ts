@@ -284,7 +284,8 @@ function isBetterCandidate(a: EvaluatedCandidate, b: EvaluatedCandidate | null):
 
 /**
  * Candidate selections for a promo: its single pinned selection, or every 2-way selection inside its scope.
- * Only unpinned single-game promos also try the promo book's alternate spreads (260930-gyl, A1).
+ * All unpinned promos also try the promo book's alternate spreads on any in-scope game with cached
+ * alt lines (260930-hor relaxes 260930-gyl A1 for league-wide promos).
  */
 export function candidatesFor(promo: RankablePromo, opts: RankOptions): ResolvedSelection[] {
   return promo.pinned
@@ -295,7 +296,7 @@ export function candidatesFor(promo: RankablePromo, opts: RankOptions): Resolved
         {
           now: opts.now,
           eligibleMarketTypes: promo.eligibleMarketTypes,
-          altSpreadBookKey: promo.scope.kind === "event" ? promo.bookKey : undefined,
+          altSpreadBookKey: promo.bookKey,
         },
       );
 }

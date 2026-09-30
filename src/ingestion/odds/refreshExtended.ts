@@ -120,16 +120,29 @@ export function toH2hOnlyEvents(events: OddsEvent[]): OddsEvent[] {
 }
 
 /**
- * Serializes against Refresh odds and the odds:refresh CLI (same refresh_lock
- * row id=1, WR-03): the lock is taken before the gate is evaluated and held
- * until the credit row is written, exactly like runOddsRefresh.
+ * Picks extra alt-spread game ids from the FRESH main lines (260930-hor league-wide
+ * top-1 picks). Synchronous: all DB loading happens in the action before the lock.
  */
-export async function runSpreadsTotalsRefresh(opts: {
+export type AltSpreadEventPicker = (fresh: {
+  moneylineEvents: OddsEvent[];
+  extendedEvents: OddsEvent[];
+  now: Date;
+}) => string[];
+
+export interface SpreadsTotalsRefreshOptions {
   confirmed: boolean;
   now?: Date;
   triggeredByUserId?: number | null;
   altSpreads?: AltSpreadRequests;
-}): Promise<ExtendedRefreshOutcome> {
+  pickAltSpreadEventIds?: AltSpreadEventPicker;
+}
+
+/**
+ * Serializes against Refresh odds and the odds:refresh CLI (same refresh_lock
+ * row id=1, WR-03): the lock is taken before the gate is evaluated and held
+ * until the credit row is written, exactly like runOddsRefresh.
+ */
+export async function runSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions): Promise<ExtendedRefreshOutcome> {
   const holder = randomUUID();
 
   let acquired: boolean;
@@ -153,12 +166,7 @@ export async function runSpreadsTotalsRefresh(opts: {
   }
 }
 
-async function runGuardedSpreadsTotalsRefresh(opts: {
-  confirmed: boolean;
-  now?: Date;
-  triggeredByUserId?: number | null;
-  altSpreads?: AltSpreadRequests;
-}): Promise<ExtendedRefreshOutcome> {
+async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions): Promise<ExtendedRefreshOutcome> {
   const now = opts.now ?? new Date();
 
   let latest;
@@ -263,7 +271,25 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
     // Alternate spread lines for games with a promo (quick 260930-gam/gyl):
     // capped, sequential, and never able to fail the main refresh. Runs
     // after the main loop so the main spreads/totals are already buffered.
-    const requests = opts.altSpreads ?? NO_ALT_SPREAD_REQUESTS;
+    // 260930-hor: league-wide promos add their top-1 main-line game via the
+    // picker hook; a pick failure never fails the main refresh.
+    const base = opts.altSpreads ?? NO_ALT_SPREAD_REQUESTS;
+    let picked: string[] = [];
+    if (opts.pickAltSpreadEventIds) {
+      try {
+        picked = opts.pickAltSpreadEventIds({
+          moneylineEvents: pendingWrites.flatMap((w) => w.h2hEvents),
+          extendedEvents: pendingWrites.flatMap((w) => w.extendedEvents),
+          now,
+        });
+      } catch {
+        picked = [];
+      }
+    }
+    const requests: AltSpreadRequests = {
+      pins: base.pins,
+      scopedEventIds: [...new Set([...base.scopedEventIds, ...picked])],
+    };
     if (requests.pins.length > 0 || requests.scopedEventIds.length > 0) {
       const { targets, skippedOverLimit } = selectAltSpreadTargets(
         requests,

@@ -101,6 +101,16 @@ describe("selectAltSpreadTargets with scoped event ids (260930-gyl)", () => {
   });
 });
 
+describe("selectAltSpreadTargets shared cap with league-wide picks (260930-hor)", () => {
+  it("7 distinct scoped ids plus a duplicate -> 5 soonest targets, skipped 2", () => {
+    const ids = ["a", "b", "c", "d", "e", "f", "g"];
+    const events = ids.map((id, i) => evt(id, 10 + i));
+    const r = selectAltSpreadTargets(reqs([], ["g", "f", "e", "d", "c", "b", "a", "c"]), events, NOW);
+    expect(r.targets.map((t) => t.eventId)).toEqual(["a", "b", "c", "d", "e"]);
+    expect(r.skippedOverLimit).toBe(2);
+  });
+});
+
 describe("buildAltSpreadRequests", () => {
   const promo = (over: Partial<AltSpreadPromoInput> = {}): AltSpreadPromoInput => ({
     promoType: "profit_boost",

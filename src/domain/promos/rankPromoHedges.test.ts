@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { calculateProfitBoostHedge } from "@/domain/hedge/profitBoost";
+import { calculateBonusBetHedge } from "@/domain/hedge/bonusBet";
 import { findUnprofitablePromos, rankPromoHedges, type RankablePromo } from "./rankPromoHedges";
 import type { PromoScope } from "./scope";
 
@@ -1251,7 +1252,7 @@ describe("rankPromoHedges: alternate spreads for unpinned single-game promos (26
     for (const o of all) expect(o.selection.line).not.toBe(-5.5);
   });
 
-  it("A1: sport_window boost and any-scope bonus stay on the main line", () => {
+  it("league-wide sport_window boost and any-scope bonus now use the alt pair (260930-hor relaxes A1)", () => {
     const windowBoost: RankablePromo = {
       ...base,
       scope: {
@@ -1274,10 +1275,135 @@ describe("rankPromoHedges: alternate spreads for unpinned single-game promos (26
     const out = rankPromoHedges([windowBoost, anyBonus], opts);
     const boost = out.find((o) => o.promo.id === 1)!;
     const bonus = out.find((o) => o.promo.id === 3)!;
-    expect(Math.abs(boost.selection.line!)).toBe(2.5);
-    expect(Math.abs(bonus.selection.line!)).toBe(2.5);
+    expect(boost.selection.line).toBe(-6.5);
+    expect(bonus.selection.line).toBe(-6.5);
+    expect(boost.hedge).toEqual({ bookKey: "draftkings", oddsAmerican: -230 });
     if (boost.result.kind !== "boost" || bonus.result.kind !== "bonus") throw new Error("kind");
-    expect(boost.result.boost.guaranteedProfit.toFixed(2)).toBe("3.13");
-    expect(bonus.result.bonus.guaranteedProfit.toFixed(2)).toBe("21.64");
+    expect(boost.result.boost.hedgeStake.toFixed(2)).toBe("69.69");
+    expect(boost.result.boost.guaranteedProfit.toFixed(2)).toBe("5.30");
+    expect(bonus.result.bonus.hedgeStake.toFixed(2)).toBe("69.69");
+    expect(bonus.result.bonus.guaranteedProfit.toFixed(2)).toBe("30.30");
+
+    // Cross-check against the project's own solvers (Browns -6.5 alt at +200, DK Steelers +6.5 at -230).
+    const directBoost = calculateProfitBoostHedge({
+      boostedOddsAmerican: null,
+      baseOddsAmerican: 200,
+      boostPercent: new Decimal(50),
+      hedgeOddsAmerican: -230,
+      maxStake: new Decimal(25),
+      winningsCap: null,
+      minOddsAmerican: -200,
+      precision: "cents",
+    })!;
+    expect(boost.result.boost.guaranteedProfit.toFixed(2)).toBe(directBoost.guaranteedProfit.toFixed(2));
+    expect(boost.result.boost.hedgeStake.toFixed(2)).toBe(directBoost.hedgeStake.toFixed(2));
+    const directBonus = calculateBonusBetHedge({
+      bonusAmount: new Decimal(50),
+      bonusOddsAmerican: 200,
+      hedgeOddsAmerican: -230,
+      precision: "cents",
+    });
+    expect(bonus.result.bonus.guaranteedProfit.toFixed(2)).toBe(directBonus.guaranteedProfit.toFixed(2));
+    expect(bonus.result.bonus.hedgeStake.toFixed(2)).toBe(directBonus.hedgeStake.toFixed(2));
+  });
+});
+
+describe("rankPromoHedges: alternate spreads for league-wide promos (260930-hor)", () => {
+  const fixture = (id: string, home: string, away: string, commence: number, withAlt: boolean): OddsEvent => ({
+    id,
+    sport_key: "americanfootball_nfl",
+    sport_title: "NFL",
+    commence_time: plusHours(commence),
+    home_team: home,
+    away_team: away,
+    bookmakers: [
+      {
+        key: "fanduel",
+        title: "FanDuel",
+        markets: [
+          {
+            key: "spreads",
+            outcomes: [
+              { name: home, price: -110, point: -2.5 },
+              { name: away, price: -110, point: 2.5 },
+            ],
+          },
+          ...(withAlt
+            ? [
+                {
+                  key: "alternate_spreads",
+                  outcomes: [
+                    { name: home, price: 200, point: -6.5 },
+                    { name: away, price: -250, point: 7.5 },
+                    { name: home, price: 180, point: -5.5 },
+                  ],
+                },
+              ]
+            : []),
+        ],
+      },
+      {
+        key: "draftkings",
+        title: "DraftKings",
+        markets: [
+          {
+            key: "spreads",
+            outcomes: [
+              { name: home, price: -110, point: -2.5 },
+              { name: away, price: -110, point: 2.5 },
+            ],
+          },
+          ...(withAlt
+            ? [
+                {
+                  key: "alternate_spreads",
+                  outcomes: [
+                    { name: away, price: -230, point: 6.5 },
+                    { name: home, price: -170, point: 3.5 },
+                  ],
+                },
+              ]
+            : []),
+        ],
+      },
+    ],
+  });
+  const cached = fixture("cached", "Cleveland Browns", "Pittsburgh Steelers", 24, true);
+  const mainOnly = fixture("main-only", "Dallas Cowboys", "New York Giants", 30, false);
+  const windowBoost: RankablePromo = {
+    ...defaultPromo,
+    bookKey: "fanduel",
+    scope: {
+      kind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: NOW,
+      windowEnd: new Date(plusHours(48)),
+    },
+    eligibleMarketTypes: ["spread"],
+    boostPercent: "50",
+    maxStake: "25",
+    minOddsAmerican: -200,
+  };
+  const opts = {
+    moneylineEvents: [] as OddsEvent[],
+    extendedEvents: [cached, mainOnly],
+    hedgeBookKeys: new Set(["fanduel", "draftkings"]),
+    precision: "cents" as const,
+    now: NOW,
+  };
+
+  it("picks the exact-opposite alt pair on the cached game over the main-only game", () => {
+    const [o] = rankPromoHedges([windowBoost], opts);
+    expect(o.selection.eventId).toBe("cached");
+    expect(o.selection.line).toBe(-6.5);
+    expect(o.hedge).toEqual({ bookKey: "draftkings", oddsAmerican: -230 });
+    if (o.result.kind !== "boost") throw new Error("kind");
+    expect(o.result.boost.guaranteedProfit.toFixed(2)).toBe("5.30");
+  });
+
+  it("exact-opposite rule and min odds: never Browns -5.5, never the -250 line", () => {
+    const [o] = rankPromoHedges([windowBoost], opts);
+    expect(o.selection.line).not.toBe(-5.5);
+    expect(o.selection.line).not.toBe(7.5);
   });
 });

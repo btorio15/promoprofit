@@ -417,6 +417,95 @@ describe("runSpreadsTotalsRefresh", () => {
       expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 0 } });
     });
 
+    it("260930-hor: a league-wide pick alone triggers the fetch; hook gets fresh main events once", async () => {
+      const events = [nflEvent("e1", 5), nflEvent("e2", 6)];
+      setup(events);
+      mockFetchEventOdds.mockResolvedValue({ event: altFor(events[1]), quota: { remaining: 290, used: 210, last: 1 } });
+      const pick = vi.fn().mockReturnValue(["e2"]);
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        altSpreads: { pins: [], scopedEventIds: [] },
+        pickAltSpreadEventIds: pick,
+      });
+
+      expect(pick).toHaveBeenCalledTimes(1);
+      const arg = pick.mock.calls[0][0];
+      expect(arg.now).toBe(now);
+      expect(arg.extendedEvents.map((e: OddsEvent) => e.id)).toEqual(["e1", "e2"]);
+      expect(arg.moneylineEvents.map((e: OddsEvent) => e.id)).toEqual(["e1", "e2"]);
+      expect(mockFetchEventOdds).toHaveBeenCalledTimes(1);
+      expect(mockFetchEventOdds.mock.calls[0][1]).toBe("e2");
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 0 } });
+    });
+
+    it("260930-hor: single-game and league-wide targets share the 5-game cap, soonest first, duplicates once", async () => {
+      const events = Array.from({ length: 6 }, (_, i) => nflEvent(`e${i}`, 10 + i));
+      setup(events);
+      mockFetchEventOdds.mockImplementation(async (_s, eventId) => {
+        const e = events.find((x) => x.id === eventId)!;
+        return { event: altFor(e), quota: { remaining: 290, used: 210, last: 1 } };
+      });
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        altSpreads: { pins: [], scopedEventIds: ["e5", "e4", "e3", "e2"] },
+        pickAltSpreadEventIds: () => ["e2", "e1", "e0"],
+      });
+
+      expect(mockFetchEventOdds.mock.calls.map((c) => c[1])).toEqual(["e0", "e1", "e2", "e3", "e4"]);
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 5, skippedOverLimit: 1 } });
+    });
+
+    it("260930-hor: a throwing picker never fails the main refresh; single-game ids still fetched", async () => {
+      const events = [nflEvent("e1", 5)];
+      setup(events);
+      mockFetchEventOdds.mockResolvedValue({ event: altFor(events[0]), quota: { remaining: 290, used: 210, last: 1 } });
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        altSpreads: { pins: [], scopedEventIds: ["e1"] },
+        pickAltSpreadEventIds: () => {
+          throw new Error("boom");
+        },
+      });
+
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 0 } });
+      expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
+      expect(mockRecordCreditUsage).toHaveBeenCalledTimes(1);
+    });
+
+    it("260930-hor: picker ids respect the credit gate (alt fetch skipped, main commit lands)", async () => {
+      const events = [nflEvent("e1", 5), nflEvent("e2", 6)];
+      setup(events, 100);
+      mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining: 21, used: 479, last: 3 } });
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        pickAltSpreadEventIds: () => ["e1", "e2"],
+      });
+
+      expect(mockFetchEventOdds).not.toHaveBeenCalled();
+      expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 0, skippedForCredits: true } });
+    });
+
+    it("260930-hor: an unconfirmed press never calls the picker or fetchEventOdds", async () => {
+      const events = [nflEvent("e1", 5)];
+      setup(events);
+      const pick = vi.fn().mockReturnValue(["e1"]);
+
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: false, now, pickAltSpreadEventIds: pick });
+
+      expect(outcome.status).toBe("confirm_required");
+      expect(pick).not.toHaveBeenCalled();
+      expect(mockFetchEventOdds).not.toHaveBeenCalled();
+    });
+
     it("an alt fetch failure never fails the main refresh; other targets still merge", async () => {
       const events = [nflEvent("e1", 5), nflEvent("e2", 6)];
       setup(events);
