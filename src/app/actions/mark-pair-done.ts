@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { MarkPairDoneInputSchema } from "@/domain/promos/reviewInput";
-import { markPairDone } from "@/db/promoTracking";
+import { MarkPairDoneInputSchema, PromoIdInputSchema } from "@/domain/promos/reviewInput";
+import { markPairDone, unmarkPairDone } from "@/db/promoTracking";
 import { computeMemberPairState } from "@/db/memberPairState";
 import { buildPairSnapshot, isSamePairDisplay } from "@/domain/promos/pairSnapshot";
 
@@ -64,4 +64,25 @@ export async function markPairDoneAction(input: unknown): Promise<MarkPairDoneRe
 
   revalidatePath("/");
   return { status: "ok", profitExtracted: primary.profitExtracted };
+}
+
+export type UndoPairDoneResponse = { status: "ok" } | { status: "invalid" };
+
+/**
+ * Undo a done pair from EITHER promo id (T-04-25/26): requireUser first, the
+ * acting user comes only from the session, and unmarkPairDone removes both
+ * rows in one statement scoped to that user.
+ */
+export async function unmarkPairDoneAction(input: unknown): Promise<UndoPairDoneResponse> {
+  const user = await requireUser();
+
+  const parsed = PromoIdInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return { status: "invalid" };
+  }
+
+  await unmarkPairDone({ userId: user.userId, promoId: parsed.data.promoId });
+
+  revalidatePath("/");
+  return { status: "ok" };
 }

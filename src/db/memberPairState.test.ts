@@ -21,13 +21,18 @@ vi.mock("@/db/queries", () => ({
   getHedgeBookKeys: mockGetHedgeBookKeys,
   getUserBookKeys: mockGetUserBookKeys,
 }));
+vi.mock("@/lib/session", () => ({ requireUser: vi.fn().mockResolvedValue({ userId: 1, email: "a@example.com", displayName: "A" }) }));
+vi.mock("@/db/promoObservations", () => ({ recordCurrentProfitObservations: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/db/promoTracking", () => ({
   getPromoCompletions: mockGetPromoCompletions,
   getProfitObservationsSince: vi.fn().mockResolvedValue([]),
 }));
 
 import { computeMemberPairState } from "./memberPairState";
-import { DonePairSnapshotSchema } from "@/domain/promos/pairSnapshot";
+import { getOpportunities } from "@/app/actions/get-opportunities";
+import { DonePairSnapshotSchema, isSamePairDisplay } from "@/domain/promos/pairSnapshot";
+import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 
 const NOW = new Date();
 const plusHours = (h: number) => new Date(NOW.getTime() + h * 3600_000);
@@ -140,5 +145,26 @@ describe("computeMemberPairState", () => {
     ]);
     const again = await computeMemberPairState(args);
     expect(again).toEqual({ kind: "already_done_pair", profitExtracted: built.primary.profitExtracted });
+  });
+
+  it("D-11 parity: the server recompute equals the pair the Opportunities feed shows (profit and both stakes)", async () => {
+    const feed = await getOpportunities({ precision: "cents" });
+    if (feed.status !== "ok") throw new Error("expected ok feed");
+    const pairsSource = feed.sources.find((src) => src.id === "pairs");
+    const shown = pairsSource?.items.find((item) => item.rowKey === "pair-1-2")?.data as PairRowDTO | undefined;
+    if (!shown) throw new Error("expected the feed to show pair-1-2");
+
+    const state = await computeMemberPairState(args);
+    if (state.kind !== "pair" || !state.row) throw new Error("expected pair");
+    expect(state.row.guaranteedProfit).toBe(shown.guaranteedProfit);
+    expect(state.row.legA.stake).toBe(shown.legA.stake);
+    expect(state.row.legB.stake).toBe(shown.legB.stake);
+    // The action's D-23 comparison treats them as the same pair.
+    expect(
+      isSamePairDisplay(
+        { profit: shown.guaranteedProfit, stakeA: shown.legA.stake, stakeB: shown.legB.stake },
+        state.row,
+      ),
+    ).toBe(true);
   });
 });
