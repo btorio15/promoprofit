@@ -33,7 +33,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Promo Capture
 
 - [ ] **PROMO-01**: Any group member can add a promo they see in their app (book, type, boost % or boosted price, market, max stake, max winnings, expiry) by picking a real upcoming event, and it feeds the opportunities feed
-- [ ] **PROMO-02**: User can mark an added promo as shared (visible to everyone with that book) or private (visible only to them)
+- [ ] **PROMO-02**: Promos a user adds are personal — visible only to that user (revised 2026-09-29: owner dropped group sharing; see 05-CONTEXT D-01)
 - [x] **PROMO-03**: System scrapes publicly accessible (no-login) promo pages for Colorado books on a schedule and adds discovered promos automatically
 - [x] **PROMO-04**: Scraped promos whose event/market can't be matched with certainty go to a review queue where a user confirms or corrects the match before it's used
 - [ ] **PROMO-05**: User can edit, expire, or delete promos they added

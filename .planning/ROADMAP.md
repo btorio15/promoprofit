@@ -255,8 +255,8 @@ Plans:
 **Requirements**: PROMO-01, PROMO-02, PROMO-05
 **Success Criteria** (what must be TRUE):
 
-  1. Any group member can add a promo (book, type, boost % or boosted price, market, max stake, max winnings, expiry) by picking a real upcoming event from a dropdown, and it appears in the opportunities feed
-  2. User can mark an added promo as shared (visible to everyone with that book) or private (visible only to them)
+  1. Any group member can add a promo (book, type, boost % or boosted price, market, max stake, max winnings, expiry) by picking real upcoming games with the search / league date-range picker, and it appears in their Promos list and Opportunities feed
+  2. A promo a user adds is visible only to them (personal; group sharing dropped by owner 2026-09-29)
   3. User can edit, expire, or delete promos they added, and the change is reflected in the feed immediately
 
 **Plans**: TBD
