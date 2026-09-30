@@ -1,11 +1,14 @@
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { isHalfPoint } from "@/domain/hedge/spreadsTotalsFilter";
+import type { PromoScope } from "./scope";
+import type { PromoMarketType, PromoSelection, PromoType } from "./types";
 
 /**
- * Alternate-spread helpers for pinned promos (quick 260930-gam). Pure,
- * zero-I/O, domain-only (no db/ingestion imports, D-16). Decides which
- * pinned games need a per-event alternate_spreads fetch and merges that
- * market into a buffered extended-odds event.
+ * Alternate-spread helpers for promo games (quick 260930-gam, generalized in
+ * 260930-gyl). Pure, zero-I/O, domain-only (no db/ingestion imports, D-16).
+ * Decides which games (single-game unpinned promos and line-pinned promos)
+ * need a per-event alternate_spreads fetch and merges that market into a
+ * buffered extended-odds event.
  */
 
 export const ALT_SPREADS_MARKET = "alternate_spreads";
@@ -22,6 +25,50 @@ export interface AltSpreadTarget {
   sportKey: string;
   eventId: string;
   commenceTime: string;
+}
+
+export interface AltSpreadRequests {
+  /** Line-pinned spread promos. */
+  pins: AltSpreadPin[];
+  /** Single-game unpinned spread-eligible promos: fetch regardless of main line. */
+  scopedEventIds: string[];
+}
+
+export const NO_ALT_SPREAD_REQUESTS: AltSpreadRequests = { pins: [], scopedEventIds: [] };
+
+export interface AltSpreadPromoInput {
+  promoType: PromoType;
+  scope: PromoScope;
+  pinned: PromoSelection | null;
+  eligibleMarketTypes: readonly PromoMarketType[];
+  maxStake: string | null;
+}
+
+/**
+ * Derives alt-spread fetch requests from server-loaded promos (never client
+ * input). Decision A1: only event-scoped unpinned promos are "scoped".
+ */
+export function buildAltSpreadRequests(promos: readonly AltSpreadPromoInput[]): AltSpreadRequests {
+  const pins: AltSpreadPin[] = [];
+  const scoped = new Set<string>();
+  for (const promo of promos) {
+    const pinned = promo.pinned;
+    if (pinned) {
+      if (
+        pinned.marketType === "spread" &&
+        pinned.line !== null &&
+        (pinned.side === "home" || pinned.side === "away")
+      ) {
+        pins.push({ eventId: pinned.eventId, line: pinned.line, side: pinned.side });
+      }
+      continue;
+    }
+    if (promo.scope.kind !== "event") continue;
+    if (!promo.eligibleMarketTypes.includes("spread")) continue;
+    if (promo.promoType === "profit_boost" && promo.maxStake === null) continue; // D-18
+    scoped.add(promo.scope.eventId);
+  }
+  return { pins, scopedEventIds: [...scoped] };
 }
 
 /** Half-point-safe equality: points are identifiers, compared at 0.5 resolution. */
@@ -50,25 +97,28 @@ function mainLineCovers(event: OddsEvent, homePoint: number): boolean {
 }
 
 export function selectAltSpreadTargets(
-  pins: AltSpreadPin[],
+  requests: AltSpreadRequests,
   extendedEvents: OddsEvent[],
   now: Date,
 ): { targets: AltSpreadTarget[]; skippedOverLimit: number } {
   const byId = new Map(extendedEvents.map((e) => [e.id, e]));
   const pinsByEvent = new Map<string, AltSpreadPin[]>();
-  for (const pin of pins) {
+  for (const pin of requests.pins) {
     if (!isHalfPoint(pin.line)) continue;
     const list = pinsByEvent.get(pin.eventId) ?? [];
     list.push(pin);
     pinsByEvent.set(pin.eventId, list);
   }
+  const scoped = new Set(requests.scopedEventIds);
+  const eventIds = new Set<string>([...scoped, ...pinsByEvent.keys()]);
 
   const candidates: AltSpreadTarget[] = [];
-  for (const [eventId, eventPins] of pinsByEvent) {
+  for (const eventId of eventIds) {
     const event = byId.get(eventId);
     if (!event) continue;
     if (!(new Date(event.commence_time).getTime() > now.getTime())) continue;
-    if (eventPins.every((p) => mainLineCovers(event, homePointOf(p)))) continue;
+    const eventPins = pinsByEvent.get(eventId) ?? [];
+    if (!scoped.has(eventId) && eventPins.every((p) => mainLineCovers(event, homePointOf(p)))) continue;
     candidates.push({ sportKey: event.sport_key, eventId, commenceTime: event.commence_time });
   }
 

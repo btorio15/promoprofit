@@ -34,7 +34,8 @@ import {
   countUnmatchedAltOutcomes,
   mergeAltSpreads,
   selectAltSpreadTargets,
-  type AltSpreadPin,
+  NO_ALT_SPREAD_REQUESTS,
+  type AltSpreadRequests,
 } from "@/domain/promos/altSpreads";
 import { REFRESH_LOCK_TTL_MS } from "./refresh";
 import {
@@ -58,7 +59,7 @@ const BUSY_MESSAGE = "Another odds refresh is already running. Try again in a mi
 export const EXTENDED_MARKETS = ["h2h", "spreads", "totals"] as const;
 
 /**
- * Alternate-spread fetch report for pinned promo games (quick 260930-gam).
+ * Alternate-spread fetch report for games with a promo (single-game promos and line-pinned promos; quick 260930-gam/gyl).
  * unmatchedOutcomes counts alt outcomes whose name matched neither team of
  * their event (assumption A2) so a naming mismatch is visible, not silent.
  */
@@ -127,7 +128,7 @@ export async function runSpreadsTotalsRefresh(opts: {
   confirmed: boolean;
   now?: Date;
   triggeredByUserId?: number | null;
-  altSpreadPins?: AltSpreadPin[];
+  altSpreads?: AltSpreadRequests;
 }): Promise<ExtendedRefreshOutcome> {
   const holder = randomUUID();
 
@@ -156,7 +157,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
   confirmed: boolean;
   now?: Date;
   triggeredByUserId?: number | null;
-  altSpreadPins?: AltSpreadPin[];
+  altSpreads?: AltSpreadRequests;
 }): Promise<ExtendedRefreshOutcome> {
   const now = opts.now ?? new Date();
 
@@ -259,13 +260,13 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
       sportsFetched.push(sport.key);
     }
 
-    // Alternate spread lines for pinned promo games (quick 260930-gam):
+    // Alternate spread lines for games with a promo (quick 260930-gam/gyl):
     // capped, sequential, and never able to fail the main refresh. Runs
     // after the main loop so the main spreads/totals are already buffered.
-    const pins = opts.altSpreadPins ?? [];
-    if (pins.length > 0) {
+    const requests = opts.altSpreads ?? NO_ALT_SPREAD_REQUESTS;
+    if (requests.pins.length > 0 || requests.scopedEventIds.length > 0) {
       const { targets, skippedOverLimit } = selectAltSpreadTargets(
-        pins,
+        requests,
         pendingWrites.flatMap((w) => w.extendedEvents),
         now,
       );

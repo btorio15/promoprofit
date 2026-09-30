@@ -339,14 +339,16 @@ describe("runSpreadsTotalsRefresh", () => {
       mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining, used: 500 - remaining, last: 3 } });
     }
 
-    const pinsFor = (events: OddsEvent[]) =>
-      events.map((e) => ({ eventId: e.id, line: -6.5, side: "home" as const }));
+    const pinsFor = (events: OddsEvent[]) => ({
+      pins: events.map((e) => ({ eventId: e.id, line: -6.5, side: "home" as const })),
+      scopedEventIds: [] as string[],
+    });
 
     it("never calls fetchEventOdds with no pins, or on an unconfirmed press", async () => {
       const events = [nflEvent("e1", 5)];
       setup(events);
-      await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: [] });
-      await runSpreadsTotalsRefresh({ confirmed: false, now, altSpreadPins: pinsFor(events) });
+      await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreads: { pins: [], scopedEventIds: [] } });
+      await runSpreadsTotalsRefresh({ confirmed: false, now, altSpreads: pinsFor(events) });
       expect(mockFetchEventOdds).not.toHaveBeenCalled();
     });
 
@@ -362,7 +364,7 @@ describe("runSpreadsTotalsRefresh", () => {
         confirmed: true,
         now,
         triggeredByUserId: 7,
-        altSpreadPins: pinsFor(events),
+        altSpreads: pinsFor(events),
       });
 
       expect(mockFetchEventOdds).toHaveBeenCalledTimes(5);
@@ -393,11 +395,26 @@ describe("runSpreadsTotalsRefresh", () => {
       // balance after the main fetch is 22; 2 alt credits -> 20 is fine, so drop to 21
       mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining: 21, used: 479, last: 3 } });
 
-      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreads: pinsFor(events) });
 
       expect(mockFetchEventOdds).not.toHaveBeenCalled();
       expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
       expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 0, skippedForCredits: true } });
+    });
+
+    it("scoped event ids alone (no pins) trigger the alt fetch and merge", async () => {
+      const events = [nflEvent("e1", 5)];
+      setup(events);
+      mockFetchEventOdds.mockResolvedValue({ event: altFor(events[0]), quota: { remaining: 290, used: 210, last: 1 } });
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        altSpreads: { pins: [], scopedEventIds: ["e1"] },
+      });
+
+      expect(mockFetchEventOdds).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 0 } });
     });
 
     it("an alt fetch failure never fails the main refresh; other targets still merge", async () => {
@@ -407,7 +424,7 @@ describe("runSpreadsTotalsRefresh", () => {
         .mockRejectedValueOnce(new Error("boom"))
         .mockResolvedValueOnce({ event: altFor(events[1]), quota: { remaining: 290, used: 210, last: 1 } });
 
-      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreads: pinsFor(events) });
 
       expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
       expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 1 } });
@@ -421,7 +438,7 @@ describe("runSpreadsTotalsRefresh", () => {
         quota: { remaining: 290, used: 210, last: 1 },
       });
 
-      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreads: pinsFor(events) });
 
       expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, unmatchedOutcomes: 1 } });
     });
