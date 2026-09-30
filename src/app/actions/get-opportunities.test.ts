@@ -1,0 +1,266 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { OddsEvent } from "@/domain/odds/schemas";
+import type { ActivePromo } from "@/db/promos";
+
+const {
+  mockRequireUser,
+  mockGetActivePromos,
+  mockGetBonusBooks,
+  mockGetCachedEvents,
+  mockGetCachedExtendedEvents,
+  mockGetHedgeBookKeys,
+  mockGetUserBookKeys,
+  mockGetPromoCompletions,
+  mockGetProfitObservationsSince,
+  mockRecordCurrentProfitObservations,
+} = vi.hoisted(() => ({
+  mockRequireUser: vi.fn(),
+  mockGetActivePromos: vi.fn(),
+  mockGetBonusBooks: vi.fn(),
+  mockGetCachedEvents: vi.fn(),
+  mockGetCachedExtendedEvents: vi.fn(),
+  mockGetHedgeBookKeys: vi.fn(),
+  mockGetUserBookKeys: vi.fn(),
+  mockGetPromoCompletions: vi.fn(),
+  mockGetProfitObservationsSince: vi.fn(),
+  mockRecordCurrentProfitObservations: vi.fn(),
+}));
+
+vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
+vi.mock("@/db/promos", () => ({ getActivePromos: mockGetActivePromos }));
+vi.mock("@/db/queries", () => ({
+  getBonusBooks: mockGetBonusBooks,
+  getCachedEvents: mockGetCachedEvents,
+  getCachedExtendedEvents: mockGetCachedExtendedEvents,
+  getHedgeBookKeys: mockGetHedgeBookKeys,
+  getUserBookKeys: mockGetUserBookKeys,
+}));
+vi.mock("@/db/promoTracking", () => ({
+  getPromoCompletions: mockGetPromoCompletions,
+  getProfitObservationsSince: mockGetProfitObservationsSince,
+}));
+vi.mock("@/db/promoObservations", () => ({
+  recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
+}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
+import { getOpportunities } from "./get-opportunities";
+
+const NOW_ISO = new Date().toISOString();
+
+function plusHours(hours: number): string {
+  return new Date(new Date(NOW_ISO).getTime() + hours * 60 * 60 * 1000).toISOString();
+}
+
+function moneylineEvent(opts: {
+  id: string;
+  homeTeam: string;
+  awayTeam: string;
+  quotes: { bookKey: string; homePrice: number; awayPrice: number }[];
+}): OddsEvent {
+  return {
+    id: opts.id,
+    sport_key: "americanfootball_nfl",
+    sport_title: "NFL",
+    commence_time: plusHours(6),
+    home_team: opts.homeTeam,
+    away_team: opts.awayTeam,
+    bookmakers: opts.quotes.map((q) => ({
+      key: q.bookKey,
+      title: q.bookKey,
+      markets: [
+        {
+          key: "h2h",
+          outcomes: [
+            { name: opts.homeTeam, price: q.homePrice },
+            { name: opts.awayTeam, price: q.awayPrice },
+          ],
+        },
+      ],
+    })),
+  };
+}
+
+function activeBoostPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
+  return {
+    id: 1,
+    bookKey: "draftkings",
+    promoType: "profit_boost",
+    scope: {
+      kind: "sport_window",
+      sportKey: "americanfootball_nfl",
+      windowStart: new Date(NOW_ISO),
+      windowEnd: new Date(plusHours(48)),
+    },
+    pinned: null,
+    eligibleMarketTypes: ["moneyline"],
+    boostPercent: "50.00",
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: null,
+    maxStake: "25.00",
+    winningsCap: null,
+    minOddsAmerican: null,
+    finePrintNote: null,
+    claimHint: null,
+    scopeLabel: "Any NFL game · Sun, Sep 27",
+    autoMatched: true,
+    attribution: [],
+    ...overrides,
+  };
+}
+
+const EVENT = moneylineEvent({
+  id: "nfl-a",
+  homeTeam: "DEN Broncos",
+  awayTeam: "LA Rams",
+  quotes: [
+    { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+    { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+  ],
+});
+
+function memberBooksAreHedgeBooks(every: string[]) {
+  mockGetHedgeBookKeys.mockImplementation(async (allowed?: ReadonlySet<string>) => {
+    if (!allowed) return every;
+    return every.filter((k) => allowed.has(k));
+  });
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockRequireUser.mockResolvedValue({ userId: 1, email: "friend@example.com", displayName: "Friend" });
+  mockGetActivePromos.mockResolvedValue([]);
+  mockGetBonusBooks.mockResolvedValue([
+    { key: "draftkings", displayName: "DraftKings" },
+    { key: "fanduel", displayName: "FanDuel" },
+    { key: "betmgm", displayName: "BetMGM" },
+  ]);
+  mockGetCachedEvents.mockResolvedValue({ events: [EVENT], fetchedAt: new Date(NOW_ISO) });
+  mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+  memberBooksAreHedgeBooks(["draftkings", "fanduel"]);
+  mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
+  mockGetPromoCompletions.mockResolvedValue([]);
+  mockGetProfitObservationsSince.mockResolvedValue([]);
+  mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
+});
+
+describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
+  it("rejects when logged out, before any db read", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await expect(getOpportunities({ precision: "whole" })).rejects.toThrow("NEXT_REDIRECT");
+    expect(mockGetActivePromos).not.toHaveBeenCalled();
+    expect(mockGetUserBookKeys).not.toHaveBeenCalled();
+    expect(mockGetPromoCompletions).not.toHaveBeenCalled();
+  });
+
+  it("returns invalid for bad or extra input without reading the db", async () => {
+    expect(await getOpportunities({ precision: "bogus" })).toEqual({ status: "invalid" });
+    expect(await getOpportunities({ precision: "whole", userId: 9 })).toEqual({ status: "invalid" });
+    expect(mockGetActivePromos).not.toHaveBeenCalled();
+  });
+
+  it("returns 'no-odds' when no odds are cached", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.totals.totalProfit).toBe("0.00");
+  });
+
+  it("includes an own-book promo with its ranking fields mapped from the row DTO", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+    const promos = result.sources.find((s) => s.id === "promos");
+    expect(promos?.items).toHaveLength(1);
+    const item = promos!.items[0];
+    expect(item.rowKey).toBe(item.data.rowKey);
+    expect(item.profit).toBe(item.data.guaranteedProfit);
+    expect(item.pct).toBe(item.data.ratePct);
+    expect(item.pctLabel).toBe(item.data.rateLabel);
+    expect(item.commenceTime).toBe(item.data.commenceTime);
+    expect(result.totals.totalProfit).toBe(item.data.guaranteedProfit);
+  });
+
+  it("D-16: a promo at a non-member book is absent", async () => {
+    mockGetActivePromos.mockResolvedValue([
+      activeBoostPromo({ id: 1, bookKey: "draftkings" }),
+      activeBoostPromo({ id: 3, bookKey: "betmgm" }),
+    ]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    const ids = result.sources.flatMap((s) => s.items.map((i) => i.data.promoId));
+    expect(ids).toEqual([1]);
+  });
+
+  it("D-17: hedge legs are only at the member's books", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    const both = await getOpportunities({ precision: "cents" });
+    if (both.status !== "ok") throw new Error("unreachable");
+    expect(both.sources[0].items[0].data.hedge.bookKey).toBe("fanduel");
+
+    mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
+    const only = await getOpportunities({ precision: "cents" });
+    if (only.status !== "ok") throw new Error("unreachable");
+    for (const item of only.sources.flatMap((s) => s.items)) {
+      expect(item.data.hedge.bookKey).toBe("draftkings");
+    }
+    expect(mockGetHedgeBookKeys).toHaveBeenCalledWith(new Set(["draftkings"]));
+  });
+
+  it("a done promo is absent and excluded from the total", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1 })]);
+    mockGetPromoCompletions.mockResolvedValue([
+      { promoId: 1, snapshot: null, profitExtracted: "0.00", completedAt: new Date(NOW_ISO) },
+    ]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.sources.flatMap((s) => s.items)).toEqual([]);
+    expect(result.totals.totalProfit).toBe("0.00");
+  });
+
+  it("'nothing-profitable' when the member has every usable book and no odds match", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: new Date(NOW_ISO) });
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("nothing-profitable");
+  });
+
+  it("'no-books' when rows exist only at books the member lacks", async () => {
+    const event = moneylineEvent({
+      id: "nfl-b",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      quotes: [
+        { bookKey: "betmgm", homePrice: -150, awayPrice: 130 },
+        { bookKey: "draftkings", homePrice: -140, awayPrice: 120 },
+      ],
+    });
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ bookKey: "betmgm", boostPercent: "100.00" })]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetUserBookKeys.mockResolvedValue(["fanduel"]);
+    memberBooksAreHedgeBooks(["draftkings", "fanduel", "betmgm"]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-books");
+  });
+
+  it("'none-scraped' when there are no active promos", async () => {
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("none-scraped");
+  });
+
+  it("spends 0 API credits: never references the odds-fetch client", () => {
+    const src = readFileSync(join(__dirname, "get-opportunities.ts"), "utf8");
+    for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports"]) {
+      expect(src).not.toContain(banned);
+    }
+  });
+});

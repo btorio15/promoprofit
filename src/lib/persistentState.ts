@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
   finderMaxHedgeAmount: "promoprofit.finder.maxHedgeAmount",
   arbTotalStake: "promoprofit.arb.totalStake",
   arbPrecision: "promoprofit.arb.precision",
+  sortMode: "promoprofit.opportunities.sort",
 } as const;
 
 type ReadableStorage = Pick<Storage, "getItem">;
