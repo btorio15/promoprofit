@@ -7,6 +7,7 @@ import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/forma
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarkPairDoneButton } from "./MarkPairDoneButton";
 import { PairDetails } from "./PairDetails";
 
 export interface PairCardProps {
@@ -53,7 +54,18 @@ function LegLine({ leg, tieRisk }: { leg: PairLegDTO; tieRisk: boolean }) {
  * full-card button sits behind pointer-events-none content so taps on the
  * card toggle it while tooltips can opt back in. All text is React text.
  */
-export function PairCard({ row, actions }: PairCardProps) {
+export function PairCard({ row, precision, onChanged, actions }: PairCardProps) {
+  const markDone = (
+    <MarkPairDoneButton
+      promoIdA={row.promoIdA}
+      promoIdB={row.promoIdB}
+      precision={precision}
+      expectedGuaranteedProfit={row.guaranteedProfit}
+      expectedStakeA={row.legA.stake}
+      expectedStakeB={row.legB.stake}
+      onChanged={onChanged}
+    />
+  );
   return (
     <Collapsible className="group rounded-lg border border-border bg-secondary">
       <div className="relative">
@@ -99,7 +111,15 @@ export function PairCard({ row, actions }: PairCardProps) {
         </div>
       </div>
       <CollapsibleContent>
-        <PairDetails row={row} actions={actions} />
+        <PairDetails
+          row={row}
+          actions={
+            <>
+              {markDone}
+              {actions}
+            </>
+          }
+        />
       </CollapsibleContent>
     </Collapsible>
   );
