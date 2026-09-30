@@ -15,7 +15,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **CALC-04**: Guaranteed profit is identical (to the cent) whichever side wins, verified against known-answer fixtures (e.g. $100 bonus at +300, hedge −275 → $220 hedge, $80 profit, 80%)
 - [x] **CALC-05**: Hedges only use markets with no push/void outcome (e.g. 2-way moneylines, half-point lines)
 - [x] **CALC-06**: User sees a brief account-risk advisory explaining that precise stakes and promo-only play can lead to account limiting
-- [ ] **CALC-07**: System computes tandem hedges where both legs are promos on opposite outcomes of the same market (boost + boost, boost + bonus bet), each leg's promo mechanics and caps applied
+- [x] **CALC-07**: System computes tandem hedges where both legs are promos on opposite outcomes of the same market (boost + boost, boost + bonus bet), each leg's promo mechanics and caps applied
 
 ### Odds Data
 
@@ -40,11 +40,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Opportunities Feed & Access
 
-- [ ] **DASH-01**: User sees an opportunities feed (the main screen) computed automatically from current promos and cached odds, each showing the promo, best hedge book, both stakes, guaranteed profit, and ROI/conversion, sortable by guaranteed profit and ROI
+- [x] **DASH-01**: User sees an opportunities feed (the main screen) computed automatically from current promos and cached odds, each showing the promo, best hedge book, both stakes, guaranteed profit, and ROI/conversion, sortable by guaranteed profit and ROI
 - [x] **DASH-02**: User can select which Colorado sportsbooks they have accounts with, and the selection persists
-- [ ] **DASH-03**: Feed opportunities (promo side and hedge side) are filtered to the user's selected books
+- [x] **DASH-03**: Feed opportunities (promo side and hedge side) are filtered to the user's selected books
 - [x] **DASH-04**: Only invited users (owner + friends) can log in; there is no public signup
-- [ ] **DASH-05**: Feed identifies competing promos (promos at different books on opposite outcomes of the same game/market) and lists the tandem opportunity with its profit next to hedging each promo separately
+- [x] **DASH-05**: Feed identifies competing promos (promos at different books on opposite outcomes of the same game/market) and lists the tandem opportunity with its profit next to hedging each promo separately
 
 ## v2 Requirements
 
@@ -102,7 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CALC-04 | Phase 1 | Complete |
 | CALC-05 | Phase 1 | Complete |
 | CALC-06 | Phase 2 | Complete |
-| CALC-07 | Phase 4 | Pending |
+| CALC-07 | Phase 4 | Complete |
 | ODDS-01 | Phase 1 | Complete |
 | ODDS-02 | Phase 1 | Complete |
 | ODDS-03 | Phase 1 | Complete |
@@ -115,11 +115,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROMO-03 | Phase 3 | Complete (scheduled trigger pending — manual dispatch only; see STATE blockers) |
 | PROMO-04 | Phase 3 | Complete |
 | PROMO-05 | Phase 5 | Pending |
-| DASH-01 | Phase 4 | Pending |
+| DASH-01 | Phase 4 | Complete |
 | DASH-02 | Phase 2 | Complete |
-| DASH-03 | Phase 4 | Pending |
+| DASH-03 | Phase 4 | Complete |
 | DASH-04 | Phase 2 | Complete |
-| DASH-05 | Phase 4 | Pending |
+| DASH-05 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 24 total

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-09-30T00:15:52.566Z"
+status: ready_to_plan
+stopped_at: Phase 4 complete (9/9) — ready to discuss Phase 5
+last_updated: 2026-09-30T02:08:52.934Z
 last_activity: 2026-09-30 -- Phase 4 execution started
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 46
-  completed_plans: 37
+  completed_plans: 46
   percent: 67
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 4 — Opportunities Feed
+**Current focus:** Phase 5 — group added promos
 
 ## Current Position
 
-Phase: 4 (Opportunities Feed) — EXECUTING
-Plan: 1 of 9
-Status: Executing Phase 4
-Last activity: 2026-09-30 -- Phase 4 execution started
+Phase: 5
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-30
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 37
+- Total plans completed: 46
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -48,6 +48,7 @@ Progress: [██████████] 100%
 | 01.1 | 8 | - | - |
 | 2 | 9 | - | - |
 | 3 | 15 | - | - |
+| 4 | 9 | - | - |
 
 **Recent Trend:**
 
