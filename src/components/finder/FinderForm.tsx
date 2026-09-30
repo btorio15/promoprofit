@@ -8,6 +8,8 @@ import { findHedges } from "@/app/actions/find-hedges";
 import { FinderInputSchema } from "@/domain/finder/finderInput";
 import type { FindHedgesResponse } from "@/domain/finder/types";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
+import { safeAction } from "@/lib/safeAction";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,6 +26,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "./EmptyState";
 import { ResultsList } from "./ResultsList";
+import { resolveFinderOutcome } from "./finderSearchOutcome";
 
 // react-hook-form's Resolver type expects the *input* shape of the zod
 // schema, not the output shape -- using the output type here trips the
@@ -64,6 +67,9 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
   // there is safe.
   const [lastValidValues, setLastValidValues] = useState<FinderFormValues | null>(null);
   const isFirstRecompute = useRef(true);
+  // quick-260930-iaw: findHedges calls are wrapped in safeAction -- a thrown
+  // action inside startTransition otherwise escapes to the page and blanks the site.
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // "Limit hedge amount" checkbox + amount (D-17/D-19): persisted per
   // browser via localStorage, not the DB, and not part of react-hook-form's
@@ -101,9 +107,11 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
     setMaxHedgeAmountError(null);
 
     startTransition(async () => {
-      const result = await findHedges(payload);
-      if (result.status === "invalid") {
-        for (const [field, messages] of Object.entries(result.fieldErrors)) {
+      const outcome = resolveFinderOutcome(
+        await safeAction(() => findHedges(payload), "findHedges"),
+      );
+      if (outcome.kind === "invalid") {
+        for (const [field, messages] of Object.entries(outcome.fieldErrors)) {
           const message = messages?.[0];
           if (!message) continue;
           if (field === "maxHedgeAmount") {
@@ -114,9 +122,17 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
         }
         return;
       }
+      if (outcome.kind === "error") {
+        // Never leave results from a different search next to an error.
+        setActionError(outcome.message);
+        setHasSearched(true);
+        setResponse(null);
+        return;
+      }
+      setActionError(null);
       setLastValidValues(payload);
       setHasSearched(true);
-      setResponse(result);
+      setResponse(outcome.response);
     });
   });
 
@@ -132,9 +148,15 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
     if (!lastValidValues) return;
 
     startTransition(async () => {
-      const result = await findHedges(lastValidValues);
-      if (result.status !== "invalid") {
-        setResponse(result);
+      const outcome = resolveFinderOutcome(
+        await safeAction(() => findHedges(lastValidValues), "findHedges"),
+      );
+      if (outcome.kind === "error") {
+        setActionError(outcome.message);
+        setResponse(null);
+      } else if (outcome.kind === "response") {
+        setActionError(null);
+        setResponse(outcome.response);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only recomputeKey should re-trigger this
@@ -244,6 +266,10 @@ export function FinderForm({ bonusBooks, hasCachedOdds, recomputeKey }: FinderFo
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
+      ) : actionError && !isPending ? (
+        <Alert variant="destructive">
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
       ) : !hasSearched ? (
         <EmptyState variant={hasCachedOdds ? "no-search" : "no-cached-odds"} />
       ) : response?.status === "no_cached_odds" ? (
