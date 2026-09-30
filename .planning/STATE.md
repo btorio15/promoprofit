@@ -5,7 +5,7 @@ milestone_name: milestone
 status: executing
 stopped_at: Quick 260930-gyl complete (Needs Review: one live Search spreads & totals press); Phase 5 human UAT pending
 last_updated: "2026-09-30T18:15:45.196Z"
-last_activity: "2026-09-30 - Completed quick task 260930-gyl: Alternate spreads raise ROI on single-game promos"
+last_activity: "2026-09-30 - Completed quick task 260930-hor: Alternate spreads for league-wide promos on their top-1 game"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5 (Group-Added Promos) — EXECUTING
 Plan: 1 of 10
 Status: Executing Phase 5
-Last activity: 2026-09-30 - Completed quick task 260930-gyl: Alternate spreads raise ROI on single-game promos
+Last activity: 2026-09-30 - Completed quick task 260930-hor: Alternate spreads for league-wide promos on their top-1 game
 
 Progress: [██████████] 100%
 
@@ -169,6 +169,7 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260930-gam | Alternate spread lines for pinned promo games (Refresh button only, max 5 games, exact opposite line) | 2026-09-30 | 10eb4c1 | Superseded by 260930-gyl | [260930-gam-add-alternate-spread-lines-for-pinned-pr](./quick/260930-gam-add-alternate-spread-lines-for-pinned-pr/) |
 | fast | Phone login on dev server: allowedDevOrigins for LAN IP; auth forms POST so credentials never go in the URL | 2026-09-30 | 4c5009e | ✅ | - |
 | 260930-gyl | Alternate spreads for single-game (unpinned) boosts and bonus bets: best exact-opposite alt pair on Search spreads & totals press (max 5 games); 260930-gam pinned-only code cleaned up | 2026-09-30 | c4bc696 | Needs Review | [260930-gyl-use-alternate-spreads-to-raise-roi-on-ga](./quick/260930-gyl-use-alternate-spreads-to-raise-roi-on-ga/) |
+| 260930-hor | League-wide promos: on Search spreads & totals press, rank on main lines, fetch alt spreads for each promo's top-1 game only (shared 5-game cap); league-wide promos use cached alt pairs | 2026-09-30 | e587502 | Verified | [260930-hor-alt-spreads-for-league-wide-promos-on-th](./quick/260930-hor-alt-spreads-for-league-wide-promos-on-th/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
