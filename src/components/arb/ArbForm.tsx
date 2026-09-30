@@ -133,15 +133,15 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
       const notes: string[] = [];
       if (alt.skippedOverLimit > 0) {
         notes.push(
-          `Alternate lines were fetched for ${alt.fetched} pinned ${alt.fetched === 1 ? "game" : "games"}; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
+          `Alternate lines were fetched for ${alt.fetched} ${alt.fetched === 1 ? "game" : "games"} with a promo; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
         );
       }
       if (alt.skippedForCredits) {
-        notes.push("Alternate lines for pinned games were skipped to save credits — your balance is low.");
+        notes.push("Alternate lines for promo games were skipped to save credits — your balance is low.");
       }
       if (alt.failed > 0) {
         notes.push(
-          `Alternate lines couldn't be loaded for ${alt.failed} pinned ${alt.failed === 1 ? "game" : "games"}.`,
+          `Alternate lines couldn't be loaded for ${alt.failed} ${alt.failed === 1 ? "game" : "games"} with a promo.`,
         );
       }
       if (alt.unmatchedOutcomes > 0) {

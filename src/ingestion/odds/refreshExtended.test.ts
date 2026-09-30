@@ -278,7 +278,7 @@ describe("runSpreadsTotalsRefresh", () => {
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
   });
 
-  describe("alternate spread lines for pinned games (260930-gam)", () => {
+  describe("alternate spread lines for promo games (260930-gam, 260930-gyl)", () => {
     const now = new Date("2026-10-01T12:00:00.000Z");
 
     function nflEvent(id: string, commenceHours: number): OddsEvent {
