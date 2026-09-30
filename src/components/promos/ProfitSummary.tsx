@@ -14,7 +14,8 @@ interface ProfitSummaryProps {
  * when the member marked promos done) beside the headline.
  *
  * quick-260927-n12: always-visible headline ("Total profit available") plus
- * a compact today/week/month "profit available" row, shown in EVERY "ok"
+ * a compact week/month "profit available" row (the "Available today" figure
+ * was dropped 2026-09-30 -- the headline already covers it), shown in EVERY "ok"
  * state (including every empty-state variant) so the numbers never
  * disappear just because the live feed is momentarily empty. Plain div +
  * Tailwind, matching ScrapeStatusPanel.tsx's card treatment -- no new UI
@@ -34,10 +35,6 @@ export function ProfitSummary({ totalProfit, totalExtracted, availableProfit }: 
         </div>
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-4">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-muted-foreground">Available today</span>
-          <span className="num text-lg font-medium">{formatUsd(availableProfit.today)}</span>
-        </div>
         <div className="flex flex-col gap-0.5">
           <span className="text-sm text-muted-foreground">This week</span>
           <span className="num text-lg font-medium">{formatUsd(availableProfit.week)}</span>
