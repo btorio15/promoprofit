@@ -670,6 +670,7 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         title: "10% profit boost",
         scopeLabel: "Denver Broncos @ Los Angeles Rams",
         autoMatched: true,
+        addedByYou: false,
         bestGuaranteedProfit: "-0.65",
         note: "No profitable hedge right now (best: −$0.65)",
         // The member only has BetMGM, not the promo's own book (WR-07).
@@ -1286,6 +1287,6 @@ describe("getPromos profit observation recording + availableProfit (quick-260927
 
     await getPromos({ precision: "whole" });
 
-    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), 1);
   });
 });

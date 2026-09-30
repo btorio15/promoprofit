@@ -100,6 +100,7 @@ describe("buildDoneSnapshot", () => {
       title: "10% profit boost",
       scopeLabel: "Away @ Home",
       autoMatched: false,
+      addedByYou: false,
       bestGuaranteedProfit: "-0.65",
       note: "No profitable hedge right now (best: −$0.65)",
       hasPromoBook: true,
@@ -143,7 +144,7 @@ describe("toDonePromoDTO", () => {
   it("no_hedge snapshot", () => {
     const row: UnprofitablePromoRowDTO = {
       rowKey: "x", promoId: 5, promoType: "profit_boost", promoTypeLabel: "Boost", bookKey: "draftkings",
-      bookName: "DraftKings", title: "t", scopeLabel: "s", autoMatched: false, bestGuaranteedProfit: null,
+      bookName: "DraftKings", title: "t", scopeLabel: "s", autoMatched: false, addedByYou: false, bestGuaranteedProfit: null,
       note: "No eligible bets right now", hasPromoBook: true,
     };
     const { snapshot } = buildDoneSnapshot({ kind: "no_hedge", terms, row }, ctx);

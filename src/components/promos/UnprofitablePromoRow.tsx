@@ -39,6 +39,7 @@ export function UnprofitablePromoRow({ row, precision, onChanged }: Unprofitable
           <Badge variant="outline">{row.promoTypeLabel}</Badge>
           <span>{row.title}</span>
           <span className="text-sm text-muted-foreground">{row.bookName}</span>
+          {row.addedByYou ? <Badge variant="outline">Added by you</Badge> : null}
           {row.autoMatched ? (
             <>
               <Badge variant="outline">Auto-matched</Badge>

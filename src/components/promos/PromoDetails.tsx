@@ -36,7 +36,11 @@ export function PromoDetails({ row }: PromoDetailsProps) {
           </span>
         ) : null}
         {row.capNote ? <span className="text-sm text-muted-foreground">{row.capNote}</span> : null}
-        {row.attribution ? <span className="text-sm text-muted-foreground">{row.attribution}</span> : null}
+        {row.addedByYou ? (
+          <span className="text-sm text-muted-foreground">You added this promo.</span>
+        ) : row.attribution ? (
+          <span className="text-sm text-muted-foreground">{row.attribution}</span>
+        ) : null}
 
         <ol className="mt-4 flex flex-col gap-2">
           {row.claimHint ? (

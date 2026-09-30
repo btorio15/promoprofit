@@ -58,6 +58,8 @@ export interface PromoRowDTO {
   /** How many eligible bets in this promo's scope were evaluated before picking the best one. */
   candidatesEvaluated: number;
   autoMatched: boolean;
+  /** True when the viewing member added this promo themselves (phase 5). Optional: frozen Done snapshots lack it. */
+  addedByYou?: boolean;
   finePrintNote: string | null;
   /** "Opt in / claim in the app first" when the promo requires it, else null. */
   claimHint: string | null;
@@ -106,6 +108,7 @@ export interface UnprofitablePromoRowDTO {
   title: string;
   scopeLabel: string;
   autoMatched: boolean;
+  addedByYou: boolean;
   /** Fixed 2-dp string (e.g. "-0.65"), or null when no candidate could be evaluated at all. */
   bestGuaranteedProfit: string | null;
   /** Display-ready: "No profitable hedge right now (best: −$0.65)" or "No eligible bets right now". */
