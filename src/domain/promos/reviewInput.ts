@@ -66,7 +66,7 @@ export type MarkPairDoneInput = z.infer<typeof MarkPairDoneInputSchema>;
  * action itself (correct-promo-match.ts) still re-resolves the pin against
  * live cached odds before ever writing it.
  */
-const PinnedSelectionInputSchema = z
+export const PinnedSelectionInputSchema = z
   .strictObject({
     marketType: z.enum(PROMO_MARKET_TYPES),
     line: z.number().nullable(),
@@ -103,7 +103,7 @@ const EventScopeInputSchema = z.strictObject({
   pinned: PinnedSelectionInputSchema.nullable(),
 });
 
-const SportDayScopeInputSchema = z.strictObject({
+export const SportDayScopeInputSchema = z.strictObject({
   kind: z.literal("sport_day"),
   sportKey: z.enum(SPORT_KEYS as [string, ...string[]]),
   etDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -149,7 +149,7 @@ export const CorrectMatchInputSchema = z.strictObject({
 
 export type CorrectMatchInput = z.infer<typeof CorrectMatchInputSchema>;
 
-const MONEY_PATTERN = /^\d{1,6}(\.\d{1,2})?$/;
+export const MONEY_PATTERN = /^\d{1,6}(\.\d{1,2})?$/;
 const MONEY_MESSAGE = "Enter an amount greater than $0.";
 
 /**
@@ -188,7 +188,7 @@ export const EnterCapsInputSchema = z.strictObject({
 
 export type EnterCapsInput = z.infer<typeof EnterCapsInputSchema>;
 
-const BOOST_PERCENT_PATTERN = /^\d{1,4}(\.\d{1,2})?$/;
+export const BOOST_PERCENT_PATTERN = /^\d{1,4}(\.\d{1,2})?$/;
 const BOOST_PERCENT_MESSAGE = "Enter a boost percent greater than 0 and at most 1000.";
 
 /**
