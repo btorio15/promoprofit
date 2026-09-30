@@ -3,6 +3,7 @@ import { isHalfPoint } from "@/domain/hedge/spreadsTotalsFilter";
 import { isTieRiskSport } from "@/config/sports";
 import type { PromoMarketType, PromoSelection, PromoSide } from "./types";
 import { eventInScope, type PromoScope } from "./scope";
+import { ALT_SPREADS_MARKET, samePoint } from "./altSpreads";
 
 /**
  * Candidate selection resolution + scope-wide enumeration (D-02, CALC-05,
@@ -85,6 +86,7 @@ function resolveSpread(event: OddsEvent, sel: PromoSelection): ResolvedSelection
 
   const promoSideQuotes: SelectionQuote[] = [];
   const oppositeSideQuotes: SelectionQuote[] = [];
+  const mainQuoted = new Set<string>();
 
   for (const bookmaker of event.bookmakers) {
     const spreads = bookmaker.markets.find((m) => m.key === "spreads");
@@ -101,6 +103,21 @@ function resolveSpread(event: OddsEvent, sel: PromoSelection): ResolvedSelection
     const oppositeOutcome = sel.side === "home" ? awayOutcome : homeOutcome;
     promoSideQuotes.push({ bookKey: bookmaker.key, oddsAmerican: promoOutcome.price });
     oppositeSideQuotes.push({ bookKey: bookmaker.key, oddsAmerican: oppositeOutcome.price });
+    mainQuoted.add(bookmaker.key);
+  }
+
+  // Alternate-spread fallback (quick 260930-gam): books without a main-line
+  // quote at this point may quote it in the cached alternate_spreads market.
+  // Exact points only: the promo line and its exact negation for the hedge.
+  for (const bookmaker of event.bookmakers) {
+    if (mainQuoted.has(bookmaker.key)) continue;
+    const alt = bookmaker.markets.find((m) => m.key === ALT_SPREADS_MARKET);
+    if (!alt) continue;
+
+    const promoOutcome = alt.outcomes.find((o) => o.name === promoTeam && samePoint(o.point, sel.line));
+    const oppositeOutcome = alt.outcomes.find((o) => o.name === oppositeTeam && samePoint(o.point, -sel.line!));
+    if (promoOutcome) promoSideQuotes.push({ bookKey: bookmaker.key, oddsAmerican: promoOutcome.price });
+    if (oppositeOutcome) oppositeSideQuotes.push({ bookKey: bookmaker.key, oddsAmerican: oppositeOutcome.price });
   }
 
   if (promoSideQuotes.length === 0 && oppositeSideQuotes.length === 0) return null;

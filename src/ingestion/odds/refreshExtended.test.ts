@@ -4,6 +4,7 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
   fetchSportOdds: vi.fn(),
+  fetchEventOdds: vi.fn(),
 }));
 
 vi.mock("@/ingestion/odds/store", () => ({
@@ -15,7 +16,7 @@ vi.mock("@/ingestion/odds/store", () => ({
   releaseRefreshLock: vi.fn(),
 }));
 
-import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
+import { listSports, fetchSportOdds, fetchEventOdds } from "@/ingestion/odds/client";
 import {
   commitOddsRefresh,
   commitSpreadsTotalsRefresh,
@@ -29,6 +30,7 @@ import { runOddsRefresh } from "./refresh";
 
 const mockListSports = vi.mocked(listSports);
 const mockFetchSportOdds = vi.mocked(fetchSportOdds);
+const mockFetchEventOdds = vi.mocked(fetchEventOdds);
 const mockGetLatestCreditUsage = vi.mocked(getLatestCreditUsage);
 const mockCommitOddsRefresh = vi.mocked(commitOddsRefresh);
 const mockCommitSpreadsTotalsRefresh = vi.mocked(commitSpreadsTotalsRefresh);
@@ -269,9 +271,160 @@ describe("runSpreadsTotalsRefresh", () => {
       sportsFetched: ["basketball_nba", "baseball_mlb"],
       creditsSpent: 6,
       remaining: 294,
+      altLines: { fetched: 0, skippedOverLimit: 0, skippedForCredits: false, failed: 0, unmatchedOutcomes: 0 },
     });
+    expect(mockFetchEventOdds).not.toHaveBeenCalled();
 
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
+  });
+
+  describe("alternate spread lines for pinned games (260930-gam)", () => {
+    const now = new Date("2026-10-01T12:00:00.000Z");
+
+    function nflEvent(id: string, commenceHours: number): OddsEvent {
+      return {
+        id,
+        sport_key: "americanfootball_nfl",
+        commence_time: new Date(now.getTime() + commenceHours * 3600_000).toISOString(),
+        home_team: "Home",
+        away_team: "Away",
+        bookmakers: [
+          {
+            key: "draftkings",
+            title: "DraftKings",
+            markets: [
+              {
+                key: "spreads",
+                outcomes: [
+                  { name: "Home", price: -110, point: -7.5 },
+                  { name: "Away", price: -110, point: 7.5 },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    function altFor(event: OddsEvent, homeName = "Home"): OddsEvent {
+      return {
+        ...event,
+        bookmakers: [
+          {
+            key: "draftkings",
+            title: "DraftKings",
+            markets: [
+              {
+                key: "alternate_spreads",
+                outcomes: [
+                  { name: homeName, price: 110, point: -6.5 },
+                  { name: "Away", price: -130, point: 6.5 },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+    }
+
+    function setup(events: OddsEvent[], remaining = 300) {
+      mockGetLatestCreditUsage.mockResolvedValue({
+        requestsRemaining: remaining,
+        requestsUsed: 500 - remaining,
+        refreshCost: 3,
+        sportsFetched: 1,
+        recordedAt: new Date(now.getTime() - 24 * 60 * 60_000),
+      });
+      mockListSports.mockResolvedValue([sport("americanfootball_nfl")]);
+      mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining, used: 500 - remaining, last: 3 } });
+    }
+
+    const pinsFor = (events: OddsEvent[]) =>
+      events.map((e) => ({ eventId: e.id, line: -6.5, side: "home" as const }));
+
+    it("never calls fetchEventOdds with no pins, or on an unconfirmed press", async () => {
+      const events = [nflEvent("e1", 5)];
+      setup(events);
+      await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: [] });
+      await runSpreadsTotalsRefresh({ confirmed: false, now, altSpreadPins: pinsFor(events) });
+      expect(mockFetchEventOdds).not.toHaveBeenCalled();
+    });
+
+    it("fetches only the 5 soonest of 7 qualifying events, merges alt markets, reports the skipped 2", async () => {
+      const events = Array.from({ length: 7 }, (_, i) => nflEvent(`e${i}`, 10 + i));
+      setup(events);
+      mockFetchEventOdds.mockImplementation(async (_s, eventId) => {
+        const e = events.find((x) => x.id === eventId)!;
+        return { event: altFor(e), quota: { remaining: 290, used: 210, last: 1 } };
+      });
+
+      const outcome = await runSpreadsTotalsRefresh({
+        confirmed: true,
+        now,
+        triggeredByUserId: 7,
+        altSpreadPins: pinsFor(events),
+      });
+
+      expect(mockFetchEventOdds).toHaveBeenCalledTimes(5);
+      expect(mockFetchEventOdds.mock.calls.map((c) => c[1])).toEqual(["e0", "e1", "e2", "e3", "e4"]);
+      expect(outcome).toMatchObject({
+        status: "ok",
+        creditsSpent: 3 + 5,
+        altLines: { fetched: 5, skippedOverLimit: 2, skippedForCredits: false, failed: 0, unmatchedOutcomes: 0 },
+      });
+
+      const committed = mockCommitSpreadsTotalsRefresh.mock.calls[0][0][0].extendedEvents;
+      const hasAlt = (e: OddsEvent) =>
+        e.bookmakers.some((b) => b.markets.some((m) => m.key === "alternate_spreads"));
+      expect(committed.filter(hasAlt).map((e) => e.id)).toEqual(["e0", "e1", "e2", "e3", "e4"]);
+      // h2h cache projection never holds alt markets
+      const h2h = mockCommitSpreadsTotalsRefresh.mock.calls[0][0][0].h2hEvents;
+      expect(h2h.some(hasAlt)).toBe(false);
+
+      expect(mockRecordCreditUsage).toHaveBeenCalledTimes(1);
+      expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ refreshCost: 8, sportsFetched: 1, triggeredByUserId: 7 }),
+      );
+    });
+
+    it("skips alt fetches when the balance would cross the credit block threshold; main refresh still lands", async () => {
+      const events = [nflEvent("e1", 5), nflEvent("e2", 6)];
+      setup(events, 100);
+      // balance after the main fetch is 22; 2 alt credits -> 20 is fine, so drop to 21
+      mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining: 21, used: 479, last: 3 } });
+
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+
+      expect(mockFetchEventOdds).not.toHaveBeenCalled();
+      expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 0, skippedForCredits: true } });
+    });
+
+    it("an alt fetch failure never fails the main refresh; other targets still merge", async () => {
+      const events = [nflEvent("e1", 5), nflEvent("e2", 6)];
+      setup(events);
+      mockFetchEventOdds
+        .mockRejectedValueOnce(new Error("boom"))
+        .mockResolvedValueOnce({ event: altFor(events[1]), quota: { remaining: 290, used: 210, last: 1 } });
+
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+
+      expect(mockCommitSpreadsTotalsRefresh).toHaveBeenCalledTimes(1);
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, failed: 1 } });
+    });
+
+    it("counts alt outcomes whose team names don't match the event (assumption A2) instead of dropping silently", async () => {
+      const events = [nflEvent("e1", 5)];
+      setup(events);
+      mockFetchEventOdds.mockResolvedValue({
+        event: altFor(events[0], "Home Team FC"),
+        quota: { remaining: 290, used: 210, last: 1 },
+      });
+
+      const outcome = await runSpreadsTotalsRefresh({ confirmed: true, now, altSpreadPins: pinsFor(events) });
+
+      expect(outcome).toMatchObject({ status: "ok", altLines: { fetched: 1, unmatchedOutcomes: 1 } });
+    });
   });
 
   it("records triggeredByUserId from opts when a caller provides one, and null when it doesn't (CLI path)", async () => {

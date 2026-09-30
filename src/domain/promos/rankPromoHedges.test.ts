@@ -101,6 +101,64 @@ describe("rankPromoHedges", () => {
     }
   });
 
+  it("pinned alt-line boost hedges at the exact opposite alt line, profit exact to the cent (260930-gam)", () => {
+    const event: OddsEvent = {
+      id: "nfl-alt",
+      sport_key: "americanfootball_nfl",
+      commence_time: plusHours(24),
+      home_team: "DEN Broncos",
+      away_team: "LA Rams",
+      bookmakers: [
+        {
+          key: "fanduel",
+          title: "fanduel",
+          markets: [
+            {
+              key: "spreads",
+              outcomes: [
+                { name: "DEN Broncos", price: -110, point: -7.5 },
+                { name: "LA Rams", price: -110, point: 7.5 },
+              ],
+            },
+            {
+              key: "alternate_spreads",
+              outcomes: [
+                { name: "DEN Broncos", price: -275, point: -6.5 },
+                { name: "LA Rams", price: 220, point: 6.5 },
+                { name: "DEN Broncos", price: -400, point: -5.5 },
+                { name: "DEN Broncos", price: -200, point: -7.5 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      scope: eventScope("nfl-alt"),
+      pinned: { eventId: "nfl-alt", marketType: "spread", line: 6.5, side: "away" },
+      eligibleMarketTypes: ["spread"],
+      boostedOddsAmerican: 300,
+      maxStake: "50",
+    };
+
+    const [opportunity] = rankPromoHedges([promo], {
+      moneylineEvents: [],
+      extendedEvents: [event],
+      hedgeBookKeys: new Set(["fanduel"]),
+      precision: "cents",
+      now: NOW,
+    });
+
+    expect(opportunity).toBeDefined();
+    expect(opportunity.hedge).toEqual({ bookKey: "fanduel", oddsAmerican: -275 });
+    expect(opportunity.selection.oppositePoint).toBe(-6.5);
+    if (opportunity.result.kind !== "boost") throw new Error("expected boost result");
+    // Same stake/odds pair as fixture B1 (boost +300 vs hedge -275, $50 max stake).
+    expect(opportunity.result.boost.hedgeStake.toFixed(2)).toBe("146.66");
+    expect(opportunity.result.boost.guaranteedProfit.toFixed(2)).toBe("3.33");
+  });
+
   it("unpinned boost: picks the argmax-profit candidate across a sport_window scope with two events", () => {
     const eventA = moneylineEvent({
       id: "nfl-a",
