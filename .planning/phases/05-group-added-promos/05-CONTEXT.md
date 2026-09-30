@@ -37,7 +37,7 @@ Not in this phase: sharing added promos with the group, new promo types (second-
 
 ### Claude's Discretion
 - Exact form layout, validation messages, how added promos are marked in lists (e.g. a small "Added by you" tag), edit flow (same form prefilled), expire vs delete controls, empty/error states — follow 03-UI-SPEC / 04-UI-SPEC patterns and plain-English copy.
-- Data model for ownership (e.g. `added_by_user_id` / source on `promos`, or a separate table) — research/planning decides; if the schema changes, a drizzle migration is required and the owner has pre-approved applying Phase 5 migrations only when asked at execution time.
+- Data model for ownership (e.g. `added_by_user_id` / source on `promos`, or a separate table) — research/planning decides; if the schema changes, a drizzle migration is required, and applying it to the live Neon database needs the owner's explicit OK at execution time (a blocking, non-autonomous task).
 
 </decisions>
 
