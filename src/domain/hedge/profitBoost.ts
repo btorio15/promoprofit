@@ -75,13 +75,13 @@ const LocalDecimal = Decimal.clone({ precision: 40 });
 // erases that noise -- many orders of magnitude below a cent -- while
 // leaving genuine sub-cent content (which needs a real floor/ceiling
 // decision) untouched. Same discipline as bonusBet.ts/arbMath.ts.
-function clean(value: Decimal): Decimal {
+export function clean(value: Decimal): Decimal {
   return value.toDecimalPlaces(20, Decimal.ROUND_HALF_UP);
 }
 
 // Books pay whole cents; flooring is the conservative assumption everywhere
 // a payout is computed.
-function floorCents(value: Decimal): Decimal {
+export function floorCents(value: Decimal): Decimal {
   return clean(value).toDecimalPlaces(2, Decimal.ROUND_DOWN);
 }
 
@@ -173,7 +173,7 @@ interface Candidate {
  * Exact (pre-cent-floor) promo payout for a given stake, per the cap kind.
  * See "Boost Math" / "Boost Stake Optimization Under Caps" in 03-RESEARCH.md.
  */
-function promoPayoutRaw(
+export function promoPayoutRaw(
   stake: Decimal,
   obEff: Decimal,
   baseDecimalOdds: Decimal | null,
@@ -200,7 +200,7 @@ function promoPayoutRaw(
 }
 
 /** Kink stake S* where the winnings cap starts to bind, per cap kind. */
-function kinkStake(
+export function kinkStake(
   obEff: Decimal,
   baseDecimalOdds: Decimal | null,
   winningsCap: WinningsCap,
