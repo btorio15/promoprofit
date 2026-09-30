@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { refreshOdds } from "@/app/actions/refresh-odds";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 import type { RefreshOutcome } from "@/ingestion/odds/refresh";
 import {
   AlertDialog,
@@ -41,8 +42,8 @@ export function RefreshConfirmDialog({
 
   function confirmRefresh() {
     startTransition(async () => {
-      const outcome = await refreshOdds({ confirmed: true });
-      onOutcome(outcome);
+      const call = await safeAction(() => refreshOdds({ confirmed: true }), "refreshOdds");
+      onOutcome(call.ok ? call.value : { status: "error", message: ACTION_FAILED_MESSAGE });
     });
   }
 

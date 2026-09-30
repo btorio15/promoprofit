@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import { refreshOdds } from "@/app/actions/refresh-odds";
 import type { RefreshOutcome } from "@/ingestion/odds/refresh";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { describeExtendedOddsAge, describeOddsAge, withAttribution } from "./oddsAge";
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
@@ -118,8 +119,12 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
   function startRefresh() {
     setBanner({ kind: "none" });
     startTransition(async () => {
-      const outcome = await refreshOdds({ confirmed: false });
-      handleOutcome(outcome);
+      const call = await safeAction(() => refreshOdds({ confirmed: false }), "refreshOdds");
+      if (!call.ok) {
+        setBanner({ kind: "error", message: ACTION_FAILED_MESSAGE });
+        return;
+      }
+      handleOutcome(call.value);
     });
   }
 
