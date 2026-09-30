@@ -29,14 +29,15 @@ export async function addPromo(input: unknown): Promise<AddedPromoResponse> {
   }
   const data = parsed.data;
 
-  if ((await countOwnActiveAddedPromos(user.userId)) >= ADDED_PROMO_MAX_ACTIVE) {
+  const now = new Date();
+  if ((await countOwnActiveAddedPromos(user.userId, now)) >= ADDED_PROMO_MAX_ACTIVE) {
     return { status: "invalid", fieldErrors: { form: [MSG_TOO_MANY] } };
   }
 
   const prepared = await prepareAddedPromoValues({
     userId: user.userId,
     data,
-    now: new Date(),
+    now,
     dedupeKey: `added:${crypto.randomUUID()}`,
   });
   if (!prepared.ok) return prepared.response;

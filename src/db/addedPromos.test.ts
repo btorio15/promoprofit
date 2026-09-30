@@ -5,7 +5,11 @@ import * as schema from "@/db/schema";
 
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 
-import { buildExpireOwnStatement, buildSoftDeleteStatements } from "./addedPromos";
+import {
+  buildCountOwnLiveAddedPromosQuery,
+  buildExpireOwnStatement,
+  buildSoftDeleteStatements,
+} from "./addedPromos";
 
 const db = drizzle({ client: neon("postgresql://u:p@db.invalid/x"), schema });
 
@@ -36,5 +40,20 @@ describe("buildSoftDeleteStatements", () => {
     expect(sql).toContain('"added_by_user_id" = $');
     expect(params).toEqual(expect.arrayContaining([5, 7]));
     for (const s of [update.toSQL().sql, sql]) expect(s).not.toMatch(/delete from "promos"/);
+  });
+});
+
+describe("buildCountOwnLiveAddedPromosQuery (CR-01)", () => {
+  const NOW = new Date("2026-10-01T16:00:00.000Z");
+  it("counts only the member's promos that are still live by the feed rule", () => {
+    const { sql, params } = buildCountOwnLiveAddedPromosQuery(db, 7, NOW).toSQL();
+    expect(sql).toMatch(/^select count\(\*\) from "promos"/);
+    expect(sql).toContain('"added_by_user_id" = $');
+    expect(sql).toContain('"status" = $');
+    // Lapsed promos (past expiry, game started, window ended) must not count.
+    expect(sql).toContain('"expires_at" > $');
+    expect(sql).toContain('"event_commence_time" > $');
+    expect(sql).toContain('"window_end" > $');
+    expect(params).toEqual(expect.arrayContaining([7, "active"]));
   });
 });

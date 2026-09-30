@@ -101,6 +101,11 @@ describe("addPromo", () => {
     expect(mockInsertAddedPromo).not.toHaveBeenCalled();
   });
 
+  it("counts the cap as of the request time so lapsed promos do not count (CR-01)", async () => {
+    await addPromo(validInput);
+    expect(mockCountOwnActiveAddedPromos).toHaveBeenCalledWith(7, NOW);
+  });
+
   it("rejects when the member already has 100 active added promos", async () => {
     mockCountOwnActiveAddedPromos.mockResolvedValue(100);
     const result = await addPromo(validInput);

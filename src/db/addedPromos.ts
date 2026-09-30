@@ -1,6 +1,7 @@
 import { and, count, eq, inArray } from "drizzle-orm";
 import { getDb } from "./client";
 import { promoProfitObservations, promos } from "./schema";
+import { activePromoWhere } from "./promos";
 import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
 import type { AddedPromoEditValues } from "@/domain/promos/addedPromoInput";
 
@@ -11,17 +12,26 @@ export async function insertAddedPromo(values: AddedPromoInsert): Promise<number
   return row.id;
 }
 
-/** How many active promos this member has added (per-user cap, T-5-10). */
-export async function countOwnActiveAddedPromos(userId: number): Promise<number> {
-  const db = getDb();
-  const [row] = await db
+type Db = ReturnType<typeof getDb>;
+
+/**
+ * Count query for the per-user cap (T-5-10). Only promos that are still live
+ * by the feed's own rule (activePromoWhere) count, so added promos whose
+ * expiry, game start or window end has passed -- which stay status='active'
+ * because the scraper never expires them -- no longer lock the member out.
+ */
+export function buildCountOwnLiveAddedPromosQuery(db: Db, userId: number, now: Date) {
+  return db
     .select({ n: count() })
     .from(promos)
-    .where(and(eq(promos.addedByUserId, userId), eq(promos.status, "active")));
-  return Number(row?.n ?? 0);
+    .where(and(eq(promos.addedByUserId, userId), activePromoWhere(now, userId)));
 }
 
-type Db = ReturnType<typeof getDb>;
+/** How many still-live promos this member has added (per-user cap, T-5-10). */
+export async function countOwnActiveAddedPromos(userId: number, now: Date = new Date()): Promise<number> {
+  const [row] = await buildCountOwnLiveAddedPromosQuery(getDb(), userId, now);
+  return Number(row?.n ?? 0);
+}
 interface OwnPromoArgs {
   promoId: number;
   userId: number;
