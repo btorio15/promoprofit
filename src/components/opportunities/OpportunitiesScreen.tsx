@@ -6,6 +6,7 @@ import { TriangleAlert } from "lucide-react";
 import { getOpportunities } from "@/app/actions/get-opportunities";
 import { pickTop, TOP_N } from "@/domain/opportunities/pick";
 import {
+  OPPORTUNITIES_ARB_TOTAL_STAKE,
   SOURCE_META,
   SOURCE_ORDER,
   type OpportunitiesEmptyVariant,
@@ -19,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { ProfitSummary } from "@/components/promos/ProfitSummary";
 import { PromoRow } from "@/components/promos/PromoRow";
+import { ArbRow } from "@/components/arb/ArbRow";
+import { formatUsd } from "@/lib/format";
 import { describeOddsAge, STALE_AFTER_MINUTES } from "@/components/finder/oddsAge";
 import { OpportunitySection } from "./OpportunitySection";
 import { SortSwitch } from "./SortSwitch";
@@ -224,8 +227,25 @@ export function OpportunitiesScreen({
                   </OpportunitySection>
                 );
               }
+              case "arbs": {
+                const top = pickTop(source.items, sort, TOP_N);
+                return (
+                  <OpportunitySection
+                    key={id}
+                    title={meta.title}
+                    caption={`${sortCaption(sort)} at a ${formatUsd(OPPORTUNITIES_ARB_TOTAL_STAKE)} total stake`}
+                    seeAll={seeAll ? { label: seeAll.label, onClick: () => onNavigate(seeAll.tab) } : null}
+                    emptyCopy={meta.emptyCopy}
+                    isEmpty={top.length === 0}
+                  >
+                    {top.map((item) => (
+                      <ArbRow key={item.rowKey} result={item.data} />
+                    ))}
+                  </OpportunitySection>
+                );
+              }
               default: {
-                const unreachable: never = source.id;
+                const unreachable: never = source;
                 return unreachable;
               }
             }
