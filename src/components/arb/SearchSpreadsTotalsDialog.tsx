@@ -55,6 +55,7 @@ export function SearchSpreadsTotalsDialog({
 
   const description =
     `This spends about ${estimatedCredits} credits — roughly 3× a normal refresh. ${remainingSentence}` +
+    " Games with a pinned spread promo on an alternate line use up to 5 more credits." +
     (minutesSinceLastRefresh !== null
       ? ` Odds were last fetched ${minutesSinceLastRefresh} min ago.`
       : "");

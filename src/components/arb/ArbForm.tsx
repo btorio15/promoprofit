@@ -38,7 +38,7 @@ interface ConfirmState {
   minutesSinceLastRefresh: number | null;
 }
 
-type SearchBanner = { kind: "blocked" | "busy" | "error"; message: string };
+type SearchBanner = { kind: "blocked" | "busy" | "error" | "info"; message: string };
 
 /**
  * Total stake + precision controls, auto-computed moneyline/spread/total arbs
@@ -129,7 +129,27 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
 
   function handleSearchOutcome(outcome: ExtendedRefreshOutcome) {
     if (outcome.status === "ok") {
-      setSearchBanner(null);
+      const alt = outcome.altLines;
+      const notes: string[] = [];
+      if (alt.skippedOverLimit > 0) {
+        notes.push(
+          `Alternate lines were fetched for ${alt.fetched} pinned ${alt.fetched === 1 ? "game" : "games"}; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
+        );
+      }
+      if (alt.skippedForCredits) {
+        notes.push("Alternate lines for pinned games were skipped to save credits — your balance is low.");
+      }
+      if (alt.failed > 0) {
+        notes.push(
+          `Alternate lines couldn't be loaded for ${alt.failed} pinned ${alt.failed === 1 ? "game" : "games"}.`,
+        );
+      }
+      if (alt.unmatchedOutcomes > 0) {
+        notes.push(
+          `${alt.unmatchedOutcomes} alternate-line ${alt.unmatchedOutcomes === 1 ? "price" : "prices"} used team names we couldn't match, so they were ignored.`,
+        );
+      }
+      setSearchBanner(notes.length > 0 ? { kind: "info", message: notes.join(" ") } : null);
       setConfirmState(null);
       router.refresh();
       onSearched();
@@ -265,7 +285,13 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
           </Alert>
         ) : null}
 
-        {searchBanner && searchBanner.kind !== "blocked" ? (
+        {searchBanner?.kind === "info" ? (
+          <Alert>
+            <AlertDescription className="num">{searchBanner.message}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        {searchBanner && searchBanner.kind !== "blocked" && searchBanner.kind !== "info" ? (
           <Alert variant="destructive">
             <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
               <span>{searchBanner.message}</span>
