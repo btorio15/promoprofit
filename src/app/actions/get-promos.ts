@@ -29,6 +29,9 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 
 const EMPTY_CORRECTION_OPTIONS: CorrectionOptions = { events: [], sportDays: [] };
 
+/** WR-02: note on the member's own added promos while no odds are cached. */
+const NO_ODDS_NOTE = "No odds loaded yet";
+
 /**
  * WR-07: promos at books the member has come first; promos at books they
  * don't have are kept (shown dimmed) but sorted after them. A stable
@@ -167,13 +170,26 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
 
   const correctionOptions = await correctionOptionsFor(needsCorrectionOptions, now, { moneylineEvents, extendedEvents });
 
+  const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
+
   if (oddsFetchedAt === null && extendedOddsFetchedAt === null) {
+    // WR-02: with no odds cached nothing can be hedged, but the member's own
+    // hand-added promos still come back (greyed, with a no-odds note) so they
+    // can see, edit, expire or delete what they just added.
+    const ownAddedRows = ownBooksFirst(
+      feedPromos
+        .filter((promo) => promo.addedByYou)
+        .map((promo) => ({
+          ...toUnprofitablePromoRowDTO({ promo, bestGuaranteedProfit: null, candidatesEvaluated: 0 }, bookNames, userBookSet),
+          note: NO_ODDS_NOTE,
+        })),
+    );
     return {
       status: "ok",
       scrapeStatus,
       emptyVariant: "no-odds",
       rows: [],
-      unprofitableRows: [],
+      unprofitableRows: ownAddedRows,
       queue,
       correctionOptions,
       totalProfit: "0.00",
@@ -183,7 +199,6 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     };
   }
 
-  const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
   const rankOpts = {
     moneylineEvents,
     extendedEvents,

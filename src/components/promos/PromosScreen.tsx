@@ -279,7 +279,23 @@ export function PromosScreen({
               </AlertDescription>
             </Alert>
           ) : response?.status === "ok" && response.emptyVariant !== null ? (
-            <PromosEmptyState variant={response.emptyVariant} />
+            <>
+              <PromosEmptyState variant={response.emptyVariant} />
+              {/* WR-02: the member's own added promos stay manageable while no odds are cached. */}
+              {response.unprofitableRows.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {response.unprofitableRows.map((row) => (
+                    <UnprofitablePromoRow
+                      key={row.rowKey}
+                      row={row}
+                      precision={precision}
+                      onChanged={handleChanged}
+                      addedActions={{ onError: setActionError, onEdit: handleEdit }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </>
           ) : response?.status === "ok" && (response.rows.length > 0 || response.unprofitableRows.length > 0) ? (
             <>
               <SortSwitch value={sort} onChange={setSortStored} />

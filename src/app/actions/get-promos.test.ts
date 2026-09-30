@@ -377,6 +377,26 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     expect(result.unprofitableRows).toEqual([]);
   });
 
+  it("still returns the member's own added promos (only) as manageable rows when no odds are cached (WR-02)", async () => {
+    mockGetActivePromos.mockResolvedValue([
+      activeBoostPromo({ id: 1, addedByYou: true }),
+      activeBoostPromo({ id: 2, addedByYou: false }),
+    ]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+
+    const result = await getPromos({ precision: "whole" });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.rows).toEqual([]);
+    expect(result.unprofitableRows.map((row) => row.promoId)).toEqual([1]);
+    expect(result.unprofitableRows[0].addedByYou).toBe(true);
+    expect(result.unprofitableRows[0].note).toBe("No odds loaded yet");
+    expect(result.unprofitableRows[0].bestGuaranteedProfit).toBeNull();
+  });
+
   it("returns a mapped row for a sport_window boost promo at the member's books", async () => {
     const event = moneylineEvent({
       id: "nfl-a",
