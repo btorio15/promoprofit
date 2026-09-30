@@ -1,6 +1,7 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
 import type { CorrectionOptions } from "./correctionOptions";
+import type { DuplicateCandidate } from "./duplicateHint";
 import {
   BOOST_PERCENT_PATTERN,
   MONEY_PATTERN,
@@ -206,6 +207,7 @@ export type AddPromoFormOptions =
       status: "ok";
       books: { key: string; displayName: string }[];
       options: CorrectionOptions;
+      duplicateCandidates: DuplicateCandidate[];
       editing: AddedPromoEditValues | null;
     }
   | { status: "invalid" }

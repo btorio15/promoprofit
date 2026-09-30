@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import { addPromo } from "@/app/actions/add-promo";
 import { editPromo } from "@/app/actions/edit-promo";
 import { getAddPromoFormOptions } from "@/app/actions/get-add-promo-options";
 import type { AddPromoFormOptions } from "@/domain/promos/addedPromoInput";
+import { looksLikeDuplicate } from "@/domain/promos/duplicateHint";
 import {
   draftFromEditValues,
   emptyBonusDraft,
@@ -97,6 +98,23 @@ export function AddPromoForm({ mode, onSaved, onCancel }: AddPromoFormProps) {
       if (!isEdit) bookRef.current?.focus();
     }
   }, [ready, isEdit]);
+
+  // D-12: advisory only; never blocks Save and never merges anything.
+  const showDuplicateHint = useMemo(
+    () =>
+      formOptions?.status === "ok"
+        ? looksLikeDuplicate(
+            draft,
+            formOptions.duplicateCandidates,
+            formOptions.options.events.map((e) => ({
+              eventId: e.eventId,
+              sportKey: e.sportKey,
+              commenceTime: e.commenceTime,
+            })),
+          )
+        : false,
+    [draft, formOptions],
+  );
 
   function focusFirstInvalid(errors: AddPromoFieldErrors) {
     const target = FOCUS_ORDER.find((entry) => errors[entry.field]?.length);
@@ -297,6 +315,13 @@ export function AddPromoForm({ mode, onSaved, onCancel }: AddPromoFormProps) {
           disabled={isSaving}
         />
       )}
+
+      {showDuplicateHint ? (
+        <Alert>
+          <Info className="size-4" />
+          <AlertDescription>This looks like a promo already in your list.</AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Button
