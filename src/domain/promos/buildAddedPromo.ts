@@ -6,7 +6,7 @@ import { etDayBounds, parseEtDateTime } from "./etTime";
 import { promoTitle } from "./promoRowDto";
 import type { ScopeGuess } from "./scope";
 import { ScrapedPromoSchema, type ScrapedPromo } from "./scraped";
-import { PROMO_MARKET_TYPES } from "./types";
+import { PROMO_MARKET_TYPES, type PromoMarketType, type PromoSide } from "./types";
 
 /**
  * Phase 5: pure builder from a validated member input + server-resolved scope
@@ -70,6 +70,13 @@ function scopeColumns(scope: ScopeGuess | { kind: "any" }) {
   };
 }
 
+export type AddedPin = {
+  marketType: PromoMarketType;
+  line: number | null;
+  side: PromoSide;
+  selectionText: string;
+};
+
 export function buildAddedPromoRow(args: {
   input: AddPromoInput;
   scope: ScopeGuess | { kind: "any" };
@@ -78,16 +85,34 @@ export function buildAddedPromoRow(args: {
   expiresAt: Date | null;
   userId: number;
   dedupeKey: string;
+  /** Boost only: the server-resolved market/side pin (null = unpinned). */
+  pinned?: AddedPin | null;
 }): { ok: true; values: AddedPromoInsert } | { ok: false } {
   const { input, scope, now, expiresAt, userId, dedupeKey } = args;
+  const pinned = input.promoType === "profit_boost" ? (args.pinned ?? null) : null;
 
-  const bonusAmount = new Decimal(input.bonusAmount).toFixed(2);
   const minOddsAmerican = input.minOddsAmerican ?? null;
+  const bonusAmount = input.promoType === "bonus_bet" ? new Decimal(input.bonusAmount).toFixed(2) : null;
+  let boostPercent: string | null = null;
+  let boostedOddsAmerican: number | null = null;
+  let maxStake: string | null = null;
+  let maxWinnings: { amount: string; kind: "total_payout" | "boost_extra" } | null = null;
+  if (input.promoType === "profit_boost") {
+    if (input.boost.mode === "percent") {
+      boostPercent = new Decimal(input.boost.boostPercent).toFixed(2);
+    } else {
+      boostedOddsAmerican = input.boost.boostedOddsAmerican;
+    }
+    maxStake = new Decimal(input.maxStake).toFixed(2);
+    if (input.maxWinnings) {
+      maxWinnings = { amount: new Decimal(input.maxWinnings.amount).toFixed(2), kind: input.maxWinnings.kind };
+    }
+  }
 
   const title = promoTitle({
-    promoType: "bonus_bet",
-    boostPercent: null,
-    boostedOddsAmerican: null,
+    promoType: input.promoType,
+    boostPercent,
+    boostedOddsAmerican,
     bonusAmount,
   });
 
@@ -114,7 +139,7 @@ export function buildAddedPromoRow(args: {
   const parsed: ScrapedPromo = {
     bookKey: input.bookKey,
     externalId: null,
-    promoType: "bonus_bet",
+    promoType: input.promoType,
     title,
     rawText: "",
     sourceUrl: "user-added",
@@ -124,14 +149,16 @@ export function buildAddedPromoRow(args: {
     windowStart,
     windowEnd,
     expiresAt: expiresAt !== null ? expiresAt.toISOString() : null,
-    eligibleMarketTypes: [...PROMO_MARKET_TYPES],
-    pinned: null,
-    boostPercent: null,
-    boostedOddsAmerican: null,
+    eligibleMarketTypes: pinned ? [pinned.marketType] : [...PROMO_MARKET_TYPES],
+    pinned: pinned
+      ? { selectionText: pinned.selectionText, marketType: pinned.marketType, line: pinned.line }
+      : null,
+    boostPercent,
+    boostedOddsAmerican,
     baseOddsAmerican: null,
     bonusAmount,
-    maxStake: null,
-    maxWinnings: null,
+    maxStake,
+    maxWinnings,
     minOddsAmerican,
     unparsedCapFields: [],
     claimRequired: null,
@@ -148,21 +175,21 @@ export function buildAddedPromoRow(args: {
     values: {
       bookKey: input.bookKey,
       dedupeKey,
-      promoType: "bonus_bet",
+      promoType: input.promoType,
       status: "active",
       autoMatched: false,
       ...scopeColumns(scope),
-      marketType: null,
-      line: null,
-      side: null,
+      marketType: pinned ? pinned.marketType : null,
+      line: pinned ? pinned.line : null,
+      side: pinned ? pinned.side : null,
       parsed: validated.data,
-      boostPercent: null,
-      boostedOddsAmerican: null,
+      boostPercent,
+      boostedOddsAmerican,
       baseOddsAmerican: null,
       bonusAmount,
-      maxStake: null,
-      maxWinnings: null,
-      maxWinningsKind: null,
+      maxStake,
+      maxWinnings: maxWinnings ? maxWinnings.amount : null,
+      maxWinningsKind: maxWinnings ? maxWinnings.kind : null,
       minOddsAmerican,
       unparsedCapFields: [],
       finePrintNote: null,

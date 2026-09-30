@@ -7,8 +7,9 @@ import { addPromo } from "@/app/actions/add-promo";
 import { getAddPromoFormOptions } from "@/app/actions/get-add-promo-options";
 import type { AddPromoFormOptions } from "@/domain/promos/addedPromoInput";
 import {
-  bonusPayloadFromDraft,
   emptyBonusDraft,
+  payloadFromDraft,
+  switchPromoType,
   type AddPromoDraft,
   type AddPromoFieldErrors,
 } from "@/domain/promos/addPromoDraft";
@@ -17,7 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BonusBetFields } from "./BonusBetFields";
+import { BoostFields } from "./BoostFields";
 
 interface AddPromoFormProps {
   onSaved: (message: string) => void;
@@ -32,14 +35,19 @@ const LOAD_FAILED = "Couldn't load your books. Check your connection and try aga
 const FOCUS_ORDER: { field: keyof AddPromoFieldErrors; id: string }[] = [
   { field: "bookKey", id: "add-book" },
   { field: "bonusAmount", id: "add-bonus-amount" },
-  { field: "expires", id: "add-expires-day" },
+  { field: "boostPercent", id: "add-boost-percent" },
+  { field: "boostedOddsAmerican", id: "add-boosted-odds" },
   { field: "scope", id: "add-search" },
+  { field: "pinned", id: "add-pin" },
+  { field: "maxStake", id: "add-max-stake" },
+  { field: "maxWinnings", id: "add-max-winnings" },
+  { field: "expires", id: "add-expires-day" },
   { field: "minOddsAmerican", id: "add-min-odds" },
 ];
 
 /**
- * Inline "Add a promo" panel (D-02). Bonus bet only in this plan; the profit
- * boost type and the Type toggle arrive in Plan 06. Client checks are a
+ * Inline "Add a promo" panel (D-02). Type (Profit boost | Bonus bet) sits under
+ * Book (D-03) and only the chosen type's fields render below. Client checks are a
  * convenience: addPromo re-validates everything server-side (T-5-input), and
  * the Book list only ever contains the member's own books (D-08, T-5-08).
  */
@@ -84,7 +92,7 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
 
   function handleSave() {
     setSaveError(null);
-    const result = bonusPayloadFromDraft(draft);
+    const result = payloadFromDraft(draft);
     if ("fieldErrors" in result) {
       setFieldErrors(result.fieldErrors);
       focusFirstInvalid(result.fieldErrors);
@@ -209,13 +217,46 @@ export function AddPromoForm({ onSaved, onCancel }: AddPromoFormProps) {
         ) : null}
       </div>
 
-      <BonusBetFields
-        draft={draft}
-        onDraftChange={setDraft}
-        options={options}
-        fieldErrors={fieldErrors}
-        disabled={isSaving}
-      />
+      <div className="flex flex-col gap-2">
+        <Label>Type</Label>
+        <ToggleGroup
+          className="w-full"
+          value={[draft.promoType]}
+          onValueChange={(values) => {
+            const next = values[0];
+            if (next === "profit_boost" || next === "bonus_bet") {
+              setDraft(switchPromoType(draft, next));
+              setFieldErrors({});
+            }
+          }}
+          disabled={isSaving}
+        >
+          <ToggleGroupItem value="profit_boost" className="min-h-11 flex-1 px-4">
+            Profit boost
+          </ToggleGroupItem>
+          <ToggleGroupItem value="bonus_bet" className="min-h-11 flex-1 px-4">
+            Bonus bet
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+
+      {draft.promoType === "profit_boost" ? (
+        <BoostFields
+          draft={draft}
+          onDraftChange={setDraft}
+          options={options}
+          fieldErrors={fieldErrors}
+          disabled={isSaving}
+        />
+      ) : (
+        <BonusBetFields
+          draft={draft}
+          onDraftChange={setDraft}
+          options={options}
+          fieldErrors={fieldErrors}
+          disabled={isSaving}
+        />
+      )}
 
       <div className="flex flex-wrap gap-2">
         <Button

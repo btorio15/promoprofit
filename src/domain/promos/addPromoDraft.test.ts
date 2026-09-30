@@ -8,6 +8,9 @@ import {
   expiryDayOptions,
   expiryTimeOptions,
   parseOddsText,
+  parsePinValue,
+  payloadFromDraft,
+  switchPromoType,
   type AddPromoDraft,
 } from "./addPromoDraft";
 
@@ -118,5 +121,105 @@ describe("bonusPayloadFromDraft", () => {
     const r = bonusPayloadFromDraft({ ...complete, bonusAmount: "-5" });
     if (!("fieldErrors" in r)) throw new Error("expected errors");
     expect(r.fieldErrors.bonusAmount).toEqual(["Enter a number greater than 0."]);
+  });
+});
+
+const dayScope = {
+  mode: "league" as const,
+  eventId: null,
+  sportKey: "americanfootball_nfl",
+  fromEtDate: "2026-10-11",
+  throughEtDate: null,
+};
+const gameScope = { ...EMPTY_BONUS_DRAFT.scope, mode: "game" as const, eventId: "evt-1" };
+
+const completeBoost: AddPromoDraft = {
+  ...EMPTY_BONUS_DRAFT,
+  promoType: "profit_boost",
+  bookKey: "draftkings",
+  boostPercent: "50",
+  maxStake: "25",
+  scope: dayScope,
+};
+
+function errorsOf(draft: AddPromoDraft) {
+  const r = payloadFromDraft(draft);
+  if (!("fieldErrors" in r)) throw new Error("expected errors");
+  return r.fieldErrors;
+}
+
+describe("switchPromoType", () => {
+  it("bonus -> boost keeps book, scope and min odds and drops the bonus amount", () => {
+    const draft: AddPromoDraft = { ...complete, scope: dayScope, minOdds: "-200" };
+    const next = switchPromoType(draft, "profit_boost");
+    expect(next.promoType).toBe("profit_boost");
+    expect(next.bookKey).toBe("draftkings");
+    expect(next.scope).toEqual(dayScope);
+    expect(next.minOdds).toBe("-200");
+    expect(next.bonusAmount).toBe("");
+  });
+});
+
+describe("boostPayloadFromDraft", () => {
+  it("reports every required field when empty", () => {
+    const errors = errorsOf({ ...EMPTY_BONUS_DRAFT, promoType: "profit_boost", bookKey: "draftkings" });
+    expect(errors.boostPercent).toEqual(["Enter a boost % or boosted odds."]);
+    expect(errors.maxStake).toEqual(["Enter the max stake. Boosts can't be used without one."]);
+    expect(errors.scope).toEqual(["Pick a game or a league and days."]);
+  });
+
+  it("odds mode: empty odds message, and a game without a pin asks for the exact bet", () => {
+    expect(errorsOf({ ...completeBoost, boostMode: "odds" }).boostedOddsAmerican).toEqual([
+      "Enter the boosted odds, like +250.",
+    ]);
+    expect(errorsOf({ ...completeBoost, boostMode: "odds", boostedOdds: "+250", scope: gameScope }).pinned).toEqual([
+      "Pick the exact bet this price is for.",
+    ]);
+  });
+
+  it("parses pin values, with ml meaning a null line", () => {
+    expect(parsePinValue("spread|-3.5|home")).toEqual({ marketType: "spread", line: -3.5, side: "home" });
+    expect(parsePinValue("moneyline|ml|away")).toEqual({ marketType: "moneyline", line: null, side: "away" });
+    expect(parsePinValue("total|47.5|over")).toEqual({ marketType: "total", line: 47.5, side: "over" });
+    expect(parsePinValue("best")).toBeNull();
+    expect(parsePinValue("spread|-3|home")).toBeNull();
+    expect(parsePinValue("spread|ml|home")).toBeNull();
+  });
+
+  it("puts the pin in the payload's event scope", () => {
+    const r = payloadFromDraft({ ...completeBoost, scope: gameScope, pinValue: "spread|-3.5|home" });
+    if (!("payload" in r) || r.payload.promoType !== "profit_boost") throw new Error("expected boost payload");
+    expect(r.payload.scope).toEqual({
+      kind: "event",
+      eventId: "evt-1",
+      pinned: { marketType: "spread", line: -3.5, side: "home" },
+    });
+  });
+
+  it("moneyline pin has a null line", () => {
+    const r = payloadFromDraft({
+      ...completeBoost,
+      boostMode: "odds",
+      boostedOdds: "+250",
+      scope: gameScope,
+      pinValue: "moneyline|ml|away",
+    });
+    if (!("payload" in r) || r.payload.promoType !== "profit_boost") throw new Error("expected boost payload");
+    expect(r.payload.scope).toMatchObject({ pinned: { marketType: "moneyline", line: null, side: "away" } });
+  });
+
+  it("default expiry sends no expires; a chosen one is sent", () => {
+    const none = payloadFromDraft(completeBoost);
+    if (!("payload" in none) || none.payload.promoType !== "profit_boost") throw new Error("expected payload");
+    expect("expires" in none.payload && none.payload.expires !== undefined).toBe(false);
+    const chosen = payloadFromDraft({ ...completeBoost, boostExpiresEtDate: "2026-10-12" });
+    if (!("payload" in chosen) || chosen.payload.promoType !== "profit_boost") throw new Error("expected payload");
+    expect(chosen.payload.expires).toEqual({ etDate: "2026-10-12", etTime: "23:59" });
+  });
+
+  it("a complete boost draft is accepted by the server schema, including a cap", () => {
+    const r = payloadFromDraft({ ...completeBoost, maxWinnings: "100", maxWinningsKind: "boost_extra" });
+    if (!("payload" in r)) throw new Error("expected payload");
+    expect(AddPromoInputSchema.safeParse(r.payload).success).toBe(true);
   });
 });

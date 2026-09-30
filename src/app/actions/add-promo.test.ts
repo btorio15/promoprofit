@@ -155,3 +155,104 @@ describe("addPromo", () => {
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 });
+
+describe("addPromo (profit boost)", () => {
+  const boostInput = {
+    promoType: "profit_boost",
+    bookKey: "fanduel",
+    boost: { mode: "percent", boostPercent: "50" },
+    scope: { kind: "sport_day", sportKey: "americanfootball_nfl", etDate: "2026-10-03" },
+    maxStake: "25",
+  };
+
+  const pricedEvent: OddsEvent = {
+    ...event,
+    bookmakers: [
+      {
+        key: "draftkings",
+        title: "DraftKings",
+        markets: [
+          {
+            key: "h2h",
+            outcomes: [
+              { name: "DEN Broncos", price: -150 },
+              { name: "LA Rams", price: 130 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("boost % on a sport day inserts a sport_window boost owned by the session user", async () => {
+    const result = await addPromo(boostInput);
+    expect(result).toEqual({ status: "ok", promoId: 42 });
+    expect(mockInsertAddedPromo.mock.calls[0][0]).toMatchObject({
+      promoType: "profit_boost",
+      scopeKind: "sport_window",
+      boostPercent: "50.00",
+      maxStake: "25.00",
+      expiresAt: null,
+      addedByUserId: 7,
+    });
+  });
+
+  it("rejects a boost with no max stake", async () => {
+    const { maxStake: omitted, ...rest } = boostInput;
+    void omitted;
+    const result = await addPromo(rest);
+    expect(result).toEqual({
+      status: "invalid",
+      fieldErrors: { maxStake: ["Enter the max stake. Boosts can't be used without one."] },
+    });
+    expect(mockInsertAddedPromo).not.toHaveBeenCalled();
+  });
+
+  it("boosted odds with a pin present in cached odds stores the pin columns and the price", async () => {
+    mockGetCachedEvents.mockResolvedValue({ events: [pricedEvent], fetchedAt: NOW });
+    const result = await addPromo({
+      ...boostInput,
+      boost: { mode: "odds", boostedOddsAmerican: 250 },
+      scope: {
+        kind: "event",
+        eventId: "evt-1",
+        pinned: { marketType: "moneyline", line: null, side: "home" },
+      },
+    });
+    expect(result.status).toBe("ok");
+    expect(mockInsertAddedPromo.mock.calls[0][0]).toMatchObject({
+      marketType: "moneyline",
+      side: "home",
+      boostedOddsAmerican: 250,
+      boostPercent: null,
+    });
+    const parsed = mockInsertAddedPromo.mock.calls[0][0].parsed as { pinned: { selectionText: string } };
+    expect(parsed.pinned.selectionText).toBe("DEN Broncos");
+  });
+
+  it("a pin that is not in cached odds is rejected without inserting", async () => {
+    const result = await addPromo({
+      ...boostInput,
+      scope: {
+        kind: "event",
+        eventId: "evt-1",
+        pinned: { marketType: "spread", line: -3.5, side: "home" },
+      },
+    });
+    expect(result).toEqual({
+      status: "invalid",
+      fieldErrors: { pinned: ["That bet isn't in the current odds. Pick another."] },
+    });
+    expect(mockInsertAddedPromo).not.toHaveBeenCalled();
+  });
+
+  it("rejects a boost expiry in the past and stores a future expiry", async () => {
+    const past = await addPromo({ ...boostInput, expires: { etDate: "2026-09-30", etTime: "23:59" } });
+    expect(past).toEqual({ status: "invalid", fieldErrors: { expires: ["Pick an expiry that hasn't passed."] } });
+    expect(mockInsertAddedPromo).not.toHaveBeenCalled();
+
+    const future = await addPromo({ ...boostInput, expires: { etDate: "2026-10-04", etTime: "23:59" } });
+    expect(future.status).toBe("ok");
+    expect(mockInsertAddedPromo.mock.calls[0][0].expiresAt).toEqual(new Date("2026-10-05T03:59:00.000Z"));
+  });
+});

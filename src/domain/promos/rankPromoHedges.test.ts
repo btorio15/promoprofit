@@ -978,3 +978,91 @@ describe("findUnprofitablePromos", () => {
     expect(unprofitable[1].bestGuaranteedProfit).toBeNull();
   });
 });
+
+// Phase 5 Plan 06: the shape a member-added profit boost has when it reaches
+// the engine (built by buildAddedPromoRow + mapActivePromoRow).
+describe("rankPromoHedges: member-added profit boosts", () => {
+  const event = moneylineEvent({
+    id: "added-evt",
+    homeTeam: "Team H",
+    awayTeam: "Team A",
+    quotes: [
+      { bookKey: "draftkings", homePrice: 200, awayPrice: -250 },
+      { bookKey: "fanduel", homePrice: 190, awayPrice: -240 },
+    ],
+  });
+  const opts = {
+    moneylineEvents: [event],
+    extendedEvents: [],
+    hedgeBookKeys: new Set(["fanduel"]),
+    precision: "cents" as const,
+    now: NOW,
+  };
+  const addedBoost: RankablePromo = {
+    ...defaultPromo,
+    scope: eventScope("added-evt"),
+    bookKey: "draftkings",
+    eligibleMarketTypes: ["moneyline", "spread", "total"],
+    boostPercent: "50.00",
+    maxStake: "25.00",
+  };
+
+  it("added boost % unpinned, max stake 25.00: stake <= 25.00 and both outcomes net the same to the cent", () => {
+    const [opportunity] = rankPromoHedges([addedBoost], opts);
+    expect(opportunity.result.kind).toBe("boost");
+    if (opportunity.result.kind !== "boost") return;
+    const b = opportunity.result.boost;
+    expect(b.promoStake.lte(new Decimal("25.00"))).toBe(true);
+    expect(b.netIfPromoWins.toFixed(2)).toBe(b.netIfHedgeWins.toFixed(2));
+    expect(b.guaranteedProfit.toFixed(2)).toBe(b.netIfHedgeWins.toFixed(2));
+  });
+
+  it("pinned boosted odds is priced at the boosted odds, not the live quote", () => {
+    const [opportunity] = rankPromoHedges(
+      [
+        {
+          ...addedBoost,
+          boostPercent: null,
+          boostedOddsAmerican: 350,
+          pinned: { eventId: "added-evt", marketType: "moneyline", line: null, side: "home" },
+          eligibleMarketTypes: ["moneyline"],
+        },
+      ],
+      opts,
+    );
+    expect(opportunity.promoOddsAmerican).toBe(350);
+    expect(opportunity.promoOddsDerived).toBe(false);
+    if (opportunity.result.kind === "boost") {
+      expect(opportunity.result.boost.priceSource).toBe("published");
+      // Whole-cent hedge stakes can leave the two outcomes a cent or two apart
+      // (engine rounding, unchanged); the reported profit is the worse one.
+      const { netIfPromoWins, netIfHedgeWins, guaranteedProfit } = opportunity.result.boost;
+      expect(guaranteedProfit.toFixed(2)).toBe(Decimal.min(netIfPromoWins, netIfHedgeWins).toFixed(2));
+      expect(netIfPromoWins.minus(netIfHedgeWins).abs().lte(new Decimal("0.02"))).toBe(true);
+    }
+  });
+
+  it("a binding total_payout cap reduces the stake below max stake", () => {
+    const [uncapped] = rankPromoHedges([addedBoost], opts);
+    const [capped] = rankPromoHedges(
+      [{ ...addedBoost, winningsCap: { kind: "total_payout", amount: "40.00" } }],
+      opts,
+    );
+    expect(capped.result.kind).toBe("boost");
+    expect(uncapped.result.kind).toBe("boost");
+    if (capped.result.kind === "boost" && uncapped.result.kind === "boost") {
+      expect(capped.result.boost.promoStake.lt(uncapped.result.boost.promoStake)).toBe(true);
+      expect(capped.result.boost.capBound).toBe("max_winnings");
+      expect(capped.result.boost.promoPayout.lte(new Decimal("40.00"))).toBe(true);
+    }
+  });
+
+  it("a boost_extra cap on an unpinned boost ranks without throwing", () => {
+    const result = rankPromoHedges(
+      [{ ...addedBoost, winningsCap: { kind: "boost_extra", amount: "10.00" } }],
+      opts,
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].result.kind).toBe("boost");
+  });
+});
