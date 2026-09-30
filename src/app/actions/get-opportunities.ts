@@ -11,7 +11,9 @@ import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
 import { rankArbs } from "@/domain/hedge/rankArbs";
 import { SPORT_KEYS } from "@/config/sports";
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
-import { sumOwnBookProfit } from "@/domain/promos/profitTotals";
+import { sumPortfolioProfit } from "@/domain/promos/profitTotals";
+import { findPairCandidates, selectPairs, singleProfitMap } from "@/domain/promos/pairPromos";
+import { toPairRowDTO, type PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import {
   OPPORTUNITIES_ARB_TOTAL_STAKE,
@@ -69,6 +71,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   if (ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null) {
     return respond("no-odds", "0.00", [
       { id: "promos", items: [] },
+      { id: "pairs", items: [] },
       { id: "arbs", items: [] },
     ]);
   }
@@ -89,8 +92,29 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     data: row,
   }));
 
-  const totalProfit = sumOwnBookProfit(
+  // D-08/D-10/D-18: pairs of promos at two member books that beat hedging
+  // each separately, each promo in at most one pair. Paired promos stay in
+  // the promos source too (D-20).
+  const chosenPairs = selectPairs(
+    findPairCandidates(ctx.feedPromos, singleProfitMap(singles), {
+      ...ctx.rankOpts,
+      memberBookKeys: ctx.userBookSet,
+    }),
+  );
+  const pairRows: PairRowDTO[] = chosenPairs.map((c) => toPairRowDTO(c, ctx.bookNames));
+  const pairItems: OpportunityItem<PairRowDTO>[] = pairRows.map((row) => ({
+    rowKey: row.rowKey,
+    profit: row.guaranteedProfit,
+    pct: row.roiPct,
+    pctLabel: "ROI" as const,
+    commenceTime: row.commenceTime,
+    data: row,
+  }));
+
+  // D-12: a pair counts once, in place of its two single profits.
+  const totalProfit = sumPortfolioProfit(
     rows.map((r) => ({ promoId: r.promoId, guaranteedProfit: r.guaranteedProfit, hasPromoBook: r.hasPromoBook })),
+    pairRows,
     ctx.doneIds,
   );
 
@@ -119,6 +143,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
 
   const sources: OpportunitySourceDTO[] = [
     { id: "promos", items },
+    { id: "pairs", items: pairItems },
     { id: "arbs", items: arbItems },
   ];
 

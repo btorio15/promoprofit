@@ -262,6 +262,78 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(result.emptyVariant).toBe("none-scraped");
   });
 
+  describe("pairs source (D-07, D-08, D-12, D-18, D-20)", () => {
+    const twoBoosts = () => [
+      activeBoostPromo({ id: 1, bookKey: "draftkings", boostPercent: "50.00", maxStake: "50.00" }),
+      activeBoostPromo({ id: 2, bookKey: "fanduel", boostPercent: "50.00", maxStake: "50.00" }),
+    ];
+
+    const PAIR_EVENT = moneylineEvent({
+      id: "nfl-pair",
+      homeTeam: "DEN Broncos",
+      awayTeam: "LA Rams",
+      quotes: [
+        { bookKey: "draftkings", homePrice: -110, awayPrice: -110 },
+        { bookKey: "fanduel", homePrice: -110, awayPrice: -110 },
+      ],
+    });
+
+    beforeEach(() => {
+      mockGetCachedEvents.mockResolvedValue({ events: [PAIR_EVENT], fetchedAt: new Date(NOW_ISO) });
+    });
+
+    it("returns a pair, keeps both promos in the promos source, and counts the pair once in the total", async () => {
+      mockGetActivePromos.mockResolvedValue(twoBoosts());
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      const pairs = result.sources.find((s) => s.id === "pairs");
+      if (pairs?.id !== "pairs") throw new Error("unreachable");
+      expect(pairs.items).toHaveLength(1);
+      const item = pairs.items[0];
+      expect(item.rowKey).toBe("pair-1-2");
+      expect(item.profit).toBe(item.data.guaranteedProfit);
+      expect(item.pct).toBe(item.data.roiPct);
+      expect(item.pctLabel).toBe("ROI");
+
+      const promos = result.sources.find((s) => s.id === "promos");
+      if (promos?.id !== "promos") throw new Error("unreachable");
+      expect(promos.items.map((i) => i.data.promoId).sort()).toEqual([1, 2]);
+
+      // D-12: the total is the pair's profit alone, not the pair plus the two singles.
+      expect(result.totals.totalProfit).toBe(item.data.guaranteedProfit);
+    });
+
+    it("is deterministic across calls", async () => {
+      mockGetActivePromos.mockResolvedValue(twoBoosts());
+      const a = await getOpportunities({ precision: "cents" });
+      const b = await getOpportunities({ precision: "cents" });
+      if (a.status !== "ok" || b.status !== "ok") throw new Error("unreachable");
+      const pa = a.sources.find((s) => s.id === "pairs");
+      const pb = b.sources.find((s) => s.id === "pairs");
+      expect(pa?.items.map((i) => [i.rowKey, i.profit])).toEqual(pb?.items.map((i) => [i.rowKey, i.profit]));
+    });
+
+    it("D-18: no pair when one of the two books is not a member book", async () => {
+      mockGetActivePromos.mockResolvedValue(twoBoosts());
+      mockGetUserBookKeys.mockResolvedValue(["draftkings"]);
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      const pairs = result.sources.find((s) => s.id === "pairs");
+      expect(pairs?.items).toHaveLength(0);
+    });
+
+    it("a done promo never appears in a pair", async () => {
+      mockGetActivePromos.mockResolvedValue(twoBoosts());
+      mockGetPromoCompletions.mockResolvedValue([
+        { promoId: 2, snapshot: null, profitExtracted: "0.00", completedAt: new Date(NOW_ISO) },
+      ]);
+      const result = await getOpportunities({ precision: "cents" });
+      if (result.status !== "ok") throw new Error("unreachable");
+      const pairs = result.sources.find((s) => s.id === "pairs");
+      expect(pairs?.items).toHaveLength(0);
+    });
+  });
+
   describe("arbs source (D-18, D-21)", () => {
     const ARB_EVENT = moneylineEvent({
       id: "nfl-arb",
