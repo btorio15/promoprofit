@@ -274,11 +274,11 @@ Server checks after parse: `bookKey` in `getUserBookKeys(user.userId)` (D-08; re
 | A3 | Require pin for "Boosted odds" mode (deviation from UI-SPEC's optional pin) | Pitfall 5 | Planner/UI must adjust the form; alternative is to disallow Boosted odds without a pin via validation message only |
 | A4 | Deleting observations for a soft-deleted promo is desired | Pitfall 1 | Available-profit numbers slightly higher if kept |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Boosted odds vs optional pin** - Recommendation: make the pin required when "Boosted odds" is chosen (Pitfall 5); planner should flag to the owner as a small UI-SPEC amendment.
-2. **`status='deleted'` exhaustiveness** - After adding to `PROMO_STATUSES`, grep `PromoStatus` usages (`lifecycle.ts`, `store.ts`) for `Record<PromoStatus,...>` maps; the scraper must treat `deleted` rows like it treats `dismissed` (never resurrect) - moot because added promos are excluded from scraper matching by dedupe key, but confirm typecheck passes.
-3. **Done row for a deleted/expired added promo** - needs `promoAddedByUserId` + `promoStatus` on `DoneCompletionInput`/`DonePromoDTO` (e.g. `addedByYou`, `sourceActive`). Small DTO change; `doneSnapshot.test.ts` has fixtures to update.
+1. **Boosted odds vs optional pin** - Recommendation: make the pin required when "Boosted odds" is chosen (Pitfall 5); planner should flag to the owner as a small UI-SPEC amendment. **RESOLVED:** Plan 05-06 (boost slice) makes the pin required in Boosted odds mode as a UI-SPEC amendment (orchestrator default A3); Boost % keeps it optional.
+2. **`status='deleted'` exhaustiveness** - After adding to `PROMO_STATUSES`, grep `PromoStatus` usages (`lifecycle.ts`, `store.ts`) for `Record<PromoStatus,...>` maps; the scraper must treat `deleted` rows like it treats `dismissed` (never resurrect) - moot because added promos are excluded from scraper matching by dedupe key, but confirm typecheck passes. **RESOLVED:** Plan 05-01 Task 2 adds `deleted` to the status set, updates every exhaustive map, and gates on typecheck.
+3. **Done row for a deleted/expired added promo** - needs `promoAddedByUserId` + `promoStatus` on `DoneCompletionInput`/`DonePromoDTO` (e.g. `addedByYou`, `sourceActive`). Small DTO change; `doneSnapshot.test.ts` has fixtures to update. **RESOLVED:** Plan 05-09 Task 1 adds `promoAddedByUserId`/`promoStatus` to the completion query and `addedByYou`/`addedPromoStatus` to `DonePromoDTO` (Task 2 renders them on Done rows).
 
 ## Environment Availability
 

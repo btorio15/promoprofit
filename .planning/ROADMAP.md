@@ -259,12 +259,12 @@ Plans:
   2. A promo a user adds is visible only to them (personal; group sharing dropped by owner 2026-09-29)
   3. User can edit, expire, or delete promos they added, and the change is reflected in the feed immediately
 
-**Plans**: 8 plans
+**Plans**: 10 plans
 
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Owner column + migration file, 'any' scope, 'deleted' status, viewer-scoped getActivePromos, scraper expiry guard
+- [ ] 05-01-PLAN.md — Owner column + migration file, 'any' scope, 'deleted' status, viewer-scoped getActivePromos, scraper expiry guard (don't use the app until 05-03 applies the migration)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -273,20 +273,25 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-04-PLAN.md — Add a bonus bet end to end: Add promo button, inline form, addPromo action (live immediately)
+- [ ] 05-04-PLAN.md — Add a bonus bet, server side: strict input schema, row builder, addPromo + form-options actions (live immediately)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05-05-PLAN.md — Add a profit boost end to end: Type toggle, boost % or boosted odds, max stake, caps, pin
-- [ ] 05-06-PLAN.md — Expire now / Delete own added promos (soft delete keeps Done history)
+- [ ] 05-05-PLAN.md — Add a bonus bet, UI: Add promo button, inline bonus-bet form
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 05-07-PLAN.md — Edit own added promos (same form prefilled, owner-only, in place)
+- [ ] 05-06-PLAN.md — Add a profit boost end to end: Type toggle, boost % or boosted odds, max stake, caps, pin
+- [ ] 05-07-PLAN.md — Expire now / Delete own added promos from Active rows (soft delete keeps Done history)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 05-08-PLAN.md — Duplicate hint (non-blocking) + empty-state nudge
+- [ ] 05-08-PLAN.md — Edit own added promos (same form prefilled, owner-only, in place)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 05-09-PLAN.md — Done rows keep history after delete, show "Added by you" and owner actions
+- [ ] 05-10-PLAN.md — Duplicate hint (non-blocking) + empty-state nudge
 **UI hint**: yes
 
 ## Progress
