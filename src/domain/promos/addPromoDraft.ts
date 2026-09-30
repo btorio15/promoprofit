@@ -1,13 +1,20 @@
+import Decimal from "decimal.js";
 import {
   AddPromoInputSchema,
+  MSG_BOOSTED_ODDS,
+  MSG_BOOST_REQUIRED,
   MSG_EXPIRY_PASSED,
+  MSG_GAME_INVALID,
+  MSG_MAX_STAKE,
   MSG_PICK_BOOK,
+  MSG_PICK_EXACT_BET,
   fieldErrorsFromIssues,
   type AddPromoInput,
   type AddedPromoField,
 } from "./addedPromoInput";
 import { EMPTY_SCOPE_DRAFT, scopeInputFromDraft, type ScopeDraft } from "./scopeDraft";
 import { etDayBounds, etDayLabel } from "./etTime";
+import { PROMO_MARKET_TYPES, PROMO_SIDES, type PromoMarketType, type PromoSide } from "./types";
 
 /**
  * Phase 5: the add-promo form's draft state and its mapping to the server
@@ -17,14 +24,44 @@ import { etDayBounds, etDayLabel } from "./etTime";
 
 export type AddPromoFieldErrors = Partial<Record<AddedPromoField, string[]>>;
 
+export type AddPromoType = "bonus_bet" | "profit_boost";
+export type BoostMode = "percent" | "odds";
+export type MaxWinningsKind = "total_payout" | "boost_extra";
+
 export interface AddPromoDraft {
+  promoType: AddPromoType;
   bookKey: string | null;
   bonusAmount: string;
   expiresEtDate: string | null;
   expiresEtTime: string;
   scope: ScopeDraft;
   minOdds: string;
+  /** Profit-boost fields. */
+  boostMode: BoostMode;
+  boostPercent: string;
+  boostedOdds: string;
+  /** CorrectionMarketOption.value format, or null/"best" for no pin. */
+  pinValue: string | null;
+  maxStake: string;
+  maxWinnings: string;
+  maxWinningsKind: MaxWinningsKind;
+  /** null = the default "When the last game starts". */
+  boostExpiresEtDate: string | null;
+  boostExpiresEtTime: string;
 }
+
+const BOOST_DEFAULTS = {
+  promoType: "bonus_bet" as AddPromoType,
+  boostMode: "percent" as BoostMode,
+  boostPercent: "",
+  boostedOdds: "",
+  pinValue: null as string | null,
+  maxStake: "",
+  maxWinnings: "",
+  maxWinningsKind: "total_payout" as MaxWinningsKind,
+  boostExpiresEtDate: null as string | null,
+  boostExpiresEtTime: "23:59",
+};
 
 export const DEFAULT_EXPIRY_TIME = "23:59";
 export const DEFAULT_EXPIRY_DAYS_AHEAD = 7;
@@ -106,6 +143,7 @@ export function emptyBonusDraft(now: Date): AddPromoDraft {
     expiresEtTime: DEFAULT_EXPIRY_TIME,
     scope: EMPTY_SCOPE_DRAFT,
     minOdds: "",
+    ...BOOST_DEFAULTS,
   };
 }
 
@@ -117,6 +155,7 @@ export const EMPTY_BONUS_DRAFT: AddPromoDraft = {
   expiresEtTime: DEFAULT_EXPIRY_TIME,
   scope: EMPTY_SCOPE_DRAFT,
   minOdds: "",
+  ...BOOST_DEFAULTS,
 };
 
 /** "+250" / "-110" / "250" -> integer; anything else -> null. Regex + parseInt only. */
@@ -159,4 +198,117 @@ export function bonusPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult 
   const parsed = AddPromoInputSchema.safeParse(candidate);
   if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
   return { payload: parsed.data };
+}
+
+/** D-03: switching Type keeps Book, scope and min odds; the other type's own values are dropped. */
+export function switchPromoType(draft: AddPromoDraft, next: AddPromoType): AddPromoDraft {
+  if (draft.promoType === next) return draft;
+  if (next === "profit_boost") {
+    return { ...draft, promoType: next, bonusAmount: "" };
+  }
+  return {
+    ...draft,
+    promoType: next,
+    boostMode: BOOST_DEFAULTS.boostMode,
+    boostPercent: "",
+    boostedOdds: "",
+    pinValue: null,
+    maxStake: "",
+    maxWinnings: "",
+    maxWinningsKind: BOOST_DEFAULTS.maxWinningsKind,
+    boostExpiresEtDate: null,
+    boostExpiresEtTime: BOOST_DEFAULTS.boostExpiresEtTime,
+  };
+}
+
+export interface ParsedPin {
+  marketType: PromoMarketType;
+  line: number | null;
+  side: PromoSide;
+}
+
+/**
+ * "spread|-3.5|home" -> {spread, -3.5, home}; "moneyline|ml|away" -> line null.
+ * The line is a half-point market descriptor, not money: a strict text check
+ * then Decimal -> number.
+ */
+export function parsePinValue(value: string | null): ParsedPin | null {
+  if (!value || value === "best") return null;
+  const parts = value.split("|");
+  if (parts.length !== 3) return null;
+  const [marketType, lineText, side] = parts;
+  if (!(PROMO_MARKET_TYPES as readonly string[]).includes(marketType)) return null;
+  if (!(PROMO_SIDES as readonly string[]).includes(side)) return null;
+  if (marketType === "moneyline") {
+    if (lineText !== "ml") return null;
+    return { marketType: "moneyline", line: null, side: side as PromoSide };
+  }
+  if (!/^-?\d+\.5$/.test(lineText)) return null;
+  return {
+    marketType: marketType as PromoMarketType,
+    line: new Decimal(lineText).toNumber(),
+    side: side as PromoSide,
+  };
+}
+
+/** Draft -> server input for a profit boost, or the field errors to show. */
+export function boostPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult {
+  const errors: AddPromoFieldErrors = {};
+
+  if (!draft.bookKey) errors.bookKey = [MSG_PICK_BOOK];
+
+  let boost: { mode: "percent"; boostPercent: string } | { mode: "odds"; boostedOddsAmerican: number } | null = null;
+  if (draft.boostMode === "percent") {
+    const percent = draft.boostPercent.trim();
+    if (percent === "") errors.boostPercent = [MSG_BOOST_REQUIRED];
+    else boost = { mode: "percent", boostPercent: percent };
+  } else {
+    const parsedOdds = parseOddsText(draft.boostedOdds);
+    if (parsedOdds === null) errors.boostedOddsAmerican = [MSG_BOOSTED_ODDS];
+    else boost = { mode: "odds", boostedOddsAmerican: parsedOdds };
+  }
+
+  const maxStake = draft.maxStake.trim();
+  if (maxStake === "") errors.maxStake = [MSG_MAX_STAKE];
+
+  const scopeInput = scopeInputFromDraft(draft.scope);
+  if (scopeInput === null) errors.scope = [MSG_GAME_INVALID];
+
+  const pin = parsePinValue(draft.pinValue);
+  if (scopeInput !== null && draft.boostMode === "odds" && !(scopeInput.kind === "event" && pin !== null)) {
+    errors.pinned = [MSG_PICK_EXACT_BET];
+  }
+
+  const oddsText = draft.minOdds.trim();
+  let minOdds: number | undefined;
+  if (oddsText !== "") {
+    const parsedMin = parseOddsText(oddsText);
+    if (parsedMin === null) errors.minOddsAmerican = [MSG_ODDS];
+    else minOdds = parsedMin;
+  }
+
+  if (Object.keys(errors).length > 0 || boost === null || scopeInput === null) return { fieldErrors: errors };
+
+  const winningsText = draft.maxWinnings.trim();
+  const candidate = {
+    promoType: "profit_boost",
+    bookKey: draft.bookKey,
+    boost,
+    scope: scopeInput.kind === "event" ? { ...scopeInput, pinned: pin } : scopeInput,
+    maxStake,
+    ...(winningsText !== "" ? { maxWinnings: { amount: winningsText, kind: draft.maxWinningsKind } } : {}),
+    ...(minOdds !== undefined ? { minOddsAmerican: minOdds } : {}),
+    ...(draft.boostExpiresEtDate
+      ? { expires: { etDate: draft.boostExpiresEtDate, etTime: draft.boostExpiresEtTime } }
+      : {}),
+  };
+
+  const parsed = AddPromoInputSchema.safeParse(candidate);
+  if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
+  return { payload: parsed.data };
+}
+
+/** Dispatches on the draft's Type. */
+export function payloadFromDraft(draft: AddPromoDraft): BonusPayloadResult {
+  return draft.promoType === "profit_boost" ? boostPayloadFromDraft(draft) : bonusPayloadFromDraft(draft);
 }
