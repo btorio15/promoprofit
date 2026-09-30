@@ -7,11 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/AppHeader";
 import { OddsStatusBar } from "@/components/finder/OddsStatusBar";
 import { CreditBanner } from "@/components/finder/CreditBanner";
-import { FinderScreen } from "@/components/finder/FinderScreen";
 import { ArbScreen } from "@/components/arb/ArbScreen";
 import { OpportunitiesScreen } from "@/components/opportunities/OpportunitiesScreen";
 import { PromosScreen } from "@/components/promos/PromosScreen";
-import { SignupOffersScreen } from "@/components/signup/SignupOffersScreen";
+import { ToolsScreen } from "@/components/tools/ToolsScreen";
 
 export interface AppShellProps {
   status: OddsStatus;
@@ -20,20 +19,19 @@ export interface AppShellProps {
   displayName: string;
 }
 
-type ActiveTab = "opportunities" | "bonus" | "arbitrage" | "promos" | "signup";
+type ActiveTab = "opportunities" | "arbitrage" | "promos" | "tools";
 
 /**
  * Page shell (D-09, D-01): one sticky status bar + credit banner shared
- * above the top-level "Opportunities | Bonus bets | Arbitrage | Promos | Sign-up offers"
+ * above the top-level "Opportunities | Arbitrage | Promos | Tools"
  * tabs, so odds age/credits/refresh stay visible regardless of which tab is
  * open. Owns recomputeKey (bumped after a refresh or a successful
  * spreads/totals search, so the odds-dependent tabs recompute together) and
  * activeTab (default "opportunities", D-01, not URL-synced) and promosVersion
  * (bumped after any Mark done / Undo so the Opportunities feed refetches). Every tab panel below stays
  * mounted while inactive so switching tabs never discards another tab's
- * results/state. quick-260928-mgi: the Sign-up offers tab needs neither
- * recomputeKey nor hasCachedOdds -- it's informational only, independent of
- * odds/ranking (T-mgi-08).
+ * results/state. The Tools tab wraps the bonus-bet finder and the
+ * informational Sign-up offers list (T-mgi-08) under sub-tabs.
  */
 export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: AppShellProps) {
   const [recomputeKey, setRecomputeKey] = useState(0);
@@ -60,11 +58,18 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
           className="gap-8"
         >
           <TabsList variant="line" aria-label="Select a tab" className="mt-2">
-            <TabsTrigger value="opportunities">Opportunities</TabsTrigger>
-            <TabsTrigger value="bonus">Bonus bets</TabsTrigger>
-            <TabsTrigger value="arbitrage">Arbitrage</TabsTrigger>
-            <TabsTrigger value="promos">Promos</TabsTrigger>
-            <TabsTrigger value="signup">Sign-up offers</TabsTrigger>
+            <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap">
+              Opportunities
+            </TabsTrigger>
+            <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap">
+              Arbitrage
+            </TabsTrigger>
+            <TabsTrigger value="promos" className="min-h-11 whitespace-nowrap">
+              Promos
+            </TabsTrigger>
+            <TabsTrigger value="tools" className="min-h-11 whitespace-nowrap">
+              Tools
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="opportunities" keepMounted>
@@ -74,14 +79,6 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
               promosVersion={promosVersion}
               onPromosChanged={bumpPromos}
               onNavigate={(tab) => setActiveTab(tab)}
-            />
-          </TabsContent>
-
-          <TabsContent value="bonus" keepMounted>
-            <FinderScreen
-              bonusBooks={bonusBooks}
-              hasCachedOdds={hasCachedOdds}
-              recomputeKey={recomputeKey}
             />
           </TabsContent>
 
@@ -98,8 +95,12 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
             <PromosScreen hasCachedOdds={hasCachedOdds} recomputeKey={recomputeKey} />
           </TabsContent>
 
-          <TabsContent value="signup" keepMounted>
-            <SignupOffersScreen />
+          <TabsContent value="tools" keepMounted>
+            <ToolsScreen
+              bonusBooks={bonusBooks}
+              hasCachedOdds={hasCachedOdds}
+              recomputeKey={recomputeKey}
+            />
           </TabsContent>
         </Tabs>
       </main>
