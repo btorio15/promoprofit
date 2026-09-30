@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books (completed 2026-09-26)
 - [x] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches (completed 2026-09-29)
 - [x] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection (completed 2026-09-30)
-- [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a promo, shared or private, feeding the same feed
+- [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a personal promo (visible only to them), feeding the same feed
 
 ## Phase Details
 
@@ -249,7 +249,7 @@ Plans:
 
 ### Phase 5: Group-Added Promos
 
-**Goal**: Any group member can hand-add a promo they see in their own app, mark it shared or private, and manage the promos they added — feeding the same opportunities feed scraping can't fully cover
+**Goal**: Any group member can hand-add a promo they see in their own app (personal, visible only to them — sharing dropped by owner 2026-09-29, D-01) and manage the promos they added — feeding the same opportunities feed scraping can't fully cover
 **Mode:** mvp
 **Depends on**: Phase 3, Phase 4
 **Requirements**: PROMO-01, PROMO-02, PROMO-05
@@ -259,7 +259,34 @@ Plans:
   2. A promo a user adds is visible only to them (personal; group sharing dropped by owner 2026-09-29)
   3. User can edit, expire, or delete promos they added, and the change is reflected in the feed immediately
 
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Owner column + migration file, 'any' scope, 'deleted' status, viewer-scoped getActivePromos, scraper expiry guard
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — Session user through every promo read (Promos, Opportunities, pairs, mark done), observation leak closed, "Added by you" badge
+- [ ] 05-03-PLAN.md — [BLOCKING, owner OK] Apply migration 0010 to live Neon + db:check
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05-04-PLAN.md — Add a bonus bet end to end: Add promo button, inline form, addPromo action (live immediately)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-05-PLAN.md — Add a profit boost end to end: Type toggle, boost % or boosted odds, max stake, caps, pin
+- [ ] 05-06-PLAN.md — Expire now / Delete own added promos (soft delete keeps Done history)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 05-07-PLAN.md — Edit own added promos (same form prefilled, owner-only, in place)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 05-08-PLAN.md — Duplicate hint (non-blocking) + empty-state nudge
 **UI hint**: yes
 
 ## Progress
@@ -274,4 +301,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 0/? | Not started | - |
+| 5. Group-Added Promos | 0/8 | Planned | - |
