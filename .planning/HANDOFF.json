@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-30T18:14:24.899Z",
+  "phase": "5",
+  "phase_name": "Group-Added Promos (open, human UAT pending)",
+  "phase_dir": ".planning/phases/05-group-added-promos",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "active_quick_task": {
+    "id": "260930-gyl",
+    "slug": "use-alternate-spreads-to-raise-roi-on-ga",
+    "dir": ".planning/quick/260930-gyl-use-alternate-spreads-to-raise-roi-on-ga",
+    "flags": ["--research", "--validate"],
+    "stage": "research spawned; no PLAN.md yet"
+  },
+  "completed_tasks": [
+    {"id": "05", "name": "Phase 5 executed + review fixes (10 plans, 7 fixes)", "status": "done", "commit": "780e1fd"},
+    {"id": "debug", "name": "FanDuel team matching + reader teams", "status": "done", "commit": "137164f"},
+    {"id": "260930-fge", "name": "Exclude Done promos from availableProfit.today", "status": "done", "commit": "c866fe8"},
+    {"id": "fast", "name": "Remove Available today from UI", "status": "done", "commit": "5fb8d44"},
+    {"id": "260930-gam", "name": "Alt spreads for promos pinned to a non-main spread line (MISUNDERSTOOD ask; needs cleanup)", "status": "done_needs_cleanup", "commit": "6ead017"},
+    {"id": "fast", "name": "Phone login on dev server (allowedDevOrigins + POST auth forms)", "status": "done", "commit": "4c5009e"}
+  ],
+  "remaining_tasks": [
+    {"id": "260930-gyl", "name": "Alt spreads for game-scoped (unpinned) boosts and bonus bets + clean up 260930-gam pinned-only code", "status": "in_progress"},
+    {"id": "05-uat", "name": "/gsd-verify-work 5 then /gsd-execute-phase 5 to close", "status": "not_started"},
+    {"id": "05-secure", "name": "/gsd-secure-phase 5 (recommended)", "status": "not_started"}
+  ],
+  "cleanup_from_misunderstanding": [
+    {"file": "src/app/actions/refresh-spreads-totals.ts", "lines": "38-45", "issue": "altSpreadPins built only from promo.pinned spread pins", "fix": "target single-game-scoped boosts/bonus bets with eligible spread + keep real pins"},
+    {"file": "src/domain/promos/altSpreads.ts", "lines": "5-7, 52", "issue": "selectAltSpreadTargets takes pins and skips events whose main spread covers the pinned line; doc says pinned", "fix": "generalize to event targets; drop main-covers skip for game-scoped; reword doc"},
+    {"file": "src/ingestion/odds/refreshExtended.ts", "lines": "61, 130, 159, 265", "issue": "AltSpreadPin / altSpreadPins naming and 'pinned' doc", "fix": "rename to targets; keep cap, credit gate, try/catch, refreshCost, altLines outcome"},
+    {"file": "src/domain/promos/selection.ts", "lines": "~79-125", "issue": "alt fallback only in resolveSpread (pinned path); unpinned enumeration ignores alternate_spreads", "fix": "keep fallback; add exact-opposite alt pair candidates to the unpinned enumeration path"},
+    {"file": "src/components/arb/ArbForm.tsx", "lines": "136, 140, 144", "issue": "banner copy says 'pinned games'", "fix": "reword to promo games"},
+    {"file": "src/components/arb/SearchSpreadsTotalsDialog.tsx", "lines": "58", "issue": "copy says 'pinned spread promo on an alternate line'", "fix": "reword to 'up to 5 promo games'"},
+    {"file": "tests: altSpreads.test.ts, refreshExtended.test.ts, selection.test.ts, rankPromoHedges.test.ts, client.test.ts", "issue": "fixtures assume pins only", "fix": "update; add test that an unpinned single-game boost picks a higher-profit alt pair to the cent"},
+    {"file": ".planning/STATE.md", "issue": "quick row 260930-gam wording/status", "fix": "mark superseded by 260930-gyl"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Change password; clear phone browser history for 10.201.28.166", "context": "password leaked to local dev log and phone history via un-hydrated GET form (fixed in 4c5009e)", "blocking": false},
+    {"action": "git push origin main (15 commits ahead)", "context": "local only since 5948f6b", "blocking": false},
+    {"action": "Correct match promo 19 before 8:15 PM ET Oct 1 if scrape hasn't matched", "context": "FanDuel Steelers @ Browns 50% boost", "blocking": false},
+    {"action": "After gyl ships: one Search spreads & totals press to confirm alt outcome names + book coverage", "context": "assumption A2/A3", "blocking": false},
+    {"action": "Decide morning-scrape fix (Vercel Cron -> workflow_dispatch)", "context": "GitHub cron dropped 8:07am runs", "blocking": false},
+    {"action": "Phase 5 hands-on UAT", "context": "05-HUMAN-UAT.md", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Alt lines fetched only on confirmed Search spreads & totals press, max 5 games soonest-first, credit gate skips alt only, exact opposite line only, spreads only", "rationale": "owner, credit budget + guaranteed profit", "phase": "quick"},
+    {"decision": "Done promos excluded from availableProfit.today; Available today removed from UI", "rationale": "owner", "phase": "quick"},
+    {"decision": "Migration 0010 applied to live Neon", "rationale": "owner approved", "phase": "5"}
+  ],
+  "uncommitted_files": [".planning/config.json", ".planning/phases/01.1-arbitrage-tab/.gitkeep (untracked)"],
+  "next_action": "Read .planning/.continue-here.md; if 260930-gyl-RESEARCH.md exists, continue /gsd-quick at the planner step (quick-full) including the cleanup table; else re-run research.",
+  "context_notes": "Owner intent: 'when i wanted alt lines it was to see if any odds would increase roi on a general promo'. 260930-gam misread 'pinned promo games' as line-pinned promos."
+}
