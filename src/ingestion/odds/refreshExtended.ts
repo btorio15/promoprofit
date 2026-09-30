@@ -21,8 +21,21 @@
  * plan does not modify refresh.ts.
  */
 import { randomUUID } from "node:crypto";
-import { fetchSportOdds, listSports } from "./client";
-import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
+import { fetchEventOdds, fetchSportOdds, listSports } from "./client";
+import {
+  CREDIT_BLOCK_THRESHOLD,
+  effectiveRemaining,
+  estimateRefreshCredits,
+  evaluateRefreshGate,
+  nextMonthlyReset,
+} from "./quota";
+import {
+  ALT_SPREADS_MARKET,
+  countUnmatchedAltOutcomes,
+  mergeAltSpreads,
+  selectAltSpreadTargets,
+  type AltSpreadPin,
+} from "@/domain/promos/altSpreads";
 import { REFRESH_LOCK_TTL_MS } from "./refresh";
 import {
   commitSpreadsTotalsRefresh,
@@ -44,8 +57,28 @@ const BUSY_MESSAGE = "Another odds refresh is already running. Try again in a mi
 /** h2h + spreads + totals, per SC2/D-13 -- exactly 3x a normal (h2h-only) refresh's market count. */
 export const EXTENDED_MARKETS = ["h2h", "spreads", "totals"] as const;
 
+/**
+ * Alternate-spread fetch report for pinned promo games (quick 260930-gam).
+ * unmatchedOutcomes counts alt outcomes whose name matched neither team of
+ * their event (assumption A2) so a naming mismatch is visible, not silent.
+ */
+export interface AltLinesOutcome {
+  fetched: number;
+  skippedOverLimit: number;
+  skippedForCredits: boolean;
+  failed: number;
+  unmatchedOutcomes: number;
+}
+
 export type ExtendedRefreshOutcome =
-  | { status: "ok"; fetchedAt: string; sportsFetched: string[]; creditsSpent: number; remaining: number | null }
+  | {
+      status: "ok";
+      fetchedAt: string;
+      sportsFetched: string[];
+      creditsSpent: number;
+      remaining: number | null;
+      altLines: AltLinesOutcome;
+    }
   | { status: "confirm_required"; estimatedCredits: number; remaining: number | null; minutesSinceLastRefresh: number | null }
   | {
       status: "blocked";
@@ -94,6 +127,7 @@ export async function runSpreadsTotalsRefresh(opts: {
   confirmed: boolean;
   now?: Date;
   triggeredByUserId?: number | null;
+  altSpreadPins?: AltSpreadPin[];
 }): Promise<ExtendedRefreshOutcome> {
   const holder = randomUUID();
 
@@ -122,6 +156,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
   confirmed: boolean;
   now?: Date;
   triggeredByUserId?: number | null;
+  altSpreadPins?: AltSpreadPin[];
 }): Promise<ExtendedRefreshOutcome> {
   const now = opts.now ?? new Date();
 
@@ -188,6 +223,13 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
   let refreshCost = 0;
   let quotaCaptured = false;
   let refreshError: unknown = null;
+  const altLines: AltLinesOutcome = {
+    fetched: 0,
+    skippedOverLimit: 0,
+    skippedForCredits: false,
+    failed: 0,
+    unmatchedOutcomes: 0,
+  };
 
   try {
     // Buffer every sport in memory first (01.1 review WR-01). Nothing is
@@ -216,6 +258,51 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
       });
       sportsFetched.push(sport.key);
     }
+
+    // Alternate spread lines for pinned promo games (quick 260930-gam):
+    // capped, sequential, and never able to fail the main refresh. Runs
+    // after the main loop so the main spreads/totals are already buffered.
+    const pins = opts.altSpreadPins ?? [];
+    if (pins.length > 0) {
+      const { targets, skippedOverLimit } = selectAltSpreadTargets(
+        pins,
+        pendingWrites.flatMap((w) => w.extendedEvents),
+        now,
+      );
+      altLines.skippedOverLimit = skippedOverLimit;
+
+      const altCost = targets.length * Math.ceil(bookKeys.length / 10);
+      const balance = lastRemaining ?? priorRemaining;
+      if (targets.length > 0 && balance !== null && balance - altCost < CREDIT_BLOCK_THRESHOLD) {
+        altLines.skippedForCredits = true;
+      } else {
+        for (const target of targets) {
+          try {
+            const { event: altEvent, quota } = await fetchEventOdds(target.sportKey, target.eventId, {
+              bookmakerKeys: bookKeys,
+              markets: [ALT_SPREADS_MARKET],
+            });
+            quotaCaptured = true;
+            if (quota.last !== null) refreshCost += quota.last;
+            if (quota.remaining !== null) lastRemaining = quota.remaining;
+            if (quota.used !== null) lastUsed = quota.used;
+
+            if (!altEvent) continue;
+            const write = pendingWrites.find((w) => w.sportKey === target.sportKey);
+            if (!write) continue;
+            const idx = write.extendedEvents.findIndex((e) => e.id === target.eventId);
+            if (idx === -1) continue;
+            const merged = mergeAltSpreads(write.extendedEvents[idx], altEvent, bookKeys);
+            altLines.unmatchedOutcomes += countUnmatchedAltOutcomes(merged);
+            write.extendedEvents = write.extendedEvents.map((e, i) => (i === idx ? merged : e));
+            altLines.fetched += 1;
+          } catch {
+            altLines.failed += 1;
+          }
+        }
+      }
+    }
+
     // One transaction: both caches' per-sport rows plus both caches'
     // purges (D-16: the ONLY call site that writes or purges
     // cached_extended_odds). All-or-nothing.
@@ -262,5 +349,6 @@ async function runGuardedSpreadsTotalsRefresh(opts: {
     sportsFetched,
     creditsSpent: refreshCost,
     remaining: lastRemaining,
+    altLines,
   };
 }

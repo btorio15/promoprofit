@@ -178,6 +178,65 @@ describe("client (Odds API v4 wrapper)", () => {
     await expect(listSports()).rejects.toThrow("Odds API returned an unexpected response shape");
   });
 
+  it("fetchEventOdds builds the per-event request, parses the single event and quota", async () => {
+    const single = {
+      id: "evt/1",
+      sport_key: "americanfootball_nfl",
+      commence_time: "2026-10-01T00:00:00Z",
+      home_team: "A",
+      away_team: "B",
+      bookmakers: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(single), {
+        status: 200,
+        headers: { "x-requests-remaining": "400", "x-requests-used": "100", "x-requests-last": "1" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { fetchEventOdds } = await import("./client");
+    const { event, quota } = await fetchEventOdds("americanfootball_nfl", "evt/1", {
+      bookmakerKeys: ["draftkings", "fanduel"],
+      markets: ["alternate_spreads"],
+    });
+
+    expect(event?.id).toBe("evt/1");
+    expect(quota).toEqual({ remaining: 400, used: 100, last: 1 });
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain("/v4/sports/americanfootball_nfl/events/evt%2F1/odds");
+    expect(calledUrl).toContain("bookmakers=draftkings%2Cfanduel");
+    expect(calledUrl).toContain("markets=alternate_spreads");
+    expect(calledUrl).toContain("oddsFormat=american");
+    expect(calledUrl).toContain("dateFormat=iso");
+    expect(calledUrl).not.toContain("commenceTime");
+  });
+
+  it("fetchEventOdds returns event null on 404, throws a leak-free OddsApiError otherwise", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("gone", { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchEventOdds, OddsApiError } = await import("./client");
+    const opts = { bookmakerKeys: ["draftkings"], markets: ["alternate_spreads"] };
+
+    const r = await fetchEventOdds("americanfootball_nfl", "e1", opts);
+    expect(r.event).toBeNull();
+
+    fetchMock.mockResolvedValue(new Response("boom", { status: 500 }));
+    try {
+      await fetchEventOdds("americanfootball_nfl", "e1", opts);
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(OddsApiError);
+      expect(String(err)).not.toContain(SENTINEL_KEY);
+      expect(String(err)).not.toContain("http");
+    }
+
+    fetchMock.mockResolvedValue(new Response(JSON.stringify([1]), { status: 200 }));
+    await expect(fetchEventOdds("americanfootball_nfl", "e1", opts)).rejects.toThrow(
+      "Odds API returned an unexpected response shape",
+    );
+  });
+
   it("never leaks the API key in a thrown error message", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response("nope", { status: 500 }));
     vi.stubGlobal("fetch", fetchMock);

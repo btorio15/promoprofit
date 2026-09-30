@@ -5,7 +5,13 @@
  * (T-01-13). Every response is validated with the shared Zod schemas before
  * being trusted (T-01-14).
  */
-import { SportListSchema, OddsEventListSchema, type Sport, type OddsEvent } from "@/domain/odds/schemas";
+import {
+  SportListSchema,
+  OddsEventListSchema,
+  OddsEventSchema,
+  type Sport,
+  type OddsEvent,
+} from "@/domain/odds/schemas";
 
 const BASE_URL = "https://api.the-odds-api.com/v4";
 
@@ -127,4 +133,55 @@ export async function fetchSportOdds(
   }
 
   return { events: parsed.data, quota };
+}
+
+export interface FetchEventOddsOptions {
+  bookmakerKeys: string[];
+  markets: readonly string[];
+}
+
+/**
+ * GET /v4/sports/{sportKey}/events/{eventId}/odds -- the per-event endpoint
+ * required for additional markets such as alternate_spreads. Cost = unique
+ * markets returned x ceil(bookmakers/10); an empty response costs 0, so
+ * 1 credit per event with the 7 free-tier books. A 404 (event gone) yields
+ * event: null rather than an error. Error messages never include the URL
+ * or the api key (T-01-13).
+ */
+export async function fetchEventOdds(
+  sportKey: string,
+  eventId: string,
+  opts: FetchEventOddsOptions,
+): Promise<{ event: OddsEvent | null; quota: QuotaHeaders }> {
+  const apiKey = getApiKey();
+  const url = new URL(`${BASE_URL}/sports/${sportKey}/events/${encodeURIComponent(eventId)}/odds`);
+  url.searchParams.set("apiKey", apiKey);
+  url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
+  url.searchParams.set("markets", opts.markets.join(","));
+  url.searchParams.set("oddsFormat", "american");
+  url.searchParams.set("dateFormat", "iso");
+
+  let res: Response;
+  try {
+    res = await fetch(url, { cache: "no-store" });
+  } catch {
+    throw new OddsApiError(`Odds API request failed for /sports/${sportKey}/events/odds`);
+  }
+
+  const quota = parseQuotaHeaders(res.headers);
+
+  if (res.status === 404) {
+    return { event: null, quota };
+  }
+  if (!res.ok) {
+    throw new OddsApiError(`Odds API returned an error for /sports/${sportKey}/events/odds`, res.status);
+  }
+
+  const body = await res.json();
+  const parsed = OddsEventSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new OddsApiError("Odds API returned an unexpected response shape", res.status);
+  }
+
+  return { event: parsed.data, quota };
 }
