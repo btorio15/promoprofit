@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import type { ActivePromo } from "@/db/promos";
+import { denverDate } from "@/domain/promos/profitTotals";
 
 const {
   mockRequireUser,
@@ -235,6 +236,20 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.sources.every((s) => s.items.length === 0)).toBe(true);
     expect(result.totals.totalProfit).toBe("0.00");
+  });
+
+  it("excludes the viewer's Done promos from availableProfit.today only (quick-260930-fge)", async () => {
+    const today = denverDate(new Date());
+    mockGetPromoCompletions.mockResolvedValue([
+      { promoId: 1, snapshot: null, profitExtracted: "0.00", completedAt: new Date(NOW_ISO) },
+    ]);
+    mockGetProfitObservationsSince.mockResolvedValue([
+      { promoId: 1, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "12.34" },
+      { promoId: 2, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "5.00" },
+    ]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.totals.availableProfit).toEqual({ today: "5.00", week: "17.34", month: "17.34" });
   });
 
   it("'nothing-profitable' when the member has every usable book and no odds match", async () => {

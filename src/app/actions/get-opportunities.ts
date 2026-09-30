@@ -50,7 +50,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
 
   // Same as getPromos: keeps the landing screen's period figures fresh.
   await recordCurrentProfitObservations(now, { activePromos: ctx.activePromos, precision });
-  const availableProfit = await loadAvailableProfit(now, ctx.userBookSet, user.userId);
+  const availableProfit = await loadAvailableProfit(now, ctx.userBookSet, user.userId, ctx.doneIds);
 
   const oddsFetchedAt = ctx.oddsFetchedAt ? ctx.oddsFetchedAt.toISOString() : null;
   const extendedOddsFetchedAt = ctx.extendedOddsFetchedAt ? ctx.extendedOddsFetchedAt.toISOString() : null;

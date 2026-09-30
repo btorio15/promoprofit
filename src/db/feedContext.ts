@@ -27,11 +27,15 @@ import type { StakePrecision } from "@/domain/hedge/arbMath";
  * getPromos/getOpportunities, including every empty-state variant. Reads
  * from the min of the week/month start (ISO date strings compare
  * correctly) so one query covers both periods.
+ *
+ * quick-260930-fge: `doneIds` is the viewer's own Done promo ids (from
+ * getPromoCompletions(viewer)); they are excluded from the today number only.
  */
 export async function loadAvailableProfit(
   now: Date,
   ownBookKeys: ReadonlySet<string>,
   viewerUserId: number,
+  doneIds: ReadonlySet<number>,
 ): Promise<AvailableProfit> {
   const { weekStart, monthStart } = periodStartDates(now);
   const sinceDate = weekStart < monthStart ? weekStart : monthStart;
@@ -39,7 +43,7 @@ export async function loadAvailableProfit(
     sinceDate,
     viewerUserId,
   );
-  return summarizeAvailableProfit(observations, ownBookKeys, now);
+  return summarizeAvailableProfit(observations, ownBookKeys, now, doneIds);
 }
 
 /**

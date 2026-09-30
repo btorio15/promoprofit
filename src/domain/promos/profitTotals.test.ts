@@ -146,7 +146,7 @@ describe("summarizeAvailableProfit (owner decision 3: per-period dedupe/max)", (
       { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-26", maxGuaranteedProfit: "8.00" },
       { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-27", maxGuaranteedProfit: "6.00" },
     ];
-    const result = summarizeAvailableProfit(observations, ownBooks, now);
+    const result = summarizeAvailableProfit(observations, ownBooks, now, new Set());
     expect(result.week).toBe("8.00");
     expect(result.today).toBe("6.00");
   });
@@ -155,7 +155,7 @@ describe("summarizeAvailableProfit (owner decision 3: per-period dedupe/max)", (
     const observations: ProfitObservation[] = [
       { promoId: 1, bookKey: "fanduel", denverDate: "2026-09-27", maxGuaranteedProfit: "5.00" },
     ];
-    const result = summarizeAvailableProfit(observations, ownBooks, now);
+    const result = summarizeAvailableProfit(observations, ownBooks, now, new Set());
     expect(result).toEqual({ today: "0.00", week: "0.00", month: "0.00" });
   });
 
@@ -167,13 +167,13 @@ describe("summarizeAvailableProfit (owner decision 3: per-period dedupe/max)", (
     const observations: ProfitObservation[] = [
       { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-29", maxGuaranteedProfit: "7.00" },
     ];
-    const result = summarizeAvailableProfit(observations, ownBooks, octNow);
+    const result = summarizeAvailableProfit(observations, ownBooks, octNow, new Set());
     expect(result.week).toBe("7.00");
     expect(result.month).toBe("0.00");
   });
 
   it("returns 0.00 for today/week/month when observations is empty", () => {
-    expect(summarizeAvailableProfit([], ownBooks, now)).toEqual({ today: "0.00", week: "0.00", month: "0.00" });
+    expect(summarizeAvailableProfit([], ownBooks, now, new Set())).toEqual({ today: "0.00", week: "0.00", month: "0.00" });
   });
 
   it("each promo counts at most once per period, summed across distinct promos", () => {
@@ -182,10 +182,58 @@ describe("summarizeAvailableProfit (owner decision 3: per-period dedupe/max)", (
       { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-26", maxGuaranteedProfit: "50.00" },
       { promoId: 2, bookKey: "draftkings", denverDate: "2026-09-27", maxGuaranteedProfit: "3.00" },
     ];
-    const result = summarizeAvailableProfit(observations, ownBooks, now);
+    const result = summarizeAvailableProfit(observations, ownBooks, now, new Set());
     // today: promo 1 -> 5.00, promo 2 -> 3.00 => 8.00
     expect(result.today).toBe("8.00");
     // week: promo 1 max(5.00, 50.00) -> 50.00, promo 2 -> 3.00 => 53.00
     expect(result.week).toBe("53.00");
+  });
+});
+
+describe("summarizeAvailableProfit excludeFromToday (quick-260930-fge)", () => {
+  const now = new Date("2026-09-27T18:00:00Z");
+  const ownBooks = new Set(["draftkings"]);
+  const obs = (promoId: number, denverDate: string, v: string): ProfitObservation => ({
+    promoId,
+    bookKey: "draftkings",
+    denverDate,
+    maxGuaranteedProfit: v,
+  });
+
+  it("drops a Done promo from today only; week/month keep it", () => {
+    const r = summarizeAvailableProfit(
+      [obs(1, "2026-09-27", "6.00"), obs(2, "2026-09-27", "4.00")],
+      ownBooks,
+      now,
+      new Set([1]),
+    );
+    expect(r).toEqual({ today: "4.00", week: "10.00", month: "10.00" });
+  });
+
+  it("excludes both promos of a Done pair from today", () => {
+    const r = summarizeAvailableProfit(
+      [obs(1, "2026-09-27", "6.00"), obs(2, "2026-09-27", "4.00"), obs(3, "2026-09-27", "2.50")],
+      ownBooks,
+      now,
+      new Set([1, 2]),
+    );
+    expect(r.today).toBe("2.50");
+    expect(r.week).toBe("12.50");
+    expect(r.month).toBe("12.50");
+  });
+
+  it("a Done promo seen earlier this week at a higher value still counts in week at its max", () => {
+    const r = summarizeAvailableProfit(
+      [obs(1, "2026-09-25", "9.00"), obs(1, "2026-09-27", "6.00")],
+      ownBooks,
+      now,
+      new Set([1]),
+    );
+    expect(r).toEqual({ today: "0.00", week: "9.00", month: "9.00" });
+  });
+
+  it("every promo Done -> today 0.00, week/month non-zero", () => {
+    const r = summarizeAvailableProfit([obs(1, "2026-09-27", "6.00")], ownBooks, now, new Set([1]));
+    expect(r).toEqual({ today: "0.00", week: "6.00", month: "6.00" });
   });
 });
