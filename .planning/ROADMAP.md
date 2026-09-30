@@ -277,7 +277,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05-05-PLAN.md — Add a bonus bet, UI: Add promo button, inline bonus-bet form
+- [x] 05-05-PLAN.md — Add a bonus bet, UI: Add promo button, inline bonus-bet form
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -306,4 +306,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 4/10 | In Progress|  |
+| 5. Group-Added Promos | 5/10 | In Progress|  |
