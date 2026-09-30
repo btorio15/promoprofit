@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Private Access & My Books** - Invite-only login, persistent book selection, finder scoped to the user's books (completed 2026-09-26)
 - [x] **Phase 3: Promo Scraping & Review** - Scheduled scraping of public promo pages, profit-boost math with caps, review queue for uncertain matches (completed 2026-09-29)
 - [x] **Phase 4: Opportunities Feed** - Main screen: auto-computed, sortable, book-filtered opportunities with competing-promo tandem detection (completed 2026-09-30)
-- [ ] **Phase 5: Group-Added Promos** - Any group member can hand-add a personal promo (visible only to them), feeding the same feed
+- [x] **Phase 5: Group-Added Promos** - Any group member can hand-add a personal promo (visible only to them), feeding the same feed (completed 2026-09-30)
 
 ## Phase Details
 
@@ -290,8 +290,8 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 05-09-PLAN.md — Done rows keep history after delete, show "Added by you" and owner actions
-- [ ] 05-10-PLAN.md — Duplicate hint (non-blocking) + empty-state nudge
+- [x] 05-09-PLAN.md — Done rows keep history after delete, show "Added by you" and owner actions
+- [x] 05-10-PLAN.md — Duplicate hint (non-blocking) + empty-state nudge
 **UI hint**: yes
 
 ## Progress
@@ -306,4 +306,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 8/10 | In Progress|  |
+| 5. Group-Added Promos | 10/10 | Complete   | 2026-09-30 |
