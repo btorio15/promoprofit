@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 export interface DismissPromoDialogProps {
   open: boolean;
@@ -34,7 +35,13 @@ export function DismissPromoDialog({ open, promoId, onCancel, onOutcome }: Dismi
 
   function confirmDismiss() {
     startTransition(async () => {
-      const outcome = await dismissPromo({ promoId });
+      const call = await safeAction(() => dismissPromo({ promoId }), "dismissPromo");
+      if (!call.ok) {
+        // Synthesized status is only a carrier for the message.
+        onOutcome({ status: "stale", message: ACTION_FAILED_MESSAGE });
+        return;
+      }
+      const outcome = call.value;
       onOutcome(outcome);
     });
   }

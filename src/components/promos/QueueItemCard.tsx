@@ -19,6 +19,7 @@ import {
   type ScopeDraft,
 } from "@/domain/promos/scopeDraft";
 import { ScopePicker } from "./ScopePicker";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 interface QueueItemCardProps {
   item: QueueItemDTO;
@@ -79,7 +80,12 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
 
   function confirmMatch() {
     startTransition(async () => {
-      const outcome = await confirmPromoMatch({ promoId: item.promoId });
+      const call = await safeAction(() => confirmPromoMatch({ promoId: item.promoId }), "confirmPromoMatch");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       handleOutcome(outcome);
     });
   }
@@ -119,7 +125,12 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
         : scopeInput;
 
     startCorrectTransition(async () => {
-      const outcome = await correctPromoMatch({ promoId: item.promoId, scope });
+      const call = await safeAction(() => correctPromoMatch({ promoId: item.promoId, scope }), "correctPromoMatch");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       if (outcome.status === "ok") {
         setCorrectOpen(false);
         resetCorrect();
@@ -142,7 +153,12 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
         }
       }
 
-      const outcome = await enterPromoCaps(payload);
+      const call = await safeAction(() => enterPromoCaps(payload), "enterPromoCaps");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
 
       if (outcome.status === "ok") {
         setCapsOpen(false);

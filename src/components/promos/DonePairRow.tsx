@@ -8,6 +8,7 @@ import type { DonePairLegDTO } from "@/domain/promos/pairSnapshot";
 import { formatAmerican, formatKickoff, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 interface DonePairRowProps {
   /** A Done row with kind "pair" (row.pair is set). */
@@ -43,7 +44,12 @@ export function DonePairRow({ row, onChanged }: DonePairRowProps) {
 
   function undo() {
     startTransition(async () => {
-      const outcome = await unmarkPairDoneAction({ promoId: row.promoId });
+      const call = await safeAction(() => unmarkPairDoneAction({ promoId: row.promoId }), "unmarkPairDoneAction");
+      if (!call.ok) {
+        setErrorMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      const outcome = call.value;
       if (outcome.status === "ok") {
         setErrorMessage(null);
         onChanged();
