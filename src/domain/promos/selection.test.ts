@@ -395,3 +395,93 @@ describe("enumerateScopeSelections", () => {
     ]);
   });
 });
+
+describe("resolveSelection -- alternate spreads fallback (260930-gam)", () => {
+  function altEvent(): OddsEvent {
+    return {
+      id: "alt-evt",
+      sport_key: "americanfootball_nfl",
+      commence_time: plusHours(24),
+      home_team: "DEN Broncos",
+      away_team: "LA Rams",
+      bookmakers: [
+        {
+          key: "fanduel",
+          title: "FanDuel",
+          markets: [
+            {
+              key: "spreads",
+              outcomes: [
+                { name: "DEN Broncos", price: -110, point: -7.5 },
+                { name: "LA Rams", price: -110, point: 7.5 },
+              ],
+            },
+            {
+              key: "alternate_spreads",
+              outcomes: [
+                { name: "DEN Broncos", price: 110, point: -6.5 },
+                { name: "LA Rams", price: -130, point: 6.5 },
+                { name: "LA Rams", price: -150, point: 5.5 },
+                { name: "LA Rams", price: -105, point: 7.5 },
+                { name: "DEN Broncos", price: 130, point: -5.5 },
+              ],
+            },
+          ],
+        },
+        {
+          key: "betmgm",
+          title: "BetMGM",
+          markets: [
+            {
+              key: "alternate_spreads",
+              outcomes: [
+                { name: "DEN Broncos", price: 115, point: -6.5 },
+                { name: "LA Rams", price: -140, point: 6.5 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  it("home -6.5 pinned reads the exact alt line and only the exact +6.5 opposite", () => {
+    const r = resolveSelection([altEvent()], { eventId: "alt-evt", marketType: "spread", line: -6.5, side: "home" });
+    expect(r).not.toBeNull();
+    expect(r!.promoSideQuotes).toEqual([
+      { bookKey: "fanduel", oddsAmerican: 110 },
+      { bookKey: "betmgm", oddsAmerican: 115 },
+    ]);
+    expect(r!.oppositeSideQuotes).toEqual([
+      { bookKey: "fanduel", oddsAmerican: -130 },
+      { bookKey: "betmgm", oddsAmerican: -140 },
+    ]);
+  });
+
+  it("away +6.5 pinned -> promo {away,+6.5}, opposite {home,-6.5}", () => {
+    const r = resolveSelection([altEvent()], { eventId: "alt-evt", marketType: "spread", line: 6.5, side: "away" });
+    expect(r!.promoSideQuotes).toEqual([
+      { bookKey: "fanduel", oddsAmerican: -130 },
+      { bookKey: "betmgm", oddsAmerican: -140 },
+    ]);
+    expect(r!.oppositeSideQuotes).toEqual([
+      { bookKey: "fanduel", oddsAmerican: 110 },
+      { bookKey: "betmgm", oddsAmerican: 115 },
+    ]);
+  });
+
+  it("a book with a main-line quote uses it and ignores its alt market", () => {
+    const r = resolveSelection([altEvent()], { eventId: "alt-evt", marketType: "spread", line: -7.5, side: "home" });
+    expect(r!.promoSideQuotes).toEqual([{ bookKey: "fanduel", oddsAmerican: -110 }]);
+    expect(r!.oppositeSideQuotes).toEqual([{ bookKey: "fanduel", oddsAmerican: -110 }]);
+  });
+
+  it("alt points never enter unpinned enumeration", () => {
+    const out = enumerateScopeSelections(
+      { moneyline: [], extended: [altEvent()] },
+      { kind: "event", eventId: "alt-evt", sportKey: "americanfootball_nfl" },
+      { now: NOW, eligibleMarketTypes: ["spread"] },
+    );
+    expect(out.map((s) => `${s.line}:${s.side}`).sort()).toEqual(["-7.5:home", "7.5:away"]);
+  });
+});
