@@ -281,8 +281,8 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 05-06-PLAN.md — Add a profit boost end to end: Type toggle, boost % or boosted odds, max stake, caps, pin
-- [ ] 05-07-PLAN.md — Expire now / Delete own added promos from Active rows (soft delete keeps Done history)
+- [x] 05-06-PLAN.md — Add a profit boost end to end: Type toggle, boost % or boosted odds, max stake, caps, pin
+- [x] 05-07-PLAN.md — Expire now / Delete own added promos from Active rows (soft delete keeps Done history)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -306,4 +306,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Private Access & My Books | 9/9 | Complete    | 2026-09-27 |
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
-| 5. Group-Added Promos | 5/10 | In Progress|  |
+| 5. Group-Added Promos | 7/10 | In Progress|  |
