@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Quick 260930-gyl (alt spreads for game-scoped promos) research running; handoff in .planning/.continue-here.md
+stopped_at: Quick 260930-gyl complete (Needs Review: one live Search spreads & totals press); Phase 5 human UAT pending
 last_updated: "2026-09-30T18:15:45.196Z"
-last_activity: "2026-09-30 - Completed quick task 260930-gam: Add alternate spread lines for pinned promo games"
+last_activity: "2026-09-30 - Completed quick task 260930-gyl: Alternate spreads raise ROI on single-game promos"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5 (Group-Added Promos) — EXECUTING
 Plan: 1 of 10
 Status: Executing Phase 5
-Last activity: 2026-09-30 - Completed quick task 260930-gam: Add alternate spread lines for pinned promo games
+Last activity: 2026-09-30 - Completed quick task 260930-gyl: Alternate spreads raise ROI on single-game promos
 
 Progress: [██████████] 100%
 
@@ -166,8 +166,9 @@ None - "Add max hedge amount input to bonus-bet finder" resolved in Phase 01.1 P
 | 260929-igk | Mark done saves a frozen snapshot, Active/Done tabs, per-account Total profit extracted (migration 0009 applied) | 2026-09-29 | 79bff9c | Needs Review | [260929-igk-mark-done-snapshots-promo-done-tab-total](./quick/260929-igk-mark-done-snapshots-promo-done-tab-total/) |
 | 260930-fge | Exclude Done promos from the Available today profit counter (week/month unchanged) | 2026-09-30 | 14fd59c |  | [260930-fge-exclude-done-promos-from-the-available-t](./quick/260930-fge-exclude-done-promos-from-the-available-t/) |
 | fast | Remove 'Available today' from the profit summary (headline total covers it) | 2026-09-30 | 5fb8d44 | ✅ | - |
-| 260930-gam | Alternate spread lines for pinned promo games (Refresh button only, max 5 games, exact opposite line) | 2026-09-30 | 10eb4c1 | Needs Review | [260930-gam-add-alternate-spread-lines-for-pinned-pr](./quick/260930-gam-add-alternate-spread-lines-for-pinned-pr/) |
+| 260930-gam | Alternate spread lines for pinned promo games (Refresh button only, max 5 games, exact opposite line) | 2026-09-30 | 10eb4c1 | Superseded by 260930-gyl | [260930-gam-add-alternate-spread-lines-for-pinned-pr](./quick/260930-gam-add-alternate-spread-lines-for-pinned-pr/) |
 | fast | Phone login on dev server: allowedDevOrigins for LAN IP; auth forms POST so credentials never go in the URL | 2026-09-30 | 4c5009e | ✅ | - |
+| 260930-gyl | Alternate spreads for single-game (unpinned) boosts and bonus bets: best exact-opposite alt pair on Search spreads & totals press (max 5 games); 260930-gam pinned-only code cleaned up | 2026-09-30 | c4bc696 | Needs Review | [260930-gyl-use-alternate-spreads-to-raise-roi-on-ga](./quick/260930-gyl-use-alternate-spreads-to-raise-roi-on-ga/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
@@ -182,5 +183,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-09-30T18:15:45.179Z
-Stopped at: Quick 260930-gyl (alt spreads for game-scoped promos) research running; handoff in .planning/.continue-here.md
-Resume file: .planning/.continue-here.md
+Stopped at: Quick 260930-gyl complete (Needs Review: one live Search spreads & totals press); Phase 5 human UAT pending
+Resume file: None
