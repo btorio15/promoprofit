@@ -154,16 +154,16 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             )}
           </p>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+          <div className="ml-auto flex flex-col items-end gap-1">
             <Button
               type="button"
               variant="outline"
-              className="h-10 w-full sm:w-auto"
+              size="sm"
               disabled={status.level === "blocked" || isPending || search.pending}
               onClick={startRefresh}
             >
               <RefreshCw
-                className={isPending ? "size-4 animate-spin" : "size-4"}
+                className={isPending ? "size-3.5 animate-spin" : "size-3.5"}
                 aria-hidden="true"
               />
               {isPending ? "Refreshing…" : "Refresh odds"}
@@ -171,11 +171,11 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             <Button
               type="button"
               variant="outline"
-              className="h-10 w-full sm:w-auto"
+              size="sm"
               disabled={isSearchDisabled(status, search.pending) || isPending}
               onClick={search.startSearch}
             >
-              {search.pending ? "Searching…" : "Refresh spreads, totals & alt lines"}
+              {search.pending ? "Searching…" : "Spreads & alt lines"}
             </Button>
           </div>
         </div>
