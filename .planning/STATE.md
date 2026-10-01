@@ -180,6 +180,7 @@ Recent decisions affecting current work:
 | 261001-e1j | Promo rows show base→boosted price and "Prices as of" age (amber after 15 min, not hidden); Your cap on Opportunities + pair legs; status-bar "Refresh spreads, totals & alt lines" button (shared with Arbitrage) | 2026-10-01 | ea8de20 | Needs Review | [261001-e1j-odds-age-and-base-to-boosted-price-on-pr](./quick/261001-e1j-odds-age-and-base-to-boosted-price-on-pr/) |
 | fast | Status-bar refresh buttons compacted (small, auto width, "Spreads & alt lines") | 2026-10-01 | 8623741 | ✅ | - |
 | fast | Status-bar buttons equal width, stacked right of credit meter | 2026-10-01 | cf10204 | ✅ | - |
+| fast | Visible rename PromoProfit → MarginMind (repo/cookie/storage/DB names unchanged); live at betmargin.vercel.app | 2026-10-01 | f134e57 | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
