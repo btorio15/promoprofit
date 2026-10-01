@@ -171,6 +171,7 @@ Recent decisions affecting current work:
 | 260930-gyl | Alternate spreads for single-game (unpinned) boosts and bonus bets: best exact-opposite alt pair on Search spreads & totals press (max 5 games); 260930-gam pinned-only code cleaned up | 2026-09-30 | c4bc696 | Needs Review | [260930-gyl-use-alternate-spreads-to-raise-roi-on-ga](./quick/260930-gyl-use-alternate-spreads-to-raise-roi-on-ga/) |
 | 260930-hor | League-wide promos: on Search spreads & totals press, rank on main lines, fetch alt spreads for each promo's top-1 game only (shared 5-game cap); league-wide promos use cached alt pairs | 2026-09-30 | e587502 | Verified | [260930-hor-alt-spreads-for-league-wide-promos-on-th](./quick/260930-hor-alt-spreads-for-league-wide-promos-on-th/) |
 | 260930-iaw | Stop DB hiccups from crashing the site: safeAction inline "Couldn't reach the database — try again" on finder, arbitrage, refresh and promo buttons; app-level error.tsx with Try again | 2026-09-30 | 945196c |  | [260930-iaw-stop-db-hiccups-from-crashing-the-site](./quick/260930-iaw-stop-db-hiccups-from-crashing-the-site/) |
+| fast | Dev LAN access: allowedDevOrigins wildcard "10.201.*.*" (laptop IP keeps changing) | 2026-09-30 | 6b223c0 | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
