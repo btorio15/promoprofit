@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "audit cleanup: PROMO-03, integration W1)"
 status: Ready to discuss Phase 05.1
-stopped_at: Phase 5 complete (UAT 2/2, security 21/21) — v1.0 milestone ready for audit
-last_updated: "2026-10-01T18:53:14.356Z"
+stopped_at: Phase 05.1 context gathered
+last_updated: "2026-10-01T18:59:14.780Z"
 last_activity: "2026-10-01 - Completed quick task 261001-e1j: odds age + base→boosted price on promo rows, Opportunities cap field, status-bar fetch-all button"
 progress:
   total_phases: 6
@@ -192,6 +192,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-10-01T02:00:00Z
-Stopped at: Phase 5 complete (UAT 2/2, security 21/21) — v1.0 milestone ready for audit
-Resume file: None
+Last session: 2026-10-01T18:59:14.773Z
+Stopped at: Phase 05.1 context gathered
+Resume file: .planning/phases/05.1-deploy-reliable-morning-scrape-deploy-the-app-to-vercel-hobb/05.1-CONTEXT.md
