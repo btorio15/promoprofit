@@ -1,4 +1,4 @@
-import type { ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
+import type { AltLinesOutcome, ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
@@ -41,28 +41,36 @@ export interface SearchReduction {
   recompute: boolean;
 }
 
+/**
+ * quick-261001-jbc: the alt-lines notes shown after a successful refresh,
+ * shared by the Arbitrage search and the status bar's "Refresh promos".
+ */
+export function describeAltLinesNotes(alt: AltLinesOutcome): string[] {
+  const notes: string[] = [];
+  if (alt.skippedOverLimit > 0) {
+    notes.push(
+      `Alternate lines were fetched for ${alt.fetched} ${alt.fetched === 1 ? "game" : "games"} with a promo; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
+    );
+  }
+  if (alt.skippedForCredits) {
+    notes.push("Alternate lines for promo games were skipped to save credits — your balance is low.");
+  }
+  if (alt.failed > 0) {
+    notes.push(
+      `Alternate lines couldn't be loaded for ${alt.failed} ${alt.failed === 1 ? "game" : "games"} with a promo.`,
+    );
+  }
+  if (alt.unmatchedOutcomes > 0) {
+    notes.push(
+      `${alt.unmatchedOutcomes} alternate-line ${alt.unmatchedOutcomes === 1 ? "price" : "prices"} used team names we couldn't match, so they were ignored.`,
+    );
+  }
+  return notes;
+}
+
 export function reduceSearchOutcome(outcome: ExtendedRefreshOutcome): SearchReduction {
   if (outcome.status === "ok") {
-    const alt = outcome.altLines;
-    const notes: string[] = [];
-    if (alt.skippedOverLimit > 0) {
-      notes.push(
-        `Alternate lines were fetched for ${alt.fetched} ${alt.fetched === 1 ? "game" : "games"} with a promo; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
-      );
-    }
-    if (alt.skippedForCredits) {
-      notes.push("Alternate lines for promo games were skipped to save credits — your balance is low.");
-    }
-    if (alt.failed > 0) {
-      notes.push(
-        `Alternate lines couldn't be loaded for ${alt.failed} ${alt.failed === 1 ? "game" : "games"} with a promo.`,
-      );
-    }
-    if (alt.unmatchedOutcomes > 0) {
-      notes.push(
-        `${alt.unmatchedOutcomes} alternate-line ${alt.unmatchedOutcomes === 1 ? "price" : "prices"} used team names we couldn't match, so they were ignored.`,
-      );
-    }
+    const notes = describeAltLinesNotes(outcome.altLines);
     return {
       confirm: null,
       banner: notes.length > 0 ? { kind: "info", message: notes.join(" ") } : null,

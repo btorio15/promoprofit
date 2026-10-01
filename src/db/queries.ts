@@ -1,4 +1,4 @@
-import { and, eq, gt, sql } from "drizzle-orm";
+import { eq, gt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "./client";
 import { cachedExtendedOdds, cachedOdds, userBooks } from "./schema";
@@ -85,115 +85,123 @@ export async function saveUserBooks(userId: number, bookKeys: readonly string[])
   await db.batch([first, ...rest]);
 }
 
-async function getMaxFetchedAt(): Promise<Date | null> {
-  const db = getDb();
-  const rows = await db
-    .select({ maxFetchedAt: sql<string | Date | null>`max(${cachedOdds.fetchedAt})` })
-    .from(cachedOdds);
-  const raw = rows[0]?.maxFetchedAt ?? null;
-  // neon-http returns raw sql`` aggregate values as strings, not Date
-  // instances (unlike typed column selects) — normalize explicitly.
-  if (raw === null) return null;
+/**
+ * quick-261001-jbc: normalizes a raw sql`` aggregate value to a Date.
+ * neon-http returns raw aggregate values as strings, not Date instances
+ * (unlike typed column selects).
+ */
+export function toDateOrNull(raw: string | Date | null | undefined): Date | null {
+  if (raw === null || raw === undefined) return null;
   return raw instanceof Date ? raw : new Date(raw);
 }
 
 /**
- * Cached events with commence_time in the future, restricted to the most
- * recent refresh batch (fetched_at = max(fetched_at)). Every row a refresh
- * writes shares that run's timestamp, so rows left over from an earlier
- * refresh -- e.g. a sport that dropped out of season -- are excluded rather
- * than ranked under a "just updated" label (WR-01). Refreshes commit
- * all-or-nothing, so a failed run never moves only some sports forward. The returned fetchedAt is therefore the true age of every
- * returned event. Rows that fail OddsEventSchema parsing are dropped (and
- * logged), never passed to the hedge engine.
+ * Pure: parses cached rows into events plus each event's OWN fetched_at.
+ * Rows failing OddsEventSchema are dropped (and logged) and absent from the
+ * map, never passed to the hedge engine.
  */
-export async function getCachedEvents(): Promise<{ events: OddsEvent[]; fetchedAt: Date | null }> {
-  const fetchedAt = await getMaxFetchedAt();
+export function collectCachedEventRows(
+  rows: { eventId: string; rawResponse: unknown; fetchedAt: Date | string }[],
+  label: string,
+): { events: OddsEvent[]; fetchedAtByEventId: Map<string, Date> } {
+  const events: OddsEvent[] = [];
+  const fetchedAtByEventId = new Map<string, Date>();
+  for (const row of rows) {
+    const parsed = OddsEventSchema.safeParse(row.rawResponse);
+    if (!parsed.success) {
+      console.warn(`${label}: dropping invalid cached row, event_id=${row.eventId}`);
+      continue;
+    }
+    events.push(parsed.data);
+    const at = toDateOrNull(row.fetchedAt);
+    if (at !== null) fetchedAtByEventId.set(row.eventId, at);
+  }
+  return { events, fetchedAtByEventId };
+}
+
+export interface CachedEventsResult {
+  events: OddsEvent[];
+  fetchedAt: Date | null;
+  /** Each event's own fetched_at (optional so existing mocks keep compiling). */
+  fetchedAtByEventId?: ReadonlyMap<string, Date>;
+}
+
+/**
+ * The OLDEST live (not yet started) row's fetched_at, falling back to the
+ * table-wide max so it is null only when the table is empty. After a full
+ * refresh this equals max(fetched_at); after a per-sport promo refresh it
+ * honestly reports the oldest prices still on screen. `now()` is evaluated
+ * in SQL -- no JS Date is interpolated into the neon-http template.
+ */
+async function getOldestLiveFetchedAt(table: typeof cachedOdds | typeof cachedExtendedOdds): Promise<Date | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      age: sql<
+        string | Date | null
+      >`coalesce(min(${table.fetchedAt}) filter (where ${table.commenceTime} > now()), max(${table.fetchedAt}))`,
+    })
+    .from(table);
+  return toDateOrNull(rows[0]?.age);
+}
+
+/**
+ * Cached events with commence_time in the future. Full commits (commitOddsRefresh,
+ * commitSpreadsTotalsRefresh) purge older rows atomically, so the cache holds a
+ * single batch after a full refresh; per-sport promo refreshes deliberately
+ * leave other sports' rows with their own fetched_at, reported per event in
+ * fetchedAtByEventId. fetchedAt is the OLDEST live row's time. Rows that fail
+ * OddsEventSchema parsing are dropped (and logged), never passed to the hedge
+ * engine.
+ */
+export async function getCachedEvents(): Promise<CachedEventsResult> {
+  const fetchedAt = await getOldestLiveFetchedAt(cachedOdds);
   if (fetchedAt === null) {
     return { events: [], fetchedAt: null };
   }
 
   const db = getDb();
   const rows = await db
-    .select({ eventId: cachedOdds.eventId, rawResponse: cachedOdds.rawResponse })
+    .select({ eventId: cachedOdds.eventId, rawResponse: cachedOdds.rawResponse, fetchedAt: cachedOdds.fetchedAt })
     .from(cachedOdds)
-    .where(
-      and(
-        gt(cachedOdds.commenceTime, new Date()),
-        sql`${cachedOdds.fetchedAt} = (select max(${cachedOdds.fetchedAt}) from ${cachedOdds})`,
-      ),
-    );
+    .where(gt(cachedOdds.commenceTime, new Date()));
 
-  const events: OddsEvent[] = [];
-  for (const row of rows) {
-    const parsed = OddsEventSchema.safeParse(row.rawResponse);
-    if (!parsed.success) {
-      console.warn(`getCachedEvents: dropping invalid cached_odds row, event_id=${row.eventId}`);
-      continue;
-    }
-    events.push(parsed.data);
-  }
-
-  return { events, fetchedAt };
+  const { events, fetchedAtByEventId } = collectCachedEventRows(rows, "getCachedEvents");
+  return { events, fetchedAt, fetchedAtByEventId };
 }
 
-/** max(fetched_at) from cached_odds; null if the table is empty. */
+/** Oldest live row's fetched_at from cached_odds; null if the table is empty. */
 export async function getOddsFreshness(): Promise<Date | null> {
-  return getMaxFetchedAt();
-}
-
-async function getMaxExtendedFetchedAt(): Promise<Date | null> {
-  const db = getDb();
-  const rows = await db
-    .select({ maxFetchedAt: sql<string | Date | null>`max(${cachedExtendedOdds.fetchedAt})` })
-    .from(cachedExtendedOdds);
-  const raw = rows[0]?.maxFetchedAt ?? null;
-  // neon-http returns raw sql`` aggregate values as strings, not Date
-  // instances (unlike typed column selects) — normalize explicitly.
-  if (raw === null) return null;
-  return raw instanceof Date ? raw : new Date(raw);
+  return getOldestLiveFetchedAt(cachedOdds);
 }
 
 /**
- * Cached spreads/totals events with commence_time in the future, restricted
- * to the most recent extended-refresh batch (fetched_at = max(fetched_at)
- * on cached_extended_odds only). This is a structural copy of
- * getCachedEvents against the independent D-16 table; it never reads or
- * writes cached_odds. Rows that fail OddsEventSchema parsing are dropped
- * (and logged), never passed to the arb engine. Returns
- * { events: [], fetchedAt: null } when the table is empty.
+ * Cached spreads/totals events with commence_time in the future: a structural
+ * copy of getCachedEvents against the independent D-16 table; it never reads
+ * or writes cached_odds. Returns { events: [], fetchedAt: null } when the
+ * table is empty.
  */
-export async function getCachedExtendedEvents(): Promise<{ events: OddsEvent[]; fetchedAt: Date | null }> {
-  const fetchedAt = await getMaxExtendedFetchedAt();
+export async function getCachedExtendedEvents(): Promise<CachedEventsResult> {
+  const fetchedAt = await getOldestLiveFetchedAt(cachedExtendedOdds);
   if (fetchedAt === null) {
     return { events: [], fetchedAt: null };
   }
 
   const db = getDb();
   const rows = await db
-    .select({ eventId: cachedExtendedOdds.eventId, rawResponse: cachedExtendedOdds.rawResponse })
+    .select({
+      eventId: cachedExtendedOdds.eventId,
+      rawResponse: cachedExtendedOdds.rawResponse,
+      fetchedAt: cachedExtendedOdds.fetchedAt,
+    })
     .from(cachedExtendedOdds)
-    .where(
-      and(
-        gt(cachedExtendedOdds.commenceTime, new Date()),
-        sql`${cachedExtendedOdds.fetchedAt} = (select max(${cachedExtendedOdds.fetchedAt}) from ${cachedExtendedOdds})`,
-      ),
-    );
+    .where(gt(cachedExtendedOdds.commenceTime, new Date()));
 
-  const events: OddsEvent[] = [];
-  for (const row of rows) {
-    const parsed = OddsEventSchema.safeParse(row.rawResponse);
-    if (!parsed.success) {
-      console.warn(`getCachedExtendedEvents: dropping invalid cached_extended_odds row, event_id=${row.eventId}`);
-      continue;
-    }
-    events.push(parsed.data);
-  }
-
-  return { events, fetchedAt };
+  const { events, fetchedAtByEventId } = collectCachedEventRows(rows, "getCachedExtendedEvents");
+  return { events, fetchedAt, fetchedAtByEventId };
 }
 
-/** max(fetched_at) from cached_extended_odds; null if the table is empty (D-16). */
+/** Oldest live row's fetched_at from cached_extended_odds; null if the table is empty (D-16). */
 export async function getExtendedOddsFreshness(): Promise<Date | null> {
-  return getMaxExtendedFetchedAt();
+  return getOldestLiveFetchedAt(cachedExtendedOdds);
 }

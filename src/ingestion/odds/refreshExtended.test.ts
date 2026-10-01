@@ -11,6 +11,7 @@ vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
   commitOddsRefresh: vi.fn(),
   commitSpreadsTotalsRefresh: vi.fn(),
+  commitPromoSportsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
   tryAcquireRefreshLock: vi.fn(),
   releaseRefreshLock: vi.fn(),
@@ -19,13 +20,14 @@ vi.mock("@/ingestion/odds/store", () => ({
 import { listSports, fetchSportOdds, fetchEventOdds } from "@/ingestion/odds/client";
 import {
   commitOddsRefresh,
+  commitPromoSportsRefresh,
   commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
-import { EXTENDED_MARKETS, runSpreadsTotalsRefresh, toH2hOnlyEvents } from "./refreshExtended";
+import { EXTENDED_MARKETS, runPromoSportsRefresh, type AltSpreadEventPicker, runSpreadsTotalsRefresh, toH2hOnlyEvents } from "./refreshExtended";
 import { runOddsRefresh } from "./refresh";
 
 const mockListSports = vi.mocked(listSports);
@@ -57,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockCommitOddsRefresh.mockResolvedValue(undefined);
   mockCommitSpreadsTotalsRefresh.mockResolvedValue(undefined);
+  vi.mocked(commitPromoSportsRefresh).mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
   mockReleaseRefreshLock.mockResolvedValue(undefined);
@@ -661,5 +664,139 @@ describe("toH2hOnlyEvents", () => {
     expect(result[1].bookmakers).toHaveLength(0);
     // Input is never mutated.
     expect(events).toEqual(snapshot);
+  });
+});
+
+describe("runPromoSportsRefresh (quick-261001-jbc)", () => {
+  const now = new Date("2026-10-01T12:00:00.000Z");
+  const mockCommitPromo = vi.mocked(commitPromoSportsRefresh);
+
+  function nflEvent(id: string, commence: string): OddsEvent {
+    return {
+      ...eventWith(id, [{ key: "h2h", outcomes: [{ name: "Home", price: -150 }, { name: "Away", price: 130 }] }]),
+      sport_key: "americanfootball_nfl",
+      commence_time: commence,
+    };
+  }
+
+  beforeEach(() => {
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 300,
+      requestsUsed: 200,
+      refreshCost: 9,
+      sportsFetched: 3,
+      recordedAt: new Date(now.getTime() - 60 * 60_000),
+    });
+    mockListSports.mockResolvedValue([
+      sport("americanfootball_nfl"),
+      sport("basketball_nba"),
+      sport("icehockey_nhl"),
+    ]);
+  });
+
+  it("unconfirmed: quotes requested ∩ in-season with the alt estimate and spends nothing", async () => {
+    const outcome = await runPromoSportsRefresh({
+      confirmed: false,
+      now,
+      sportKeys: ["americanfootball_nfl", "baseball_mlb"], // MLB is out of season
+      altGameEstimate: 2,
+    });
+
+    expect(outcome).toEqual({
+      status: "confirm_required",
+      estimatedCredits: 3 + 2, // 1 sport * 3 markets + 2 alt games * 1 region group
+      remaining: 300,
+      minutesSinceLastRefresh: null,
+      sportKeys: ["americanfootball_nfl"],
+    });
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+    expect(mockRecordCreditUsage).not.toHaveBeenCalled();
+    expect(mockCommitPromo).not.toHaveBeenCalled();
+  });
+
+  it("no requested sport in season -> no_promos, no fetch, no credit row", async () => {
+    const outcome = await runPromoSportsRefresh({
+      confirmed: true,
+      now,
+      sportKeys: ["baseball_mlb"],
+      altGameEstimate: 0,
+    });
+    expect(outcome).toEqual({ status: "no_promos", message: "No active promos to refresh." });
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+    expect(mockRecordCreditUsage).not.toHaveBeenCalled();
+  });
+
+  it("confirmed: fetches only the promo sport, commits via commitPromoSportsRefresh, one honest credit row", async () => {
+    const events = [0, 1, 2, 3, 4, 5, 6].map((i) => nflEvent(`e${i}`, `2026-10-0${2 + (i % 5)}T00:00:00Z`));
+    mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining: 297, used: 203, last: 3 } });
+    mockFetchEventOdds.mockImplementation(async () => ({ event: null, quota: { remaining: 290, used: 210, last: 1 } }));
+    const picker = vi.fn<AltSpreadEventPicker>(() => events.map((e) => e.id)); // 7 picks -> cap 5
+
+    const outcome = await runPromoSportsRefresh({
+      confirmed: true,
+      now,
+      triggeredByUserId: 42,
+      sportKeys: ["americanfootball_nfl"],
+      altGameEstimate: 7,
+      altSpreads: { pins: [], scopedEventIds: [] },
+      pickAltSpreadEventIds: picker,
+    });
+
+    expect(mockFetchSportOdds).toHaveBeenCalledTimes(1);
+    expect(mockFetchSportOdds.mock.calls[0][0]).toBe("americanfootball_nfl");
+    expect(mockFetchSportOdds.mock.calls[0][1].markets).toEqual(EXTENDED_MARKETS);
+    expect(mockCommitPromo).toHaveBeenCalledTimes(1);
+    expect(mockCommitPromo.mock.calls[0][0].map((w) => w.sportKey)).toEqual(["americanfootball_nfl"]);
+    expect(mockCommitSpreadsTotalsRefresh).not.toHaveBeenCalled();
+
+    // The picker only sees the fresh nfl events.
+    expect(picker.mock.calls[0][0].extendedEvents.map((e) => e.id)).toEqual(events.map((e) => e.id));
+    expect(mockFetchEventOdds).toHaveBeenCalledTimes(5);
+
+    // 3 (main) + 5 alt calls * 1 = 8 real credits; sportsFetched is the
+    // full in-season count (3), not the promo-sport count (1).
+    expect(mockRecordCreditUsage).toHaveBeenCalledTimes(1);
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        refreshCost: 8,
+        sportsFetched: 3,
+        triggeredByUserId: 42,
+        requestsRemaining: 290,
+      }),
+    );
+    expect(outcome).toMatchObject({ status: "ok", sportsFetched: ["americanfootball_nfl"], creditsSpent: 8 });
+    if (outcome.status === "ok") {
+      expect(outcome.altLines.skippedOverLimit).toBe(2);
+    }
+  });
+
+  it("low-credit gate returns blocked and never fetches", async () => {
+    mockGetLatestCreditUsage.mockResolvedValue({
+      requestsRemaining: 19,
+      requestsUsed: 481,
+      refreshCost: 3,
+      sportsFetched: 1,
+      recordedAt: new Date(now.getTime() - 60 * 60_000),
+    });
+    const outcome = await runPromoSportsRefresh({
+      confirmed: true,
+      now,
+      sportKeys: ["americanfootball_nfl"],
+      altGameEstimate: 0,
+    });
+    expect(outcome.status).toBe("blocked");
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+  });
+
+  it("busy when the refresh lock is held", async () => {
+    mockTryAcquireRefreshLock.mockResolvedValue(false);
+    const outcome = await runPromoSportsRefresh({
+      confirmed: true,
+      now,
+      sportKeys: ["americanfootball_nfl"],
+      altGameEstimate: 0,
+    });
+    expect(outcome.status).toBe("busy");
+    expect(mockListSports).not.toHaveBeenCalled();
   });
 });

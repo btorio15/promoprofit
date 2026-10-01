@@ -161,7 +161,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     };
   }
 
-  const [hedgeBookKeys, bonusBooks, { events: moneylineEvents, fetchedAt: oddsFetchedAt }, { events: extendedEvents, fetchedAt: extendedOddsFetchedAt }] =
+  const [
+    hedgeBookKeys,
+    bonusBooks,
+    { events: moneylineEvents, fetchedAt: oddsFetchedAt, fetchedAtByEventId: oddsFetchedAtByEventId },
+    { events: extendedEvents, fetchedAt: extendedOddsFetchedAt, fetchedAtByEventId: extendedOddsFetchedAtByEventId },
+  ] =
     await Promise.all([
       getHedgeBookKeys(userBookSet),
       getBonusBooks(),
@@ -200,7 +205,10 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     };
   }
 
-  const priceAge = buildPriceAgeContext(moneylineEvents, oddsFetchedAt, extendedOddsFetchedAt);
+  const priceAge = buildPriceAgeContext(moneylineEvents, oddsFetchedAt, extendedOddsFetchedAt, {
+    moneyline: oddsFetchedAtByEventId,
+    extended: extendedOddsFetchedAtByEventId,
+  });
 
   const rankOpts = {
     moneylineEvents,
