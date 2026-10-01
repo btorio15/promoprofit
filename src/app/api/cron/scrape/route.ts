@@ -8,8 +8,9 @@ import { dispatchScrapeWorkflow } from "@/lib/githubDispatch";
  * `Authorization: Bearer $CRON_SECRET` automatically. The proxy exempts
  * /api/cron/ from the session-cookie check, so this route authenticates
  * itself and fails closed. A duplicate delivery is guarded (WR-01): if today's
- * morning observe already ran, dispatch without forcing the odds refresh so
- * Odds API credits are not spent twice. The DB check fails open toward a
+ * morning observe already ran, dispatch with skip_morning_observe so the
+ * workflow skips the odds refresh entirely and Odds API credits are not spent
+ * twice (the scrape itself still runs; it costs no credits). The DB check fails open toward a
  * single forced dispatch. No retries.
  */
 export const runtime = "nodejs";

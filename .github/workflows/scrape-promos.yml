@@ -31,6 +31,10 @@ on:
         description: "Force the moneyline odds refresh + profit-observation step, even outside the morning Denver window (the Vercel cron dispatch sets this to true)"
         type: boolean
         default: false
+      skip_morning_observe:
+        description: "Skip the moneyline odds refresh + profit-observation step entirely (the Vercel cron dispatch sets this when today's morning refresh already ran, so a duplicate cron delivery never spends Odds API credits twice)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -72,7 +76,7 @@ jobs:
       # quick-260927-ov2: runs even when the scrape step above fails (a
       # flaky/all-excluded book must not block the once-daily moneyline
       # refresh), but not when the run is cancelled.
-      - if: ${{ !cancelled() && (github.event_name != 'schedule' || steps.today.outputs.observe_done != 'true') }}
+      - if: ${{ !cancelled() && github.event.inputs.skip_morning_observe != 'true' && (github.event_name != 'schedule' || steps.today.outputs.observe_done != 'true') }}
         run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

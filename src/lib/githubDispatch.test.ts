@@ -31,7 +31,7 @@ describe("dispatchScrapeWorkflow", () => {
     });
     expect(JSON.parse(init.body)).toEqual({
       ref: "main",
-      inputs: { force_morning_observe: "true" },
+      inputs: { force_morning_observe: "true", skip_morning_observe: "false" },
     });
   });
 
@@ -72,10 +72,10 @@ describe("dispatchScrapeWorkflow", () => {
     expect(JSON.stringify(errSpy.mock.calls)).not.toContain(TOKEN);
   });
 
-  it("sends force_morning_observe=false when forceMorningObserve is false", async () => {
+  it("tells the workflow to skip the morning refresh when forceMorningObserve is false", async () => {
     const f = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     await dispatchScrapeWorkflow({ token: TOKEN, forceMorningObserve: false, fetchImpl: f as unknown as typeof fetch });
-    expect(JSON.parse(f.mock.calls[0][1].body).inputs).toEqual({ force_morning_observe: "false" });
+    expect(JSON.parse(f.mock.calls[0][1].body).inputs).toEqual({ force_morning_observe: "false", skip_morning_observe: "true" });
   });
 
   it("uses a valid owner/name repo", async () => {

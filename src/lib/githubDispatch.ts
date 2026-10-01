@@ -18,7 +18,11 @@ const REF = "main";
 export async function dispatchScrapeWorkflow(opts: {
   token: string;
   repo?: string;
-  /** Defaults to true. False skips the forced morning odds refresh (credit guard). */
+  /**
+   * Defaults to true (force the morning odds refresh). False means today's
+   * refresh already ran: the workflow is told to skip that step entirely
+   * (skip_morning_observe), so a duplicate cron delivery spends no credits.
+   */
   forceMorningObserve?: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<DispatchResult> {
@@ -40,7 +44,10 @@ export async function dispatchScrapeWorkflow(opts: {
         "Content-Type": "application/json",
       },
       // workflow_dispatch inputs are strings; the workflow compares == 'true'.
-      body: JSON.stringify({ ref: REF, inputs: { force_morning_observe: force ? "true" : "false" } }),
+      body: JSON.stringify({
+        ref: REF,
+        inputs: { force_morning_observe: force ? "true" : "false", skip_morning_observe: force ? "false" : "true" },
+      }),
       cache: "no-store",
     });
 

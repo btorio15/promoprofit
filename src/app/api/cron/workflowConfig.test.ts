@@ -21,6 +21,11 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
     expect(code).not.toContain("7 14,18,23");
   });
 
+  it("declares skip_morning_observe and the observe step honours it (WR-01 duplicate cron guard)", () => {
+    expect(text).toContain("skip_morning_observe:");
+    expect(text).toContain("github.event.inputs.skip_morning_observe != 'true'");
+  });
+
   it("keeps workflow_dispatch + force_morning_observe, no timezone key", () => {
     expect(text).toContain("workflow_dispatch:");
     expect(text).toContain("force_morning_observe:");
