@@ -3,14 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveBooks } from "@/app/actions/save-books";
+import { safeAction } from "@/lib/safeAction";
+import { resolveSaveBooksOutcome } from "./saveBooksOutcome";
 import { Button } from "@/components/ui/button";
 import { BookPicker } from "./BookPicker";
 
 export interface OnboardingBooksFormProps {
   books: { key: string; displayName: string }[];
 }
-
-const MIN_ONE_BOOK_MESSAGE = "Select at least one book.";
 
 /**
  * "Pick your books" onboarding step (D-08, D-09). Starts with nothing
@@ -28,14 +28,13 @@ export function OnboardingBooksForm({ books }: OnboardingBooksFormProps) {
 
   function handleContinue() {
     startTransition(async () => {
-      const result = await saveBooks({ bookKeys: Array.from(selected) });
-      if (result.status === "invalid") {
-        const message = result.fieldErrors.bookKeys?.[0];
-        setError(
-          message === MIN_ONE_BOOK_MESSAGE
-            ? "Select at least one book to continue."
-            : (message ?? "Select at least one book to continue."),
-        );
+      const call = await safeAction(
+        () => saveBooks({ bookKeys: Array.from(selected) }),
+        "saveBooks",
+      );
+      const outcome = resolveSaveBooksOutcome(call, "onboarding");
+      if (outcome.kind === "error") {
+        setError(outcome.message);
         return;
       }
       router.push("/");

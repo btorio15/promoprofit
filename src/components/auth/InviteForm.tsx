@@ -7,6 +7,8 @@ import type { z } from "zod";
 import Link from "next/link";
 import { InviteRedemptionInputSchema } from "@/domain/auth/authInput";
 import { redeemInvite } from "@/app/actions/redeem-invite";
+import { safeAction } from "@/lib/safeAction";
+import { resolveInviteOutcome } from "./authFormOutcome";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,16 +40,14 @@ export function InviteForm({ token }: InviteFormProps) {
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
-      const result = await redeemInvite({ ...values, token });
-      if (result.status === "invite_invalid") {
-        form.setError("root", {
-          message:
-            "This link has already been used or has expired. Ask the person who invited you for a new one.",
-        });
+      const call = await safeAction(() => redeemInvite({ ...values, token }), "redeemInvite");
+      const outcome = resolveInviteOutcome(call);
+      if (outcome.kind === "root-error") {
+        form.setError("root", { message: outcome.message });
         return;
       }
 
-      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+      for (const [field, messages] of Object.entries(outcome.fieldErrors)) {
         const message = messages?.[0];
         if (!message) continue;
         form.setError(field as keyof FormValues, { message });

@@ -6,6 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
 import { LoginInputSchema } from "@/domain/auth/authInput";
 import { login } from "@/app/actions/login";
+import { safeAction } from "@/lib/safeAction";
+import { resolveLoginOutcome } from "./authFormOutcome";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +18,6 @@ import { Label } from "@/components/ui/label";
 // same escape hatch (@hookform/resolvers + zod@4 overload mismatch,
 // resolvers #842).
 type FormValues = z.input<typeof LoginInputSchema>;
-
-const INCORRECT_CREDENTIALS_MESSAGE = "Incorrect email or password.";
-const LOCKED_MESSAGE = "Too many attempts — try again in a few minutes.";
 
 /**
  * Login form (D-01, D-05, D-07). A wrong password and an unknown email both
@@ -36,19 +35,15 @@ export function LoginForm() {
 
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
-      const result = await login(values);
+      const call = await safeAction(() => login(values), "login");
+      const outcome = resolveLoginOutcome(call);
 
-      if (result.status === "invalid_credentials") {
-        form.setError("root", { message: INCORRECT_CREDENTIALS_MESSAGE });
+      if (outcome.kind === "root-error") {
+        form.setError("root", { message: outcome.message });
         return;
       }
 
-      if (result.status === "locked") {
-        form.setError("root", { message: LOCKED_MESSAGE });
-        return;
-      }
-
-      for (const [field, messages] of Object.entries(result.fieldErrors)) {
+      for (const [field, messages] of Object.entries(outcome.fieldErrors)) {
         const message = messages?.[0];
         if (!message) continue;
         form.setError(field as keyof FormValues, { message });
