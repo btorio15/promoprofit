@@ -1,8 +1,8 @@
 ---
 phase: 05-group-added-promos
 verified: 2026-09-30T00:00:00Z
-status: human_needed
-score: 3/3 must-haves verified (automated); 2 human checks outstanding
+status: passed
+score: 3/3 must-haves verified (automated); 2/2 human checks passed (05-HUMAN-UAT.md, 2026-10-01)
 overrides_applied: 0
 human_verification:
   - test: "Sign in as two different members. Member A adds a promo. Check Promos list and Opportunities feed as Member B."

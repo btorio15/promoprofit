@@ -2,7 +2,7 @@
 
 ## What This Is
 
-PromoProfit is a private web app that already knows the current promotions at Colorado sportsbooks (scraped automatically, with group members adding any the scrapers miss) and shows a ranked feed of the guaranteed-profit opportunities they create, including pairs of competing promos on opposite sides of the same game. Users sort the feed by profit, filter it to the books they have, and place the bets themselves. A bonus-bet finder lets a user enter "I have a $X bonus bet at book Y" and see the best market to convert it on and the best book to hedge at. It's built for the owner and a small group of friends.
+PromoProfit is a private web app that already knows the current promotions at Colorado sportsbooks (scraped automatically and shared with the group, plus personal promos each member adds for anything the scrapers miss) and shows a ranked feed of the guaranteed-profit opportunities they create, including pairs of competing promos on opposite sides of the same game. Users sort the feed by profit, filter it to the books they have, and place the bets themselves. A bonus-bet finder lets a user enter "I have a $X bonus bet at book Y" and see the best market to convert it on and the best book to hedge at. It's built for the owner and a small group of friends.
 
 ## Core Value
 
@@ -19,14 +19,16 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - ✓ **Invite-only access**: owner-generated single-use invite links, email/password login with DB-backed lockout, `proxy.ts` redirect plus per-action session checks, no public signup — Validated in Phase 2: Private Access & My Books
 - ✓ **Book selection (finder + arbitrage)**: each user picks their books at onboarding and in Settings; bonus-bet finder and Arbitrage tab suggestions only use those books; account-risk advisory on both tabs — Validated in Phase 2: Private Access & My Books
 
+- ✓ **Promo scraping**: scheduled scraping of public Colorado promo pages (GitHub Actions), Claude Haiku promo reader with verbatim guard, uncertain matches to a "Needs a look" review queue — Validated in Phase 3: Promo Scraping & Review
+- ✓ **Hedge engine**: exact bonus-bet, profit-boost (caps, max stake, min odds) and tandem math, fixture-tested to the cent — Validated in Phases 1, 3 and 4
+- ✓ **Opportunities feed** (main screen): auto-computed from current promos and cached odds, sortable by guaranteed profit, filtered to the user's books — Validated in Phase 4: Opportunities Feed
+- ✓ **Competing promos**: promos at different books on opposite outcomes of the same game are paired and hedged in tandem — Validated in Phase 4: Opportunities Feed
+- ✓ **Book selection (feed)**: the feed and Promos tab only use the member's selected books — Validated in Phase 4: Opportunities Feed
+- ✓ **Group-added promos**: any member can hand-add a bonus bet or profit boost; it is private to that member (visible only to them) and feeds their own Promos, Opportunities and Done — Validated in Phase 5: Group-Added Promos (owner UAT 2/2, security 21/21 closed)
+
 ### Active
 
-- [ ] **Opportunities feed** (main screen): opportunities computed automatically from current promos and cached odds, sortable by guaranteed profit, filtered to the user's books
-- [ ] **Promo scraping**: scrape public Colorado sportsbook promo pages on a schedule; uncertain event matches go to a review queue
-- [ ] **Group-added promos**: anyone in the group can add a promo they see in their app, feeding the same opportunities feed (fallback for books that can't be scraped)
-- [ ] **Competing promos**: detect promos at different books on opposite outcomes of the same game (e.g. two 50% profit boosts) and compute the tandem hedge profit
-- [ ] **Hedge engine**: exact bonus-bet, profit-boost (with caps), and tandem math, fixture-tested to the cent (bonus-bet math done in Phase 1; boost and tandem remain)
-- [ ] **Book selection (feed)**: the opportunities feed must also be filtered to the user's selected books (finder/arb scoping done in Phase 2)
+(none — all v1.0 requirements validated; next milestone not yet defined)
 
 ### Out of Scope
 
@@ -64,12 +66,12 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Use an odds API for hedge odds, scrape only promos | Odds scraping is brittle and gets blocked; API is reliable | ✓ Good (Phase 1: The Odds API live-verified; Caesars/Fanatics are paid-tier only) |
-| Feed is the main product; calculator dropped from v1 | Users want to view and sort ready-made opportunities, not do math | — Pending |
+| Feed is the main product; calculator dropped from v1 | Users want to view and sort ready-made opportunities, not do math | ✓ Good (Phase 4) |
 | Free tier + user-triggered refresh button; smart scheduled refresh later | Keeps cost at $0 while making the feed refreshable on demand | ✓ Good (Phase 1: ~3 credits per refresh using bookmakers= instead of regions=) |
-| Scraping primary, group-added promos as fallback | Scraping may be blocked for some books; friends can fill gaps | — Pending |
+| Scraping primary, group-added promos as fallback | Scraping may be blocked for some books; friends can fill gaps | ✓ Good (Phases 3 & 5; added promos ended up private per member, scraped promos shared) |
 | Bonus-bet finder is enter book + amount, nothing saved | Bonus bets are per-account and can't be scraped | ✓ Good (Phase 1) |
-| v1 promo types: bonus bets + profit boosts | Most common, highest-value recurring promos | — Pending |
-| Competing promos hedged in tandem (both legs promo-adjusted) | Two promos on opposite sides beat hedging each against plain odds | — Pending |
+| v1 promo types: bonus bets + profit boosts | Most common, highest-value recurring promos | ✓ Good (Phases 3–5) |
+| Competing promos hedged in tandem (both legs promo-adjusted) | Two promos on opposite sides beat hedging each against plain odds | ✓ Good (Phase 4) |
 | Hedge engine rules: equal profit on both outcomes; boost stake defaults to the max allowed by caps; binding max-winnings cap auto-reduces the stake with an explanation; boost % applies to profit | Carried from the superseded Phase 1 discussion | — Pending |
 | Display rules: American odds only; money to the cent; conversion % for bonus bets, ROI % for cash legs; account-risk advisory as a small footnote | Carried from the superseded Phase 1 discussion | — Pending |
 | Colorado only, sportsbooks only | Owner's state; keeps scope tight | — Pending |
@@ -78,6 +80,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 | Arbitrage tab: strict implied-sum < 1 only (no near-arbs); total stake is a hard cap on rounded legs | Sure bets only; never lay more than the user entered | ✓ Good (Phase 01.1; owner saw zero arbs at verification — correct, closest market was break-even) |
 | Refreshes are all-or-nothing (fetch every sport, then one db.batch write) | A partial failure must never hide sports or shrink the finder | ✓ Good (Phase 01.1 review fix WR-01) |
 | Finder hedge cap drops a game whose best orientation exceeds the cap | A bonus bet on the favorite is a poor conversion; owner prefers hiding the game | ✓ Good (Phase 01.1 UAT, owner decision) |
+| Member-added promos are private to the member who added them; scraped promos are shared | Personal promos (targeted offers) shouldn't clutter or leak into friends' feeds | ✓ Good (Phase 5, UAT + security audit) |
+| Alternate spreads fetched only on the confirmed "Search spreads & totals" press: single-game promos + each league-wide promo's top-1 main-line game, max 5 games/press | Longer odds raise boost/bonus value, but the free-tier credit budget can't afford every game | ✓ Good (quick 260930-gyl/hor; live press verified 2026-09-30) |
 
 ## Evolution
 
@@ -97,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-27 after Phase 2 (Private Access & My Books) completion*
+*Last updated: 2026-10-01 after Phase 5 (Group-Added Promos) completion — last v1.0 phase*
