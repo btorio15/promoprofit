@@ -19,6 +19,7 @@
     "promos:check": "tsx --env-file=.env.local scripts/promos-check.ts",
     "promos:match-report": "tsx --env-file=.env.local scripts/promo-match-report.ts",
     "scrape:promos": "tsx scripts/scrape-promos.ts",
+    "scrape:already-ran-today": "tsx scripts/already-ran-today.ts",
     "promos:reader-smoke": "tsx scripts/promo-reader-smoke.ts",
     "odds:smoke": "tsx --env-file=.env.local scripts/odds-smoke.ts",
     "odds:refresh": "tsx --env-file=.env.local scripts/refresh-odds.ts",
