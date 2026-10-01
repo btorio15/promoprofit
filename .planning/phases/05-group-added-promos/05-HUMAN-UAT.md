@@ -3,12 +3,12 @@ status: partial
 phase: 05-group-added-promos
 source: [05-VERIFICATION.md]
 started: 2026-09-30T00:00:00Z
-updated: 2026-09-30T00:00:00Z
+updated: 2026-09-30T20:40:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing]
+[paused 2026-09-30 — owner will circle back; resume with /gsd-verify-work 5 at Test 1]
 
 ## Tests
 
