@@ -307,3 +307,13 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3. Promo Scraping & Review | 15/15 | Complete    | 2026-09-29 |
 | 4. Opportunities Feed | 9/9 | Complete    | 2026-09-30 |
 | 5. Group-Added Promos | 10/10 | Complete    | 2026-10-01 |
+
+### Phase 05.1: Deploy & Reliable Morning Scrape: deploy the app to Vercel (Hobby), once-daily Vercel Cron triggers the morning promo scrape + morning odds observe (drop GitHub midday/evening scrape runs), and add safeAction throw guards to login/invite/books forms (v1.0 audit cleanup: PROMO-03, integration W1) (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 05.1 to break down)

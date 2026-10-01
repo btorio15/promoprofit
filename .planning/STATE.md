@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: milestone_complete
-stopped_at: Milestone complete (Phase 5 was final phase)
-last_updated: 2026-10-01T02:50:14.608Z
+milestone_name: "audit cleanup: PROMO-03, integration W1)"
+status: Ready to discuss Phase 05.1
+stopped_at: Phase 5 complete (UAT 2/2, security 21/21) — v1.0 milestone ready for audit
+last_updated: "2026-10-01T18:53:14.356Z"
 last_activity: "2026-10-01 - Completed quick task 261001-e1j: odds age + base→boosted price on promo rows, Opportunities cap field, status-bar fetch-all button"
 progress:
   total_phases: 6
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 
 ## Current Position
 
-Phase: 5
+Phase: 05.1 (Deploy & Reliable Morning Scrape) — INSERTED, not planned
 Plan: Not started
-Status: Milestone complete
+Status: Ready to discuss Phase 05.1
 Last activity: 2026-10-01 - Completed quick task 261001-e1j: odds age + base→boosted price on promo rows, Opportunities cap field, status-bar fetch-all button
 
 Progress: [██████████] 100%
@@ -84,6 +84,7 @@ Progress: [██████████] 100%
 ### Roadmap Evolution
 
 - Phase 01.1 inserted after Phase 1: Arbitrage Tab: moneyline arbs from cached odds (no extra credits) + separate opt-in spreads/totals refresh button; odds-age + account-risk advisory (URGENT)
+- Phase 05.1 inserted after Phase 5: Deploy to Vercel + once-daily Vercel Cron morning scrape (drop midday/evening runs) + login/invite/books form throw guards — v1.0 audit cleanup (PROMO-03, integration W1); owner chose Vercel deploy 2026-10-01 (URGENT)
 
 ### Decisions
 
