@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: "audit cleanup: PROMO-03, integration W1)"
 status: executing
 stopped_at: Phase 05.1 context gathered
-last_updated: "2026-10-01T19:16:28.673Z"
-last_activity: 2026-10-01 -- Phase 05.1 planning complete
+last_updated: "2026-10-01T19:16:46.700Z"
+last_activity: 2026-10-01 -- Phase 05.1 execution started
 progress:
   total_phases: 1
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Milestone complete
+**Current focus:** Phase 05.1 — Deploy & Reliable Morning Scrape
 
 ## Current Position
 
-Phase: 05.1 (Deploy & Reliable Morning Scrape) — INSERTED, not planned
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-01 -- Phase 05.1 planning complete
+Phase: 05.1 (Deploy & Reliable Morning Scrape) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 05.1
+Last activity: 2026-10-01 -- Phase 05.1 execution started
 
 Progress: [██████████] 100%
 
