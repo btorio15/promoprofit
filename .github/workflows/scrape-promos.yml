@@ -1,33 +1,34 @@
-# Scheduled + manual promo scraper (PROMO-03, D-07, D-08). Installs no
-# browser -- all three target books are render_mode "http" (D-09), so the
-# scrape step itself is a plain `npm ci` + one Node script writing straight
-# to the shared Neon Postgres DB and spends zero Odds API credits. The
-# second step (quick-260927-n12) spends ONE moneyline-only refresh, but
-# only on the 8:07am Denver (14:07 UTC) run (gated inside the script) -- the 12:07/5:07pm
-# runs of this same schedule call it too and no-op.
+# Promo scraper + morning odds observe (PROMO-03, D-01, D-04, D-05, D-07, D-08).
 #
-# Schedule is plain UTC, tuned for MDT (UTC-6): 14:07/18:07/23:07 UTC =
-# 8:07am/12:07pm/5:07pm Denver. During MST (early Nov to mid Mar) every run
-# lands an hour earlier (7:07/11:07/4:07pm) -- an accepted seasonal drift
-# (03-RECON.md cron_hours_mountain). The morning gate
-# (isMorningObservationWindow, Denver hour < 10) still catches the 14:07 UTC
-# run in both seasons.
+# Primary trigger: a once-daily Vercel Cron (13:00-13:59 UTC) calls
+# /api/cron/scrape, which dispatches this workflow with
+# force_morning_observe=true. The single schedule below (15:37 UTC, about
+# 9:37 AM MDT / 8:37 AM MST) is only a BACKUP: it skips the scrape when every
+# targeted book already scraped OK earlier that Denver day, and skips the odds
+# observe when a scheduled (no-user) refresh already ran that Denver day. The
+# check reads scrape_runs / credit_usage and spends zero Odds API credits.
+# Manual and Vercel-dispatched runs are never skipped. Manual dispatch is
+# still available.
+#
+# Installs no browser -- all target books are render_mode "http" (D-09), so
+# the scrape step is a plain `npm ci` + one Node script writing straight to
+# the shared Neon Postgres DB and spends zero Odds API credits.
 #
 # 2026-09-28: switched off the `timezone: "America/Denver"` key (GitHub
 # Changelog 2026-03-19). With it, no scheduled run ever fired -- not at :00
 # and not after moving to :07 -- only manual workflow_dispatch runs, matching
 # community reports of the new key silently failing scheduler registration.
-# Minute :07 (not :00) stays: the top of the hour is the most heavily
+# Minute :37 (not :00) stays non-round: the top of the hour is the most heavily
 # loaded, most often delayed/dropped scheduled slot.
 name: Scrape promos
 
 on:
   schedule:
-    - cron: "7 14,18,23 * * *"
+    - cron: "37 15 * * *"
   workflow_dispatch:
     inputs:
       force_morning_observe:
-        description: "Force the moneyline odds refresh + profit-observation step, even outside the 8:07am Denver window"
+        description: "Force the moneyline odds refresh + profit-observation step, even outside the morning Denver window (the Vercel cron dispatch sets this to true)"
         type: boolean
         default: false
 
@@ -49,24 +50,28 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
-      - run: npm run scrape:promos
+      - id: today
+        name: Check whether today's morning run already happened
+        if: github.event_name == 'schedule'
+        run: npm run scrape:already-ran-today
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - if: ${{ github.event_name != 'schedule' || steps.today.outputs.scrape_done != 'true' }}
+        run: npm run scrape:promos
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           # quick-260928-kc5: optional -- absent means the pattern parsers only (no Claude Haiku promo reader this run).
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-      # quick-260927-n12 (owner scope change B): moneyline-only odds refresh
-      # + profit-observation recording, gated to the 8:07am Denver run inside
-      # the script itself (isMorningObservationWindow) -- the 12:07/5:07pm
-      # runs of this same schedule call the script too, but it no-ops for
-      # them. `--force` (workflow_dispatch input) bypasses the Denver-hour
-      # gate for manual testing. Never the spreads/totals extended refresh
-      # here (3x the credit cost would blow the 500-credit monthly budget).
+      # quick-260927-n12: moneyline-only odds refresh + profit-observation
+      # recording. `--force` (set by the Vercel cron dispatch, or manually)
+      # bypasses the Denver-hour gate. On the scheduled backup run it is
+      # skipped when a scheduled refresh already ran that Denver day. Never the
+      # spreads/totals extended refresh here (3x the credit cost would blow the
+      # 500-credit monthly budget).
       # quick-260927-ov2: runs even when the scrape step above fails (a
       # flaky/all-excluded book must not block the once-daily moneyline
-      # refresh), but not when the run is cancelled -- the script's own
-      # 8:07am-Denver gate still makes the 12:07/5:07pm runs no-op, so no
-      # extra credit spend either way.
-      - if: ${{ !cancelled() }}
+      # refresh), but not when the run is cancelled.
+      - if: ${{ !cancelled() && (github.event_name != 'schedule' || steps.today.outputs.observe_done != 'true') }}
         run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
