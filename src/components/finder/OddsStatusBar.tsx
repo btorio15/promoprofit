@@ -11,10 +11,10 @@ import { describeExtendedOddsAge, describeOddsAge, withAttribution } from "./odd
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SearchSpreadsTotalsDialog } from "@/components/arb/SearchSpreadsTotalsDialog";
 import { SpreadsTotalsSearchBanners } from "@/components/arb/SpreadsTotalsSearchBanners";
-import { isSearchDisabled } from "@/components/arb/spreadsTotalsSearch";
-import { useSpreadsTotalsSearch } from "@/components/arb/useSpreadsTotalsSearch";
+import { PromoRefreshDialog } from "./PromoRefreshDialog";
+import { isPromoRefreshDisabled } from "./promoRefresh";
+import { usePromoRefresh } from "./usePromoRefresh";
 import { RefreshConfirmDialog } from "./RefreshConfirmDialog";
 
 const AGE_TICK_MS = 60_000;
@@ -60,8 +60,9 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
   const router = useRouter();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [banner, setBanner] = useState<RefreshBanner>({ kind: "none" });
-  // quick-261001-e1j: same flow as the Arbitrage tab's "Search spreads & totals".
-  const search = useSpreadsTotalsSearch({ onSearched: () => onRefreshed?.() });
+  // quick-261001-jbc: "Refresh promos" -- only the sports the member's active
+  // promos cover (the Arbitrage tab keeps its own full search).
+  const promoRefresh = usePromoRefresh({ onRefreshed: () => onRefreshed?.() });
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), AGE_TICK_MS);
@@ -198,7 +199,7 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
               variant="outline"
               size="sm"
               className="w-full"
-              disabled={status.level === "blocked" || isPending || search.pending}
+              disabled={status.level === "blocked" || isPending || promoRefresh.pending}
               onClick={startRefresh}
             >
               <RefreshCw
@@ -212,10 +213,10 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
               variant="outline"
               size="sm"
               className="w-full"
-              disabled={isSearchDisabled(status, search.pending) || isPending}
-              onClick={search.startSearch}
+              disabled={isPromoRefreshDisabled(status, promoRefresh.pending) || isPending}
+              onClick={promoRefresh.startRefresh}
             >
-              {search.pending ? "Searching…" : "Spreads & alt lines"}
+              {promoRefresh.pending ? "Refreshing promos…" : "Refresh promos"}
             </Button>
           </div>
         </div>
@@ -237,16 +238,16 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
           </Alert>
         ) : null}
 
-        <SpreadsTotalsSearchBanners banner={search.banner} onRetry={search.startSearch} />
+        <SpreadsTotalsSearchBanners banner={promoRefresh.banner} onRetry={promoRefresh.startRefresh} />
       </div>
 
-      <SearchSpreadsTotalsDialog
-        open={search.confirmState !== null}
-        estimatedCredits={search.confirmState?.estimatedCredits ?? 0}
-        remaining={search.confirmState?.remaining ?? null}
-        minutesSinceLastRefresh={search.confirmState?.minutesSinceLastRefresh ?? null}
-        onCancel={search.cancelConfirm}
-        onOutcome={search.handleOutcome}
+      <PromoRefreshDialog
+        open={promoRefresh.confirmState !== null}
+        sportKeys={promoRefresh.confirmState?.sportKeys ?? []}
+        estimatedCredits={promoRefresh.confirmState?.estimatedCredits ?? 0}
+        remaining={promoRefresh.confirmState?.remaining ?? null}
+        onCancel={promoRefresh.cancelConfirm}
+        onOutcome={promoRefresh.handleOutcome}
       />
 
       <RefreshConfirmDialog
