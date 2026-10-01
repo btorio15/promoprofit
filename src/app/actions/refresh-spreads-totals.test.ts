@@ -92,7 +92,9 @@ describe("refreshSpreadsTotals server action", () => {
       requestsUsed: 485,
       refreshCost: 3,
       sportsFetched: 1,
-      recordedAt: new Date(Date.now() - 24 * 60 * 60_000),
+      // Same billing month as "now" (a 24h-old record crosses the 1st-of-month
+      // credit reset on the 1st, which correctly un-blocks the refresh).
+      recordedAt: new Date(Date.now() - 1_000),
     });
     mockListSports.mockResolvedValue([sport("basketball_nba")]);
 
