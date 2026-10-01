@@ -5,7 +5,7 @@ milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
 last_updated: 2026-10-01T02:50:14.608Z
-last_activity: "2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 pending owner OK)"
+last_activity: "2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 applied)"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 pending owner OK)
+Last activity: 2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 applied)
 
 Progress: [██████████] 100%
 
@@ -173,7 +173,7 @@ Recent decisions affecting current work:
 | 260930-hor | League-wide promos: on Search spreads & totals press, rank on main lines, fetch alt spreads for each promo's top-1 game only (shared 5-game cap); league-wide promos use cached alt pairs | 2026-09-30 | e587502 | Verified | [260930-hor-alt-spreads-for-league-wide-promos-on-th](./quick/260930-hor-alt-spreads-for-league-wide-promos-on-th/) |
 | 260930-iaw | Stop DB hiccups from crashing the site: safeAction inline "Couldn't reach the database — try again" on finder, arbitrage, refresh and promo buttons; app-level error.tsx with Try again | 2026-09-30 | 945196c |  | [260930-iaw-stop-db-hiccups-from-crashing-the-site](./quick/260930-iaw-stop-db-hiccups-from-crashing-the-site/) |
 | fast | Dev LAN access: allowedDevOrigins wildcard "10.201.*.*" (laptop IP keeps changing) | 2026-09-30 | 6b223c0 | ✅ | - |
-| 261001-dhn | Per-member "Your cap" max-stake override for profit boosts (inline on Promos, instant save, member-only, scrape-proof); migration 0011 generated, NOT yet applied (owner OK pending) | 2026-10-01 | a31fd71 | Needs Review | [261001-dhn-per-member-max-stake-cap-override-for-pr](./quick/261001-dhn-per-member-max-stake-cap-override-for-pr/) |
+| 261001-dhn | Per-member "Your cap" max-stake override for profit boosts (inline on Promos, instant save, member-only, scrape-proof); migration 0011 applied to live Neon 2026-10-01 with owner OK; live check pending | 2026-10-01 | a31fd71 | Needs Review | [261001-dhn-per-member-max-stake-cap-override-for-pr](./quick/261001-dhn-per-member-max-stake-cap-override-for-pr/) |
 | fast | Low-credit refresh test fixture kept in current billing month (failed on the 1st) | 2026-10-01 | 896d920 | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
