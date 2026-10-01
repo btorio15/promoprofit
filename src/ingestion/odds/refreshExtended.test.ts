@@ -27,7 +27,7 @@ import {
   releaseRefreshLock,
   tryAcquireRefreshLock,
 } from "@/ingestion/odds/store";
-import { EXTENDED_MARKETS, runPromoSportsRefresh, runSpreadsTotalsRefresh, toH2hOnlyEvents } from "./refreshExtended";
+import { EXTENDED_MARKETS, runPromoSportsRefresh, type AltSpreadEventPicker, runSpreadsTotalsRefresh, toH2hOnlyEvents } from "./refreshExtended";
 import { runOddsRefresh } from "./refresh";
 
 const mockListSports = vi.mocked(listSports);
@@ -730,9 +730,7 @@ describe("runPromoSportsRefresh (quick-261001-jbc)", () => {
     const events = [0, 1, 2, 3, 4, 5, 6].map((i) => nflEvent(`e${i}`, `2026-10-0${2 + (i % 5)}T00:00:00Z`));
     mockFetchSportOdds.mockResolvedValue({ events, quota: { remaining: 297, used: 203, last: 3 } });
     mockFetchEventOdds.mockImplementation(async () => ({ event: null, quota: { remaining: 290, used: 210, last: 1 } }));
-    const picker = vi.fn((_fresh: { moneylineEvents: OddsEvent[]; extendedEvents: OddsEvent[]; now: Date }) =>
-      events.map((e) => e.id),
-    ); // 7 picks -> cap 5
+    const picker = vi.fn<AltSpreadEventPicker>(() => events.map((e) => e.id)); // 7 picks -> cap 5
 
     const outcome = await runPromoSportsRefresh({
       confirmed: true,
