@@ -223,6 +223,8 @@ export function OpportunitiesScreen({
                         row={item.data}
                         precision={precision}
                         onChanged={onPromosChanged}
+                        capEditable
+                        capFieldIdPrefix="opp-your-cap"
                       />
                     ))}
                   </OpportunitySection>

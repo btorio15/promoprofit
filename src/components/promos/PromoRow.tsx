@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { AddedPromoActions } from "./AddedPromoActions";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { MarkUsedButton } from "./MarkUsedButton";
+import { PriceAgeNote } from "./PriceAgeNote";
 import { PromoDetails } from "./PromoDetails";
 import { YourCapField } from "./YourCapField";
 
@@ -22,6 +23,8 @@ interface PromoRowProps {
   onChanged: () => void;
   /** Promos tab only: show the inline "Your cap" field on boost rows. */
   capEditable?: boolean;
+  /** Distinct YourCapField id prefix when the same promo can render in two mounted tabs. */
+  capFieldIdPrefix?: string;
   /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
   addedActions?: {
     onError: (message: string) => void;
@@ -45,7 +48,7 @@ interface PromoRowProps {
  * belt-and-braces alongside the overlay/content split, so tapping it never
  * also toggles the row.
  */
-export function PromoRow({ row, precision, onChanged, capEditable, addedActions }: PromoRowProps) {
+export function PromoRow({ row, precision, onChanged, capEditable, capFieldIdPrefix, addedActions }: PromoRowProps) {
   // WR-07: a promo at a book the member doesn't have stays visible but uses
   // the same muted styling as UnprofitablePromoRow, with a short hint.
   // quick-260929-igk: done promos never appear here -- they live in the
@@ -92,9 +95,11 @@ export function PromoRow({ row, precision, onChanged, capEditable, addedActions 
               />
             </span>
             <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
+            <PriceAgeNote pricesAsOf={row.pricesAsOf} />
             {capEditable && row.yourCap ? (
               <YourCapField
                 key={row.yourCap.override ?? "none"}
+                idPrefix={capFieldIdPrefix}
                 promoId={row.promoId}
                 promoCap={row.yourCap.promoCap}
                 override={row.yourCap.override}
@@ -120,7 +125,17 @@ export function PromoRow({ row, precision, onChanged, capEditable, addedActions 
             <span className="text-sm text-muted-foreground md:hidden">Promo</span>
             <span className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">{row.promoTypeLabel}</Badge>
-              {row.promo.selectionLabel} <span className="num">{formatAmerican(row.promo.oddsAmerican)}</span>
+              {row.promo.selectionLabel}{" "}
+              {row.promoType === "profit_boost" && row.promo.baseOddsAmerican != null ? (
+                <>
+                  <span className="num">
+                    {formatAmerican(row.promo.baseOddsAmerican)} → {formatAmerican(row.promo.oddsAmerican)}
+                  </span>
+                  <span className="text-sm text-muted-foreground">boosted</span>
+                </>
+              ) : (
+                <span className="num">{formatAmerican(row.promo.oddsAmerican)}</span>
+              )}
             </span>
             <span className="text-sm text-muted-foreground">{row.promo.bookName}</span>
             {row.hasPromoBook ? null : <span className="text-sm text-muted-foreground">{NO_PROMO_BOOK_HINT}</span>}

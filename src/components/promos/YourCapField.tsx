@@ -15,6 +15,8 @@ interface YourCapFieldProps {
   /** The member's override, or null when none is set. */
   override: string | null;
   onChanged: () => void;
+  /** Input id prefix. Promos and Opportunities are both mounted, so ids must differ per tab. */
+  idPrefix?: string;
 }
 
 /**
@@ -28,7 +30,7 @@ interface YourCapFieldProps {
  * so the wrapper opts back in and stops click/pointer/key events so typing
  * or tapping never toggles the row's Collapsible.
  */
-export function YourCapField({ promoId, promoCap, override, onChanged }: YourCapFieldProps) {
+export function YourCapField({ promoId, promoCap, override, onChanged, idPrefix = "your-cap" }: YourCapFieldProps) {
   const [isPending, startTransition] = useTransition();
   const [value, setValue] = useState(override ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,11 +68,11 @@ export function YourCapField({ promoId, promoCap, override, onChanged }: YourCap
       onKeyDown={stop}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={`your-cap-${promoId}`} className="text-sm text-muted-foreground">
+        <label htmlFor={`${idPrefix}-${promoId}`} className="text-sm text-muted-foreground">
           Your cap
         </label>
         <Input
-          id={`your-cap-${promoId}`}
+          id={`${idPrefix}-${promoId}`}
           aria-label="Your max stake for this boost"
           inputMode="decimal"
           autoComplete="off"
