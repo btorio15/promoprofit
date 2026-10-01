@@ -5,6 +5,7 @@ import { calculateProfitBoostHedge } from "@/domain/hedge/profitBoost";
 import { calculateBonusBetHedge } from "@/domain/hedge/bonusBet";
 import { findUnprofitablePromos, rankPromoHedges, type RankablePromo } from "./rankPromoHedges";
 import type { PromoScope } from "./scope";
+import { applyMemberCaps } from "./yourCap";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
 
@@ -1405,5 +1406,72 @@ describe("rankPromoHedges: alternate spreads for league-wide promos (260930-hor)
     const [o] = rankPromoHedges([windowBoost], opts);
     expect(o.selection.line).not.toBe(-5.5);
     expect(o.selection.line).not.toBe(7.5);
+  });
+});
+
+describe("member cap override (quick-261001-dhn)", () => {
+  const capEvent = moneylineEvent({
+    id: "nfl-your-cap",
+    homeTeam: "Team H",
+    awayTeam: "Team A",
+    quotes: [
+      { bookKey: "ballybet", homePrice: 120, awayPrice: -140 },
+      { bookKey: "betmgm", homePrice: -130, awayPrice: 115 },
+    ],
+  });
+
+  const boost: RankablePromo = {
+    ...defaultPromo,
+    id: 20,
+    bookKey: "ballybet",
+    promoType: "profit_boost",
+    scope: eventScope("nfl-your-cap"),
+    pinned: null,
+    eligibleMarketTypes: ["moneyline"],
+    boostPercent: "50.00",
+    maxStake: "25.00",
+    minOddsAmerican: null,
+    winningsCap: null,
+  };
+
+  const opts = {
+    moneylineEvents: [capEvent],
+    extendedEvents: [],
+    hedgeBookKeys: new Set(["betmgm"]),
+    precision: "cents" as const,
+    now: NOW,
+  };
+
+  function solveAt(maxStake: string, baseOdds: number, hedgeOdds: number) {
+    return calculateProfitBoostHedge({
+      boostedOddsAmerican: null,
+      baseOddsAmerican: baseOdds,
+      boostPercent: new Decimal("50.00"),
+      hedgeOddsAmerican: hedgeOdds,
+      maxStake: new Decimal(maxStake),
+      winningsCap: null,
+      minOddsAmerican: null,
+      precision: "cents",
+    });
+  }
+
+  it("a member's $20 cap ranks to the cent exactly like the solver at $20 (and differs from $25)", () => {
+    const [own] = rankPromoHedges([boost], opts);
+    const [capped] = rankPromoHedges(applyMemberCaps([boost], new Map([[20, "20.00"]])), opts);
+    if (own.result.kind !== "boost" || capped.result.kind !== "boost") throw new Error("expected boost results");
+
+    // Hedge at betmgm away (+115) means the boost is on ballybet home (+120); otherwise away (-140).
+    const baseOdds = capped.hedge.oddsAmerican === 115 ? 120 : -140;
+    const expected20 = solveAt("20", baseOdds, capped.hedge.oddsAmerican);
+    const expected25 = solveAt("25", baseOdds, capped.hedge.oddsAmerican);
+    expect(expected20).not.toBeNull();
+    expect(expected25).not.toBeNull();
+
+    expect(capped.result.boost.capBound).toBe("max_stake");
+    expect(capped.result.boost.guaranteedProfit.equals(expected20!.guaranteedProfit)).toBe(true);
+    expect(capped.result.boost.promoStake.equals(expected20!.promoStake)).toBe(true);
+    expect(capped.result.boost.hedgeStake.equals(expected20!.hedgeStake)).toBe(true);
+    expect(capped.result.boost.guaranteedProfit.equals(expected25!.guaranteedProfit)).toBe(false);
+    expect(own.result.boost.guaranteedProfit.equals(expected25!.guaranteedProfit)).toBe(true);
   });
 });

@@ -11,6 +11,7 @@ import { AddedPromoActions } from "./AddedPromoActions";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { MarkUsedButton } from "./MarkUsedButton";
 import { PromoDetails } from "./PromoDetails";
+import { YourCapField } from "./YourCapField";
 
 /** WR-07: shown on rows whose promo is at a book the member hasn't saved. */
 export const NO_PROMO_BOOK_HINT = "You don't have this book";
@@ -19,6 +20,8 @@ interface PromoRowProps {
   row: PromoRowDTO;
   precision: "whole" | "cents";
   onChanged: () => void;
+  /** Promos tab only: show the inline "Your cap" field on boost rows. */
+  capEditable?: boolean;
   /** Present only in Promos > Active; shows Expire now / Delete on the member's own added promos. */
   addedActions?: {
     onError: (message: string) => void;
@@ -42,7 +45,7 @@ interface PromoRowProps {
  * belt-and-braces alongside the overlay/content split, so tapping it never
  * also toggles the row.
  */
-export function PromoRow({ row, precision, onChanged, addedActions }: PromoRowProps) {
+export function PromoRow({ row, precision, onChanged, capEditable, addedActions }: PromoRowProps) {
   // WR-07: a promo at a book the member doesn't have stays visible but uses
   // the same muted styling as UnprofitablePromoRow, with a short hint.
   // quick-260929-igk: done promos never appear here -- they live in the
@@ -89,6 +92,15 @@ export function PromoRow({ row, precision, onChanged, addedActions }: PromoRowPr
               />
             </span>
             <span className="text-sm text-muted-foreground">Promo: {row.scopeLabel}</span>
+            {capEditable && row.yourCap ? (
+              <YourCapField
+                key={row.yourCap.override ?? "none"}
+                promoId={row.promoId}
+                promoCap={row.yourCap.promoCap}
+                override={row.yourCap.override}
+                onChanged={onChanged}
+              />
+            ) : null}
             {row.claimHint ? <span className="text-sm text-muted-foreground">{row.claimHint}</span> : null}
             {row.finePrintNote ? (
               <Tooltip>

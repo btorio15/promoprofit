@@ -2,6 +2,7 @@ import { getActivePromos, type ActivePromo } from "./promos";
 import { getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys } from "./queries";
 import { recordProfitObservations } from "./promoTracking";
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
+import { stripMemberCaps } from "@/domain/promos/yourCap";
 import { denverDate } from "@/domain/promos/profitTotals";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 
@@ -40,7 +41,9 @@ export async function recordCurrentProfitObservations(
   if (oddsFetchedAt === null) return;
 
   const everyUsableBookKeys = await getHedgeBookKeys();
-  const opportunities = rankPromoHedges(activePromos, {
+  // Group-level observations must never reflect one member's "Your cap":
+  // always rank at each promo's own max stake (quick-261001-dhn).
+  const opportunities = rankPromoHedges(stripMemberCaps(activePromos), {
     moneylineEvents,
     extendedEvents,
     hedgeBookKeys: new Set(everyUsableBookKeys),

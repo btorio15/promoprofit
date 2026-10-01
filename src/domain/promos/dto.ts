@@ -88,6 +88,11 @@ export interface PromoRowDTO {
    * still shown, but dimmed and sorted after every own-book row.
    */
   hasPromoBook: boolean;
+  /**
+   * quick-261001-dhn: Promos-tab-only "Your cap" edit data for profit boosts.
+   * Optional because frozen Done snapshots lack it.
+   */
+  yourCap?: { promoCap: string; override: string | null };
 }
 
 /**
@@ -115,6 +120,11 @@ export interface UnprofitablePromoRowDTO {
   note: string;
   /** WR-07: same meaning as PromoRowDTO.hasPromoBook -- false rows are sorted last. */
   hasPromoBook: boolean;
+  /**
+   * quick-261001-dhn: Promos-tab-only "Your cap" edit data for profit boosts.
+   * Optional because frozen Done snapshots lack it.
+   */
+  yourCap?: { promoCap: string; override: string | null };
 }
 
 /**
