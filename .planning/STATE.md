@@ -143,7 +143,7 @@ Recent decisions affecting current work:
 - Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
 - Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
-- Scheduled scrape never fires (tracked open item, owner decision 2026-09-29): GitHub has never created a `schedule` run for Scrape promos (cron `7 14,18,23 * * *`; timezone key, minute shifts and disable/re-enable all tried). Manual dispatch works. Next: external trigger of workflow_dispatch or GitHub support — do not reshuffle cron. Fix alongside Phase 4.
+- Scheduled scrape unreliable (updated 2026-10-01 milestone audit): GitHub `schedule` runs DO fire since 2026-09-29 22:07Z (4 successful), but late (23:07Z slot ran 01:57Z) and the 14:07Z / 8:07 AM Denver slot (which also runs morning-observe) has not fired on 09-30 or 10-01; owner covers with manual dispatch. Planned fix (owner, not started): once-daily external trigger of workflow_dispatch (e.g. Vercel Cron).
 - Phase 3 deferred walkthrough steps (owner: "approved, queue steps later"): Confirm, Correct (new search/date-range picker, check on phone), Enter cap details, Dismiss, Needs a look card, Auto-matched flag — check on the next scrape that queues a promo.
 
 ### Quick Tasks Completed
