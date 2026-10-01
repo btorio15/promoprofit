@@ -33,24 +33,24 @@ import { AppHeader } from "@/components/AppHeader";
 import SettingsPage from "./settings/page";
 
 describe("settings navigation (owner-reported gap closure)", () => {
-  it("AppHeader wordmark is an anchor linking to / with text PromoProfit", () => {
+  it("AppHeader wordmark is an anchor linking to / with text MarginMind", () => {
     const markup = renderToStaticMarkup(React.createElement(AppHeader, { displayName: "Mike" }));
 
-    expect(markup).toMatch(/<a href="\/"[^>]*>PromoProfit<\/a>/);
+    expect(markup).toMatch(/<a href="\/"[^>]*>MarginMind<\/a>/);
   });
 
-  it("SettingsPage renders a Back to PromoProfit anchor linking to /", async () => {
+  it("SettingsPage renders a Back to MarginMind anchor linking to /", async () => {
     const element = await SettingsPage();
     const markup = renderToStaticMarkup(element as Parameters<typeof renderToStaticMarkup>[0]);
 
-    expect(markup).toMatch(/<a href="\/"[^>]*>(?:(?!<\/a>).)*Back to PromoProfit<\/a>/);
+    expect(markup).toMatch(/<a href="\/"[^>]*>(?:(?!<\/a>).)*Back to MarginMind<\/a>/);
   });
 
-  it("the Back to PromoProfit link appears before the Settings heading", async () => {
+  it("the Back to MarginMind link appears before the Settings heading", async () => {
     const element = await SettingsPage();
     const markup = renderToStaticMarkup(element as Parameters<typeof renderToStaticMarkup>[0]);
 
-    const backLinkIndex = markup.indexOf("Back to PromoProfit");
+    const backLinkIndex = markup.indexOf("Back to MarginMind");
     const headingIndex = markup.indexOf(">Settings<");
 
     expect(backLinkIndex).toBeGreaterThan(-1);

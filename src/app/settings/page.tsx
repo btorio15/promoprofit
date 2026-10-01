@@ -40,7 +40,7 @@ export default async function SettingsPage() {
             className="inline-flex min-h-10 w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to PromoProfit
+            Back to MarginMind
           </Link>
           <div className="flex flex-col gap-1">
             <h1 className="text-xl font-semibold">Settings</h1>

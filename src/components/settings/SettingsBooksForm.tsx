@@ -89,7 +89,7 @@ export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps
           <AlertDescription>
             Your books were updated.{" "}
             <Link href="/" className="underline underline-offset-4">
-              Back to PromoProfit
+              Back to MarginMind
             </Link>
           </AlertDescription>
         </Alert>

@@ -21,7 +21,7 @@ export default async function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
       <div className="mx-auto w-full max-w-[400px]">
-        <h1 className="text-center text-xl font-semibold">PromoProfit</h1>
+        <h1 className="text-center text-xl font-semibold">MarginMind</h1>
         <p className="mt-1 text-center text-sm text-muted-foreground">
           Private access for invited friends.
         </p>

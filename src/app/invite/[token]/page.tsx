@@ -24,7 +24,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       <div className="mx-auto w-full max-w-[400px]">
         {valid ? (
           <Card className="p-6">
-            <h1 className="text-xl font-semibold">Join PromoProfit</h1>
+            <h1 className="text-xl font-semibold">Join MarginMind</h1>
             <p className="text-sm text-muted-foreground">Create your account to get started.</p>
             <InviteForm token={token} />
           </Card>
