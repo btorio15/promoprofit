@@ -138,6 +138,7 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - Stats overhaul (ui) — `.planning/todos/pending/2026-09-30-stats-overhaul.md`
+- "Refresh promos" button (spreads/totals only for active-promo games) — `.planning/todos/pending/2026-10-01-refresh-promos-button.md`
 
 ### Blockers/Concerns
 
