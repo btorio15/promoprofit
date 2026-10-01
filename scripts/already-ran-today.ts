@@ -12,23 +12,34 @@ config({ path: ".env.local" });
 
 import { appendFileSync } from "node:fs";
 import { getDailyRunStatus } from "../src/db/dailyRunStatus";
+import { withTimeout } from "../src/lib/withTimeout";
 
 function emit(scrapeDone: boolean, observeDone: boolean) {
   console.log(`already-ran-today: scrape_done=${scrapeDone}`);
   console.log(`already-ran-today: observe_done=${observeDone}`);
   if (process.env.GITHUB_OUTPUT) {
-    appendFileSync(process.env.GITHUB_OUTPUT, `scrape_done=${scrapeDone}\nobserve_done=${observeDone}\n`);
+    try {
+      appendFileSync(process.env.GITHUB_OUTPUT, `scrape_done=${scrapeDone}\nobserve_done=${observeDone}\n`);
+    } catch (err) {
+      // Fail open: a missing output just means the workflow treats both as not done.
+      console.error("already-ran-today: could not write GITHUB_OUTPUT:", err instanceof Error ? err.message : err);
+    }
   }
 }
 
+const STATUS_TIMEOUT_MS = 30_000;
+
 async function main() {
-  const { scrapeDone, observeDone } = await getDailyRunStatus();
+  let scrapeDone = false;
+  let observeDone = false;
+  try {
+    ({ scrapeDone, observeDone } = await withTimeout(getDailyRunStatus(), STATUS_TIMEOUT_MS, "getDailyRunStatus"));
+  } catch (err) {
+    console.error("already-ran-today failed:", err instanceof Error ? err.message : err);
+  }
+  // Emit exactly once, outside the try, so a failure never duplicates output keys.
   emit(scrapeDone, observeDone);
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error("already-ran-today failed:", err instanceof Error ? err.message : err);
-  emit(false, false);
-  process.exit(0);
-});
+void main();

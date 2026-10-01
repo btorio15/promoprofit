@@ -53,6 +53,7 @@ jobs:
       - id: today
         name: Check whether today's morning run already happened
         if: github.event_name == 'schedule'
+        timeout-minutes: 2
         run: npm run scrape:already-ran-today
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
