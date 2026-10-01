@@ -137,28 +137,67 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
   return (
     <div className="sticky top-0 z-40 border-b border-border bg-secondary px-4 py-3">
       <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm">
-            {isPending ? (
-              <span className="text-muted-foreground">Refreshing odds…</span>
-            ) : age.stale ? (
-              <span className="inline-flex items-center gap-1.5 text-warning">
-                <TriangleAlert className="size-4" aria-hidden="true" />
-                {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)} —{" "}
-                <span className="font-semibold">Refresh before betting</span>
-              </span>
-            ) : (
-              <span className="text-muted-foreground">
-                {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)}
-              </span>
-            )}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <p className="text-sm">
+              {isPending ? (
+                <span className="text-muted-foreground">Refreshing odds…</span>
+              ) : age.stale ? (
+                <span className="inline-flex items-center gap-1.5 text-warning">
+                  <TriangleAlert className="size-4" aria-hidden="true" />
+                  {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)} —{" "}
+                  <span className="font-semibold">Refresh before betting</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground">
+                  {withAttribution(age.label, "Refreshed by", status.oddsRefreshedBy)}
+                </span>
+              )}
+            </p>
 
-          <div className="ml-auto flex flex-col items-end gap-1">
+            {showExtendedAge ? (
+              <p className="text-sm">
+                {extendedAge.stale ? (
+                  <span className="inline-flex items-center gap-1.5 text-warning">
+                    <TriangleAlert className="size-4" aria-hidden="true" />
+                    {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)} —{" "}
+                    <span className="font-semibold">may be phantom arbs, refresh before betting</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)}
+                  </span>
+                )}
+              </p>
+            ) : null}
+
+            {status.level === "unknown" ? (
+              <p className="text-sm text-muted-foreground">
+                Credit balance appears after the next refresh
+              </p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <Progress
+                  value={status.total > 0 ? ((status.remaining ?? 0) / status.total) * 100 : 0}
+                  aria-label="Odds API credits remaining this month"
+                >
+                  <ProgressTrack>
+                    <ProgressIndicator className={LEVEL_INDICATOR_CLASS[status.level]} />
+                  </ProgressTrack>
+                </Progress>
+                <p className="num text-sm text-muted-foreground">
+                  {status.remaining} of {status.total} credits remaining this month
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex shrink-0 flex-col gap-1">
             <Button
               type="button"
               variant="outline"
               size="sm"
+              className="w-full"
               disabled={status.level === "blocked" || isPending || search.pending}
               onClick={startRefresh}
             >
@@ -172,6 +211,7 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
               type="button"
               variant="outline"
               size="sm"
+              className="w-full"
               disabled={isSearchDisabled(status, search.pending) || isPending}
               onClick={search.startSearch}
             >
@@ -179,42 +219,6 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             </Button>
           </div>
         </div>
-
-        {showExtendedAge ? (
-          <p className="text-sm">
-            {extendedAge.stale ? (
-              <span className="inline-flex items-center gap-1.5 text-warning">
-                <TriangleAlert className="size-4" aria-hidden="true" />
-                {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)} —{" "}
-                <span className="font-semibold">may be phantom arbs, refresh before betting</span>
-              </span>
-            ) : (
-              <span className="text-muted-foreground">
-                {withAttribution(extendedAge.label, "Searched by", status.extendedSearchedBy)}
-              </span>
-            )}
-          </p>
-        ) : null}
-
-        {status.level === "unknown" ? (
-          <p className="text-sm text-muted-foreground">
-            Credit balance appears after the next refresh
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <Progress
-              value={status.total > 0 ? ((status.remaining ?? 0) / status.total) * 100 : 0}
-              aria-label="Odds API credits remaining this month"
-            >
-              <ProgressTrack>
-                <ProgressIndicator className={LEVEL_INDICATOR_CLASS[status.level]} />
-              </ProgressTrack>
-            </Progress>
-            <p className="num text-sm text-muted-foreground">
-              {status.remaining} of {status.total} credits remaining this month
-            </p>
-          </div>
-        )}
 
         {banner.kind === "blocked" ? (
           <Alert variant="destructive">
