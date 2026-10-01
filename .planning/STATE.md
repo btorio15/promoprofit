@@ -5,7 +5,7 @@ milestone_name: milestone
 status: milestone_complete
 stopped_at: Milestone complete (Phase 5 was final phase)
 last_updated: 2026-10-01T02:50:14.608Z
-last_activity: "2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 applied)"
+last_activity: "2026-10-01 - Completed quick task 261001-e1j: odds age + base→boosted price on promo rows, Opportunities cap field, status-bar fetch-all button"
 progress:
   total_phases: 6
   completed_phases: 6
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 5
 Plan: Not started
 Status: Milestone complete
-Last activity: 2026-10-01 - Completed quick task 261001-dhn: per-member Your cap override (migration 0011 applied)
+Last activity: 2026-10-01 - Completed quick task 261001-e1j: odds age + base→boosted price on promo rows, Opportunities cap field, status-bar fetch-all button
 
 Progress: [██████████] 100%
 
@@ -175,6 +175,7 @@ Recent decisions affecting current work:
 | fast | Dev LAN access: allowedDevOrigins wildcard "10.201.*.*" (laptop IP keeps changing) | 2026-09-30 | 6b223c0 | ✅ | - |
 | 261001-dhn | Per-member "Your cap" max-stake override for profit boosts (inline on Promos, instant save, member-only, scrape-proof); migration 0011 applied to live Neon 2026-10-01 with owner OK; live check pending | 2026-10-01 | a31fd71 | Needs Review | [261001-dhn-per-member-max-stake-cap-override-for-pr](./quick/261001-dhn-per-member-max-stake-cap-override-for-pr/) |
 | fast | Low-credit refresh test fixture kept in current billing month (failed on the 1st) | 2026-10-01 | 896d920 | ✅ | - |
+| 261001-e1j | Promo rows show base→boosted price and "Prices as of" age (amber after 15 min, not hidden); Your cap on Opportunities + pair legs; status-bar "Refresh spreads, totals & alt lines" button (shared with Arbitrage) | 2026-10-01 | ea8de20 | Needs Review | [261001-e1j-odds-age-and-base-to-boosted-price-on-pr](./quick/261001-e1j-odds-age-and-base-to-boosted-price-on-pr/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
