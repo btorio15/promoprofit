@@ -2,7 +2,8 @@ import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { getSportLabel } from "@/config/sports";
 import type { PairLegResult } from "@/domain/hedge/pairMath";
 import type { PairCandidate } from "./pairPromos";
-import { capNoteFor, promoTitle, type PresentablePromo } from "./promoRowDto";
+import { pricesAsOfFor, type PriceAgeContext } from "./priceAge";
+import { capNoteFor, promoTitle, yourCapFor, type PresentablePromo } from "./promoRowDto";
 import type { ResolvedSelection } from "./selection";
 
 /**
@@ -20,6 +21,10 @@ export interface PairLegDTO {
   promoTitle: string;
   selectionLabel: string;
   oddsAmerican: number;
+  /** quick-261001-e1j: the book's price before the boost (boost legs only). */
+  baseOddsAmerican?: number | null;
+  /** quick-261001-e1j: "Your cap" edit data, boost legs with a known promo cap only. */
+  yourCap?: { promoCap: string; override: string | null };
   stake: string;
   payout: string;
   capNote: string | null;
@@ -50,12 +55,15 @@ export interface PairRowDTO {
   separateProfitB: string;
   gain: string;
   worstCase: boolean;
+  /** quick-261001-e1j: ISO time of the OLDER cache either leg's price came from. */
+  pricesAsOf?: string | null;
 }
 
 function toLegDTO(
   promo: PresentablePromo,
   selection: ResolvedSelection,
   oddsAmerican: number,
+  baseOddsAmerican: number | null,
   leg: PairLegResult,
   bookNames: Map<string, string>,
 ): PairLegDTO {
@@ -68,6 +76,8 @@ function toLegDTO(
     promoTitle: promoTitle(promo),
     selectionLabel: selectionLabel(selection.marketType, selection.sideSelection, selection.sidePoint),
     oddsAmerican,
+    baseOddsAmerican: isBoost ? baseOddsAmerican : null,
+    yourCap: yourCapFor(promo),
     stake: leg.stake.toFixed(2),
     payout: leg.payout.toFixed(2),
     capNote: isBoost && leg.capBound !== null ? capNoteFor(promo, leg.capBound, bookNames) : null,
@@ -78,6 +88,7 @@ function toLegDTO(
 export function toPairRowDTO<P extends PresentablePromo>(
   c: PairCandidate<P>,
   bookNames: Map<string, string>,
+  priceAge?: PriceAgeContext,
 ): PairRowDTO {
   const { result, selectionA } = c;
   return {
@@ -92,8 +103,8 @@ export function toPairRowDTO<P extends PresentablePromo>(
     awayTeam: selectionA.awayTeam,
     marketBadge: marketBadgeLabel(selectionA.marketType, selectionA.line),
     tieRisk: selectionA.tieRisk || c.selectionB.tieRisk,
-    legA: toLegDTO(c.promoA, c.selectionA, c.oddsAAmerican, result.legA, bookNames),
-    legB: toLegDTO(c.promoB, c.selectionB, c.oddsBAmerican, result.legB, bookNames),
+    legA: toLegDTO(c.promoA, c.selectionA, c.oddsAAmerican, c.baseOddsAAmerican, result.legA, bookNames),
+    legB: toLegDTO(c.promoB, c.selectionB, c.oddsBAmerican, c.baseOddsBAmerican, result.legB, bookNames),
     totalStaked: result.totalStaked.toFixed(2),
     netIfAWins: result.netIfAWins.toFixed(2),
     netIfBWins: result.netIfBWins.toFixed(2),
@@ -104,5 +115,6 @@ export function toPairRowDTO<P extends PresentablePromo>(
     separateProfitB: c.separateProfitB.toFixed(2),
     gain: result.guaranteedProfit.minus(c.separateProfitA).minus(c.separateProfitB).toFixed(2),
     worstCase: !result.netIfAWins.equals(result.netIfBWins),
+    pricesAsOf: priceAge ? pricesAsOfFor([c.selectionA, c.selectionB], priceAge) : null,
   };
 }

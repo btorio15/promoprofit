@@ -11,6 +11,10 @@ import { describeExtendedOddsAge, describeOddsAge, withAttribution } from "./odd
 import { Progress, ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SearchSpreadsTotalsDialog } from "@/components/arb/SearchSpreadsTotalsDialog";
+import { SpreadsTotalsSearchBanners } from "@/components/arb/SpreadsTotalsSearchBanners";
+import { isSearchDisabled } from "@/components/arb/spreadsTotalsSearch";
+import { useSpreadsTotalsSearch } from "@/components/arb/useSpreadsTotalsSearch";
 import { RefreshConfirmDialog } from "./RefreshConfirmDialog";
 
 const AGE_TICK_MS = 60_000;
@@ -56,6 +60,8 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
   const router = useRouter();
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [banner, setBanner] = useState<RefreshBanner>({ kind: "none" });
+  // quick-261001-e1j: same flow as the Arbitrage tab's "Search spreads & totals".
+  const search = useSpreadsTotalsSearch({ onSearched: () => onRefreshed?.() });
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), AGE_TICK_MS);
@@ -148,19 +154,30 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             )}
           </p>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10"
-            disabled={status.level === "blocked" || isPending}
-            onClick={startRefresh}
-          >
-            <RefreshCw
-              className={isPending ? "size-4 animate-spin" : "size-4"}
-              aria-hidden="true"
-            />
-            {isPending ? "Refreshing…" : "Refresh odds"}
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full sm:w-auto"
+              disabled={status.level === "blocked" || isPending || search.pending}
+              onClick={startRefresh}
+            >
+              <RefreshCw
+                className={isPending ? "size-4 animate-spin" : "size-4"}
+                aria-hidden="true"
+              />
+              {isPending ? "Refreshing…" : "Refresh odds"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-full sm:w-auto"
+              disabled={isSearchDisabled(status, search.pending) || isPending}
+              onClick={search.startSearch}
+            >
+              {search.pending ? "Searching…" : "Refresh spreads, totals & alt lines"}
+            </Button>
+          </div>
         </div>
 
         {showExtendedAge ? (
@@ -215,7 +232,18 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
             </AlertDescription>
           </Alert>
         ) : null}
+
+        <SpreadsTotalsSearchBanners banner={search.banner} onRetry={search.startSearch} />
       </div>
+
+      <SearchSpreadsTotalsDialog
+        open={search.confirmState !== null}
+        estimatedCredits={search.confirmState?.estimatedCredits ?? 0}
+        remaining={search.confirmState?.remaining ?? null}
+        minutesSinceLastRefresh={search.confirmState?.minutesSinceLastRefresh ?? null}
+        onCancel={search.cancelConfirm}
+        onOutcome={search.handleOutcome}
+      />
 
       <RefreshConfirmDialog
         open={confirmState !== null}

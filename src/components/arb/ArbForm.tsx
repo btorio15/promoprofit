@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { findArbs } from "@/app/actions/find-arbs";
-import { refreshSpreadsTotals } from "@/app/actions/refresh-spreads-totals";
 import { ArbInputSchema, type ArbInput } from "@/domain/arb/arbInput";
 import type { FindArbsResponse } from "@/domain/arb/types";
-import type { ExtendedRefreshOutcome } from "@/ingestion/odds/refreshExtended";
 import type { OddsStatus } from "@/ingestion/odds/status";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
@@ -21,6 +18,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ArbEmptyState } from "./ArbEmptyState";
 import { ArbResultsList } from "./ArbResultsList";
 import { SearchSpreadsTotalsDialog } from "./SearchSpreadsTotalsDialog";
+import { SpreadsTotalsSearchBanners } from "./SpreadsTotalsSearchBanners";
+import { isSearchDisabled } from "./spreadsTotalsSearch";
+import { useSpreadsTotalsSearch } from "./useSpreadsTotalsSearch";
 
 const DEBOUNCE_MS = 300;
 
@@ -33,14 +33,6 @@ export interface ArbFormProps {
   onSearched: () => void;
 }
 
-interface ConfirmState {
-  estimatedCredits: number;
-  remaining: number | null;
-  minutesSinceLastRefresh: number | null;
-}
-
-type SearchBanner = { kind: "blocked" | "busy" | "error" | "info"; message: string };
-
 /**
  * Total stake + precision controls, auto-computed moneyline/spread/total arbs
  * (SC1, no submit step), the account-risk advisory (SC3), and the guarded
@@ -49,8 +41,6 @@ type SearchBanner = { kind: "blocked" | "busy" | "error" | "info"; message: stri
  * no react-hook-form here -- every control auto-fetches on change.
  */
 export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: ArbFormProps) {
-  const router = useRouter();
-
   const [totalStake, setTotalStake] = usePersistentString(
     STORAGE_KEYS.arbTotalStake,
     "200.00",
@@ -133,88 +123,17 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only recomputeKey should re-trigger this
   }, [recomputeKey]);
 
-  // "Search spreads & totals" flow (SC2, D-13, D-14).
-  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [searchPending, startSearchTransition] = useTransition();
-  const [searchBanner, setSearchBanner] = useState<SearchBanner | null>(null);
+  // "Search spreads & totals" flow (SC2, D-13, D-14), shared with the status bar.
+  const {
+    confirmState,
+    banner: searchBanner,
+    pending: searchPending,
+    startSearch,
+    handleOutcome: handleSearchOutcome,
+    cancelConfirm,
+  } = useSpreadsTotalsSearch({ onSearched });
 
-  function handleSearchOutcome(outcome: ExtendedRefreshOutcome) {
-    if (outcome.status === "ok") {
-      const alt = outcome.altLines;
-      const notes: string[] = [];
-      if (alt.skippedOverLimit > 0) {
-        notes.push(
-          `Alternate lines were fetched for ${alt.fetched} ${alt.fetched === 1 ? "game" : "games"} with a promo; ${alt.skippedOverLimit} more ${alt.skippedOverLimit === 1 ? "was" : "were"} skipped (limit is 5 per search).`,
-        );
-      }
-      if (alt.skippedForCredits) {
-        notes.push("Alternate lines for promo games were skipped to save credits — your balance is low.");
-      }
-      if (alt.failed > 0) {
-        notes.push(
-          `Alternate lines couldn't be loaded for ${alt.failed} ${alt.failed === 1 ? "game" : "games"} with a promo.`,
-        );
-      }
-      if (alt.unmatchedOutcomes > 0) {
-        notes.push(
-          `${alt.unmatchedOutcomes} alternate-line ${alt.unmatchedOutcomes === 1 ? "price" : "prices"} used team names we couldn't match, so they were ignored.`,
-        );
-      }
-      setSearchBanner(notes.length > 0 ? { kind: "info", message: notes.join(" ") } : null);
-      setConfirmState(null);
-      router.refresh();
-      onSearched();
-      return;
-    }
-
-    if (outcome.status === "confirm_required") {
-      setConfirmState({
-        estimatedCredits: outcome.estimatedCredits,
-        remaining: outcome.remaining,
-        minutesSinceLastRefresh: outcome.minutesSinceLastRefresh,
-      });
-      return;
-    }
-
-    setConfirmState(null);
-
-    if (outcome.status === "blocked") {
-      setSearchBanner({
-        kind: "blocked",
-        message: `Only ${outcome.remaining} credits left — not enough for a spreads & totals search. It's disabled until next month's reset (1st).`,
-      });
-      return;
-    }
-
-    // error/busy: an error can come after some sports were already fetched
-    // (credits spent and recorded server-side), and busy means another
-    // refresh is mid-flight -- re-read the page so the credit meter and
-    // status bar reflect the real balance instead of the pre-search one
-    // (01.1 review WR-01). The caches themselves are unchanged on error.
-    router.refresh();
-    setSearchBanner({ kind: outcome.status, message: outcome.message });
-  }
-
-  function startSearch() {
-    setSearchBanner(null);
-    startSearchTransition(async () => {
-      const call = await safeAction(
-        () => refreshSpreadsTotals({ confirmed: false }),
-        "refreshSpreadsTotals",
-      );
-      if (!call.ok) {
-        router.refresh();
-        setSearchBanner({ kind: "error", message: ACTION_FAILED_MESSAGE });
-        return;
-      }
-      handleSearchOutcome(call.value);
-    });
-  }
-
-  const searchDisabled =
-    status.level === "blocked" ||
-    (status.remaining !== null && status.remaining < status.estimatedExtendedRefreshCredits) ||
-    searchPending;
+  const searchDisabled = isSearchDisabled(status, searchPending);
 
   const hasOkResponse = response?.status === "ok";
   // Results only render for a stake that is currently valid on both the
@@ -298,28 +217,7 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
           </Alert>
         ) : null}
 
-        {searchBanner?.kind === "blocked" ? (
-          <Alert variant="destructive">
-            <AlertDescription className="num">{searchBanner.message}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        {searchBanner?.kind === "info" ? (
-          <Alert>
-            <AlertDescription className="num">{searchBanner.message}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        {searchBanner && searchBanner.kind !== "blocked" && searchBanner.kind !== "info" ? (
-          <Alert variant="destructive">
-            <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-              <span>{searchBanner.message}</span>
-              <Button type="button" variant="secondary" size="sm" onClick={startSearch}>
-                Try again
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        <SpreadsTotalsSearchBanners banner={searchBanner} onRetry={startSearch} />
       </Card>
 
       <RiskAdvisory />
@@ -347,7 +245,7 @@ export function ArbForm({ status, hasCachedOdds, recomputeKey, onSearched }: Arb
         estimatedCredits={confirmState?.estimatedCredits ?? 0}
         remaining={confirmState?.remaining ?? null}
         minutesSinceLastRefresh={confirmState?.minutesSinceLastRefresh ?? null}
-        onCancel={() => setConfirmState(null)}
+        onCancel={cancelConfirm}
         onOutcome={handleSearchOutcome}
       />
     </div>

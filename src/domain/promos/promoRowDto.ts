@@ -4,6 +4,7 @@ import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
 import { formatBoostPercent } from "./describe";
+import { pricesAsOfFor, type PriceAgeContext } from "./priceAge";
 import type { PromoOpportunity, RankablePromo, UnprofitablePromo } from "./rankPromoHedges";
 
 /**
@@ -43,7 +44,7 @@ export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max
 }
 
 /** Promos-tab "Your cap" edit data; boosts whose own cap is known only. */
-function yourCapFor(promo: PresentablePromo): { promoCap: string; override: string | null } | undefined {
+export function yourCapFor(promo: PresentablePromo): { promoCap: string; override: string | null } | undefined {
   if (promo.promoType !== "profit_boost" || typeof promo.promoMaxStake !== "string") return undefined;
   return { promoCap: promo.promoMaxStake, override: promo.capOverride ?? null };
 }
@@ -57,6 +58,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
   opportunity: PromoOpportunity<P>,
   bookNames: Map<string, string>,
   userBookSet: ReadonlySet<string>,
+  priceAge?: PriceAgeContext,
 ): PromoRowDTO {
   const { promo, selection, hedge, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
 
@@ -128,6 +130,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
       selectionLabel: promoSelectionLabel,
       oddsAmerican: promoOddsAmerican,
       oddsDerived: promoOddsDerived,
+      baseOddsAmerican: promo.promoType === "profit_boost" ? (opportunity.promoBaseOddsAmerican ?? null) : null,
     },
     hedge: {
       bookKey: hedge.bookKey,
@@ -150,6 +153,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     worstCase: netIfPromoWins !== netIfHedgeWins,
     hasPromoBook: userBookSet.has(promo.bookKey),
     yourCap: yourCapFor(promo),
+    pricesAsOf: priceAge ? pricesAsOfFor([selection], priceAge) : null,
   };
 }
 

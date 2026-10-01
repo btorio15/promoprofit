@@ -20,6 +20,7 @@ import { loadAvailableProfit } from "@/db/feedContext";
 import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
+import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
 import { listCorrectionOptions, scrapedWindowEtDays } from "@/domain/promos/correctionOptions";
 import { findUnprofitablePromos, rankPromoHedges } from "@/domain/promos/rankPromoHedges";
@@ -199,6 +200,8 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     };
   }
 
+  const priceAge = buildPriceAgeContext(moneylineEvents, oddsFetchedAt, extendedOddsFetchedAt);
+
   const rankOpts = {
     moneylineEvents,
     extendedEvents,
@@ -268,7 +271,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   }
 
   const rows = ownBooksFirst(
-    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet)),
+    opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, priceAge)),
   );
   // quick-260927-n12 (owner decision 1): own-book rows only. Done promos are
   // already filtered out of the feed (quick-260929-igk); doneIds stays as a

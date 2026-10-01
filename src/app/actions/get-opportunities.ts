@@ -7,6 +7,7 @@ import { getHedgeBookKeys } from "@/db/queries";
 import { loadAvailableProfit, loadMemberFeedContext } from "@/db/feedContext";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO } from "@/domain/promos/promoRowDto";
+import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
 import { rankArbs } from "@/domain/hedge/rankArbs";
 import { SPORT_KEYS } from "@/config/sports";
@@ -76,11 +77,13 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     ]);
   }
 
+  const priceAge = buildPriceAgeContext(ctx.moneylineEvents, ctx.oddsFetchedAt, ctx.extendedOddsFetchedAt);
+
   // D-17: rankOpts.hedgeBookKeys is the member's own hedge books only.
   const singles = rankPromoHedges(ctx.feedPromos, ctx.rankOpts);
   // D-16: promos at books the member lacks are excluded entirely.
   const rows: PromoRowDTO[] = singles
-    .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet))
+    .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet, priceAge))
     .filter((r) => r.hasPromoBook);
 
   const items: OpportunityItem<PromoRowDTO>[] = rows.map((row) => ({
@@ -101,7 +104,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
       memberBookKeys: ctx.userBookSet,
     }),
   );
-  const pairRows: PairRowDTO[] = chosenPairs.map((c) => toPairRowDTO(c, ctx.bookNames));
+  const pairRows: PairRowDTO[] = chosenPairs.map((c) => toPairRowDTO(c, ctx.bookNames, priceAge));
   const pairItems: OpportunityItem<PairRowDTO>[] = pairRows.map((row) => ({
     rowKey: row.rowKey,
     profit: row.guaranteedProfit,

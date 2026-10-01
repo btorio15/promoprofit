@@ -443,6 +443,8 @@ function stubCandidate(s: StubPair): PairCandidate<RankablePromo> {
     marketKey: "e1|moneyline|ml",
     oddsAAmerican: 100,
     oddsBAmerican: 100,
+    baseOddsAAmerican: null,
+    baseOddsBAmerican: null,
     result: { guaranteedProfit: gain } as PairCandidate<RankablePromo>["result"],
     separateProfitA: new Decimal(0),
     separateProfitB: new Decimal(0),
