@@ -290,6 +290,7 @@ export function PromosScreen({
                       row={row}
                       precision={precision}
                       onChanged={handleChanged}
+                      capEditable
                       addedActions={{ onError: setActionError, onEdit: handleEdit }}
                     />
                   ))}
@@ -307,6 +308,7 @@ export function PromosScreen({
                     row={row}
                     precision={precision}
                     onChanged={handleChanged}
+                    capEditable
                     addedActions={{ onError: setActionError, onEdit: handleEdit }}
                   />
                 ))}
@@ -316,6 +318,7 @@ export function PromosScreen({
                     row={row}
                     precision={precision}
                     onChanged={handleChanged}
+                    capEditable
                     addedActions={{ onError: setActionError, onEdit: handleEdit }}
                   />
                 ))}
