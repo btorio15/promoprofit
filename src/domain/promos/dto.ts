@@ -65,7 +65,15 @@ export interface PromoRowDTO {
   claimHint: string | null;
   tieRisk: boolean;
   sameBook: boolean;
-  promo: { bookKey: string; bookName: string; selectionLabel: string; oddsAmerican: number; oddsDerived: boolean };
+  promo: {
+    bookKey: string;
+    bookName: string;
+    selectionLabel: string;
+    oddsAmerican: number;
+    oddsDerived: boolean;
+    /** quick-261001-e1j: the book's price before the boost (boosts only). Optional: Done snapshots lack it. */
+    baseOddsAmerican?: number | null;
+  };
   hedge: { bookKey: string; bookName: string; selectionLabel: string; oddsAmerican: number };
   promoStake: string;
   hedgeStake: string;
@@ -82,6 +90,8 @@ export interface PromoRowDTO {
   /** "Confirmed by X · Cap entered by Y" or null for auto-matched promos (no human to attribute). */
   attribution: string | null;
   worstCase: boolean;
+  /** quick-261001-e1j: ISO cache time of this row's prices. Optional: Done snapshots lack it. */
+  pricesAsOf?: string | null;
   /**
    * WR-07: whether the member has an account at the promo's own book (set
    * on the server from their saved books). Rows where this is false are

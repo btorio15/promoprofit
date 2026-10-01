@@ -44,6 +44,8 @@ export interface PromoOpportunity<P extends RankablePromo = RankablePromo> {
   selection: ResolvedSelection;
   promoOddsAmerican: number;
   promoOddsDerived: boolean;
+  /** The book's own price before the boost, as fed to the solver; null for bonus bets and for a pinned boost with only a published boosted price. */
+  promoBaseOddsAmerican: number | null;
   hedge: SelectionQuote;
   sameBook: boolean;
   candidatesEvaluated: number;
@@ -62,6 +64,7 @@ interface EvaluatedCandidate {
   selection: ResolvedSelection;
   promoOddsAmerican: number;
   promoOddsDerived: boolean;
+  promoBaseOddsAmerican: number | null;
   hedge: SelectionQuote;
   sameBook: boolean;
   result: { kind: "boost"; boost: ProfitBoostResult } | { kind: "bonus"; bonus: BonusBetHedgeResult };
@@ -192,6 +195,7 @@ function evaluateBoostCandidate(
     selection,
     promoOddsAmerican,
     promoOddsDerived,
+    promoBaseOddsAmerican: baseOddsAmerican,
     hedge,
     sameBook,
     result: { kind: "boost", boost: result },
@@ -222,6 +226,7 @@ function evaluateBonusCandidate(
     selection,
     promoOddsAmerican: promoBookQuote.oddsAmerican,
     promoOddsDerived: false,
+    promoBaseOddsAmerican: null,
     hedge,
     sameBook,
     result: { kind: "bonus", bonus },
@@ -323,6 +328,7 @@ function evaluatePromo<P extends RankablePromo>(promo: P, opts: RankOptions): Pr
     selection: best.selection,
     promoOddsAmerican: best.promoOddsAmerican,
     promoOddsDerived: best.promoOddsDerived,
+    promoBaseOddsAmerican: best.promoBaseOddsAmerican,
     hedge: best.hedge,
     sameBook: best.sameBook,
     candidatesEvaluated,

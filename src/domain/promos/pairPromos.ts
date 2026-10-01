@@ -41,6 +41,9 @@ export interface PairCandidate<P extends RankablePromo = RankablePromo> {
   marketKey: string;
   oddsAAmerican: number;
   oddsBAmerican: number;
+  /** Each boost leg's own price before the boost; null for bonus legs / published-only boosts. */
+  baseOddsAAmerican: number | null;
+  baseOddsBAmerican: number | null;
   result: PairResult;
   separateProfitA: Decimal;
   separateProfitB: Decimal;
@@ -102,6 +105,7 @@ interface LegOption<P extends RankablePromo> {
   marketKey: string;
   side: PromoSide;
   oddsAmerican: number;
+  baseOddsAmerican: number | null;
   /** decimal odds used for pruning */
   oddsDecimal: Decimal;
   boost: BoostLegInput | null;
@@ -137,6 +141,7 @@ function buildLegOption<P extends RankablePromo>(
       return {
         ...base,
         oddsAmerican: input.boostedOddsAmerican ?? decimalToAmericanDisplay(decimal),
+        baseOddsAmerican: input.baseOddsAmerican,
         oddsDecimal: new LocalDecimal(decimal),
         boost: input,
         bonus: null,
@@ -154,6 +159,7 @@ function buildLegOption<P extends RankablePromo>(
   return {
     ...base,
     oddsAmerican: ownQuote.oddsAmerican,
+    baseOddsAmerican: null,
     oddsDecimal: new LocalDecimal(americanToDecimal(ownQuote.oddsAmerican)),
     boost: null,
     bonus: { bonusAmount: new Decimal(promo.bonusAmount), oddsAmerican: ownQuote.oddsAmerican },
@@ -299,6 +305,8 @@ export function findPairCandidates<P extends RankablePromo>(
               marketKey,
               oddsAAmerican: legA.oddsAmerican,
               oddsBAmerican: legB.oddsAmerican,
+              baseOddsAAmerican: legA.baseOddsAmerican,
+              baseOddsBAmerican: legB.baseOddsAmerican,
               result,
               separateProfitA: singleA,
               separateProfitB: singleB,
