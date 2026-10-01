@@ -313,11 +313,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 **Goal:** The app runs at a private, invite-only HTTPS address on Vercel (Hobby), one reliable morning promo scrape + morning odds observe is triggered daily by Vercel Cron (with a single self-skipping GitHub backup run), and the last unguarded login/invite/books/logout calls show an inline retry message instead of blanking the page.
 **Requirements**: PROMO-03 (+ audit W1 under DASH-02, DASH-04)
 **Depends on:** Phase 5
-**Plans:** 3/5 plans executed
+**Plans:** 4/5 plans executed
 
 Plans:
 - [x] 05.1-01-PLAN.md — Vercel Cron route (bearer-protected) that dispatches the Scrape promos workflow, proxy exemption, vercel.json
 - [x] 05.1-02-PLAN.md — Single 15:37 UTC GitHub backup schedule that skips when today's scrape/observe already ran
 - [x] 05.1-03-PLAN.md — safeAction throw guards on login, invite, books forms, logout (audit W1)
-- [ ] 05.1-04-PLAN.md — Pre-deploy gate, local CRON_SECRET, owner-approved push to main
+- [x] 05.1-04-PLAN.md — Pre-deploy gate, local CRON_SECRET, owner-approved push to main
 - [ ] 05.1-05-PLAN.md — Owner Vercel setup + env vars, live-site and cron verification, docs update
