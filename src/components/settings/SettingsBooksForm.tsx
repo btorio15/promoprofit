@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { saveBooks } from "@/app/actions/save-books";
+import { safeAction } from "@/lib/safeAction";
+import { resolveSaveBooksOutcome } from "./saveBooksOutcome";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BookPicker } from "./BookPicker";
@@ -12,8 +14,6 @@ export interface SettingsBooksFormProps {
   books: { key: string; displayName: string }[];
   initialKeys: string[];
 }
-
-const MIN_ONE_BOOK_MESSAGE = "Select at least one book.";
 
 function sameKeys(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   if (a.size !== b.size) return false;
@@ -47,19 +47,18 @@ export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps
 
   function handleSave() {
     startTransition(async () => {
-      const result = await saveBooks({ bookKeys: Array.from(selected) });
-      if (result.status === "invalid") {
-        const message = result.fieldErrors.bookKeys?.[0];
-        setError(
-          message === MIN_ONE_BOOK_MESSAGE
-            ? "Select at least one book to save."
-            : (message ?? "Select at least one book to save."),
-        );
+      const call = await safeAction(
+        () => saveBooks({ bookKeys: Array.from(selected) }),
+        "saveBooks",
+      );
+      const outcome = resolveSaveBooksOutcome(call, "settings");
+      if (outcome.kind === "error") {
+        setError(outcome.message);
         return;
       }
       setError(null);
       setSaved(true);
-      setLastSaved(new Set(result.bookKeys));
+      setLastSaved(new Set(outcome.bookKeys));
       router.refresh();
     });
   }
