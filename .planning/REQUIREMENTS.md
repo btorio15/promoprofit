@@ -112,7 +112,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BONUS-02 | Phase 2 | Complete |
 | PROMO-01 | Phase 5 | Complete |
 | PROMO-02 | Phase 5 | Complete |
-| PROMO-03 | Phase 3 | Complete (scheduled trigger pending — manual dispatch only; see STATE blockers) |
+| PROMO-03 | Phase 3, 05.1 | Complete (daily Vercel Cron → GitHub workflow_dispatch + 15:37 UTC backup; verified 2026-10-01) |
 | PROMO-04 | Phase 3 | Complete |
 | PROMO-05 | Phase 5 | Complete |
 | DASH-01 | Phase 4 | Complete |

@@ -144,7 +144,7 @@ Recent decisions affecting current work:
 - Phase 1/2: Official Colorado sportsbook operator list triangulated from third-party sources only (sbg.colorado.gov returned 403 during research) — spot-check before finalizing book config.
 - Phase 3: Event/market matching approach has no single reference architecture — worth a focused spike before committing.
 - Phase 3: Per-book scraping feasibility is uncertain (anti-bot posture varies) — research per target book when planning this phase.
-- Scheduled scrape unreliable (updated 2026-10-01 milestone audit): GitHub `schedule` runs DO fire since 2026-09-29 22:07Z (4 successful), but late (23:07Z slot ran 01:57Z) and the 14:07Z / 8:07 AM Denver slot (which also runs morning-observe) has not fired on 09-30 or 10-01; owner covers with manual dispatch. Planned fix (owner, not started): once-daily external trigger of workflow_dispatch (e.g. Vercel Cron).
+- RESOLVED 2026-10-01 (Phase 05.1): daily morning scrape now triggered by Vercel Cron (13:17 UTC, fires within the hour) → GitHub workflow_dispatch; single 15:37 UTC GitHub backup skips if every book already scraped today. Live at https://betmargin.vercel.app. GitHub dispatch token expires ~2026-12-30 — renew before then.
 - Phase 3 deferred walkthrough steps (owner: "approved, queue steps later"): Confirm, Correct (new search/date-range picker, check on phone), Enter cap details, Dismiss, Needs a look card, Auto-matched flag — check on the next scrape that queues a promo.
 
 ### Quick Tasks Completed
