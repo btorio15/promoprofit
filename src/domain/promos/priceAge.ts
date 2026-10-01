@@ -18,17 +18,27 @@ export interface PriceAgeContext {
   moneylineEventIds: ReadonlySet<string>;
   moneylineFetchedAt: Date | null;
   extendedFetchedAt: Date | null;
+  /**
+   * quick-261001-jbc (D-06): each cached event's OWN fetched_at. A per-sport
+   * promo refresh leaves other sports' rows on their older time, so a row's
+   * age is its event's time, falling back to the cache-wide time.
+   */
+  moneylineFetchedAtByEvent?: ReadonlyMap<string, Date>;
+  extendedFetchedAtByEvent?: ReadonlyMap<string, Date>;
 }
 
 export function buildPriceAgeContext(
   moneylineEvents: OddsEvent[],
   moneylineFetchedAt: Date | null,
   extendedFetchedAt: Date | null,
+  perEvent?: { moneyline?: ReadonlyMap<string, Date>; extended?: ReadonlyMap<string, Date> },
 ): PriceAgeContext {
   return {
     moneylineEventIds: new Set(moneylineEvents.map((e) => e.id)),
     moneylineFetchedAt,
     extendedFetchedAt,
+    moneylineFetchedAtByEvent: perEvent?.moneyline,
+    extendedFetchedAtByEvent: perEvent?.extended,
   };
 }
 
@@ -52,7 +62,9 @@ export function pricesAsOfFor(
 ): string | null {
   let oldest: Date | null = null;
   for (const selection of selections) {
-    const at = oddsSourceFor(selection, ctx) === "moneyline" ? ctx.moneylineFetchedAt : ctx.extendedFetchedAt;
+    const isMoneyline = oddsSourceFor(selection, ctx) === "moneyline";
+    const own = (isMoneyline ? ctx.moneylineFetchedAtByEvent : ctx.extendedFetchedAtByEvent)?.get(selection.eventId);
+    const at = own ?? (isMoneyline ? ctx.moneylineFetchedAt : ctx.extendedFetchedAt);
     if (at === null) return null;
     if (oldest === null || at.getTime() < oldest.getTime()) oldest = at;
   }

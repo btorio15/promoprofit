@@ -77,7 +77,10 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     ]);
   }
 
-  const priceAge = buildPriceAgeContext(ctx.moneylineEvents, ctx.oddsFetchedAt, ctx.extendedOddsFetchedAt);
+  const priceAge = buildPriceAgeContext(ctx.moneylineEvents, ctx.oddsFetchedAt, ctx.extendedOddsFetchedAt, {
+    moneyline: ctx.oddsFetchedAtByEventId,
+    extended: ctx.extendedOddsFetchedAtByEventId,
+  });
 
   // D-17: rankOpts.hedgeBookKeys is the member's own hedge books only.
   const singles = rankPromoHedges(ctx.feedPromos, ctx.rankOpts);

@@ -94,3 +94,37 @@ describe("describePriceAge", () => {
     expect(describePriceAge(null, new Date())).toBeNull();
   });
 });
+
+describe("pricesAsOfFor with per-event fetched-at maps (quick-261001-jbc, D-06)", () => {
+  const NEW_AT = new Date("2026-10-01T17:00:00.000Z");
+  const OLD_AT = new Date("2026-10-01T09:00:00.000Z");
+  const perCtx = buildPriceAgeContext([evt("nfl"), evt("nhl")], ML_AT, EXT_AT, {
+    moneyline: new Map([
+      ["nfl", NEW_AT],
+      ["nhl", OLD_AT],
+    ]),
+    extended: new Map([
+      ["nfl", NEW_AT],
+      ["nhl", OLD_AT],
+    ]),
+  });
+
+  it("each selection reports its own event's time", () => {
+    expect(pricesAsOfFor([{ eventId: "nfl", marketType: "moneyline" }], perCtx)).toBe(NEW_AT.toISOString());
+    expect(pricesAsOfFor([{ eventId: "nhl", marketType: "spread" }], perCtx)).toBe(OLD_AT.toISOString());
+  });
+  it("a pair spanning both reports the older", () => {
+    expect(
+      pricesAsOfFor(
+        [
+          { eventId: "nfl", marketType: "moneyline" },
+          { eventId: "nhl", marketType: "moneyline" },
+        ],
+        perCtx,
+      ),
+    ).toBe(OLD_AT.toISOString());
+  });
+  it("a selection missing from the map falls back to the cache-wide time", () => {
+    expect(pricesAsOfFor([{ eventId: "other", marketType: "spread" }], perCtx)).toBe(EXT_AT.toISOString());
+  });
+});

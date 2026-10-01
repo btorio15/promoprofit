@@ -66,8 +66,12 @@ export async function loadMemberFeedContext({
     completions,
     userBookKeys,
     bonusBooks,
-    { events: moneylineEvents, fetchedAt: oddsFetchedAt },
-    { events: extendedEvents, fetchedAt: extendedOddsFetchedAt },
+    { events: moneylineEvents, fetchedAt: oddsFetchedAt, fetchedAtByEventId: oddsFetchedAtByEventId },
+    {
+      events: extendedEvents,
+      fetchedAt: extendedOddsFetchedAt,
+      fetchedAtByEventId: extendedOddsFetchedAtByEventId,
+    },
   ] = await Promise.all([
     getActivePromos(now, userId),
     getPromoCompletions(userId),
@@ -111,6 +115,8 @@ export async function loadMemberFeedContext({
     extendedEvents,
     oddsFetchedAt,
     extendedOddsFetchedAt,
+    oddsFetchedAtByEventId,
+    extendedOddsFetchedAtByEventId,
     rankOpts,
   };
 }

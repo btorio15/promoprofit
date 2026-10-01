@@ -9,7 +9,7 @@ vi.mock("./client", () => ({
 }));
 
 import { getDb } from "./client";
-import { getBonusBooks, getHedgeBookKeys, getUsableUserBooks, getUserBookKeys, saveUserBooks } from "./queries";
+import { collectCachedEventRows, toDateOrNull, getBonusBooks, getHedgeBookKeys, getUsableUserBooks, getUserBookKeys, saveUserBooks } from "./queries";
 
 describe("book lists share one runtime source with runOddsRefresh (WR-05)", () => {
   it("getBonusBooks returns exactly usableOddsBooks(), in config sort order", async () => {
@@ -124,5 +124,50 @@ describe("getUserBookKeys / saveUserBooks (DASH-02)", () => {
     ]);
     expect(mockBatch).toHaveBeenCalledTimes(1);
     expect(mockBatch).toHaveBeenCalledWith([deleteStatement, insertStatement]);
+  });
+});
+
+describe("collectCachedEventRows / toDateOrNull (quick-261001-jbc, D-06)", () => {
+  const rawEvent = (id: string, sport: string) => ({
+    id,
+    sport_key: sport,
+    sport_title: sport,
+    commence_time: "2026-10-02T00:00:00Z",
+    home_team: "H",
+    away_team: "A",
+    bookmakers: [],
+  });
+
+  it("returns both sports' events with each row's own fetchedAt (string normalized to Date)", () => {
+    const nfl = new Date("2026-10-01T17:00:00.000Z");
+    const { events, fetchedAtByEventId } = collectCachedEventRows(
+      [
+        { eventId: "a", rawResponse: rawEvent("a", "americanfootball_nfl"), fetchedAt: nfl },
+        { eventId: "b", rawResponse: rawEvent("b", "icehockey_nhl"), fetchedAt: "2026-10-01T09:00:00.000Z" },
+      ],
+      "test",
+    );
+    expect(events.map((e) => e.id)).toEqual(["a", "b"]);
+    expect(fetchedAtByEventId.get("a")).toEqual(nfl);
+    expect(fetchedAtByEventId.get("b")).toEqual(new Date("2026-10-01T09:00:00.000Z"));
+  });
+
+  it("drops an invalid row and leaves it out of the map", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { events, fetchedAtByEventId } = collectCachedEventRows(
+      [{ eventId: "bad", rawResponse: { nope: true }, fetchedAt: new Date() }],
+      "test",
+    );
+    expect(events).toEqual([]);
+    expect(fetchedAtByEventId.has("bad")).toBe(false);
+    warn.mockRestore();
+  });
+
+  it("toDateOrNull normalizes aggregate strings, passes Dates and nulls through", () => {
+    expect(toDateOrNull(null)).toBeNull();
+    expect(toDateOrNull(undefined)).toBeNull();
+    const d = new Date("2026-10-01T09:00:00.000Z");
+    expect(toDateOrNull(d)).toBe(d);
+    expect(toDateOrNull("2026-10-01T09:00:00.000Z")).toEqual(d);
   });
 });

@@ -1,9 +1,12 @@
 /**
  * Server-only Postgres cache writer for the odds refresh pipeline
- * (ODDS-01/ODDS-02). commitOddsRefresh and commitSpreadsTotalsRefresh are
- * the only cache writers; each commits a whole refresh in one transaction.
- * commitSpreadsTotalsRefresh is the only writer of the spreads/totals cache,
- * cached_extended_odds (D-16).
+ * (ODDS-01/ODDS-02). commitOddsRefresh, commitSpreadsTotalsRefresh and
+ * commitPromoSportsRefresh are the only cache writers; each commits a whole
+ * refresh in one transaction. commitSpreadsTotalsRefresh and
+ * commitPromoSportsRefresh are the two writers of the spreads/totals cache,
+ * cached_extended_odds (D-16). The promo commit replaces only the refreshed
+ * sports and leaves every other sport's rows and fetched_at untouched
+ * (quick-261001-jbc D-06).
  * recordCreditUsage/getLatestCreditUsage are the only reader/writer pair for
  * the persisted credit meter (D-11's thresholds read the latest row, never
  * a fresh API call).
@@ -89,10 +92,12 @@ function replaceSportStatements(
  * season, WR-01) and events that have already started.
  */
 function purgeStatements(db: Db, table: CacheTable, fetchedAt: Date): Statement[] {
-  return [
-    db.delete(table).where(lt(table.fetchedAt, fetchedAt)),
-    db.delete(table).where(lte(table.commenceTime, fetchedAt)),
-  ];
+  return [db.delete(table).where(lt(table.fetchedAt, fetchedAt)), purgeStartedStatement(db, table, fetchedAt)];
+}
+
+/** Deletes events that have already started (commence_time <= fetchedAt). */
+function purgeStartedStatement(db: Db, table: CacheTable, fetchedAt: Date): Statement {
+  return db.delete(table).where(lte(table.commenceTime, fetchedAt));
 }
 
 /**
@@ -132,6 +137,30 @@ export async function commitSpreadsTotalsRefresh(
     ...sports.flatMap((s) => replaceSportStatements(db, cachedOdds, s.sportKey, s.h2hEvents, fetchedAt)),
     ...purgeStatements(db, cachedExtendedOdds, fetchedAt),
     ...purgeStatements(db, cachedOdds, fetchedAt),
+  ];
+  await db.batch([first, ...rest]);
+}
+
+/**
+ * quick-261001-jbc (D-06): commits a promo-sports refresh in ONE batch.
+ * Replaces ONLY the given sports in cached_extended_odds and cached_odds and
+ * purges only already-started events -- it must never purge by fetched_at,
+ * which would delete every sport not refreshed. Other sports keep their rows
+ * and their original fetched_at (readers report each row's own time).
+ */
+export async function commitPromoSportsRefresh(
+  sports: ExtendedSportOddsWrite[],
+  fetchedAt: Date,
+): Promise<void> {
+  if (sports.length === 0) return;
+  const db = getDb();
+  const [first, ...rest]: Statement[] = [
+    ...sports.flatMap((s) =>
+      replaceSportStatements(db, cachedExtendedOdds, s.sportKey, s.extendedEvents, fetchedAt),
+    ),
+    ...sports.flatMap((s) => replaceSportStatements(db, cachedOdds, s.sportKey, s.h2hEvents, fetchedAt)),
+    purgeStartedStatement(db, cachedExtendedOdds, fetchedAt),
+    purgeStartedStatement(db, cachedOdds, fetchedAt),
   ];
   await db.batch([first, ...rest]);
 }
