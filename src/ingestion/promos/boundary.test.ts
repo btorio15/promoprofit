@@ -49,6 +49,23 @@ describe("scraper/app-router boundary", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("no scraper/ingestion or scripts file touches member caps (quick-261001-dhn: scrapes never overwrite Your cap)", () => {
+    const roots = [join(REPO_ROOT, "src", "ingestion"), join(REPO_ROOT, "scripts")];
+    const offenders: string[] = [];
+
+    for (const root of roots) {
+      for (const file of walkFiles(root)) {
+        if (file.endsWith(".test.ts")) continue;
+        const text = readFileSync(file, "utf8");
+        if (/userPromoCaps|user_promo_caps|@\/db\/promoCaps/.test(text)) {
+          offenders.push(file);
+        }
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   it("root package.json never depends on playwright or puppeteer", () => {
     const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")) as {
       dependencies?: Record<string, string>;

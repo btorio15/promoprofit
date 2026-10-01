@@ -19,6 +19,9 @@ export interface PresentablePromo extends RankablePromo {
   scopeLabel: string;
   autoMatched: boolean;
   addedByYou?: boolean;
+  /** quick-261001-dhn: the promo's own max stake / the viewer's override (see ActivePromo). */
+  promoMaxStake?: string | null;
+  capOverride?: string | null;
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
 }
 
@@ -26,6 +29,9 @@ export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max
   const bookName = bookNames.get(promo.bookKey) ?? promo.bookKey;
 
   if (capBound === "max_stake" && promo.maxStake !== null) {
+    if (promo.capOverride != null && promo.promoMaxStake != null) {
+      return `Capped at your ${formatUsd(promo.capOverride)} max stake (${bookName}'s page says ${formatUsd(promo.promoMaxStake)}) — a smaller stake keeps guaranteed profit equal on both sides.`;
+    }
     return `Capped at ${bookName}'s ${formatUsd(promo.maxStake)} max stake — a smaller stake keeps guaranteed profit equal on both sides.`;
   }
 
@@ -34,6 +40,12 @@ export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max
   }
 
   return null;
+}
+
+/** Promos-tab "Your cap" edit data; boosts whose own cap is known only. */
+function yourCapFor(promo: PresentablePromo): { promoCap: string; override: string | null } | undefined {
+  if (promo.promoType !== "profit_boost" || typeof promo.promoMaxStake !== "string") return undefined;
+  return { promoCap: promo.promoMaxStake, override: promo.capOverride ?? null };
 }
 
 function attributionLineFor(promo: PresentablePromo): string | null {
@@ -137,6 +149,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     attribution: attributionLineFor(promo),
     worstCase: netIfPromoWins !== netIfHedgeWins,
     hasPromoBook: userBookSet.has(promo.bookKey),
+    yourCap: yourCapFor(promo),
   };
 }
 
@@ -193,5 +206,6 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),
     hasPromoBook: userBookSet.has(promo.bookKey),
+    yourCap: yourCapFor(promo),
   };
 }

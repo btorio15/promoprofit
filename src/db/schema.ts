@@ -329,6 +329,29 @@ export const promoCompletions = pgTable(
 );
 
 /**
+ * quick-261001-dhn: a member's own max-stake override ("Your cap") for a
+ * profit boost, because their sportsbook account can allow less (or more)
+ * than the promo's public page. Per-member: keyed (user_id, promo_id), so
+ * one member's cap never changes another member's numbers. A SEPARATE table
+ * the scraper never references, so a scrape that rewrites promos.max_stake
+ * can never overwrite or delete it. ON DELETE CASCADE on both FKs.
+ */
+export const userPromoCaps = pgTable(
+  "user_promo_caps",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    maxStake: numeric("max_stake", { precision: 10, scale: 2 }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.promoId] })],
+);
+
+/**
  * quick-260927-n12 (owner decision 3): the best guaranteed profit observed
  * for a promo on a given America/Denver calendar day, recorded by getPromos
  * on every Promos-tab load (never by the scraper -- see get-promos.ts's

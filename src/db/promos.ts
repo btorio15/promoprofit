@@ -18,6 +18,8 @@ import type { PromoScope } from "@/domain/promos/scope";
 import type { RankablePromo } from "@/domain/promos/rankPromoHedges";
 import { getSportLabel } from "@/config/sports";
 import { etDayLabel } from "@/domain/promos/etTime";
+import { applyMemberCaps } from "@/domain/promos/yourCap";
+import { getMemberPromoCaps } from "./promoCaps";
 
 export interface ScrapeStatusRow {
   lastOkAt: Date | null;
@@ -78,6 +80,10 @@ export interface ActivePromo extends RankablePromo {
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
   /** True when the viewer hand-added this promo (personal, D-01). */
   addedByYou: boolean;
+  /** quick-261001-dhn: the promo's own max stake (set when a viewer's caps were applied). */
+  promoMaxStake?: string | null;
+  /** quick-261001-dhn: the viewer's "Your cap" override, or null (set when a viewer's caps were applied). */
+  capOverride?: string | null;
 }
 
 const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
@@ -280,6 +286,12 @@ export function activePromoWhere(now: Date, viewerUserId?: number): SQL {
  * commence_time (event scope) or its window's end (sport_window scope,
  * D-16). pending_review promos never reach this query -- they have no
  * resolved scope_kind until a reviewer or the auto-matcher sets one.
+ *
+ * quick-261001-dhn: when a viewer is given, THAT viewer's own "Your cap"
+ * overrides are applied here (maxStake becomes the override for boosts), so
+ * every member-scoped caller (Promos, Opportunities, pairs, alt-spreads,
+ * mark-done) gets them with no change. recordCurrentProfitObservations
+ * strips them again so shared observations stay group-level.
  */
 export async function getActivePromos(now: Date, viewerUserId?: number): Promise<ActivePromo[]> {
   const confirmedByUsers = alias(users, "confirmed_by_users");
@@ -287,7 +299,7 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
   const capEnteredByUsers = alias(users, "cap_entered_by_users");
 
   const db = getDb();
-  const rows = await db
+  const rowsQuery = db
     .select({
       id: promos.id,
       bookKey: promos.bookKey,
@@ -324,10 +336,15 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
     .leftJoin(capEnteredByUsers, eq(promos.capEnteredByUserId, capEnteredByUsers.id))
     .where(activePromoWhere(now, viewerUserId));
 
+  const [rows, caps] = await Promise.all([
+    rowsQuery,
+    viewerUserId !== undefined ? getMemberPromoCaps(viewerUserId) : Promise.resolve(null),
+  ]);
+
   const activePromos: ActivePromo[] = [];
   for (const row of rows) {
     const mapped = mapActivePromoRow(row, viewerUserId);
     if (mapped) activePromos.push(mapped);
   }
-  return activePromos;
+  return caps === null ? activePromos : applyMemberCaps(activePromos, caps);
 }
