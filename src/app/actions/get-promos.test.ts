@@ -1246,7 +1246,8 @@ describe("computeMemberPromoState parity with getPromos (quick-260929-igk)", () 
     const hedge = await computeMemberPromoState({ userId: 1, promoId: 1, precision: "cents", now: new Date() });
     expect(hedge.kind).toBe("hedge");
     if (hedge.kind !== "hedge") throw new Error("unreachable");
-    expect(hedge.row).toEqual(feed.rows.find((r) => r.promoId === 1));
+    // quick-261001-e1j: pricesAsOf is feed-only (the recompute has no cache timestamps; Done snapshots never carry it).
+    expect({ ...hedge.row, pricesAsOf: null }).toEqual({ ...feed.rows.find((r) => r.promoId === 1), pricesAsOf: null });
 
     const noHedge = await computeMemberPromoState({ userId: 1, promoId: 4, precision: "cents", now: new Date() });
     expect(noHedge.kind).toBe("no_hedge");
