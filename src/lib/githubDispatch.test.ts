@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dispatchScrapeWorkflow } from "./githubDispatch";
+import { DEFAULT_GH_REPO, dispatchScrapeWorkflow } from "./githubDispatch";
 
 const TOKEN = "ghp_TESTSECRET123";
 let errSpy: ReturnType<typeof vi.spyOn>;
@@ -71,4 +71,27 @@ describe("dispatchScrapeWorkflow", () => {
     expect(JSON.stringify(r2)).not.toContain(TOKEN);
     expect(JSON.stringify(errSpy.mock.calls)).not.toContain(TOKEN);
   });
+
+  it("sends force_morning_observe=false when forceMorningObserve is false", async () => {
+    const f = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    await dispatchScrapeWorkflow({ token: TOKEN, forceMorningObserve: false, fetchImpl: f as unknown as typeof fetch });
+    expect(JSON.parse(f.mock.calls[0][1].body).inputs).toEqual({ force_morning_observe: "false" });
+  });
+
+  it("uses a valid owner/name repo", async () => {
+    const f = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    await dispatchScrapeWorkflow({ token: TOKEN, repo: "a-b/c.d_e", fetchImpl: f as unknown as typeof fetch });
+    expect(f.mock.calls[0][0]).toContain("/repos/a-b/c.d_e/actions/");
+  });
+
+  it.each(["../..", "a/b?x=1", "a/b/c", "owner", "a/b#frag", "a b/c"])(
+    "falls back to the default repo for invalid GH_REPO %j",
+    async (repo) => {
+      const f = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+      await dispatchScrapeWorkflow({ token: TOKEN, repo, fetchImpl: f as unknown as typeof fetch });
+      expect(f.mock.calls[0][0]).toBe(
+        `https://api.github.com/repos/${DEFAULT_GH_REPO}/actions/workflows/scrape-promos.yml/dispatches`,
+      );
+    },
+  );
 });

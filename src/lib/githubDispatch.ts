@@ -11,15 +11,21 @@
 export type DispatchResult = { ok: true } | { ok: false; status?: number };
 
 export const DEFAULT_GH_REPO = "btorio15/promoprofit";
+const GH_REPO_PATTERN = /^(?!\.+\/)(?!.*\/\.+$)[\w.-]+\/[\w.-]+$/;
 const WORKFLOW_FILE = "scrape-promos.yml";
 const REF = "main";
 
 export async function dispatchScrapeWorkflow(opts: {
   token: string;
   repo?: string;
+  /** Defaults to true. False skips the forced morning odds refresh (credit guard). */
+  forceMorningObserve?: boolean;
   fetchImpl?: typeof fetch;
 }): Promise<DispatchResult> {
-  const repo = opts.repo ?? DEFAULT_GH_REPO;
+  // WR-03: the repo goes into the URL path with the PAT attached, so only a
+  // plain owner/name is accepted; anything else falls back to the default.
+  const repo = opts.repo && GH_REPO_PATTERN.test(opts.repo) ? opts.repo : DEFAULT_GH_REPO;
+  const force = opts.forceMorningObserve ?? true;
   const doFetch = opts.fetchImpl ?? fetch;
   const url = `https://api.github.com/repos/${repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
 
@@ -34,7 +40,7 @@ export async function dispatchScrapeWorkflow(opts: {
         "Content-Type": "application/json",
       },
       // workflow_dispatch inputs are strings; the workflow compares == 'true'.
-      body: JSON.stringify({ ref: REF, inputs: { force_morning_observe: "true" } }),
+      body: JSON.stringify({ ref: REF, inputs: { force_morning_observe: force ? "true" : "false" } }),
       cache: "no-store",
     });
 

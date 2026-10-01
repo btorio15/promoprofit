@@ -4,6 +4,9 @@ import { NextRequest } from "next/server";
 const mockDispatch = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/githubDispatch", () => ({ dispatchScrapeWorkflow: mockDispatch }));
 
+const mockStatus = vi.hoisted(() => vi.fn());
+vi.mock("@/db/dailyRunStatus", () => ({ getDailyRunStatus: mockStatus }));
+
 import { GET } from "./route";
 
 const SECRET = "cronsecret-0123456789";
@@ -17,6 +20,7 @@ function req(auth?: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockStatus.mockResolvedValue({ scrapeDone: false, observeDone: false });
   vi.spyOn(console, "error").mockImplementation(() => {});
   process.env.CRON_SECRET = SECRET;
   process.env.GH_DISPATCH_TOKEN = TOKEN;
@@ -81,5 +85,34 @@ describe("GET /api/cron/scrape", () => {
     mockDispatch.mockResolvedValue({ ok: true });
     await GET(req(`Bearer ${SECRET}`));
     expect(mockDispatch.mock.calls[0][0].repo).toBe("a/b");
+  });
+
+  it("forces the morning observe when not yet done", async () => {
+    mockDispatch.mockResolvedValue({ ok: true });
+    await GET(req(`Bearer ${SECRET}`));
+    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(true);
+  });
+
+  it("does not force the observe when it already ran today (duplicate delivery)", async () => {
+    mockStatus.mockResolvedValue({ scrapeDone: true, observeDone: true });
+    mockDispatch.mockResolvedValue({ ok: true });
+    const res = await GET(req(`Bearer ${SECRET}`));
+    expect(res.status).toBe(200);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(false);
+  });
+
+  it("fails open to a single forced dispatch when the DB check throws", async () => {
+    mockStatus.mockRejectedValue(new Error("db down"));
+    mockDispatch.mockResolvedValue({ ok: true });
+    const res = await GET(req(`Bearer ${SECRET}`));
+    expect(res.status).toBe(200);
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(true);
+  });
+
+  it("does not touch the DB when unauthorized", async () => {
+    await GET(req("Bearer nope"));
+    expect(mockStatus).not.toHaveBeenCalled();
   });
 });

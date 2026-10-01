@@ -1,13 +1,16 @@
 import { timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
+import { getDailyRunStatus } from "@/db/dailyRunStatus";
 import { dispatchScrapeWorkflow } from "@/lib/githubDispatch";
 
 /**
  * Vercel Cron target (D-01, D-03, D-05). Vercel Cron sends
  * `Authorization: Bearer $CRON_SECRET` automatically. The proxy exempts
  * /api/cron/ from the session-cookie check, so this route authenticates
- * itself and fails closed. Duplicate cron deliveries are accepted (rare;
- * the workflow concurrency group serializes runs). No retries.
+ * itself and fails closed. A duplicate delivery is guarded (WR-01): if today's
+ * morning observe already ran, dispatch without forcing the odds refresh so
+ * Odds API credits are not spent twice. The DB check fails open toward a
+ * single forced dispatch. No retries.
  */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +36,17 @@ export async function GET(request: NextRequest) {
     return Response.json({ dispatched: false }, { status: 500 });
   }
 
+  let forceMorningObserve = true;
+  try {
+    const status = await getDailyRunStatus();
+    if (status.observeDone) forceMorningObserve = false;
+  } catch (err) {
+    console.error("cron/scrape status check failed:", err instanceof Error ? err.message : "unknown error");
+  }
+
   const result = await dispatchScrapeWorkflow({
     token,
+    forceMorningObserve,
     repo: process.env.GH_REPO || undefined,
   });
   if (result.ok) return Response.json({ dispatched: true });
