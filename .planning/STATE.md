@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 05.1 (Deploy & Reliable Morning Scrape) — EXECUTING
 Plan: 1 of 5
 Status: Executing Phase 05.1
-Last activity: 2026-10-01 -- Phase 05.1 execution started
+Last activity: 2026-10-01 - Completed quick task 261001-jbc: Refresh promos button
 
 Progress: [██████████] 100%
 
@@ -138,7 +138,6 @@ Recent decisions affecting current work:
 ### Pending Todos
 
 - Stats overhaul (ui) — `.planning/todos/pending/2026-09-30-stats-overhaul.md`
-- "Refresh promos" button (spreads/totals only for active-promo games) — `.planning/todos/pending/2026-10-01-refresh-promos-button.md`
 
 ### Blockers/Concerns
 
@@ -181,6 +180,7 @@ Recent decisions affecting current work:
 | fast | Status-bar refresh buttons compacted (small, auto width, "Spreads & alt lines") | 2026-10-01 | 8623741 | ✅ | - |
 | fast | Status-bar buttons equal width, stacked right of credit meter | 2026-10-01 | cf10204 | ✅ | - |
 | fast | Visible rename PromoProfit → MarginMind (repo/cookie/storage/DB names unchanged); live at betmargin.vercel.app | 2026-10-01 | f134e57 | ✅ | - |
+| 261001-jbc | "Refresh promos" status-bar button replaces "Spreads & alt lines": h2h+spreads+totals only for sports with active promos, alt lines for each promo's best game, cost confirm; partial-sport cache commit keeps other sports + per-row price age | 2026-10-01 | f5cb5af | Needs Review | [261001-jbc-refresh-promos-button-spreads-totals-for](./quick/261001-jbc-refresh-promos-button-spreads-totals-for/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
