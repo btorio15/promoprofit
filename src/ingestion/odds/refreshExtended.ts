@@ -19,6 +19,12 @@
  * failed run changes neither cache. The reverse direction remains forbidden -- refresh.ts must
  * never import from this file or reference cached_extended_odds (D-16); this
  * plan does not modify refresh.ts.
+ *
+ * quick-261001-jbc: runPromoSportsRefresh is the second caller of the same
+ * guarded body. It is scoped to the sports the member's active promos cover
+ * (h2h+spreads+totals in one call per sport), reuses the alt-spread section
+ * unchanged, commits via commitPromoSportsRefresh (other sports' cached rows
+ * and fetched_at untouched) and records one credit_usage row.
  */
 import { randomUUID } from "node:crypto";
 import { fetchEventOdds, fetchSportOdds, listSports } from "./client";
@@ -39,6 +45,7 @@ import {
 } from "@/domain/promos/altSpreads";
 import { REFRESH_LOCK_TTL_MS } from "./refresh";
 import {
+  commitPromoSportsRefresh,
   commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
   recordCreditUsage,
@@ -53,6 +60,8 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 const FETCH_WINDOW_DAYS = 7;
 const MISSING_KEY_MESSAGE = "ODDS_API_KEY is not set";
 const GENERIC_FAILURE_MESSAGE = "Couldn't search spreads & totals: the Odds API didn't respond.";
+const PROMO_GENERIC_FAILURE_MESSAGE = "Couldn't refresh promo odds: the Odds API didn't respond.";
+const NO_PROMOS_MESSAGE = "No active promos to refresh.";
 const BUSY_MESSAGE = "Another odds refresh is already running. Try again in a minute.";
 
 /** h2h + spreads + totals, per SC2/D-13 -- exactly 3x a normal (h2h-only) refresh's market count. */
@@ -91,13 +100,35 @@ export type ExtendedRefreshOutcome =
   | { status: "busy"; message: string }
   | { status: "error"; message: string };
 
-function safeMessage(err: unknown): string {
+/**
+ * quick-261001-jbc: the promo-sports refresh's outcome. The Arbitrage
+ * reducer's ExtendedRefreshOutcome is deliberately NOT widened: this adds
+ * sportKeys to confirm_required and a no_promos variant.
+ */
+export type PromoRefreshOutcome =
+  | Exclude<ExtendedRefreshOutcome, { status: "confirm_required" }>
+  | {
+      status: "confirm_required";
+      estimatedCredits: number;
+      remaining: number | null;
+      minutesSinceLastRefresh: number | null;
+      sportKeys: string[];
+    }
+  | { status: "no_promos"; message: string };
+
+/** Scope for a promo-sports run: only these sports, plus the alt-game quote. */
+interface PromoScopeOptions {
+  sportKeys: readonly string[];
+  altGameEstimate: number;
+}
+
+function safeMessage(err: unknown, scoped = false): string {
   if (err instanceof Error && err.message === MISSING_KEY_MESSAGE) {
     return MISSING_KEY_MESSAGE;
   }
   // Same discipline as refresh.ts's safeMessage: never surface a raw error,
   // which could echo request state (T-01.1-15).
-  return GENERIC_FAILURE_MESSAGE;
+  return scoped ? PROMO_GENERIC_FAILURE_MESSAGE : GENERIC_FAILURE_MESSAGE;
 }
 
 /**
@@ -143,20 +174,41 @@ export interface SpreadsTotalsRefreshOptions {
  * until the credit row is written, exactly like runOddsRefresh.
  */
 export async function runSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions): Promise<ExtendedRefreshOutcome> {
+  // Unscoped runs never return no_promos or a sportKeys confirm, so the
+  // narrowing to ExtendedRefreshOutcome is exact.
+  return (await runLocked(opts)) as ExtendedRefreshOutcome;
+}
+
+/**
+ * quick-261001-jbc: refreshes h2h+spreads+totals for ONLY `sportKeys` (those
+ * in season), then the shared alt-spread shortcut, under the same refresh
+ * lock and credit gate as the full search. Always requires a confirm.
+ */
+export async function runPromoSportsRefresh(
+  opts: SpreadsTotalsRefreshOptions & PromoScopeOptions,
+): Promise<PromoRefreshOutcome> {
+  const { sportKeys, altGameEstimate, ...base } = opts;
+  return (await runLocked(base, { sportKeys, altGameEstimate })) as PromoRefreshOutcome;
+}
+
+async function runLocked(
+  opts: SpreadsTotalsRefreshOptions,
+  scope?: PromoScopeOptions,
+): Promise<ExtendedRefreshOutcome | PromoRefreshOutcome> {
   const holder = randomUUID();
 
   let acquired: boolean;
   try {
     acquired = await tryAcquireRefreshLock(holder, REFRESH_LOCK_TTL_MS);
   } catch (err) {
-    return { status: "error", message: safeMessage(err) };
+    return { status: "error", message: safeMessage(err, scope !== undefined) };
   }
   if (!acquired) {
     return { status: "busy", message: BUSY_MESSAGE };
   }
 
   try {
-    return await runGuardedSpreadsTotalsRefresh(opts);
+    return await runGuardedSpreadsTotalsRefresh(opts, scope);
   } finally {
     try {
       await releaseRefreshLock(holder);
@@ -166,26 +218,40 @@ export async function runSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
   }
 }
 
-async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions): Promise<ExtendedRefreshOutcome> {
+async function runGuardedSpreadsTotalsRefresh(
+  opts: SpreadsTotalsRefreshOptions,
+  scope?: PromoScopeOptions,
+): Promise<ExtendedRefreshOutcome | PromoRefreshOutcome> {
   const now = opts.now ?? new Date();
+  const scoped = scope !== undefined;
 
   let latest;
   try {
     latest = await getLatestCreditUsage();
   } catch (err) {
-    return { status: "error", message: safeMessage(err) };
+    return { status: "error", message: safeMessage(err, scoped) };
   }
 
   let sports;
   try {
     sports = await listSports(); // 0 credits
   } catch (err) {
-    return { status: "error", message: safeMessage(err) };
+    return { status: "error", message: safeMessage(err, scoped) };
   }
 
   const inSeason = sports.filter((s) => s.active && SPORT_KEYS.includes(s.key));
+  // D-01: a scoped run fetches only the promo sports that are in season.
+  const targets = scope ? inSeason.filter((s) => scope.sportKeys.includes(s.key)) : inSeason;
+  if (scope && targets.length === 0) {
+    return { status: "no_promos", message: NO_PROMOS_MESSAGE };
+  }
   const bookKeys = usableOddsBooks().map((b) => b.key); // D-15, never paid_only
-  const estimatedCredits = estimateRefreshCredits(inSeason.length, bookKeys.length, EXTENDED_MARKETS.length);
+  const mainEstimate = estimateRefreshCredits(targets.length, bookKeys.length, EXTENDED_MARKETS.length);
+  // D-04 quote: the gate stays on the main fetch (alt is skippable, as in the
+  // full search); the confirm dialog quotes main + an alt-game upper bound.
+  const estimatedCredits = scope
+    ? mainEstimate + scope.altGameEstimate * Math.ceil(bookKeys.length / 10)
+    : mainEstimate;
 
   // A row from before the last monthly reset is last month's balance:
   // treat it as unknown so the low-credit block lifts on the 1st (CR-01).
@@ -195,7 +261,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
   const gate = evaluateRefreshGate({
     remaining: priorRemaining,
     lastRefreshAt: latest?.recordedAt ?? null,
-    estimatedCredits,
+    estimatedCredits: mainEstimate,
     now,
     confirmed: opts.confirmed,
   });
@@ -214,11 +280,21 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
   // confirm, regardless of the shared 15-minute window -- never proceed on
   // an unconfirmed call, and never spend credits without one.
   if (!opts.confirmed) {
+    const minutesSinceLastRefresh = gate.action === "confirm" ? gate.minutesSinceLastRefresh : null;
+    if (scope) {
+      return {
+        status: "confirm_required",
+        estimatedCredits,
+        remaining: priorRemaining,
+        minutesSinceLastRefresh,
+        sportKeys: targets.map((t) => t.key),
+      };
+    }
     return {
       status: "confirm_required",
       estimatedCredits,
       remaining: priorRemaining,
-      minutesSinceLastRefresh: gate.action === "confirm" ? gate.minutesSinceLastRefresh : null,
+      minutesSinceLastRefresh,
     };
   }
 
@@ -245,7 +321,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
     // written until the whole loop succeeds, so a failed search leaves BOTH
     // caches exactly as they were -- it can no longer hide not-yet-fetched
     // sports from the Arbitrage tab or the Bonus-bets finder.
-    for (const sport of inSeason) {
+    for (const sport of targets) {
       const { events, quota } = await fetchSportOdds(sport.key, {
         bookmakerKeys: bookKeys,
         commenceTimeFrom,
@@ -333,7 +409,10 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
     // One transaction: both caches' per-sport rows plus both caches'
     // purges (D-16: the ONLY call site that writes or purges
     // cached_extended_odds). All-or-nothing.
-    await commitSpreadsTotalsRefresh(pendingWrites, now);
+    // Scoped (promo) runs merge per sport and leave other sports' rows alone
+    // (D-06); the full search replaces everything and purges older batches.
+    if (scope) await commitPromoSportsRefresh(pendingWrites, now);
+    else await commitSpreadsTotalsRefresh(pendingWrites, now);
   } catch (err) {
     refreshError = err;
   } finally {
@@ -355,6 +434,9 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
           // finished: status.ts derives every credit estimate from this,
           // and a partial run's count would under-state the next run's
           // cost (01.1 review WR-03). Equal to sports fetched on success.
+          // A promo run records the FULL in-season count too (not its
+          // narrower promo-sport count), or the next full refresh's
+          // estimate would be understated (quick-261001-jbc).
           sportsFetched: inSeason.length,
           recordedAt: now,
           triggeredByUserId: opts.triggeredByUserId ?? null,
@@ -367,7 +449,7 @@ async function runGuardedSpreadsTotalsRefresh(opts: SpreadsTotalsRefreshOptions)
   }
 
   if (refreshError) {
-    return { status: "error", message: safeMessage(refreshError) };
+    return { status: "error", message: safeMessage(refreshError, scoped) };
   }
 
   return {
