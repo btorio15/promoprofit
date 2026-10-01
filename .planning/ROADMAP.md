@@ -310,10 +310,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 ### Phase 05.1: Deploy & Reliable Morning Scrape: deploy the app to Vercel (Hobby), once-daily Vercel Cron triggers the morning promo scrape + morning odds observe (drop GitHub midday/evening scrape runs), and add safeAction throw guards to login/invite/books forms (v1.0 audit cleanup: PROMO-03, integration W1) (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** The app runs at a private, invite-only HTTPS address on Vercel (Hobby), one reliable morning promo scrape + morning odds observe is triggered daily by Vercel Cron (with a single self-skipping GitHub backup run), and the last unguarded login/invite/books/logout calls show an inline retry message instead of blanking the page.
+**Requirements**: PROMO-03 (+ audit W1 under DASH-02, DASH-04)
 **Depends on:** Phase 5
-**Plans:** 0 plans
+**Plans:** 5 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 05.1 to break down)
+- [ ] 05.1-01-PLAN.md — Vercel Cron route (bearer-protected) that dispatches the Scrape promos workflow, proxy exemption, vercel.json
+- [ ] 05.1-02-PLAN.md — Single 15:37 UTC GitHub backup schedule that skips when today's scrape/observe already ran
+- [ ] 05.1-03-PLAN.md — safeAction throw guards on login, invite, books forms, logout (audit W1)
+- [ ] 05.1-04-PLAN.md — Pre-deploy gate, local CRON_SECRET, owner-approved push to main
+- [ ] 05.1-05-PLAN.md — Owner Vercel setup + env vars, live-site and cron verification, docs update
