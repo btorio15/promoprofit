@@ -605,6 +605,7 @@ export async function getActivePromoForFlag(
   const rows = await db
     .select({
       id: promos.id,
+      autoMatched: promos.autoMatched,
       addedByUserId: promos.addedByUserId,
       scopeKind: promos.scopeKind,
       eventId: promos.eventId,

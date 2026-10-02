@@ -19,6 +19,7 @@ export interface PresentablePromo extends RankablePromo {
   claimHint: string | null;
   scopeLabel: string;
   autoMatched: boolean;
+  scraped?: boolean;
   addedByYou?: boolean;
   /** quick-261001-dhn: the promo's own max stake / the viewer's override (see ActivePromo). */
   promoMaxStake?: string | null;
@@ -119,6 +120,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     scopeLabel: promo.scopeLabel,
     candidatesEvaluated,
     autoMatched: promo.autoMatched,
+    flaggable: promo.scraped === true,
     addedByYou: promo.addedByYou === true,
     finePrintNote: promo.finePrintNote,
     claimHint: promo.claimHint,
@@ -206,6 +208,7 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
     title: promoTitle(promo),
     scopeLabel: promo.scopeLabel,
     autoMatched: promo.autoMatched,
+    flaggable: promo.scraped === true,
     addedByYou: promo.addedByYou === true,
     bestGuaranteedProfit: bestGuaranteedProfit?.toFixed(2) ?? null,
     note: unprofitablePromoNote(bestGuaranteedProfit),

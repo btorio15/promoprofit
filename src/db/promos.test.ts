@@ -125,4 +125,10 @@ describe("mapActivePromoRow", () => {
     expect(mapActivePromoRow(makeRow({ addedByUserId: null }), 7)?.addedByYou).toBe(false);
     expect(mapActivePromoRow(makeRow({ addedByUserId: 7 }), undefined)?.addedByYou).toBe(false);
   });
+
+  it("scraped is true only when the promo has no owner (quick-261002-dqn)", () => {
+    expect(mapActivePromoRow(makeRow({ addedByUserId: null }), 7)?.scraped).toBe(true);
+    expect(mapActivePromoRow(makeRow({ addedByUserId: 7 }), 7)?.scraped).toBe(false);
+    expect(mapActivePromoRow(makeRow({ addedByUserId: 9 }), undefined)?.scraped).toBe(false);
+  });
 });

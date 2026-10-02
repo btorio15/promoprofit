@@ -39,7 +39,7 @@ interface PromoRowProps {
  * The trigger is an empty, full-row overlay button BEHIND the row content
  * rather than a button wrapping it (ArbRow.tsx's pattern, 01.1 review
  * WR-06) -- necessary here because the flag-back icon (D-11 safety net,
- * only on autoMatched rows) is a real interactive <button>, and nesting a
+ * on flaggable (active scraped) rows) is a real interactive <button>, and nesting a
  * button inside CollapsibleTrigger's own <button> is invalid HTML with
  * unpredictable keyboard/click behavior. The content layer is
  * pointer-events-none so taps fall through to the trigger; only the flag
@@ -80,12 +80,8 @@ export function PromoRow({ row, precision, onChanged, capEditable, capFieldIdPre
               </span>
               <Badge variant="outline">{row.marketBadge}</Badge>
               {row.addedByYou ? <Badge variant="outline">Added by you</Badge> : null}
-              {row.autoMatched ? (
-                <>
-                  <Badge variant="outline">Auto-matched</Badge>
-                  <FlagMatchButton promoId={row.promoId} onChanged={onChanged} />
-                </>
-              ) : null}
+              {row.autoMatched ? <Badge variant="outline">Auto-matched</Badge> : null}
+              {row.flaggable ? <FlagMatchButton promoId={row.promoId} onChanged={onChanged} /> : null}
               <MarkUsedButton
                 mode="mark"
                 promoId={row.promoId}

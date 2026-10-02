@@ -58,6 +58,8 @@ export interface PromoRowDTO {
   /** How many eligible bets in this promo's scope were evaluated before picking the best one. */
   candidatesEvaluated: number;
   autoMatched: boolean;
+  /** quick-261002-dqn: true for active scraped promos (auto-matched or human-confirmed) -- drives the Flag button independently of autoMatched. Optional because frozen Done snapshots lack it (absent = not flaggable). */
+  flaggable?: boolean;
   /** True when the viewing member added this promo themselves (phase 5). Optional: frozen Done snapshots lack it. */
   addedByYou?: boolean;
   finePrintNote: string | null;
@@ -123,6 +125,8 @@ export interface UnprofitablePromoRowDTO {
   title: string;
   scopeLabel: string;
   autoMatched: boolean;
+  /** quick-261002-dqn: true for active scraped promos (auto-matched or human-confirmed) -- drives the Flag button independently of autoMatched. Optional because frozen Done snapshots lack it (absent = not flaggable). */
+  flaggable?: boolean;
   addedByYou: boolean;
   /** Fixed 2-dp string (e.g. "-0.65"), or null when no candidate could be evaluated at all. */
   bestGuaranteedProfit: string | null;

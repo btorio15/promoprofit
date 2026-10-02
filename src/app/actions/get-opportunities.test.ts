@@ -109,6 +109,7 @@ function activeBoostPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
     scopeLabel: "Any NFL game · Sun, Sep 27",
     autoMatched: true,
     attribution: [],
+    scraped: true,
     addedByYou: false,
     ...overrides,
   };
