@@ -84,6 +84,7 @@ function boost(id: number, bookKey: string): ActivePromo {
     scopeLabel: "Any NFL game",
     autoMatched: true,
     attribution: [],
+    scraped: true,
     addedByYou: false,
   };
 }

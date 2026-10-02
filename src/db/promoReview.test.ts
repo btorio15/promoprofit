@@ -5,7 +5,7 @@ import * as schema from "@/db/schema";
 
 vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 
-import { activePromoForFlagWhere } from "./promoReview";
+import { activePromoForFlagWhere, flagUpdateWhere } from "./promoReview";
 import { promos } from "./schema";
 
 const db = drizzle({ client: neon("postgresql://u:p@db.invalid/x"), schema });
@@ -19,5 +19,20 @@ describe("activePromoForFlagWhere (WR-05)", () => {
     expect(sql).toContain('"added_by_user_id" is null');
     expect(sql).toContain('"added_by_user_id" = $');
     expect(params).toEqual(expect.arrayContaining([5, "active", 7]));
+  });
+});
+
+describe("flagUpdateWhere (quick-261002-dqn)", () => {
+  it("gates the flag UPDATE on active + scraped, with no auto_matched requirement", () => {
+    const { sql, params } = db
+      .update(promos)
+      .set({ status: "pending_review" })
+      .where(flagUpdateWhere(5))
+      .toSQL();
+    expect(sql).toContain('"id" = $');
+    expect(sql).toContain('"status" = $');
+    expect(sql).toContain('"added_by_user_id" is null');
+    expect(sql).not.toContain('"auto_matched"');
+    expect(params).toEqual(expect.arrayContaining([5, "active"]));
   });
 });

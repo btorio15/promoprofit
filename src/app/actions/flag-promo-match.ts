@@ -10,13 +10,13 @@ const CONFLICT: PromoReviewResponse = { status: "conflict", message: "Someone el
 
 /**
  * The D-11 safety net (D-12, ARCHITECTURE.md Anti-Pattern 2 guard): any
- * logged-in member can flag an auto-matched promo as wrong, pulling it out
+ * logged-in member can flag an active scraped promo (auto-matched or human-confirmed) as wrong, pulling it out
  * of hedge math immediately and sending it back to the review queue with
  * its own current scope as the best guess (presentational only -- it never
  * re-auto-activates). requireUser() is the literal first statement
  * (T-03-10-01) -- a logged-out call redirects before any read/write. The
  * write is a single conditional UPDATE gated on
- * status = 'active' AND auto_matched = true (T-03-10-02), so a concurrent
+ * status = 'active' AND added_by_user_id IS NULL (T-03-10-02), so a concurrent
  * flag/confirm/dismiss on the same row can affect at most one caller.
  * decideScrapedWrite's autoMatchBlocked rule (Plan 08) permanently refuses
  * to auto-reactivate this row on any later scrape -- only a member's
@@ -37,8 +37,8 @@ export async function flagPromoMatch(input: unknown): Promise<PromoReviewRespons
     return CONFLICT;
   }
 
-  if (!row.autoMatched) {
-    return { status: "conflict", message: "Only auto-matched promos can be flagged." };
+  if (!row.scraped) {
+    return { status: "conflict", message: "Only scraped promos can be flagged." };
   }
 
   const ok = await applyFlag({ promoId, userId: user.userId, guess: row.guess, now: new Date() });

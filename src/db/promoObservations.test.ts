@@ -63,6 +63,7 @@ const boost: ActivePromo = {
   scopeLabel: "Team A @ Team H",
   autoMatched: false,
   attribution: [],
+  scraped: true,
   addedByYou: false,
 };
 

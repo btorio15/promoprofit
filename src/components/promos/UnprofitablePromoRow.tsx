@@ -49,12 +49,8 @@ export function UnprofitablePromoRow({ row, precision, onChanged, capEditable, a
           <span>{row.title}</span>
           <span className="text-sm text-muted-foreground">{row.bookName}</span>
           {row.addedByYou ? <Badge variant="outline">Added by you</Badge> : null}
-          {row.autoMatched ? (
-            <>
-              <Badge variant="outline">Auto-matched</Badge>
-              <FlagMatchButton promoId={row.promoId} onChanged={onChanged} />
-            </>
-          ) : null}
+          {row.autoMatched ? <Badge variant="outline">Auto-matched</Badge> : null}
+          {row.flaggable ? <FlagMatchButton promoId={row.promoId} onChanged={onChanged} /> : null}
           <MarkUsedButton
             mode="mark"
             promoId={row.promoId}

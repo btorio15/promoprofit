@@ -960,7 +960,7 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
       awayTeam: "Los Angeles Rams",
       commenceTime: plusHours(6),
     };
-    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, autoMatched: true, guess });
+    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, scraped: true, guess });
     mockApplyFlag.mockResolvedValue(true);
 
     const result = await flagPromoMatch({ promoId: 5 });
@@ -984,7 +984,7 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
       windowStart: NOW_ISO,
       windowEnd: plusHours(48),
     };
-    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, autoMatched: true, guess });
+    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, scraped: true, guess });
     mockApplyFlag.mockResolvedValue(true);
 
     const result = await flagPromoMatch({ promoId: 5 });
@@ -998,10 +998,29 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
     });
   });
 
-  it("returns conflict when the active promo was human-confirmed (autoMatched false)", async () => {
+  it("flags an active human-confirmed scraped promo", async () => {
+    const guess = {
+        kind: "event" as const,
+        eventId: "nfl-1",
+        sportKey: "americanfootball_nfl",
+        homeTeam: "Denver Broncos",
+        awayTeam: "Los Angeles Rams",
+        commenceTime: plusHours(6),
+      };
+    mockGetActivePromoForFlag.mockResolvedValue({ id: 5, scraped: true, guess });
+    mockApplyFlag.mockResolvedValue(true);
+
+    const result = await flagPromoMatch({ promoId: 5 });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyFlag).toHaveBeenCalledWith({ promoId: 5, userId: 7, guess, now: expect.any(Date) });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/");
+  });
+
+  it("returns conflict for a member-added promo", async () => {
     mockGetActivePromoForFlag.mockResolvedValue({
       id: 5,
-      autoMatched: false,
+      scraped: false,
       guess: {
         kind: "event" as const,
         eventId: "nfl-1",
@@ -1014,7 +1033,7 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
 
     const result = await flagPromoMatch({ promoId: 5 });
 
-    expect(result).toEqual({ status: "conflict", message: "Only auto-matched promos can be flagged." });
+    expect(result).toEqual({ status: "conflict", message: "Only scraped promos can be flagged." });
     expect(mockApplyFlag).not.toHaveBeenCalled();
   });
 
@@ -1030,7 +1049,7 @@ describe("flagPromoMatch server action (D-11, D-12, T-03-10-01..02)", () => {
   it("returns conflict when the conditional write affects zero rows (concurrent reviewers)", async () => {
     mockGetActivePromoForFlag.mockResolvedValue({
       id: 5,
-      autoMatched: true,
+      scraped: true,
       guess: {
         kind: "event" as const,
         eventId: "nfl-1",

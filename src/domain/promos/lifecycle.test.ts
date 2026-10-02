@@ -256,6 +256,32 @@ describe("decideScrapedWrite", () => {
     });
   });
 
+  it("flagged formerly human-confirmed row (blocked, non-null humanScope) stays pending_review/match (quick-261002-dqn)", () => {
+    const existing = baseExisting({
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatchBlocked: true,
+      humanScope: MATCHED_SCOPE,
+    });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT, NOW)).toEqual({
+      kind: "refresh",
+      status: "pending_review",
+      reviewReason: "match",
+      unparsedCapFields: [],
+    });
+  });
+
+  it("flagged formerly human-confirmed row with member-entered caps -> touch (quick-261002-dqn)", () => {
+    const existing = baseExisting({
+      status: "pending_review",
+      reviewReason: "match",
+      autoMatchBlocked: true,
+      humanScope: MATCHED_SCOPE,
+      capsEnteredByMember: true,
+    });
+    expect(decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT, NOW)).toEqual({ kind: "touch" });
+  });
+
   it("existing pending_review/match, not blocked, now matched -> write as new-matched (re-match, D-19)", () => {
     const existing = baseExisting({ status: "pending_review", reviewReason: "match", autoMatchBlocked: false });
     const decision = decideScrapedWrite(existing, baseParsed(), MATCHED_RESULT, NOW);

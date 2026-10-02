@@ -128,6 +128,7 @@ function activeBoostPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
     scopeLabel: "Any NFL game · Sun, Sep 27",
     autoMatched: true,
     attribution: [],
+    scraped: true,
     addedByYou: false,
     ...overrides,
   };
@@ -153,6 +154,7 @@ function activeBonusPromo(overrides: Partial<ActivePromo> = {}): ActivePromo {
     scopeLabel: "LA Rams @ DEN Broncos",
     autoMatched: false,
     attribution: [],
+    scraped: true,
     addedByYou: false,
     ...overrides,
   };
@@ -379,7 +381,7 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
 
   it("still returns the member's own added promos (only) as manageable rows when no odds are cached (WR-02)", async () => {
     mockGetActivePromos.mockResolvedValue([
-      activeBoostPromo({ id: 1, addedByYou: true }),
+      activeBoostPromo({ id: 1, addedByYou: true, scraped: false }),
       activeBoostPromo({ id: 2, addedByYou: false }),
     ]);
     mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
@@ -393,6 +395,7 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     expect(result.rows).toEqual([]);
     expect(result.unprofitableRows.map((row) => row.promoId)).toEqual([1]);
     expect(result.unprofitableRows[0].addedByYou).toBe(true);
+    expect(result.unprofitableRows[0].flaggable).toBe(false);
     expect(result.unprofitableRows[0].note).toBe("No odds loaded yet");
     expect(result.unprofitableRows[0].bestGuaranteedProfit).toBeNull();
   });
@@ -449,7 +452,7 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
       ],
     });
     mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
-    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ addedByYou: true })]);
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ addedByYou: true, scraped: false })]);
     const own = await getPromos({ precision: "cents" });
     if (own.status !== "ok") throw new Error("unreachable");
     expect(own.rows[0].addedByYou).toBe(true);
@@ -458,6 +461,14 @@ describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () 
     const scraped = await getPromos({ precision: "cents" });
     if (scraped.status !== "ok") throw new Error("unreachable");
     expect(scraped.rows[0].addedByYou).toBe(false);
+
+    // quick-261002-dqn: flaggable follows scraped, independent of autoMatched.
+    expect(own.rows[0].flaggable).toBe(false);
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ scraped: true, autoMatched: false })]);
+    const confirmed = await getPromos({ precision: "cents" });
+    if (confirmed.status !== "ok") throw new Error("unreachable");
+    expect(confirmed.rows[0].flaggable).toBe(true);
+    expect(confirmed.rows[0].autoMatched).toBe(false);
   });
 
   it("returns a mapped row for an event-scope bonus bet with scopeLabel '{away} @ {home}'", async () => {
@@ -690,6 +701,7 @@ describe("getPromos unprofitableRows (quick-260927-edt)", () => {
         title: "10% profit boost",
         scopeLabel: "Denver Broncos @ Los Angeles Rams",
         autoMatched: true,
+        flaggable: true,
         addedByYou: false,
         bestGuaranteedProfit: "-0.65",
         note: "No profitable hedge right now (best: −$0.65)",

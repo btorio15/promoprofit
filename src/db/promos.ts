@@ -77,6 +77,8 @@ export interface ActivePromo extends RankablePromo {
   claimHint: string | null;
   scopeLabel: string;
   autoMatched: boolean;
+  /** True when the promo came from the scraper (added_by_user_id IS NULL) -- the only promos a member may flag; quick-261002-dqn. */
+  scraped: boolean;
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
   /** True when the viewer hand-added this promo (personal, D-01). */
   addedByYou: boolean;
@@ -252,6 +254,7 @@ export function mapActivePromoRow(row: ActivePromoRow, viewerUserId?: number): A
     scopeLabel,
     autoMatched: row.autoMatched,
     attribution,
+    scraped: row.addedByUserId === null,
     addedByYou: viewerUserId !== undefined && row.addedByUserId === viewerUserId,
   };
 }
