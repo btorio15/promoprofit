@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "audit cleanup: PROMO-03, integration W1)"
-status: executing
-stopped_at: Phase 05.1 context gathered
-last_updated: "2026-10-01T19:16:46.700Z"
+status: ready_to_plan
+stopped_at: Phase 05.1 complete (5/5) — ready to discuss Phase 999.1
+last_updated: 2026-10-02T18:14:43.914Z
 last_activity: 2026-10-01 -- Phase 05.1 execution started
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
+  completed_plans: 61
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 05.1 — Deploy & Reliable Morning Scrape
+**Current focus:** Phase 999.1 — admin page
 
 ## Current Position
 
-Phase: 05.1 (Deploy & Reliable Morning Scrape) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 05.1
-Last activity: 2026-10-02 - Completed quick task 261002-dqn: flag any active scraped promo
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-02
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 56
+- Total plans completed: 61
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -50,6 +50,7 @@ Progress: [██████████] 100%
 | 3 | 15 | - | - |
 | 4 | 9 | - | - |
 | 5 | 10 | - | - |
+| 05.1 | 5 | - | - |
 
 **Recent Trend:**
 
