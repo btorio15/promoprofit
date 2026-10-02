@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "audit cleanup: PROMO-03, integration W1)"
-status: Awaiting next milestone
+status: completed
 stopped_at: Phase 05.1 context gathered
-last_updated: "2026-10-02T19:50:29.652Z"
+last_updated: "2026-10-02T19:51:07.254Z"
 last_activity: 2026-10-02 — Milestone v1.0 completed and archived
 progress:
   total_phases: 2
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: v1.0 shipped — next milestone not started
 Plan: —
-Status: Awaiting next milestone
+Status: Milestone v1.0 complete (2026-10-02)
 Last activity: 2026-10-02 — Milestone v1.0 completed and archived
 
 ## Performance Metrics

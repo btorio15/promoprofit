@@ -4,6 +4,14 @@
 
 PromoProfit is a private web app that already knows the current promotions at Colorado sportsbooks (scraped automatically and shared with the group, plus personal promos each member adds for anything the scrapers miss) and shows a ranked feed of the guaranteed-profit opportunities they create, including pairs of competing promos on opposite sides of the same game. Users sort the feed by profit, filter it to the books they have, and place the bets themselves. A bonus-bet finder lets a user enter "I have a $X bonus bet at book Y" and see the best market to convert it on and the best book to hedge at. It's built for the owner and a small group of friends.
 
+## Current State
+
+**Shipped:** v1.0 "MarginMind" on 2026-10-02 — live at https://betmargin.vercel.app (Vercel Hobby, auto-deploy on push to main; repo btorio15/promoprofit). Daily promo scrape via Vercel Cron → GitHub Actions (~7 AM MT) with a GitHub backup. Archive: `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`.
+
+## Next Milestone Goals
+
+Not yet defined — start with `/gsd-new-milestone`. Candidates already captured: stats overhaul + profit graph (`.planning/todos/pending/2026-09-30-stats-overhaul.md`), admin page (ROADMAP backlog 999.1). Watch: GitHub dispatch token expires ~2026-12-30.
+
 ## Core Value
 
 Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
@@ -101,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-01 after Phase 5 (Group-Added Promos) completion — last v1.0 phase*
+*Last updated: 2026-10-02 after v1.0 milestone close*
