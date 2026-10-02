@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 05.1 (Deploy & Reliable Morning Scrape) — EXECUTING
 Plan: 1 of 5
 Status: Executing Phase 05.1
-Last activity: 2026-10-01 - Completed quick task 261001-jbc: Refresh promos button
+Last activity: 2026-10-02 - Completed quick task 261002-dqn: flag any active scraped promo
 
 Progress: [██████████] 100%
 
@@ -181,6 +181,7 @@ Recent decisions affecting current work:
 | fast | Status-bar buttons equal width, stacked right of credit meter | 2026-10-01 | cf10204 | ✅ | - |
 | fast | Visible rename PromoProfit → MarginMind (repo/cookie/storage/DB names unchanged); live at betmargin.vercel.app | 2026-10-01 | f134e57 | ✅ | - |
 | 261001-jbc | "Refresh promos" status-bar button replaces "Spreads & alt lines": h2h+spreads+totals only for sports with active promos, alt lines for each promo's best game, cost confirm; partial-sport cache commit keeps other sports + per-row price age | 2026-10-01 | f5cb5af | Needs Review | [261001-jbc-refresh-promos-button-spreads-totals-for](./quick/261001-jbc-refresh-promos-button-spreads-totals-for/) |
+| 261002-dqn | Flag button on every active scraped promo (incl. human-confirmed/corrected), member-added still refused; flagged row returns to Needs a look | 2026-10-02 | ee7cbe7 |  | [261002-dqn-allow-flagging-any-active-scraped-promo](./quick/261002-dqn-allow-flagging-any-active-scraped-promo/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
