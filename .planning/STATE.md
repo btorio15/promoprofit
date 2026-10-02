@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "audit cleanup: PROMO-03, integration W1)"
-status: ready_to_plan
-stopped_at: Phase 05.1 complete (5/5) — ready to discuss Phase 999.1
-last_updated: 2026-10-02T18:14:43.914Z
-last_activity: 2026-10-01 -- Phase 05.1 execution started
+status: Awaiting next milestone
+stopped_at: Phase 05.1 context gathered
+last_updated: "2026-10-02T19:50:29.652Z"
+last_activity: 2026-10-02 — Milestone v1.0 completed and archived
 progress:
-  total_phases: 1
-  completed_phases: 0
+  total_phases: 2
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 61
-  percent: 0
+  completed_plans: 5
+  percent: 50
 ---
 
 # Project State
@@ -25,12 +25,10 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-02
-
-Progress: [██████████] 100%
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-02 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -188,14 +186,23 @@ Recent decisions affecting current work:
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged and deferred at v1.0 milestone close on 2026-10-02:
 
-| Category | Item | Status | Deferred At |
-|----------|------|--------|-------------|
-| *(none)* | | | |
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | 01.1 Arbitrage: Multiple books / Tie risk badge check | blocked — no live arb with that badge yet |
+| uat_gap | 05.1 backup run skip (15:37 UTC) | not observed — GitHub did not fire the schedule; unit-tested |
+| verification_gap | 03 review-queue walkthrough (Confirm/Correct/caps/Dismiss/Needs a look/Flag) | owner to do on next queued promo |
+| quick_task | 20 older quick-task SUMMARYs lack a `status: complete` tag | bookkeeping only — work is done and committed |
+| todo | Stats overhaul + profit graph | next milestone |
+| backlog | 999.1 Admin page | next milestone |
 
 ## Session Continuity
 
 Last session: 2026-10-01T18:59:14.773Z
 Stopped at: Phase 05.1 context gathered
 Resume file: .planning/phases/05.1-deploy-reliable-morning-scrape-deploy-the-app-to-vercel-hobb/05.1-CONTEXT.md
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
