@@ -582,7 +582,7 @@ function activeScopeGuessFromRow(row: ActivePromoScopeRow): ScopeGuess | null {
 }
 
 /**
- * One active promo's id/autoMatched/current-scope-as-guess, for the flag
+ * One active promo's id/scraped/current-scope-as-guess, for the flag
  * action (D-11, T-03-10-01). Null when the row isn't active or its scope
  * can't be built into a valid ScopeGuess -- flagPromoMatch treats either as
  * "someone else already handled this promo" (the row moved on, or its data
@@ -600,12 +600,12 @@ export function activePromoForFlagWhere(id: number, viewerUserId: number) {
 export async function getActivePromoForFlag(
   id: number,
   viewerUserId: number,
-): Promise<{ id: number; autoMatched: boolean; guess: ScopeGuess } | null> {
+): Promise<{ id: number; scraped: boolean; guess: ScopeGuess } | null> {
   const db = getDb();
   const rows = await db
     .select({
       id: promos.id,
-      autoMatched: promos.autoMatched,
+      addedByUserId: promos.addedByUserId,
       scopeKind: promos.scopeKind,
       eventId: promos.eventId,
       sportKey: promos.sportKey,
@@ -625,13 +625,23 @@ export async function getActivePromoForFlag(
   const guess = activeScopeGuessFromRow(row);
   if (!guess) return null;
 
-  return { id: row.id, autoMatched: row.autoMatched, guess };
+  return { id: row.id, scraped: row.addedByUserId === null, guess };
 }
 
 /**
- * Flags an auto-matched active promo back into the review queue (D-11,
+ * WHERE for applyFlag: only an active scraped promo (auto-matched or
+ * human-confirmed/corrected/classified) can be flagged; member-added rows
+ * (added_by_user_id set) never match (quick-261002-dqn).
+ */
+export function flagUpdateWhere(promoId: number) {
+  return and(eq(promos.id, promoId), eq(promos.status, "active"), isNull(promos.addedByUserId));
+}
+
+/**
+ * Flags an active scraped promo (auto-matched or human-confirmed/corrected/
+ * classified) back into the review queue (D-11,
  * D-12, ARCHITECTURE.md Anti-Pattern 2): a single conditional UPDATE gated
- * on status = 'active' AND auto_matched = true (T-03-10-02) so a concurrent
+ * on status = 'active' AND added_by_user_id IS NULL (T-03-10-02) so a concurrent
  * flag/confirm/dismiss on the same row can affect at most one caller. Sets
  * auto_match_blocked true (decideScrapedWrite, Plan 08, permanently refuses
  * to auto-reactivate this row on any later scrape until a human
@@ -671,7 +681,7 @@ export async function applyFlag(args: {
       line: null,
       side: null,
     })
-    .where(and(eq(promos.id, promoId), eq(promos.status, "active"), eq(promos.autoMatched, true)))
+    .where(flagUpdateWhere(promoId))
     .returning({ id: promos.id });
 
   return rows.length === 1;
