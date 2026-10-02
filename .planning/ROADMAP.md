@@ -321,3 +321,14 @@ Plans:
 - [x] 05.1-03-PLAN.md — safeAction throw guards on login, invite, books forms, logout (audit W1)
 - [x] 05.1-04-PLAN.md — Pre-deploy gate, local CRON_SECRET, owner-approved push to main
 - [x] 05.1-05-PLAN.md — Owner Vercel setup + env vars, live-site and cron verification, docs update
+
+## Backlog
+
+### Phase 999.1: Admin page (BACKLOG)
+
+**Goal:** [Captured for future planning] An owner-only admin page. Candidate scope to confirm with the owner (captured 2026-10-02): create/copy invite links in the app (today: `npm run invite:create` on the laptop), see/manage members (list, disable, password reset — today `scripts/password-reset.ts`), Odds API credit usage history, scrape/cron run status + a manual "scrape now" trigger, and reminders like the GitHub dispatch token expiry (~2026-12-30).
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
