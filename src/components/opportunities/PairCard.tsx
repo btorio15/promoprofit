@@ -87,6 +87,7 @@ export function PairCard({ row, precision, onChanged, actions }: PairCardProps) 
       expectedGuaranteedProfit={row.guaranteedProfit}
       expectedStakeA={row.legA.stake}
       expectedStakeB={row.legB.stake}
+      expectedStakeC={row.legC?.stake}
       onChanged={onChanged}
     />
   );
@@ -125,8 +126,21 @@ export function PairCard({ row, precision, onChanged, actions }: PairCardProps) 
             <ChevronDown className="hidden size-5 shrink-0 self-center text-muted-foreground transition-transform group-data-open:rotate-180 md:block" />
           </div>
 
+          {row.legC ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
+              <span>{row.legC.bookName}</span>
+              <Badge variant="outline">Ordinary bet</Badge>
+              <span>
+                {row.legC.selectionLabel} <span className="num">{formatAmerican(row.legC.oddsAmerican)}</span>
+              </span>
+              <span className="text-muted-foreground">
+                - stake <span className="num text-foreground">{formatUsd(row.legC.stake)}</span>
+              </span>
+            </div>
+          ) : null}
+
           <p className="text-sm text-muted-foreground">
-            vs. <span className="num">{formatUsd(row.separateProfitA)}</span> +{" "}
+            vs.<span className="num">{formatUsd(row.separateProfitA)}</span> +{" "}
             <span className="num">{formatUsd(row.separateProfitB)}</span> hedging each separately
             <span className="text-foreground">
               {" "}

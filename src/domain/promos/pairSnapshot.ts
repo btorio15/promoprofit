@@ -28,6 +28,17 @@ const PairLegSnapshotSchema = z.object({
   bonusNote: z.string().nullable(),
 });
 
+const PairTopUpSnapshotSchema = z.object({
+  side: z.enum(["A", "B"]),
+  bookKey: z.string(),
+  bookName: z.string(),
+  selectionLabel: z.string(),
+  oddsAmerican: z.number(),
+  stake: z.string(),
+  payout: z.string(),
+  note: z.string(),
+});
+
 export const PairRowSnapshotSchema = z.object({
   rowKey: z.string(),
   promoIdA: z.number(),
@@ -42,6 +53,8 @@ export const PairRowSnapshotSchema = z.object({
   tieRisk: z.boolean(),
   legA: PairLegSnapshotSchema,
   legB: PairLegSnapshotSchema,
+  // Optional so snapshots stored before quick-261003-fxf (2 legs) still parse.
+  legC: PairTopUpSnapshotSchema.nullable().optional(),
   totalStaked: z.string(),
   netIfAWins: z.string(),
   netIfBWins: z.string(),
@@ -109,6 +122,15 @@ export interface DonePairLegDTO {
   payout: string;
 }
 
+export interface DonePairLegC {
+  side: "A" | "B";
+  bookName: string;
+  selectionLabel: string;
+  oddsAmerican: number;
+  stake: string;
+  payout: string;
+}
+
 export interface DonePairDTO {
   pairPromoIds: [number, number];
   pairTypeLabel: "Boost + Boost" | "Boost + Bonus bet";
@@ -119,6 +141,7 @@ export interface DonePairDTO {
   awayTeam: string;
   legA: DonePairLegDTO;
   legB: DonePairLegDTO;
+  legC: DonePairLegC | null;
   guaranteedProfit: string;
   roiPct: string;
   separateProfitA: string;
@@ -151,6 +174,16 @@ export function toDonePairDTO(snapshot: DonePairSnapshot): DonePairDTO {
     awayTeam: r.awayTeam,
     legA: toDoneLeg(r.legA),
     legB: toDoneLeg(r.legB),
+    legC: r.legC
+      ? {
+          side: r.legC.side,
+          bookName: r.legC.bookName,
+          selectionLabel: r.legC.selectionLabel,
+          oddsAmerican: r.legC.oddsAmerican,
+          stake: r.legC.stake,
+          payout: r.legC.payout,
+        }
+      : null,
     guaranteedProfit: r.guaranteedProfit,
     roiPct: r.roiPct,
     separateProfitA: r.separateProfitA,
@@ -188,7 +221,12 @@ export function buildPairSnapshot(
       moneyline: ctx.oddsFetchedAt.moneyline ? ctx.oddsFetchedAt.moneyline.toISOString() : null,
       spreadsTotals: ctx.oddsFetchedAt.spreadsTotals ? ctx.oddsFetchedAt.spreadsTotals.toISOString() : null,
     },
-    row: { ...row, legA: { ...row.legA }, legB: { ...row.legB } },
+    row: {
+      ...row,
+      legA: { ...row.legA },
+      legB: { ...row.legB },
+      ...(row.legC ? { legC: { ...row.legC } } : {}),
+    },
     termsA: { ...termsA },
     termsB: { ...termsB },
     completedAtIso: ctx.now.toISOString(),
@@ -209,13 +247,14 @@ export function buildPairSnapshot(
 
 /** D-23: still the same pair to the cent? Profit and BOTH stakes must match. null = pair gone. */
 export function isSamePairDisplay(
-  expected: { profit: string; stakeA: string; stakeB: string },
+  expected: { profit: string; stakeA: string; stakeB: string; stakeC?: string },
   current: PairRowDTO | null,
 ): boolean {
   if (current === null) return false;
   return (
     new Decimal(expected.profit).equals(current.guaranteedProfit) &&
     new Decimal(expected.stakeA).equals(current.legA.stake) &&
-    new Decimal(expected.stakeB).equals(current.legB.stake)
+    new Decimal(expected.stakeB).equals(current.legB.stake) &&
+    new Decimal(expected.stakeC ?? "0").equals(current.legC?.stake ?? "0")
   );
 }
