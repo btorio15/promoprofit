@@ -61,6 +61,8 @@ export interface PairResult {
   netIfBWins: Decimal;
   guaranteedProfit: Decimal;
   roiPct: Decimal;
+  /** Present only on a boost + boost pair that adds an ordinary top-up bet. */
+  topUp?: { side: "A" | "B"; leg: PairLegResult };
 }
 
 // Local clone so this module never mutates the shared global Decimal config.
@@ -405,4 +407,211 @@ export function solveBoostBonusPair(
   const result = solveBoostBonusPairUnfiltered(boost, bonus, precision);
   if (result === null || result.guaranteedProfit.lte(0)) return null;
   return result;
+}
+
+/** An ordinary (unboosted) quote used to top up one side of a boost + boost pair. */
+export interface TopUpQuote {
+  oddsAmerican: number;
+}
+
+interface TopUpSolution {
+  /** Leg passed first / second to the internal solver. */
+  stakeFirst: Decimal;
+  stakeSecond: Decimal;
+  stakeTop: Decimal;
+  payoutFirst: Decimal;
+  payoutSecond: Decimal;
+  payoutTop: Decimal;
+  total: Decimal;
+  profit: Decimal;
+}
+
+/**
+ * Three-bet search: promo legs `first` and `second` (boosts) plus an ordinary
+ * bet C on the SAME side as `second`, at decimal odds `oddsC`. With total
+ * T = sf + ss + sc the outcomes are
+ *   first wins:  PF(sf) - T        second wins: PS(ss) + PC(sc) - T
+ * where PC(sc) = floor_cents(sc * oddsC) and sc >= 0 has no cap.
+ *
+ * Holding sc at its balancing value, profit is linear in each boost stake
+ * between breakpoints, so the optimum sits at a boost's max stake, cap kink,
+ * unit minimum, or the cross-seed that balances the two boosts. For every
+ * (sf, ss) visited the balancing top-up stake is recomputed and a +/- 1 unit
+ * neighbourhood scored, so the search stays bounded (no grid scan).
+ */
+function solveTopUpOnSecond(
+  first: PreparedBoost,
+  second: PreparedBoost,
+  oddsC: Decimal,
+  p: Precision,
+): TopUpSolution | null {
+  const seedsF = [...stakeSeeds(first), p.unit];
+  const payoutF = memoPayout(first);
+  const payoutS = memoPayout(second);
+
+  const seeds: Array<[Decimal, Decimal]> = [];
+  const seedsS = [...stakeSeeds(second), p.unit];
+  for (const sf of seedsF) {
+    for (const ss of seedsS) seeds.push([sf, ss]);
+    const cross = inversePayout(second, rawPayout(first, sf));
+    if (cross !== null) seeds.push([sf, cross]);
+  }
+  for (const ss of seedsS) {
+    const cross = inversePayout(first, rawPayout(second, ss));
+    if (cross !== null) seeds.push([cross, ss]);
+  }
+
+  let best: TopUpSolution | null = null;
+  const seen = new Set<string>();
+
+  for (const [seedF, seedS] of seeds) {
+    const windowF = windowAround(seedF, p, p.unit, first.max);
+    const windowS = windowAround(seedS, p, p.unit, second.max);
+    for (const sf of windowF) {
+      const pf = payoutF(sf);
+      for (const ss of windowS) {
+        const key = `${sf.toFixed()}|${ss.toFixed()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const ps = payoutS(ss);
+        const gap = pf.minus(ps);
+        const balanced = gap.lte(0)
+          ? new LocalDecimal(0)
+          : gap.dividedBy(oddsC).dividedBy(p.unit).ceil().times(p.unit);
+        const tops = dedupe(
+          [new LocalDecimal(0), balanced.minus(p.unit), balanced, balanced.plus(p.unit)].filter(
+            (value) => value.gte(0),
+          ),
+        );
+        for (const sc of tops) {
+          const pc = floorCents(sc.times(oddsC));
+          const total = sf.plus(ss).plus(sc);
+          const profit = Decimal.min(pf.minus(total), ps.plus(pc).minus(total));
+          if (beats(profit, total, sf, best === null ? null : { profit: best.profit, total: best.total, stakeA: best.stakeFirst })) {
+            best = {
+              stakeFirst: sf,
+              stakeSecond: ss,
+              stakeTop: sc,
+              payoutFirst: pf,
+              payoutSecond: ps,
+              payoutTop: pc,
+              total,
+              profit,
+            };
+          }
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Boost + boost pair that may add ONE ordinary top-up bet on either side, so
+ * the boost with the larger cap can use it fully when the other cap binds.
+ * Picks the best guaranteed profit across {no top-up, top-up on B's side,
+ * top-up on A's side}; ties prefer fewer bets, then less cash. Returns null
+ * unless some candidate guarantees a profit. A winning top-up of $0 returns
+ * the plain 2-bet result untouched.
+ */
+export function solveBoostBoostPairWithTopUp(
+  a: BoostLegInput,
+  b: BoostLegInput,
+  topUp: { onA: TopUpQuote | null; onB: TopUpQuote | null },
+  precision: StakePrecision,
+): PairResult | null {
+  const p = precisionOf(precision);
+  const legA = prepareBoost(a, p);
+  const legB = prepareBoost(b, p);
+  if (legA === null || legB === null) return null;
+
+  const one = new LocalDecimal(1);
+  const plain = solveBoostBoostPairUnfiltered(a, b, precision);
+  let winner: PairResult | null = plain !== null && plain.guaranteedProfit.gt(0) ? plain : null;
+
+  const oddsOf = (quote: TopUpQuote) => new LocalDecimal(americanToDecimal(quote.oddsAmerican));
+  const canHelp = (promo: PreparedBoost, other: PreparedBoost, oddsC: Decimal): boolean =>
+    clean(one.dividedBy(promo.odds).plus(one.dividedBy(Decimal.max(other.odds, oddsC)))).lt(1);
+
+  if (topUp.onB !== null) {
+    const oddsC = oddsOf(topUp.onB);
+    if (canHelp(legA, legB, oddsC)) {
+      const sol = solveTopUpOnSecond(legA, legB, oddsC, p);
+      if (sol !== null && sol.stakeTop.gt(0) && sol.profit.gt(0) && (winner === null || sol.profit.gt(winner.guaranteedProfit) || (sol.profit.equals(winner.guaranteedProfit) && winner !== plain && sol.total.lt(winner.totalStaked)))) {
+        winner = {
+          legA: {
+            stake: sol.stakeFirst,
+            payout: sol.payoutFirst,
+            oddsDecimal: legA.odds,
+            priceSource: legA.priceSource,
+            capBound: capBoundOf(legA, sol.stakeFirst),
+          },
+          legB: {
+            stake: sol.stakeSecond,
+            payout: sol.payoutSecond,
+            oddsDecimal: legB.odds,
+            priceSource: legB.priceSource,
+            capBound: capBoundOf(legB, sol.stakeSecond),
+          },
+          totalStaked: sol.total,
+          netIfAWins: sol.payoutFirst.minus(sol.total),
+          netIfBWins: sol.payoutSecond.plus(sol.payoutTop).minus(sol.total),
+          guaranteedProfit: sol.profit,
+          roiPct: roiOf(sol.profit, sol.total),
+          topUp: {
+            side: "B",
+            leg: {
+              stake: sol.stakeTop,
+              payout: sol.payoutTop,
+              oddsDecimal: oddsC,
+              priceSource: "quote",
+              capBound: null,
+            },
+          },
+        };
+      }
+    }
+  }
+
+  if (topUp.onA !== null) {
+    const oddsC = oddsOf(topUp.onA);
+    if (canHelp(legB, legA, oddsC)) {
+      const sol = solveTopUpOnSecond(legB, legA, oddsC, p);
+      if (sol !== null && sol.stakeTop.gt(0) && sol.profit.gt(0) && (winner === null || sol.profit.gt(winner.guaranteedProfit) || (sol.profit.equals(winner.guaranteedProfit) && winner !== plain && sol.total.lt(winner.totalStaked)))) {
+        winner = {
+          legA: {
+            stake: sol.stakeSecond,
+            payout: sol.payoutSecond,
+            oddsDecimal: legA.odds,
+            priceSource: legA.priceSource,
+            capBound: capBoundOf(legA, sol.stakeSecond),
+          },
+          legB: {
+            stake: sol.stakeFirst,
+            payout: sol.payoutFirst,
+            oddsDecimal: legB.odds,
+            priceSource: legB.priceSource,
+            capBound: capBoundOf(legB, sol.stakeFirst),
+          },
+          totalStaked: sol.total,
+          netIfAWins: sol.payoutSecond.plus(sol.payoutTop).minus(sol.total),
+          netIfBWins: sol.payoutFirst.minus(sol.total),
+          guaranteedProfit: sol.profit,
+          roiPct: roiOf(sol.profit, sol.total),
+          topUp: {
+            side: "A",
+            leg: {
+              stake: sol.stakeTop,
+              payout: sol.payoutTop,
+              oddsDecimal: oddsC,
+              priceSource: "quote",
+              capBound: null,
+            },
+          },
+        };
+      }
+    }
+  }
+
+  return winner;
 }
