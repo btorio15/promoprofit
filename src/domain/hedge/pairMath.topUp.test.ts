@@ -18,7 +18,7 @@ import {
   type OracleBoostLeg,
 } from "./pairMath.oracle";
 
-const D = (v: string | number) => new Decimal(v);
+const D = (v: Decimal.Value) => new Decimal(v);
 
 function derived(base: number, pct: number, max: number, minOdds: number | null = -200): BoostLegInput {
   return {

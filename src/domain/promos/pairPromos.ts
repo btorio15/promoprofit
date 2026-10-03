@@ -2,13 +2,14 @@ import Decimal from "decimal.js";
 import { americanToDecimal } from "@/domain/hedge/americanOdds";
 import {
   solveBoostBonusPair,
-  solveBoostBoostPair,
+  solveBoostBoostPairWithTopUp,
   type BonusLegInput,
   type BoostLegInput,
   type PairResult,
 } from "@/domain/hedge/pairMath";
 import { decimalToAmericanDisplay, effectiveBoostedDecimal } from "@/domain/hedge/profitBoost";
 import {
+  bestHedgeQuote,
   candidatesFor,
   passesBaseMinOdds,
   type PromoOpportunity,
@@ -45,6 +46,11 @@ export interface PairCandidate<P extends RankablePromo = RankablePromo> {
   baseOddsAAmerican: number | null;
   baseOddsBAmerican: number | null;
   result: PairResult;
+  /**
+   * Boost + boost only: the ordinary top-up bet on one leg's side, at the best
+   * hedge-book quote for that side. selection is that leg's own selection.
+   */
+  topUp?: { side: "A" | "B"; selection: ResolvedSelection; bookKey: string; oddsAmerican: number } | null;
   separateProfitA: Decimal;
   separateProfitB: Decimal;
   /** pair profit minus the two promos hedged separately. */
@@ -194,6 +200,26 @@ function lineOfKey(marketKey: string): Decimal {
   return new Decimal(k === "ml" ? 0 : k);
 }
 
+/** The chosen top-up bet's book and quote, or null when the result has no top-up. */
+function topUpOf<P extends RankablePromo>(
+  result: PairResult,
+  legA: LegOption<P>,
+  legB: LegOption<P>,
+  quoteOnA: SelectionQuote | null,
+  quoteOnB: SelectionQuote | null,
+): PairCandidate<P>["topUp"] {
+  if (!result.topUp) return null;
+  const onA = result.topUp.side === "A";
+  const quote = onA ? quoteOnA : quoteOnB;
+  if (!quote) return null;
+  return {
+    side: result.topUp.side,
+    selection: onA ? legA.selection : legB.selection,
+    bookKey: quote.bookKey,
+    oddsAmerican: quote.oddsAmerican,
+  };
+}
+
 /** Better = higher profit, then commence asc, eventId, market, line, side, lower ids. */
 function isBetterCandidate(a: PairCandidate, b: PairCandidate | null): boolean {
   if (!b) return true;
@@ -267,13 +293,32 @@ export function findPairCandidates<P extends RankablePromo>(
             const boostA = legA.boost!;
             const one = new LocalDecimal(1);
             let bound: Decimal;
+            let quoteOnA: SelectionQuote | null = null;
+            let quoteOnB: SelectionQuote | null = null;
             if (kind === "boost_boost") {
-              if (one.dividedBy(legA.oddsDecimal).plus(one.dividedBy(legB.oddsDecimal)).gte(1)) continue;
               const boostB = legB.boost!;
-              bound = Decimal.min(
-                new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)),
-                new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)),
-              );
+              quoteOnA = bestHedgeQuote(legA.selection.promoSideQuotes, opts.hedgeBookKeys);
+              quoteOnB = bestHedgeQuote(legB.selection.promoSideQuotes, opts.hedgeBookKeys);
+              const invA = one.dividedBy(legA.oddsDecimal);
+              const invB = one.dividedBy(legB.oddsDecimal);
+              const invCOnA = quoteOnA ? one.dividedBy(americanToDecimal(quoteOnA.oddsAmerican)) : null;
+              const invCOnB = quoteOnB ? one.dividedBy(americanToDecimal(quoteOnB.oddsAmerican)) : null;
+              // A top-up on a side can help only when promo + max(other boost, top-up) odds form an arb.
+              const helpsOnB = invCOnB !== null && invA.plus(Decimal.min(invB, invCOnB)).lt(1);
+              const helpsOnA = invCOnA !== null && invB.plus(Decimal.min(invA, invCOnA)).lt(1);
+              if (invA.plus(invB).gte(1) && !helpsOnB && !helpsOnA) continue;
+              // Guaranteed profit <= the profit when a given promo side wins. With a top-up
+              // on B's side, A-wins net <= maxA*(OA-1) (B and C stakes only reduce it); with
+              // none it is also capped by B-wins net <= maxB*(OB-1). Mirror for A's side.
+              const bounds = [
+                Decimal.min(
+                  new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)),
+                  new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)),
+                ),
+              ];
+              if (quoteOnB) bounds.push(new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)));
+              if (quoteOnA) bounds.push(new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)));
+              bound = Decimal.max(...bounds);
             } else {
               const winIfBonus = new LocalDecimal(legB.bonus!.bonusAmount).times(legB.oddsDecimal.minus(1));
               bound = Decimal.min(winIfBonus, new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)));
@@ -284,7 +329,15 @@ export function findPairCandidates<P extends RankablePromo>(
             try {
               result =
                 kind === "boost_boost"
-                  ? solveBoostBoostPair(boostA, legB.boost!, opts.precision)
+                  ? solveBoostBoostPairWithTopUp(
+                      boostA,
+                      legB.boost!,
+                      {
+                        onA: quoteOnA ? { oddsAmerican: quoteOnA.oddsAmerican } : null,
+                        onB: quoteOnB ? { oddsAmerican: quoteOnB.oddsAmerican } : null,
+                      },
+                      opts.precision,
+                    )
                   : solveBoostBonusPair(boostA, legB.bonus!, opts.precision);
             } catch (err) {
               if (err instanceof RangeError) {
@@ -308,6 +361,7 @@ export function findPairCandidates<P extends RankablePromo>(
               baseOddsAAmerican: legA.baseOddsAmerican,
               baseOddsBAmerican: legB.baseOddsAmerican,
               result,
+              topUp: topUpOf(result, legA, legB, quoteOnA, quoteOnB),
               separateProfitA: singleA,
               separateProfitB: singleB,
               gain: result.guaranteedProfit.minus(singleSum),

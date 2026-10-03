@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
-import { rankPromoHedges, type RankablePromo, type RankOptions } from "./rankPromoHedges";
+import { solveBoostBoostPairWithTopUp } from "@/domain/hedge/pairMath";
+import { rankPromoHedges,type RankablePromo, type RankOptions } from "./rankPromoHedges";
 import type { ResolvedSelection } from "./selection";
 import type { PromoScope } from "./scope";
 import {
@@ -549,5 +550,128 @@ describe("selectPairs: exact non-conflicting choice (D-10)", () => {
 
   it("empty input -> empty output", () => {
     expect(selectPairs([])).toEqual([]);
+  });
+});
+
+describe("findPairCandidates: boost + boost with an ordinary top-up bet", () => {
+  // Owner case: DK 50% boost (cap $20) on away +154, FD 30% boost (cap $10) on home -172.
+  const ownerEvent = moneylineEvent({
+    id: "e1",
+    quotes: [
+      { bookKey: "draftkings", homePrice: -250, awayPrice: 154 },
+      { bookKey: "fanduel", homePrice: -172, awayPrice: -250 },
+      { bookKey: "betrivers", homePrice: -165, awayPrice: 100 },
+    ],
+  });
+  const dk = boostPromo({
+    id: 36,
+    bookKey: "draftkings",
+    boostPercent: "50",
+    maxStake: "20",
+    minOddsAmerican: -200,
+  });
+  const fd = boostPromo({
+    id: 39,
+    bookKey: "fanduel",
+    boostPercent: "30",
+    maxStake: "10",
+    minOddsAmerican: -200,
+  });
+
+  function ownerOpts(hedgeBooks: string[]) {
+    return {
+      ...optsFor([ownerEvent], ["draftkings", "fanduel"]),
+      hedgeBookKeys: new Set(hedgeBooks),
+    };
+  }
+
+  it("owner fixture: one top-up pair on B's side at the best hedge book, beating the singles", () => {
+    const opts = ownerOpts(["draftkings", "fanduel", "betrivers"]);
+    const singles = singleProfitMap(rankPromoHedges([dk, fd], opts));
+    const singleSum = (singles.get(36) ?? new Decimal(0)).plus(singles.get(39) ?? new Decimal(0));
+    const found = findPairCandidates([dk, fd], singles, opts);
+    expect(found).toHaveLength(1);
+    const c = found[0];
+    expect(c.kind).toBe("boost_boost");
+    expect(c.result.topUp?.side).toBe("B");
+    expect(c.topUp?.side).toBe("B");
+    expect(c.topUp?.bookKey).toBe("betrivers");
+    expect(c.topUp?.oddsAmerican).toBe(-165);
+    expect(c.result.guaranteedProfit.gt(singleSum)).toBe(true);
+    expect(c.gain.equals(c.result.guaranteedProfit.minus(singleSum))).toBe(true);
+  });
+
+  it("no hedge book quotes either side -> no candidate (2-bet pair is dropped by D-08)", () => {
+    const opts = ownerOpts(["nobook"]);
+    const singles = new Map<number, Decimal>([
+      [36, new Decimal("4.33")],
+      [39, new Decimal("0.85")],
+    ]);
+    expect(findPairCandidates([dk, fd], singles, opts)).toEqual([]);
+  });
+
+  it("D-08: a top-up pair that does not beat the singles is dropped", () => {
+    const opts = ownerOpts(["draftkings", "fanduel", "betrivers"]);
+    const singles = new Map<number, Decimal>([
+      [36, new Decimal("50")],
+      [39, new Decimal("50")],
+    ]);
+    expect(findPairCandidates([dk, fd], singles, opts)).toEqual([]);
+  });
+
+  it("bound safety: no profitable top-up pair is ever pruned (seeded fixtures)", () => {
+    let state = 12345;
+    const rnd = (n: number) => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state % n;
+    };
+    for (let i = 0; i < 60; i += 1) {
+      const awayDk = [110, 130, 154, 180][rnd(4)];
+      const homeFd = [-190, -172, -150, -130][rnd(4)];
+      const homeHedge = [-165, -140, -120][rnd(3)];
+      const capA = 10 + rnd(30);
+      const capB = 5 + rnd(20);
+      const event = moneylineEvent({
+        id: "e1",
+        quotes: [
+          { bookKey: "draftkings", homePrice: -250, awayPrice: awayDk },
+          { bookKey: "fanduel", homePrice: homeFd, awayPrice: -250 },
+          { bookKey: "betrivers", homePrice: homeHedge, awayPrice: 100 },
+        ],
+      });
+      const a = boostPromo({ id: 1, bookKey: "draftkings", boostPercent: "50", maxStake: String(capA), minOddsAmerican: -200 });
+      const b = boostPromo({ id: 2, bookKey: "fanduel", boostPercent: "30", maxStake: String(capB), minOddsAmerican: -200 });
+      const opts = {
+        ...optsFor([event], ["draftkings", "fanduel"]),
+        hedgeBookKeys: new Set(["draftkings", "fanduel", "betrivers"]),
+      };
+      const singles = singleProfitMap(rankPromoHedges([a, b], opts));
+      const singleSum = (singles.get(1) ?? new Decimal(0)).plus(singles.get(2) ?? new Decimal(0));
+      const direct = solveBoostBoostPairWithTopUp(
+        {
+          boostedOddsAmerican: null,
+          baseOddsAmerican: awayDk,
+          boostPercent: new Decimal(50),
+          maxStake: new Decimal(capA),
+          winningsCap: null,
+          minOddsAmerican: -200,
+        },
+        {
+          boostedOddsAmerican: null,
+          baseOddsAmerican: homeFd,
+          boostPercent: new Decimal(30),
+          maxStake: new Decimal(capB),
+          winningsCap: null,
+          minOddsAmerican: -200,
+        },
+        { onA: { oddsAmerican: awayDk }, onB: { oddsAmerican: Math.max(homeHedge, homeFd) } },
+        "cents",
+      );
+      const found = findPairCandidates([a, b], singles, opts);
+      if (direct && direct.guaranteedProfit.gt(singleSum)) {
+        expect(found).toHaveLength(1);
+        expect(found[0].result.guaranteedProfit.gte(direct.guaranteedProfit)).toBe(true);
+      }
+    }
   });
 });
