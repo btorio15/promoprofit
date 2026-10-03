@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: v1.0 shipped — next milestone not started
 Plan: —
 Status: Milestone v1.0 complete (2026-10-02)
-Last activity: 2026-10-02 — Milestone v1.0 completed and archived
+Last activity: 2026-10-03 - Completed quick task 261003-fxf: three-bet boost pairs
 
 ## Performance Metrics
 
@@ -136,6 +136,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
+- 2-bet pair solver can be 1¢ short of optimal at whole-dollar stakes (oracle $16.00 vs $15.99, found in 261003-fxf tests) — `.planning/todos/pending/2026-10-03-two-bet-pair-solver-rounding.md`
 - Stats overhaul (ui) — `.planning/todos/pending/2026-09-30-stats-overhaul.md`
 
 ### Blockers/Concerns
@@ -181,6 +182,7 @@ Recent decisions affecting current work:
 | fast | Visible rename PromoProfit → MarginMind (repo/cookie/storage/DB names unchanged); live at betmargin.vercel.app | 2026-10-01 | f134e57 | ✅ | - |
 | 261001-jbc | "Refresh promos" status-bar button replaces "Spreads & alt lines": h2h+spreads+totals only for sports with active promos, alt lines for each promo's best game, cost confirm; partial-sport cache commit keeps other sports + per-row price age | 2026-10-01 | f5cb5af | Needs Review | [261001-jbc-refresh-promos-button-spreads-totals-for](./quick/261001-jbc-refresh-promos-button-spreads-totals-for/) |
 | 261002-dqn | Flag button on every active scraped promo (incl. human-confirmed/corrected), member-added still refused; flagged row returns to Needs a look | 2026-10-02 | ee7cbe7 |  | [261002-dqn-allow-flagging-any-active-scraped-promo](./quick/261002-dqn-allow-flagging-any-active-scraped-promo/) |
+| 261003-fxf | Three-bet boost pairs: ordinary top-up hedge on the short side lets the bigger-cap boost use its full stake (owner case $5.20 whole / $5.43 cents vs $5.18 singles); third leg shown + snapshotted | 2026-10-03 | ce56985 | Needs Review | [261003-fxf-three-bet-boost-pairs-with-ordinary-top-](./quick/261003-fxf-three-bet-boost-pairs-with-ordinary-top-/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
