@@ -7,6 +7,7 @@ import {
   PairMemberSnapshotSchema,
   buildPairSnapshot,
   isSamePairDisplay,
+  toDonePairDTO,
 } from "./pairSnapshot";
 
 const row: PairRowDTO = {
@@ -122,6 +123,76 @@ describe("buildPairSnapshot", () => {
     expect(built.member.profitExtracted).toBe("0.00");
     expect(built.member.snapshot).toEqual({ version: 1, kind: "pair_member", pairedWithPromoId: 1 });
     expect(PairMemberSnapshotSchema.safeParse(built.member.snapshot).success).toBe(true);
+  });
+});
+
+describe("three-bet pair (quick-261003-fxf)", () => {
+  const legC = {
+    side: "B" as const,
+    bookKey: "betrivers",
+    bookName: "BetRivers",
+    selectionLabel: "Home Team",
+    oddsAmerican: -165,
+    stake: "30.76",
+    payout: "49.99",
+    note: "Ordinary bet (no promo): tops up the Home Team side so the bigger boost can use its full cap.",
+  };
+  const ctx = {
+    now: new Date("2026-09-29T15:00:00.000Z"),
+    precision: "cents" as const,
+    oddsFetchedAt: { moneyline: null, spreadsTotals: null },
+  };
+  const three = buildPairSnapshot(
+    { row: { ...row, legC }, termsA: termsFor(1, "draftkings"), termsB: termsFor(2, "fanduel") },
+    ctx,
+  );
+
+  it("buildPairSnapshot copies legC and the snapshot parses", () => {
+    expect(three.primary.snapshot.row.legC).toEqual(legC);
+    expect(DonePairSnapshotSchema.safeParse(JSON.parse(JSON.stringify(three.primary.snapshot))).success).toBe(true);
+  });
+
+  it("toDonePairDTO exposes legC", () => {
+    const dto = toDonePairDTO(three.primary.snapshot);
+    expect(dto.legC).toEqual({
+      side: "B",
+      bookName: "BetRivers",
+      selectionLabel: "Home Team",
+      oddsAmerican: -165,
+      stake: "30.76",
+      payout: "49.99",
+    });
+  });
+
+  it("an old stored 2-leg snapshot (no legC key) still parses and gives legC null", () => {
+    const old = JSON.parse(
+      JSON.stringify(
+        buildPairSnapshot({ row, termsA: termsFor(1, "draftkings"), termsB: termsFor(2, "fanduel") }, ctx).primary
+          .snapshot,
+      ),
+    );
+    expect("legC" in old.row).toBe(false);
+    const parsed = DonePairSnapshotSchema.safeParse(old);
+    expect(parsed.success).toBe(true);
+    expect(toDonePairDTO(parsed.data!).legC).toBeNull();
+  });
+
+  it("isSamePairDisplay compares the third stake", () => {
+    const current = { ...row, legC };
+    const base = { profit: "22.73", stakeA: "50.00", stakeB: "50.00" };
+    expect(isSamePairDisplay({ ...base, stakeC: "30.76" }, current)).toBe(true);
+    expect(isSamePairDisplay({ ...base, stakeC: "30.75" }, current)).toBe(false);
+    expect(isSamePairDisplay(base, current)).toBe(false);
+    // No top-up: absent or "0.00" expected stakeC matches.
+    expect(isSamePairDisplay(base, row)).toBe(true);
+    expect(isSamePairDisplay({ ...base, stakeC: "0.00" }, row)).toBe(true);
+    expect(isSamePairDisplay({ ...base, stakeC: "5.00" }, row)).toBe(false);
+  });
+
+  it("MarkPairDoneInputSchema accepts an optional expectedStakeC and still rejects unknown keys", () => {
+    expect(MarkPairDoneInputSchema.safeParse({ ...validInput, expectedStakeC: "30.76" }).success).toBe(true);
+    expect(MarkPairDoneInputSchema.safeParse({ ...validInput, expectedStakeC: "30.7" }).success).toBe(false);
+    expect(MarkPairDoneInputSchema.safeParse({ ...validInput, expectedStakeD: "1.00" }).success).toBe(false);
   });
 });
 

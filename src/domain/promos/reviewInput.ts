@@ -52,6 +52,7 @@ export const MarkPairDoneInputSchema = z
     expectedGuaranteedProfit: Money2dp,
     expectedStakeA: Money2dp,
     expectedStakeB: Money2dp,
+    expectedStakeC: Money2dp.optional(),
   })
   .refine((v) => v.promoIdA !== v.promoIdB);
 

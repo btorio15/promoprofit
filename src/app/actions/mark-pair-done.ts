@@ -28,7 +28,8 @@ export async function markPairDoneAction(input: unknown): Promise<MarkPairDoneRe
     return { status: "invalid" };
   }
 
-  const { promoIdA, promoIdB, precision, expectedGuaranteedProfit, expectedStakeA, expectedStakeB } = parsed.data;
+  const { promoIdA, promoIdB, precision, expectedGuaranteedProfit, expectedStakeA, expectedStakeB, expectedStakeC } =
+    parsed.data;
   const now = new Date();
 
   const state = await computeMemberPairState({ userId: user.userId, promoIdA, promoIdB, precision, now });
@@ -40,7 +41,10 @@ export async function markPairDoneAction(input: unknown): Promise<MarkPairDoneRe
     return { status: "not_found", message: "One of these promos is no longer active." };
   }
 
-  const expected = { profit: expectedGuaranteedProfit, stakeA: expectedStakeA, stakeB: expectedStakeB };
+  const expected = { profit: expectedGuaranteedProfit, stakeA: expectedStakeA,
+    stakeB: expectedStakeB,
+    stakeC: expectedStakeC,
+  };
   if (state.row === null || !isSamePairDisplay(expected, state.row)) {
     return {
       status: "odds_changed",

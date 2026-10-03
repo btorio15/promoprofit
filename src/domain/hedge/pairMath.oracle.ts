@@ -86,6 +86,40 @@ export function bruteForceBoostBoost(
   return { profit: new Decimal(best).dividedBy(100) };
 }
 
+/**
+ * Whole-dollar scan for boost A + boost B + an ordinary top-up bet C on B's
+ * side: sa in [1, maxA], sb in [1, maxB], sc in [0, scMax]. Integer cents
+ * throughout; C pays floor_cents(sc * ocDecimal). Profit only.
+ */
+export function bruteForceTopUpOnB(
+  a: OracleBoostLeg,
+  b: OracleBoostLeg,
+  ocDecimal: Decimal,
+  scMax: number,
+): { profit: Decimal } | null {
+  const unit = new Decimal(1);
+  const ga = gridPayoutsCents(a, unit);
+  const gb = gridPayoutsCents(b, unit);
+  if (ga.stakes.length === 0 || gb.stakes.length === 0) return null;
+
+  const pcs: number[] = [];
+  for (let sc = 0; sc <= scMax; sc += 1) {
+    pcs.push(floorCents(new Decimal(sc).times(ocDecimal)).times(100).toNumber());
+  }
+
+  let best = -Infinity;
+  for (let i = 0; i < ga.stakes.length; i += 1) {
+    for (let j = 0; j < gb.stakes.length; j += 1) {
+      for (let sc = 0; sc <= scMax; sc += 1) {
+        const total = ga.stakes[i] + gb.stakes[j] + sc * 100;
+        const p = Math.min(ga.payouts[i], gb.payouts[j] + pcs[sc]) - total;
+        if (p > best) best = p;
+      }
+    }
+  }
+  return { profit: new Decimal(best).dividedBy(100) };
+}
+
 /** Boost stake scan for boost + bonus bet; bonusWinPayout is the (already floored) bonus win W. */
 export function bruteForceBoostBonus(
   boost: OracleBoostLeg,

@@ -143,4 +143,42 @@ describe("toPairRowDTO", () => {
     const dto = toPairRowDTO(forced, bookNames);
     expect(dto.legA.capNote).toContain("Capped at DraftKings's $50.00 max stake");
   });
+
+  it("a 2-bet pair has legC null", () => {
+    const dto = toPairRowDTO(candidate([base(1, "draftkings"), bonus(2, "fanduel")]), bookNames);
+    expect(dto.legC).toBeNull();
+  });
+
+  it("a top-up candidate maps legC with 2-dp money and the third stake in the total", () => {
+    const c = candidate([base(1, "draftkings"), base(2, "fanduel")]);
+    const topUpLeg = {
+      stake: new Decimal("30.76"),
+      payout: new Decimal("48.63"),
+      oddsDecimal: new Decimal("1.5814"),
+      priceSource: "quote" as const,
+      capBound: null,
+    };
+    const forced: PairCandidate<PresentablePromo> = {
+      ...c,
+      result: {
+        ...c.result,
+        totalStaked: c.result.totalStaked.plus(topUpLeg.stake),
+        topUp: { side: "B", leg: topUpLeg },
+      },
+      topUp: { side: "B", selection: c.selectionB, bookKey: "fanduel", oddsAmerican: -172 },
+    };
+    const dto = toPairRowDTO(forced, bookNames);
+    expect(dto.legC).toEqual({
+      side: "B",
+      bookKey: "fanduel",
+      bookName: "FanDuel",
+      selectionLabel: expect.any(String),
+      oddsAmerican: -172,
+      stake: "30.76",
+      payout: "48.63",
+      note: expect.stringContaining("Ordinary bet (no promo)"),
+    });
+    expect(dto.totalStaked).toBe(forced.result.totalStaked.toFixed(2));
+    expect(dto.legC?.note).toContain(dto.legC!.selectionLabel);
+  });
 });

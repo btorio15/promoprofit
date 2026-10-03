@@ -74,7 +74,7 @@ const MARKET_ORDER: Record<PromoMarketType, number> = { moneyline: 0, spread: 1,
 const SIDE_ORDER: Record<PromoSide, number> = { home: 0, away: 1, over: 2, under: 3 };
 
 /** Highest-decimal-odds quote among hedgeBookKeys; ties broken alphabetically by bookKey (copied from rankBonusBetHedges.ts's bestHedgeQuote). */
-function bestHedgeQuote(quotes: SelectionQuote[], hedgeBookKeys: ReadonlySet<string>): SelectionQuote | null {
+export function bestHedgeQuote(quotes: SelectionQuote[], hedgeBookKeys: ReadonlySet<string>): SelectionQuote | null {
   const candidates = quotes.filter((q) => hedgeBookKeys.has(q.bookKey));
   if (candidates.length === 0) return null;
 

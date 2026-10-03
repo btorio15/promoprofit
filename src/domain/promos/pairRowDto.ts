@@ -31,6 +31,18 @@ export interface PairLegDTO {
   bonusNote: string | null;
 }
 
+/** quick-261003-fxf: the ordinary (no promo) third bet that tops up one side of a boost + boost pair. */
+export interface PairTopUpLegDTO {
+  side: "A" | "B";
+  bookKey: string;
+  bookName: string;
+  selectionLabel: string;
+  oddsAmerican: number;
+  stake: string;
+  payout: string;
+  note: string;
+}
+
 export interface PairRowDTO {
   rowKey: string;
   promoIdA: number;
@@ -45,6 +57,8 @@ export interface PairRowDTO {
   tieRisk: boolean;
   legA: PairLegDTO;
   legB: PairLegDTO;
+  /** Optional third bet (boost + boost only); null/absent for a plain 2-bet pair. */
+  legC?: PairTopUpLegDTO | null;
   totalStaked: string;
   netIfAWins: string;
   netIfBWins: string;
@@ -85,6 +99,26 @@ function toLegDTO(
   };
 }
 
+function toTopUpLegDTO<P extends PresentablePromo>(
+  c: PairCandidate<P>,
+  bookNames: Map<string, string>,
+): PairTopUpLegDTO | null {
+  const topUp = c.topUp ?? null;
+  const leg = c.result.topUp?.leg;
+  if (!topUp || !leg) return null;
+  const label = selectionLabel(topUp.selection.marketType, topUp.selection.sideSelection, topUp.selection.sidePoint);
+  return {
+    side: topUp.side,
+    bookKey: topUp.bookKey,
+    bookName: bookNames.get(topUp.bookKey) ?? topUp.bookKey,
+    selectionLabel: label,
+    oddsAmerican: topUp.oddsAmerican,
+    stake: leg.stake.toFixed(2),
+    payout: leg.payout.toFixed(2),
+    note: `Ordinary bet (no promo): tops up the ${label} side so the bigger boost can use its full cap.`,
+  };
+}
+
 export function toPairRowDTO<P extends PresentablePromo>(
   c: PairCandidate<P>,
   bookNames: Map<string, string>,
@@ -105,6 +139,7 @@ export function toPairRowDTO<P extends PresentablePromo>(
     tieRisk: selectionA.tieRisk || c.selectionB.tieRisk,
     legA: toLegDTO(c.promoA, c.selectionA, c.oddsAAmerican, c.baseOddsAAmerican, result.legA, bookNames),
     legB: toLegDTO(c.promoB, c.selectionB, c.oddsBAmerican, c.baseOddsBAmerican, result.legB, bookNames),
+    legC: toTopUpLegDTO(c, bookNames),
     totalStaked: result.totalStaked.toFixed(2),
     netIfAWins: result.netIfAWins.toFixed(2),
     netIfBWins: result.netIfBWins.toFixed(2),

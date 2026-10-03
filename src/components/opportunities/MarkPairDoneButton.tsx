@@ -27,6 +27,8 @@ export interface MarkPairDoneButtonProps {
   expectedGuaranteedProfit: string;
   expectedStakeA: string;
   expectedStakeB: string;
+  /** Third (ordinary top-up) bet stake, only when the pair has one. */
+  expectedStakeC?: string;
   onChanged: () => void;
 }
 
@@ -55,6 +57,7 @@ export function MarkPairDoneButton(props: MarkPairDoneButtonProps) {
         expectedGuaranteedProfit: props.expectedGuaranteedProfit,
         expectedStakeA: props.expectedStakeA,
         expectedStakeB: props.expectedStakeB,
+        ...(props.expectedStakeC !== undefined ? { expectedStakeC: props.expectedStakeC } : {}),
       }), "markPairDoneAction");
       if (!call.ok) {
         setOpen(false);

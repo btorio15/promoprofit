@@ -78,6 +78,18 @@ export function DonePairRow({ row, onChanged }: DonePairRowProps) {
           </span>
           <LegLine leg={pair.legA} />
           <LegLine leg={pair.legB} />
+          {pair.legC ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
+              <span>{pair.legC.bookName}</span>
+              <Badge variant="outline">Ordinary bet</Badge>
+              <span>
+                {pair.legC.selectionLabel} <span className="num">{formatAmerican(pair.legC.oddsAmerican)}</span>
+              </span>
+              <span className="text-muted-foreground">
+                - stake <span className="num text-foreground">{formatUsd(pair.legC.stake)}</span>
+              </span>
+            </div>
+          ) : null}
           <span className="text-sm text-muted-foreground">Marked done {formatKickoff(row.completedAt)}</span>
         </div>
         <div className="flex items-center gap-3">
