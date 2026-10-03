@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-10-03T18:06:05Z",
+  "phase": null,
+  "phase_name": "v1.0 shipped; next milestone not started",
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "v1.0", "name": "Milestone v1.0 closed, archived, tagged, pushed", "status": "done", "commit": "32b36e8"},
+    {"id": "261002-dqn", "name": "Flag any active scraped promo", "status": "done", "commit": "d46dc4e"},
+    {"id": "261003-fxf", "name": "Three-bet boost pairs (ordinary top-up)", "status": "done_needs_review", "commit": "be3a925"}
+  ],
+  "remaining_tasks": [
+    {"id": "review-261003-fxf", "name": "Live check: DK 50% + FD 30% NCAAF three-bet pair on Opportunities, mark done shows 3 legs", "status": "not_started"},
+    {"id": "review-others", "name": "Needs Review live checks: 261001-jbc Refresh promos, 261001-dhn Your cap, 261001-e1j odds age, older 260928/260929 items", "status": "not_started"},
+    {"id": "todo-rounding", "name": "2-bet pair solver 1c rounding (.planning/todos/pending/2026-10-03-two-bet-pair-solver-rounding.md)", "status": "not_started"},
+    {"id": "next-milestone", "name": "/gsd-new-milestone: stats overhaul + profit graph (todo), admin page (backlog 999.1)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Renew GitHub fine-grained dispatch token (Vercel GH_DISPATCH_TOKEN) before ~2026-12-30", "blocking": false},
+    {"action": "Change password (leaked to an old local dev log on 2026-09-30); clear phone history for old 10.201.x.x addresses", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Live at https://betmargin.vercel.app; Vercel project marginmind; repo stays btorio15/promoprofit; auto-deploy on push to main; migrations manual with owner OK", "phase": "05.1"},
+    {"decision": "Daily scrape: Vercel Cron 13:17 UTC -> GitHub workflow_dispatch; GitHub backup 15:37 UTC skips if every book scraped today (GitHub schedule unreliable)", "phase": "05.1"}
+  ],
+  "uncommitted_files": [".planning/config.json", ".planning/phases/01.1-arbitrage-tab/.gitkeep (untracked)", ".planning/phases/05.1-*/.gitkeep (untracked)"],
+  "next_action": "Owner live-checks the three-bet pair; then /gsd-new-milestone (stats overhaul + admin page).",
+  "context_notes": "Owner prefers plain-English explanations, push only on explicit OK (each push deploys production), GSD workflow for all code changes. Local .env.local has CRON_SECRET and APP_URL=https://betmargin.vercel.app; invite links via npm run invite:create print live URLs."
+}
