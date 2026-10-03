@@ -2,6 +2,7 @@
 created: 2026-09-30T19:21:55.865Z
 title: Stats overhaul
 area: ui
+resolves_phase: 7
 files:
   - src/components/promos/ProfitSummary.tsx
   - src/domain/promos/profitTotals.ts
