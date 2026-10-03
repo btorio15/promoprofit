@@ -134,6 +134,8 @@ Recent decisions affecting current work:
 - [Phase 02]: Plan 09: All navigation hrefs added (header wordmark, settings back-link, save-success link) are the hard-coded literal "/" -- no query-param or user-controlled redirect target -- closing the open-redirect threat (T-02-G8) at the source
 - [Phase 02]: Plan 09: Owner completed the live click-through approving steps 1-6 (header wordmark link, settings back-link, save-success link, book-change reflected on main page); closed DASH-02 as Phase 2's last outstanding must-have
 
+- 2026-10-03 (debug three-bet-pairs-not-showing): owner kept the pair rule — a pair shows only when it beats the two promos hedged separately, ranked by guaranteed dollars (not return on cash).
+
 ### Pending Todos
 
 - 2-bet pair solver can be 1¢ short of optimal at whole-dollar stakes (oracle $16.00 vs $15.99, found in 261003-fxf tests) — `.planning/todos/pending/2026-10-03-two-bet-pair-solver-rounding.md`
@@ -182,7 +184,7 @@ Recent decisions affecting current work:
 | fast | Visible rename PromoProfit → MarginMind (repo/cookie/storage/DB names unchanged); live at betmargin.vercel.app | 2026-10-01 | f134e57 | ✅ | - |
 | 261001-jbc | "Refresh promos" status-bar button replaces "Spreads & alt lines": h2h+spreads+totals only for sports with active promos, alt lines for each promo's best game, cost confirm; partial-sport cache commit keeps other sports + per-row price age | 2026-10-01 | f5cb5af | Needs Review | [261001-jbc-refresh-promos-button-spreads-totals-for](./quick/261001-jbc-refresh-promos-button-spreads-totals-for/) |
 | 261002-dqn | Flag button on every active scraped promo (incl. human-confirmed/corrected), member-added still refused; flagged row returns to Needs a look | 2026-10-02 | ee7cbe7 |  | [261002-dqn-allow-flagging-any-active-scraped-promo](./quick/261002-dqn-allow-flagging-any-active-scraped-promo/) |
-| 261003-fxf | Three-bet boost pairs: ordinary top-up hedge on the short side lets the bigger-cap boost use its full stake (owner case $5.20 whole / $5.43 cents vs $5.18 singles); third leg shown + snapshotted | 2026-10-03 | ce56985 | Needs Review | [261003-fxf-three-bet-boost-pairs-with-ordinary-top-](./quick/261003-fxf-three-bet-boost-pairs-with-ordinary-top-/) |
+| 261003-fxf | Three-bet boost pairs: ordinary top-up hedge on the short side lets the bigger-cap boost use its full stake (owner case $5.20 whole / $5.43 cents vs $5.18 singles); third leg shown + snapshotted | 2026-10-03 | ce56985 | Needs Review (live 10-03: pair correctly hidden — singles $9.86 beat pair $5.57; 3-leg display not yet seen live) | [261003-fxf-three-bet-boost-pairs-with-ordinary-top-](./quick/261003-fxf-three-bet-boost-pairs-with-ordinary-top-/) |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 
@@ -202,8 +204,8 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-10-02:
 ## Session Continuity
 
 Last session: 2026-10-03T18:06:06.186Z
-Stopped at: Paused after v1.0 close + quick tasks 261002-dqn, 261003-fxf (pushed, be3a925)
-Resume file: .planning/.continue-here.md
+Stopped at: Session resumed 2026-10-03; debug three-bet-pairs-not-showing closed (no defect, rule kept)
+Resume file: None
 
 ## Operator Next Steps
 
