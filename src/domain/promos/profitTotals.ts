@@ -87,23 +87,18 @@ export interface PeriodStartDates {
 }
 
 /**
- * Calendar-arithmetic period starts derived from denverDate(now), using
- * Date.UTC on the DATE STRING (never local-time Date methods, which would
- * reintroduce the machine's own timezone). Weeks start Monday: a Sunday
- * steps back 6 days; any other weekday steps back to its own Monday.
+ * Rolling period starts derived from denverDate(now), using Date.UTC on the
+ * DATE STRING (never local-time Date methods, which would reintroduce the
+ * machine's own timezone). "Last 7 days" and "Last 30 days" both include
+ * today: weekStart is today minus 6 days, monthStart is today minus 29 days
+ * (Date.UTC normalizes day underflow across month/year boundaries).
  */
 export function periodStartDates(now: Date): PeriodStartDates {
   const today = denverDate(now);
   const [year, month, day] = today.split("-").map((n) => parseInt(n, 10));
 
-  const asUtcDate = new Date(Date.UTC(year, month - 1, day));
-  const weekday = asUtcDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ...
-  const daysSinceMonday = weekday === 0 ? 6 : weekday - 1;
-
-  const weekStartDate = new Date(Date.UTC(year, month - 1, day - daysSinceMonday));
-  const weekStart = toDateString(weekStartDate);
-
-  const monthStart = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-01`;
+  const weekStart = toDateString(new Date(Date.UTC(year, month - 1, day - 6)));
+  const monthStart = toDateString(new Date(Date.UTC(year, month - 1, day - 29)));
 
   return { today, weekStart, monthStart };
 }

@@ -107,30 +107,27 @@ describe("denverDate (America/Denver, DST-safe via Intl)", () => {
   });
 });
 
-describe("periodStartDates (Monday-start week, America/Denver)", () => {
-  it("Sunday 2026-09-27 local -> week 2026-09-21, month 2026-09-01", () => {
-    // 2026-09-27 is a Sunday; noon local (18:00Z in MDT, UTC-6) is safely mid-day.
+describe("periodStartDates (rolling last 7 / last 30 days incl. today, America/Denver)", () => {
+  it("Sun 2026-09-27 -> last 7 days from 2026-09-21, last 30 days from 2026-08-29", () => {
+    // noon local (18:00Z in MDT, UTC-6) is safely mid-day.
     const now = new Date("2026-09-27T18:00:00Z");
-    expect(periodStartDates(now)).toEqual({ today: "2026-09-27", weekStart: "2026-09-21", monthStart: "2026-09-01" });
+    expect(periodStartDates(now)).toEqual({ today: "2026-09-27", weekStart: "2026-09-21", monthStart: "2026-08-29" });
   });
 
-  it("Monday -> week start is itself", () => {
-    // 2026-09-28 is a Monday.
+  it("ignores weekday: Mon 2026-09-28 -> 2026-09-22 / 2026-08-30", () => {
     const now = new Date("2026-09-28T18:00:00Z");
-    expect(periodStartDates(now)).toEqual({ today: "2026-09-28", weekStart: "2026-09-28", monthStart: "2026-09-01" });
+    expect(periodStartDates(now)).toEqual({ today: "2026-09-28", weekStart: "2026-09-22", monthStart: "2026-08-30" });
   });
 
-  it("a week spanning a month boundary: Thu 2026-10-01 -> week 2026-09-28, month 2026-10-01", () => {
-    const now = new Date("2026-10-01T18:00:00Z");
-    expect(periodStartDates(now)).toEqual({ today: "2026-10-01", weekStart: "2026-09-28", monthStart: "2026-10-01" });
+  it("crosses month and year boundaries: Fri 2027-01-01 -> 2026-12-26 / 2026-12-03", () => {
+    const now = new Date("2027-01-01T19:00:00Z");
+    expect(periodStartDates(now)).toEqual({ today: "2027-01-01", weekStart: "2026-12-26", monthStart: "2026-12-03" });
   });
 
-  it("an instant at 05:00Z on the 1st that is still the prior month in Denver -> prior month's start", () => {
-    // 2026-10-01T05:00:00Z is 2026-09-30 23:00 MDT (UTC-6) -- still September in Denver.
+  it("an instant at 05:00Z on the 1st that is still the prior day in Denver counts from the Denver day", () => {
+    // 2026-10-01T05:00:00Z is 2026-09-30 23:00 MDT (UTC-6).
     const now = new Date("2026-10-01T05:00:00Z");
-    const result = periodStartDates(now);
-    expect(result.today).toBe("2026-09-30");
-    expect(result.monthStart).toBe("2026-09-01");
+    expect(periodStartDates(now)).toEqual({ today: "2026-09-30", weekStart: "2026-09-24", monthStart: "2026-09-01" });
   });
 });
 
@@ -159,17 +156,17 @@ describe("summarizeAvailableProfit (owner decision 3: per-period dedupe/max)", (
     expect(result).toEqual({ today: "0.00", week: "0.00", month: "0.00" });
   });
 
-  it("includes a week day that falls before the month start in the week total, but excludes it from month", () => {
-    // week start 2026-09-21 (Monday) is within September, so construct a
-    // scenario using a week that spans the month boundary instead: anchor
-    // "now" to Thu 2026-10-01 (week start 2026-09-28, month start 2026-10-01).
-    const octNow = new Date("2026-10-01T18:00:00Z");
+  it("rolling edges: 7 days back counts in 7-day and 30-day, 8 days back only in 30-day, 30 days back in neither", () => {
+    // now = Sun 2026-09-27: last 7 days from 2026-09-21, last 30 days from 2026-08-29.
     const observations: ProfitObservation[] = [
-      { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-29", maxGuaranteedProfit: "7.00" },
+      { promoId: 1, bookKey: "draftkings", denverDate: "2026-09-21", maxGuaranteedProfit: "7.00" },
+      { promoId: 2, bookKey: "draftkings", denverDate: "2026-09-20", maxGuaranteedProfit: "2.00" },
+      { promoId: 3, bookKey: "draftkings", denverDate: "2026-08-29", maxGuaranteedProfit: "1.00" },
+      { promoId: 4, bookKey: "draftkings", denverDate: "2026-08-28", maxGuaranteedProfit: "50.00" },
     ];
-    const result = summarizeAvailableProfit(observations, ownBooks, octNow, new Set());
+    const result = summarizeAvailableProfit(observations, ownBooks, now, new Set());
     expect(result.week).toBe("7.00");
-    expect(result.month).toBe("0.00");
+    expect(result.month).toBe("10.00");
   });
 
   it("returns 0.00 for today/week/month when observations is empty", () => {

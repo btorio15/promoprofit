@@ -36,16 +36,16 @@ export function ProfitSummary({ totalProfit, totalExtracted, availableProfit }: 
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-border pt-4">
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-muted-foreground">This week</span>
+          <span className="text-sm text-muted-foreground">Last 7 days</span>
           <span className="num text-lg font-medium">{formatUsd(availableProfit.week)}</span>
         </div>
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-muted-foreground">This month</span>
+          <span className="text-sm text-muted-foreground">Last 30 days</span>
           <span className="num text-lg font-medium">{formatUsd(availableProfit.month)}</span>
         </div>
       </div>
       <span className="text-sm text-muted-foreground">
-        Best guaranteed profit seen per promo, at your books (Mountain Time; weeks start Monday)
+        Best guaranteed profit seen per promo, at your books (Mountain Time days, including today)
       </span>
     </div>
   );
