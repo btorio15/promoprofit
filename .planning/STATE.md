@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-03T18:30:07.757Z"
 last_activity: 2026-10-03
 progress:
-  total_phases: 0
+  total_phases: 2
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Milestone v1.1 Profit Stats — defining requirements
+**Current focus:** Phase 6 — Profit Graph (milestone v1.1 Profit Stats)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 6 of 7 (Profit Graph) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-03 — Milestone v1.1 started
+Status: Roadmap created, ready to plan Phase 6
+Last activity: 2026-10-03 — v1.1 roadmap created (Phases 6-7)
 
 ## Performance Metrics
 
@@ -209,4 +209,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Plan Phase 6 with /gsd-plan-phase 6

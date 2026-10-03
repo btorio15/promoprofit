@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MarginMind v1.0** — Phases 1, 01.1, 2, 3, 4, 5, 05.1 (shipped 2026-10-02) — full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
-- 📋 **Next milestone** — not yet defined (start with `/gsd-new-milestone`)
+- 🚧 **v1.1 Profit Stats** — Phases 6–7 (in progress)
 
 ## Phases
 
@@ -20,11 +20,46 @@
 
 </details>
 
+### 🚧 v1.1 Profit Stats (In Progress)
+
+**Milestone goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
+
+- [ ] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page
+- [ ] **Phase 7: Stats Page** - Stats page in main navigation with the same graph, headline totals, and counts; profit summary leaves the Promos tab
+
+## Phase Details
+
+### Phase 6: Profit Graph
+**Goal**: A member sees, at the top of the Opportunities page, how much profit was available at their books over time next to how much they personally extracted
+**Depends on**: Nothing (builds on v1.0 `promo_profit_observations` and `promo_completions`; no schema change)
+**Requirements**: STATS-01, STATS-02, STATS-03, STATS-04, STATS-05, STATS-06
+**Success Criteria** (what must be TRUE):
+  1. Member opens the Opportunities page and sees a cumulative graph at the top with a grey line (profit available at their books, each promo counted once at its best observed guaranteed profit on the Denver day first seen) and a green line (profit they personally extracted via Mark done, by Denver day of completion)
+  2. Member can switch the graph between Last 7 days, Last 30 days, and All time, and the lines redraw for that range
+  3. Hovering or tapping a day shows that date with both running totals, exact to the cent
+  4. On a phone the graph fits the screen and is usable by touch; a member with no history sees a short "nothing yet" message instead of an empty chart
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 7: Stats Page
+**Goal**: A member can open a dedicated Stats page that shows the graph plus headline totals and simple counts, and the Promos tab no longer carries the profit summary
+**Depends on**: Phase 6
+**Requirements**: STATS-07, STATS-08, STATS-09, STATS-10
+**Success Criteria** (what must be TRUE):
+  1. Member opens Stats from the main navigation and sees the same graph and range picker as on the Opportunities page
+  2. Stats page shows headline totals: total profit extracted, total profit available, last 7 days, and last 30 days, exact to the cent
+  3. Stats page shows promos completed, average profit per completed promo, and best single promo
+  4. Promos tab no longer shows the profit summary; those numbers appear only on the Stats page
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
-| Milestone | Phases | Plans | Status | Shipped |
-|-----------|--------|-------|--------|---------|
-| v1.0 | 7 | 61 | Complete | 2026-10-02 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
+| 6. Profit Graph | v1.1 | 0/0 | Not started | - |
+| 7. Stats Page | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
 

@@ -47,16 +47,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STATS-01 | — | Pending |
-| STATS-02 | — | Pending |
-| STATS-03 | — | Pending |
-| STATS-04 | — | Pending |
-| STATS-05 | — | Pending |
-| STATS-06 | — | Pending |
-| STATS-07 | — | Pending |
-| STATS-08 | — | Pending |
-| STATS-09 | — | Pending |
-| STATS-10 | — | Pending |
+| STATS-01 | Phase 6 | Pending |
+| STATS-02 | Phase 6 | Pending |
+| STATS-03 | Phase 6 | Pending |
+| STATS-04 | Phase 6 | Pending |
+| STATS-05 | Phase 6 | Pending |
+| STATS-06 | Phase 6 | Pending |
+| STATS-07 | Phase 7 | Pending |
+| STATS-08 | Phase 7 | Pending |
+| STATS-09 | Phase 7 | Pending |
+| STATS-10 | Phase 7 | Pending |
 
 ---
 *Requirements defined: 2026-10-03*
+*Roadmap created: 2026-10-03 (10/10 mapped)*
