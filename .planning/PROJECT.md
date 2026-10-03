@@ -8,9 +8,16 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Shipped:** v1.0 "MarginMind" on 2026-10-02 — live at https://betmargin.vercel.app (Vercel Hobby, auto-deploy on push to main; repo btorio15/promoprofit). Daily promo scrape via Vercel Cron → GitHub Actions (~7 AM MT) with a GitHub backup. Archive: `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`.
 
-## Next Milestone Goals
+## Current Milestone: v1.1 Profit Stats
 
-Not yet defined — start with `/gsd-new-milestone`. Candidates already captured: stats overhaul + profit graph (`.planning/todos/pending/2026-09-30-stats-overhaul.md`), admin page (ROADMAP backlog 999.1). Watch: GitHub dispatch token expires ~2026-12-30.
+**Goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
+
+**Target features:**
+- Two-line cumulative profit graph at the top of Opportunities (home): grey = profit available at the member's books (each promo counted once at its best observed profit), green = profit the member personally extracted (Mark done); 7 days / 30 days / All time picker
+- New Stats page: same graph and picker, plus headline totals (total extracted, total available, last 7 days, last 30 days) and simple counts (promos completed, average profit per promo, best single promo)
+- Profit summary moves off the Promos tab to the Stats page
+
+**Key context:** own numbers only (no group totals or leaderboard), no per-book/type/sport breakdowns. Both lines come from data already stored (`promo_profit_observations` since 2026-09-27; `promo_completions`) — no schema change expected. Undo of Mark done deletes the completion, so undone promos leave no green-line history. Admin page stays in backlog (999.1).
 
 ## Core Value
 
@@ -36,7 +43,9 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 ### Active
 
-(none — all v1.0 requirements validated; next milestone not yet defined)
+- [ ] Cumulative profit graph (available vs extracted) on Opportunities, with time range picker
+- [ ] Stats page: graph, headline totals, simple counts
+- [ ] Profit summary moved from Promos tab to Stats page
 
 ### Out of Scope
 
@@ -109,4 +118,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-02 after v1.0 milestone close*
+*Last updated: 2026-10-03 after starting milestone v1.1 Profit Stats*

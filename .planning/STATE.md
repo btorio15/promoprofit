@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: "audit cleanup: PROMO-03, integration W1)"
-status: completed
-stopped_at: Paused after v1.0 close + quick tasks 261002-dqn, 261003-fxf (pushed, be3a925)
-last_updated: "2026-10-03T18:06:06.198Z"
-last_activity: "2026-10-03 - Completed quick task 261003-fxf: three-bet boost pairs"
+milestone: v1.1
+milestone_name: Profit Stats
+status: planning
+last_updated: "2026-10-03T18:30:07.757Z"
+last_activity: 2026-10-03
 progress:
-  total_phases: 8
-  completed_phases: 7
-  total_plans: 61
-  completed_plans: 61
-  percent: 88
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 999.1 — admin page
+**Current focus:** Milestone v1.1 Profit Stats — defining requirements
 
 ## Current Position
 
-Phase: v1.0 shipped — next milestone not started
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone v1.0 complete (2026-10-02)
-Last activity: 2026-10-03 - Completed quick task 261003-fxf: three-bet boost pairs
+Status: Defining requirements
+Last activity: 2026-10-03 — Milestone v1.1 started
 
 ## Performance Metrics
 
