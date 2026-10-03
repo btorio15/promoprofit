@@ -35,7 +35,7 @@
 |---------|--------|
 | History for undone promos | Undoing Mark done deletes the completion row by design; the green line reflects only current completions |
 | Other members' numbers | Owner chose own-numbers-only for privacy within the group |
-| New stored data / schema change | Both lines derive from existing `promo_profit_observations` (since 2026-09-27) and `promo_completions` |
+| Estimated history before the graph start day | Owner chose exact data only (Phase 6 D-04/D-18): grey reads only the new per-member table, so both lines start on its first day |
 
 ## Constraints carried forward
 

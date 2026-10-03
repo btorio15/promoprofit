@@ -2,7 +2,7 @@
 phase: 6
 slug: profit-graph
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-10-03
 ---
@@ -36,15 +36,28 @@ created: 2026-10-03
 
 ## Per-Task Verification Map
 
-Filled by the planner per task. Requirement → test mapping from RESEARCH.md:
+One row per plan task, taken from each task's `<verify><automated>` command. "❌ W0" means the test file does not exist yet and is created by that task (RED first where the plan says so).
 
-| Requirement | Behavior | Test Type | Automated Command | File Exists | Status |
-|-------------|----------|-----------|-------------------|-------------|--------|
-| STATS-02 | each promo once at best value on first-seen Denver day; member rows beat group rows; fallback filtered to own books; pair shares sum exactly | unit (table-driven) | `npx vitest run src/domain/promos/profitSeries.test.ts` | ❌ W0 | ⬜ pending |
-| STATS-02 | member recorder writes singles + pair shares, positive only, never throws | unit (mock db) | `npx vitest run src/db/memberObservations.test.ts` | ❌ W0 | ⬜ pending |
-| STATS-03 | completions bucketed by Denver day incl. DST edges, legacy "0.00" | unit | `npx vitest run src/domain/promos/profitSeries.test.ts` | ❌ W0 | ⬜ pending |
-| STATS-04 | 7d/30d/all slices start at $0; All time clamped to 2026-09-27; rolling Denver days | unit | `npx vitest run src/domain/promos/profitSeries.test.ts` | ❌ W0 | ⬜ pending |
-| STATS-01/05/06 | response carries series in every ok branch; empty series → empty state; readout strings exact to the cent | unit/component | `npx vitest run src/app/actions/get-opportunities.test.ts` | ✅ (needs update) | ⬜ pending |
+| Task ID | Plan | Wave | Requirement | Threat Ref | Test Type | Automated Command | File Exists | Status |
+|---------|------|------|-------------|------------|-----------|-------------------|-------------|--------|
+| 06-01-1 | 06-01 | 1 | STATS-02/03/04 | T-06-02 | unit (RED: series tests fail, totals pass) | `npx vitest run src/domain/promos/profitTotals.test.ts` passes and `npx vitest run src/domain/promos/profitSeries.test.ts` fails (module missing) | ✅ profitTotals / ❌ W0 profitSeries (created here) | ⬜ pending |
+| 06-01-2 | 06-01 | 1 | STATS-02/03/04 | T-06-01, T-06-02, T-06-03 | unit (table-driven, GREEN) | `npx vitest run src/domain/promos/profitSeries.test.ts src/domain/promos/profitTotals.test.ts && npm run typecheck` | ❌ W0 (from 06-01-1) | ⬜ pending |
+| 06-02-1 | 06-02 | 1 | STATS-02 | T-06-05, T-06-06 | unit | `npx vitest run src/domain/promos/memberFeed.test.ts` | ❌ W0 (created here) | ⬜ pending |
+| 06-02-2 | 06-02 | 1 | STATS-02 | T-06-04 | unit (exact pair-share sum) | `npx vitest run src/domain/promos/memberObservationEntries.test.ts && npm run typecheck` | ❌ W0 (created here) | ⬜ pending |
+| 06-03-1 | 06-03 | 1 | STATS-02 | T-06-09 | schema/migration file check | `npm run typecheck && test -f drizzle/0012_member_profit_observations.sql && grep -c "CREATE TABLE \"member_profit_observations\"" drizzle/0012_member_profit_observations.sql` | n/a (generated) | ⬜ pending |
+| 06-03-2 | 06-03 | 1 | STATS-02 | T-06-07, T-06-08, T-06-10, T-06-11 | unit (mock db, toSQL) | `npx vitest run src/db/memberObservations.test.ts src/db/promoCaps.test.ts && npm run typecheck` | ❌ W0 memberObservations (created here) / ✅ promoCaps | ⬜ pending |
+| 06-04-1 | 06-04 | 2 | STATS-01/02/03 | T-06-13, T-06-14 | unit | `npx vitest run src/db` | ✅ (06-03 tests) | ⬜ pending |
+| 06-04-2 | 06-04 | 2 | STATS-01/02/03 | T-06-12, T-06-13, T-06-14, T-06-15 | unit (action, mocked DB) | `npx vitest run src/app/actions/get-opportunities.test.ts && npm run typecheck && npm run lint` | ✅ (updated here) | ⬜ pending |
+| 06-05-1 | 06-05 | 2 | STATS-05/06 | T-06-SC | registry check + blocking owner gate | `npm view recharts@3.10.1 version` | n/a | ⬜ pending |
+| 06-05-2 | 06-05 | 2 | STATS-04/05/06 | T-06-16, T-06-18 | unit (view model, exact cents and copy) | `npx vitest run src/components/opportunities/profitGraphView.test.ts src/lib/persistentState.test.ts && npm run typecheck` | ❌ W0 profitGraphView (created here) / ✅ persistentState | ⬜ pending |
+| 06-05-3 | 06-05 | 2 | STATS-05/06 | T-06-17, T-06-18 | typecheck + lint + component-folder tests + grep gates | `npm run typecheck && npm run lint && npx vitest run src/components/opportunities src/ingestion/promos/boundary.test.ts` | ✅ (from 06-05-2) | ⬜ pending |
+| 06-06-1 | 06-06 | 2 | STATS-02 | T-06-19, T-06-20, T-06-21, T-06-22 | unit | `npx vitest run src/ingestion/odds/morningObserve.test.ts src/ingestion/promos/boundary.test.ts && npm run typecheck` | ✅ (updated here) | ⬜ pending |
+| 06-06-2 | 06-06 | 2 | STATS-02 | T-06-21 | typecheck + boundary | `npm run typecheck && npx vitest run src/ingestion/promos/boundary.test.ts` | ✅ | ⬜ pending |
+| 06-07-1 | 06-07 | 3 | STATS-01/04/05/06 | T-06-26 | full suite | `npm test && npm run typecheck && npm run lint` | ✅ | ⬜ pending |
+| 06-07-2 | 06-07 | 3 | STATS-02 | T-06-23, T-06-25 | blocking owner checkpoint + read-only query | read-only `select count(*) from member_profit_observations` succeeds after owner OK | n/a | ⬜ pending |
+| 06-07-3 | 06-07 | 3 | STATS-02/05/06 | T-06-24 | manual phone check + read-only query | read-only query of today's owner rows in `member_profit_observations` (see Manual-Only below) | n/a | ⬜ pending |
+
+Requirement coverage (from RESEARCH.md): STATS-02 → 06-01, 06-02, 06-03, 06-04, 06-06; STATS-03 → 06-01, 06-04; STATS-04 → 06-01, 06-05; STATS-01/05/06 → 06-04, 06-05, 06-07.
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,9 +65,12 @@ Filled by the planner per task. Requirement → test mapping from RESEARCH.md:
 
 ## Wave 0 Requirements
 
-- [ ] `src/domain/promos/profitSeries.test.ts` — series math stubs for STATS-02/03/04
-- [ ] `src/db/memberObservations.test.ts` — recorder stubs for STATS-02
-- [ ] `src/app/actions/get-opportunities.test.ts` — update mocks for new DB calls + response field
+- [ ] `src/domain/promos/profitSeries.test.ts` — series math for STATS-02/03/04 (created RED in 06-01-1)
+- [ ] `src/domain/promos/memberFeed.test.ts` — shared member feed helper (06-02-1)
+- [ ] `src/domain/promos/memberObservationEntries.test.ts` — exact pair shares (06-02-2)
+- [ ] `src/db/memberObservations.test.ts` — recorder/read for STATS-02 (06-03-2)
+- [ ] `src/components/opportunities/profitGraphView.test.ts` — graph view model, exact cents and copy (06-05-2)
+- [ ] `src/app/actions/get-opportunities.test.ts` — update mocks for new DB calls + response field (06-04-2)
 
 Framework install: none (Vitest present).
 
@@ -71,11 +87,11 @@ Framework install: none (Vitest present).
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 60s
+- [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending

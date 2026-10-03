@@ -323,11 +323,14 @@ const shareB = new Decimal(pair.guaranteedProfit).minus(shareA);
 | A4 | recharts package safe (slopcheck could not check npm) | Package Audit | Low (11-year-old well-known package); gated behind a human-verify checkpoint |
 | A5 | Pair completions store primary + member `profit_extracted` that sum to the pair profit | Pattern 2 | Green would double or half count pairs; verify in `mark-pair-done.ts` first |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the owner accept the fallback days' approximation?** Past days (09-27 to ship day) show group-level, singles-only, full-stake numbers. Recommendation: yes, with a short footnote or caption under the graph ("Before Oct N, available profit is estimated at each promo's full max stake"), since past odds are gone. Cap-raise cases (user 2) are the worst offender.
+   - RESOLVED: owner chose no group fallback; the graph starts when the member table starts (CONTEXT D-04 revised, D-18). No estimate caption.
 2. **Record on Promos-tab loads too?** `getPromos` also calls `recordCurrentProfitObservations`. It computes pairs only in Opportunities; recording member rows only from `getOpportunities` plus the morning job is enough. Recommendation: Opportunities and the morning job only.
+   - RESOLVED: Opportunities and the morning job only (Plans 04, 06).
 3. **Whether to clamp** grey up to green on a day for legacy rows. Recommendation: no (honest data, no invention).
+   - RESOLVED: no clamp.
 
 ## Environment Availability
 
