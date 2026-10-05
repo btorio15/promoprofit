@@ -4,8 +4,8 @@ milestone: v1.1
 milestone_name: Profit Stats
 status: executing
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-03T19:36:56.717Z"
-last_activity: 2026-10-03 -- Phase 6 planning complete
+last_updated: "2026-10-05T06:26:56.982Z"
+last_activity: 2026-10-05 -- Phase 06 execution started
 progress:
   total_phases: 3
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 6 — Profit Graph (milestone v1.1 Profit Stats)
+**Current focus:** Phase 06 — profit-graph
 
 ## Current Position
 
-Phase: 6 of 7 (Profit Graph) — not started
-Plan: —
-Status: Ready to execute
-Last activity: 2026-10-03 -- Phase 6 planning complete
+Phase: 06 (profit-graph) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 06
+Last activity: 2026-10-05 -- Phase 06 execution started
 
 ## Performance Metrics
 
