@@ -10,6 +10,13 @@
 # Manual and Vercel-dispatched runs are never skipped. Manual dispatch is
 # still available.
 #
+# 2026-10-06 (debug dk-mlb-choice-boost-missed): two afternoon promo-only
+# passes (18:37 and 22:37 UTC, about 12:37 / 4:37 PM MDT) catch promos books
+# post after the morning scrape -- a DraftKings "choice of 2 MLB games" 50%
+# boost was missed for a whole day because it went up after 9:42 AM ET.
+# These passes ALWAYS scrape (no already-ran-today skip) and NEVER run the
+# odds observe step, so they spend zero Odds API credits.
+#
 # Installs no browser -- all target books are render_mode "http" (D-09), so
 # the scrape step is a plain `npm ci` + one Node script writing straight to
 # the shared Neon Postgres DB and spends zero Odds API credits.
@@ -25,6 +32,8 @@ name: Scrape promos
 on:
   schedule:
     - cron: "37 15 * * *"
+    - cron: "37 18 * * *"
+    - cron: "37 22 * * *"
   workflow_dispatch:
     inputs:
       force_morning_observe:
@@ -56,7 +65,7 @@ jobs:
       - run: npm ci
       - id: today
         name: Check whether today's morning run already happened
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' && github.event.schedule == '37 15 * * *'
         timeout-minutes: 2
         run: npm run scrape:already-ran-today
         env:
@@ -76,7 +85,9 @@ jobs:
       # quick-260927-ov2: runs even when the scrape step above fails (a
       # flaky/all-excluded book must not block the once-daily moneyline
       # refresh), but not when the run is cancelled.
-      - if: ${{ !cancelled() && github.event.inputs.skip_morning_observe != 'true' && (github.event_name != 'schedule' || steps.today.outputs.observe_done != 'true') }}
+      # Afternoon promo-only passes (any schedule other than the 15:37 backup)
+      # never run this step.
+      - if: ${{ !cancelled() && github.event.inputs.skip_morning_observe != 'true' && (github.event_name != 'schedule' || (github.event.schedule == '37 15 * * *' && steps.today.outputs.observe_done != 'true')) }}
         run: npm run odds:morning-observe -- ${{ github.event.inputs.force_morning_observe == 'true' && '--force' || '' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
