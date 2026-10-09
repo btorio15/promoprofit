@@ -20,13 +20,22 @@ export function isPlausibleTeamName(name: string): boolean {
   return trimmed.length > 0 && trimmed.length <= MAX_TEAM_NAME_CHARS && !NON_TEAM_CHARS_RE.test(trimmed);
 }
 
+/** A league/sport label a book appends after the team ("Georgia @ Alabama College Football game"). */
+const TRAILING_SPORT_RE =
+  /\s+(?:college\s+football|college\s+basketball|ncaaf|ncaab|cfb|nfl|mlb|nhl|nba|wnba|football|baseball|hockey|basketball)$/i;
+
+export function stripTrailingSport(name: string): string {
+  const stripped = name.replace(TRAILING_SPORT_RE, "").trim();
+  return stripped.length > 0 ? stripped : name;
+}
+
 export function splitTeams(scopeText: string): [string, string] | null {
   for (const delimiter of TEAM_DELIMITERS) {
     const index = scopeText.indexOf(delimiter);
     if (index === -1) continue;
 
-    const first = scopeText.slice(0, index).trim();
-    const second = scopeText.slice(index + delimiter.length).trim();
+    const first = stripTrailingSport(scopeText.slice(0, index).trim());
+    const second = stripTrailingSport(scopeText.slice(index + delimiter.length).trim());
     if (isPlausibleTeamName(first) && isPlausibleTeamName(second)) {
       return [first, second];
     }

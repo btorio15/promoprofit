@@ -375,3 +375,32 @@ describe("fanduelScraper -- 'on the <team> @ <team> NFL Game on <date>' scope (S
     expect(promo.windowStart).not.toBeNull();
   });
 });
+
+describe("fanduelScraper -- '<team> @ <team> College Football Game on <date>' scope (Georgia @ Alabama, 2026-10-08)", () => {
+  it("drops the two-word sport label from the home team", () => {
+    const expires = "2026-10-11T04:00:00.000Z";
+    const list = JSON.stringify({
+      promoPlacements: [
+        {
+          placementId: "SBK_PROMOHUB",
+          promotions: [
+            {
+              promoCode: "LOBMOCPBT1008",
+              title: "College Football BMOC Profit Boost",
+              name: "Get a 50% Profit Boost Token to use on ANY wager for the Georgia @ Alabama College Football Game on October 10th, 2026!",
+              tags: ["american-football", "ncaaf"],
+              combinedEndDate: expires,
+            },
+          ],
+        },
+      ],
+    });
+    const result = fanduelScraper.parse(
+      { listBody: list, detailBodies: {} },
+      { now: new Date("2026-10-08T23:33:15Z"), sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions" },
+    );
+    const promo = result.candidates[0];
+    expect(promo.teamsText).toEqual(["Georgia", "Alabama"]);
+    expect(promo.windowStart).not.toBeNull();
+  });
+});

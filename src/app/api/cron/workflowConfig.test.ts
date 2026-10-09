@@ -14,11 +14,20 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
   const lines = text.split("\n").filter((l) => !l.trim().startsWith("#"));
   const code = lines.join("\n");
 
-  it("has exactly one schedule, 37 15 * * *", () => {
+  it("has the 15:37 backup plus the 18:37 and 22:37 promo-only passes (debug dk-mlb-choice-boost-missed)", () => {
     const crons = lines.filter((l) => /^\s*-\s*cron:/.test(l));
-    expect(crons).toHaveLength(1);
+    expect(crons).toHaveLength(3);
     expect(crons[0]).toContain("37 15 * * *");
+    expect(crons[1]).toContain("37 18 * * *");
+    expect(crons[2]).toContain("37 22 * * *");
     expect(code).not.toContain("7 14,18,23");
+  });
+
+  it("runs the already-ran check and the odds observe only on the 15:37 backup, never the afternoon passes", () => {
+    const checkGate = lines.find((l) => l.includes("github.event_name == 'schedule' &&"));
+    const observeGate = lines.find((l) => l.includes("steps.today.outputs.observe_done != 'true'"));
+    expect(checkGate).toContain("github.event.schedule == '37 15 * * *'");
+    expect(observeGate).toContain("github.event.schedule == '37 15 * * *'");
   });
 
   it("declares skip_morning_observe and the observe step honours it (WR-01 duplicate cron guard)", () => {

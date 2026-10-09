@@ -426,6 +426,51 @@ describe("matchPromo", () => {
     expect(result.signals.marketMatch).toBe(false);
   });
 
+  describe("college school names that prefix several teams (Georgia @ Alabama, 2026-10-08)", () => {
+    const CFB_NOW = new Date("2026-10-08T23:33:15Z");
+    const cfb = (id: string, home: string, away: string, commence: string) =>
+      baseEvent({ id, sport_key: NCAAF, home_team: home, away_team: away, commence_time: commence });
+    const georgiaAlabama = cfb("evt-uga-bama", "Alabama Crimson Tide", "Georgia Bulldogs", "2026-10-10T23:30:00Z");
+    const georgiaTech = cfb("evt-gt", "Georgia Tech Yellow Jackets", "Duke Blue Devils", "2026-10-10T19:30:00Z");
+    const georgiaSouthern = cfb("evt-gs", "Georgia Southern Eagles", "James Madison Dukes", "2026-10-10T23:30:00Z");
+    const dkParsed = baseParsed({
+      bookKey: "draftkings",
+      sportKeyHint: null,
+      teamsText: ["Georgia", "Alabama"],
+      windowStart: "2026-10-10T04:00:00.000Z",
+      windowEnd: "2026-10-11T03:59:59.999Z",
+    });
+
+    it("matches 'Georgia' to the only Georgia team that actually plays Alabama", () => {
+      const events = { moneyline: [georgiaAlabama, georgiaTech, georgiaSouthern], extended: [] as OddsEvent[] };
+      const result = record(matchPromo(dkParsed, events, { now: CFB_NOW }));
+
+      expect(result.status).toBe("matched");
+      if (result.status !== "matched") throw new Error("unreachable");
+      expect(result.scope).toMatchObject({ kind: "event", eventId: "evt-uga-bama", homeTeam: "Alabama Crimson Tide", awayTeam: "Georgia Bulldogs" });
+    });
+
+    it("still fails as ambiguous when two different Georgia teams play Alabama in the window", () => {
+      const rematch = cfb("evt-gt-bama", "Alabama Crimson Tide", "Georgia Tech Yellow Jackets", "2026-10-10T19:30:00Z");
+      const events = { moneyline: [georgiaAlabama, georgiaTech, georgiaSouthern, rematch], extended: [] as OddsEvent[] };
+      const result = record(matchPromo(dkParsed, events, { now: CFB_NOW }));
+
+      expect(result.status).toBe("unmatched");
+      if (result.status !== "unmatched") throw new Error("unreachable");
+      expect(result.unresolvedTeamTexts).toEqual(["Georgia"]);
+    });
+
+    it("never narrows when the other side names no known team", () => {
+      const parsed = { ...dkParsed, teamsText: ["Georgia", "Alabama College Football"] };
+      const events = { moneyline: [georgiaAlabama, georgiaTech, georgiaSouthern], extended: [] as OddsEvent[] };
+      const result = record(matchPromo(parsed, events, { now: CFB_NOW }));
+
+      expect(result.status).toBe("unmatched");
+      if (result.status !== "unmatched") throw new Error("unreachable");
+      expect(result.unresolvedTeamTexts).toEqual(["Georgia", "Alabama College Football"]);
+    });
+  });
+
   it("invariant: status is 'matched' if and only if every signal is true, across every fixture above", () => {
     expect(allResults.length).toBeGreaterThan(0);
     for (const result of allResults) {

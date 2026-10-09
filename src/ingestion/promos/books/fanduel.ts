@@ -22,7 +22,7 @@ import {
 } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromTags, sportFromText } from "@/ingestion/promos/sportHints";
-import { isPlausibleTeamName, splitTeams } from "@/ingestion/promos/promoText";
+import { isPlausibleTeamName, splitTeams, stripTrailingSport } from "@/ingestion/promos/promoText";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
 const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
@@ -319,8 +319,8 @@ function parseGameScope(text: string): FanduelGameScope | null {
   }
   if (!best) return null;
 
-  const away = best[1].trim();
-  const home = best[2].trim();
+  const away = stripTrailingSport(best[1].trim());
+  const home = stripTrailingSport(best[2].trim());
   const dateText = best[3].trim();
   if (!isPlausibleTeamName(away) || !isPlausibleTeamName(home)) return null;
 

@@ -77,6 +77,47 @@ function eventMatchesTeamPair(e: OddsEvent, teamA: string, teamB: string): boole
   return names.size === 2 && names.has(teamA) && names.has(teamB);
 }
 
+/**
+ * College school names ("Georgia") prefix-match several teams ("Georgia
+ * Bulldogs", "Georgia Tech Yellow Jackets", "Georgia Southern Eagles"). When
+ * either side is ambiguous, keep only the team pairs that actually meet in a
+ * cached game (inside the promo's window when it has a valid one). Exactly one
+ * surviving pair resolves both sides; anything else leaves both lists as they
+ * were, so the caller still fails it as ambiguous -- this never guesses.
+ */
+function narrowByOpponent(
+  resolvedA: string[],
+  resolvedB: string[],
+  pool: readonly OddsEvent[],
+  windowInfo: ReturnType<typeof computeWindowValidity>,
+): { resolvedA: string[]; resolvedB: string[] } {
+  const unchanged = { resolvedA, resolvedB };
+  if (resolvedA.length === 0 || resolvedB.length === 0) return unchanged;
+  if (resolvedA.length === 1 && resolvedB.length === 1) return unchanged;
+
+  const inWindow = (e: OddsEvent) => {
+    if (!(windowInfo.given && windowInfo.valid)) return true;
+    const c = new Date(e.commence_time).getTime();
+    return c >= windowInfo.start!.getTime() && c <= windowInfo.end!.getTime();
+  };
+
+  const pairs = new Set<string>();
+  let found: [string, string] | null = null;
+  for (const e of pool) {
+    if (!inWindow(e)) continue;
+    for (const a of resolvedA) {
+      for (const b of resolvedB) {
+        if (eventMatchesTeamPair(e, a, b)) {
+          pairs.add(`${a}\u0000${b}`);
+          found = [a, b];
+        }
+      }
+    }
+  }
+  if (pairs.size !== 1 || found === null) return unchanged;
+  return { resolvedA: [found[0]], resolvedB: [found[1]] };
+}
+
 function earliestByCommence(events: readonly OddsEvent[]): OddsEvent {
   return [...events].sort(
     (a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime(),
@@ -201,8 +242,13 @@ function matchGameNamed(
   const knownTeams = knownTeamsFromPool(pool);
 
   const [textA, textB] = parsed.teamsText;
-  const resolvedA = resolveTeam(textA, knownTeams, parsed.sportKeyHint);
-  const resolvedB = resolveTeam(textB, knownTeams, parsed.sportKeyHint);
+  const windowInfo = computeWindowValidity(parsed.windowStart, parsed.windowEnd, now, windowDaysMs);
+  const { resolvedA, resolvedB } = narrowByOpponent(
+    resolveTeam(textA, knownTeams, parsed.sportKeyHint),
+    resolveTeam(textB, knownTeams, parsed.sportKeyHint),
+    pool,
+    windowInfo,
+  );
 
   const unresolvedTeamTexts: string[] = [];
   if (resolvedA.length !== 1) unresolvedTeamTexts.push(textA);
@@ -222,7 +268,6 @@ function matchGameNamed(
   const candidateEvents = pool.filter((e) => eventMatchesTeamPair(e, teamA, teamB));
   const teamMatch = candidateEvents.length > 0;
 
-  const windowInfo = computeWindowValidity(parsed.windowStart, parsed.windowEnd, now, windowDaysMs);
   let filteredCandidates = candidateEvents;
   if (windowInfo.given && windowInfo.valid) {
     const startMs = windowInfo.start!.getTime();

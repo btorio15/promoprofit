@@ -20,6 +20,11 @@ describe("splitTeams", () => {
     expect(splitTeams(sentence)).toBeNull();
   });
 
+  it("drops a trailing sport label from a team name (FanDuel 'Georgia @ Alabama College Football')", () => {
+    expect(splitTeams("Georgia @ Alabama College Football")).toEqual(["Georgia", "Alabama"]);
+    expect(splitTeams("Steelers @ Browns NFL")).toEqual(["Steelers", "Browns"]);
+  });
+
   it("returns null for sport-wide scope text with no named game", () => {
     expect(splitTeams("any WNBA playoff game")).toBeNull();
   });
