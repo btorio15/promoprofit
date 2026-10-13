@@ -8,13 +8,16 @@ vi.mock("@/db/queries", () => ({
   getExtendedOddsFreshness: vi.fn(),
 }));
 
-vi.mock("./store", () => ({
+vi.mock("./store", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./store")>()),
   getLatestCreditUsage: vi.fn(),
+  getLatestCreditUsageByKey: vi.fn(),
   getSpendAttribution: vi.fn(),
 }));
 
 import { getExtendedOddsFreshness, getOddsFreshness } from "@/db/queries";
-import { getLatestCreditUsage, getSpendAttribution } from "./store";
+import { getLatestCreditUsage, getLatestCreditUsageByKey, getSpendAttribution, type CreditUsageRow } from "./store";
+import { keyFingerprint } from "./oddsKeys";
 import { getOddsStatus } from "./status";
 
 const mockGetOddsFreshness = vi.mocked(getOddsFreshness);
@@ -27,6 +30,9 @@ const EXTENDED_MARKET_COUNT = 3;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("ODDS_API_KEY", "");
+  vi.stubEnv("ODDS_API_KEYS", "");
+  vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({ keyColumn: false });
   mockGetExtendedOddsFreshness.mockResolvedValue(null);
   mockGetSpendAttribution.mockResolvedValue(null);
 });
@@ -217,5 +223,82 @@ describe("getOddsStatus", () => {
     const status = await getOddsStatus(NOW);
 
     expect(status.oddsRefreshedBy).toBeNull();
+  });
+});
+
+describe("getOddsStatus combined meter (several keys)", () => {
+  const [A, B, C] = ["test-key-a", "test-key-b", "test-key-c"];
+  const row = (
+    remaining: number,
+    used: number,
+    recordedAt = NOW,
+  ): CreditUsageRow => ({
+    requestsRemaining: remaining,
+    requestsUsed: used,
+    refreshCost: 2,
+    sportsFetched: 2,
+    recordedAt,
+  });
+  function setup(
+    rows: Record<string, CreditUsageRow>,
+    legacy?: CreditUsageRow,
+  ) {
+    vi.stubEnv("ODDS_API_KEYS", `${A},${B},${C}`);
+    const map = new Map<string | null, CreditUsageRow>(
+      Object.entries(rows).map(([k, v]) => [keyFingerprint(k), v]),
+    );
+    if (legacy) map.set(null, legacy);
+    vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({
+      keyColumn: true,
+      byKeyId: map,
+    });
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(row(300, 200));
+  }
+
+  it("sums remaining and total across keys (a key with no rows counts as a fresh 500)", async () => {
+    setup({ [A]: row(300, 200), [B]: row(450, 50) });
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBe(1250);
+    expect(status.total).toBe(1500);
+    expect(status.level).toBe("normal");
+  });
+
+  it("is blocked only when every key is below the block threshold", async () => {
+    setup({ [A]: row(10, 490), [B]: row(15, 485), [C]: row(5, 495) });
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBe(30);
+    expect(status.level).toBe("blocked");
+  });
+
+  it("warns when even the best key is below the warning threshold", async () => {
+    setup({ [A]: row(90, 410), [B]: row(10, 490), [C]: row(10, 490) });
+    expect((await getOddsStatus(NOW)).level).toBe("warning");
+  });
+
+  it("counts a last-month row as a fresh 500, ignores unknown fingerprints and credits legacy rows to ODDS_API_KEY", async () => {
+    const lastMonth = row(5, 495, new Date("2026-09-20T12:00:00.000Z"));
+    setup({ [A]: lastMonth, "test-key-removed": row(1, 499) }, row(100, 400));
+    vi.stubEnv("ODDS_API_KEY", B);
+    const status = await getOddsStatus(NOW);
+    // A: 500 (stale), B: legacy 100, C: 500 (no rows)
+    expect(status.remaining).toBe(1100);
+    expect(status.total).toBe(1500);
+  });
+
+  it("keeps single-key behavior with 3 keys configured when the key_id column is missing", async () => {
+    setup({});
+    vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({
+      keyColumn: false,
+    });
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBe(300);
+    expect(status.total).toBe(500);
+  });
+
+  it("keeps lastRefreshAt and estimates on the global latest row", async () => {
+    setup({ [A]: row(300, 200) });
+    const status = await getOddsStatus(NOW);
+    expect(status.lastRefreshAt).toBe(NOW.toISOString());
   });
 });

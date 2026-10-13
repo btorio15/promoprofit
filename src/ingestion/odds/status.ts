@@ -16,7 +16,13 @@ import {
   FREE_TIER_MONTHLY_CREDITS,
   type CreditLevel,
 } from "./quota";
-import { getLatestCreditUsage, getSpendAttribution } from "./store";
+import { legacyKeyId, configuredOddsKeys } from "./oddsKeys";
+import {
+  getLatestCreditUsage,
+  getLatestCreditUsageByKey,
+  getSpendAttribution,
+  latestRowForKey,
+} from "./store";
 
 /** h2h + spreads + totals -- matches refreshExtended.ts's EXTENDED_MARKETS.length (D-13/D-14). */
 const EXTENDED_MARKET_COUNT = 3;
@@ -36,10 +42,11 @@ export interface OddsStatus {
 }
 
 export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus> {
-  const [oddsFetchedAt, extendedOddsFetchedAt, latest] = await Promise.all([
+  const [oddsFetchedAt, extendedOddsFetchedAt, latest, byKey] = await Promise.all([
     getOddsFreshness(),
     getExtendedOddsFreshness(),
     getLatestCreditUsage(),
+    getLatestCreditUsageByKey(),
   ]);
 
   // Each cache's fetched_at IS the recorded_at of the credit_usage row that
@@ -54,9 +61,34 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
 
   // A row from before the last monthly reset is last month's balance --
   // show it as unknown (not blocked) once the quota has reset (CR-01).
-  const remaining = effectiveRemaining(latest, now);
-  const total =
+  let remaining = effectiveRemaining(latest, now);
+  let total =
     latest && remaining !== null ? latest.requestsRemaining + latest.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
+  let level = creditLevel(remaining);
+
+  // Several configured keys (and migration 0013 applied): the meter shows the
+  // combined balance. The level follows the balance the NEXT refresh would be
+  // gated on (the best key), so it is "blocked" exactly when every key is
+  // below the block threshold -- the refresh button is disabled only then.
+  // One key, or no key_id column yet: unchanged single-key behavior.
+  const keys = configuredOddsKeys();
+  if (byKey.keyColumn && keys.length > 1) {
+    const legacyId = legacyKeyId();
+    let sumRemaining = 0;
+    let sumTotal = 0;
+    let best = -Infinity;
+    for (const k of keys) {
+      const row = latestRowForKey(byKey.byKeyId, k.id, legacyId);
+      const eff = effectiveRemaining(row, now);
+      const keyRemaining = eff ?? FREE_TIER_MONTHLY_CREDITS;
+      sumRemaining += keyRemaining;
+      sumTotal += eff !== null && row ? row.requestsRemaining + row.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
+      best = Math.max(best, keyRemaining);
+    }
+    remaining = sumRemaining;
+    total = sumTotal;
+    level = creditLevel(best);
+  }
 
   // Never hardcode the estimate (research pitfall -- never a literal like
   // "10 credits"). Both estimates use the same exact formula the server-side
@@ -80,7 +112,7 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     lastRefreshAt: latest ? latest.recordedAt.toISOString() : null,
     remaining,
     total,
-    level: creditLevel(remaining),
+    level,
     estimatedRefreshCredits,
     resetsOn: nextMonthlyReset(now).toISOString(),
     extendedOddsFetchedAt: extendedOddsFetchedAt ? extendedOddsFetchedAt.toISOString() : null,

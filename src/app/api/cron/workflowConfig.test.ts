@@ -35,6 +35,11 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
     expect(text).toContain("github.event.inputs.skip_morning_observe != 'true'");
   });
 
+  it("passes both ODDS_API_KEY and ODDS_API_KEYS secrets to the morning observe step", () => {
+    expect(code).toContain("ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}");
+    expect(code).toContain("ODDS_API_KEYS: ${{ secrets.ODDS_API_KEYS }}");
+  });
+
   it("keeps workflow_dispatch + force_morning_observe, no timezone key", () => {
     expect(text).toContain("workflow_dispatch:");
     expect(text).toContain("force_morning_observe:");
