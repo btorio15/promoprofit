@@ -53,7 +53,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 06-04-PLAN.md — getOpportunities records the member feed and returns the member-only series
-- [ ] 06-05-PLAN.md — ProfitGraph component (owner OK before installing recharts)
+- [x] 06-05-PLAN.md — ProfitGraph component (owner OK before installing recharts)
 - [x] 06-06-PLAN.md — Morning job records every member's feed
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -83,7 +83,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
-| 6. Profit Graph | v1.1 | 5/7 | In Progress|  |
+| 6. Profit Graph | v1.1 | 6/7 | In Progress|  |
 | 7. Dashboard | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
