@@ -8,6 +8,8 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Shipped:** v1.0 "MarginMind" on 2026-10-02 — live at https://betmargin.vercel.app (Vercel Hobby, auto-deploy on push to main; repo btorio15/promoprofit). Daily promo scrape via Vercel Cron → GitHub Actions (~7 AM MT) with a GitHub backup. Archive: `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`.
 
+**In progress:** v1.1 Profit Stats — Phase 6 (Profit Graph) complete 2026-10-13 (migration 0012 applied); Phase 7 (Dashboard) next.
+
 ## Current Milestone: v1.1 Profit Stats
 
 **Goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
@@ -40,10 +42,10 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - ✓ **Competing promos**: promos at different books on opposite outcomes of the same game are paired and hedged in tandem — Validated in Phase 4: Opportunities Feed
 - ✓ **Book selection (feed)**: the feed and Promos tab only use the member's selected books — Validated in Phase 4: Opportunities Feed
 - ✓ **Group-added promos**: any member can hand-add a bonus bet or profit boost; it is private to that member (visible only to them) and feeds their own Promos, Opportunities and Done — Validated in Phase 5: Group-Added Promos (owner UAT 2/2, security 21/21 closed)
+- ✓ **Profit graph**: cumulative two-line graph at the top of Opportunities — grey = profit available at the member's own books (per-member daily record, migration 0012, starts 2026-10-13, no estimates), green = profit they extracted via Mark done; 7 days / 30 days / All time, touch tooltip to the cent, phone-ready — Validated in Phase 6: Profit Graph (owner iPhone check, verification 6/6)
 
 ### Active
 
-- [ ] Cumulative profit graph (available vs extracted) on Opportunities, with time range picker
 - [ ] Dashboard (renamed Opportunities tab): headline totals, simple counts, graph, full feed
 - [ ] Profit summary moved from Promos tab to Dashboard
 
@@ -118,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-03 after starting milestone v1.1 Profit Stats*
+*Last updated: 2026-10-13 after Phase 6 (Profit Graph)*
