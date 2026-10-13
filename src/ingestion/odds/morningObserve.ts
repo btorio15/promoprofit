@@ -1,6 +1,12 @@
 import { runOddsRefresh, type RefreshOutcome } from "./refresh";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
+import { listUserIds } from "@/db/queries";
+import { loadMemberFeedContext } from "@/db/feedContext";
+import { recordMemberProfitObservations } from "@/db/memberObservations";
 import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
+import { computeMemberFeed } from "@/domain/promos/memberFeed";
+import { buildMemberObservationEntries } from "@/domain/promos/memberObservationEntries";
+import { denverDate } from "@/domain/promos/profitTotals";
 
 /**
  * quick-260927-n12 (owner scope change B): the once-daily morning job run
@@ -17,10 +23,58 @@ import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
  * record: a blocked/failed refresh is exactly why the morning job exists in
  * the first place, and skipping observations on a bad refresh would lose
  * the whole day's number.
+ *
+ * Phase 6 D-18: after the group-level recording, a member pass records each
+ * member's own feed into member_profit_observations. It reads cached odds
+ * only (no extra credits) and applies each member's own books, private
+ * promos and Your cap through the shared feed context, using the same
+ * computeMemberFeed + buildMemberObservationEntries path as the
+ * Opportunities load. One member failing never stops the others.
  */
 export type MorningObserveResult =
   | { status: "skipped"; reason: "not-morning-window" | "missing-api-key" }
-  | { status: "ran"; refreshOutcome: RefreshOutcome };
+  | {
+      status: "ran";
+      refreshOutcome: RefreshOutcome;
+      memberObservations: { recorded: number; failed: number };
+    };
+
+export async function recordAllMembersObservations(
+  now: Date,
+): Promise<{ recorded: number; failed: number }> {
+  let ids: number[];
+  try {
+    ids = await listUserIds();
+  } catch (err) {
+    console.error("recordAllMembersObservations: could not list users", err);
+    return { recorded: 0, failed: 0 };
+  }
+  let recorded = 0;
+  let failed = 0;
+  for (const id of ids) {
+    try {
+      const ctx = await loadMemberFeedContext({ userId: id, precision: "whole", now });
+      if (ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null) continue;
+      const feed = computeMemberFeed({
+        feedPromos: ctx.feedPromos,
+        rankOpts: ctx.rankOpts,
+        userBookSet: ctx.userBookSet,
+      });
+      const entries = buildMemberObservationEntries({
+        denverDate: denverDate(now),
+        singles: feed.singles,
+        chosenPairs: feed.chosenPairs,
+        userBookSet: ctx.userBookSet,
+      });
+      await recordMemberProfitObservations(id, entries, now);
+      recorded++;
+    } catch (err) {
+      console.error("recordAllMembersObservations: member " + id + " failed", err);
+      failed++;
+    }
+  }
+  return { recorded, failed };
+}
 
 export async function runMorningObservation(opts: {
   now?: Date;
@@ -42,5 +96,7 @@ export async function runMorningObservation(opts: {
   const refreshOutcome = await runOddsRefresh({ confirmed: true, triggeredByUserId: null, now });
   await recordCurrentProfitObservations(now);
 
-  return { status: "ran", refreshOutcome };
+  const memberObservations = await recordAllMembersObservations(now);
+
+  return { status: "ran", refreshOutcome, memberObservations };
 }

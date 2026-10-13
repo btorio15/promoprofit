@@ -1,7 +1,7 @@
 import { eq, gt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "./client";
-import { cachedExtendedOdds, cachedOdds, userBooks } from "./schema";
+import { cachedExtendedOdds, cachedOdds, userBooks, users } from "./schema";
 import { usableOddsBooks } from "@/config/books";
 import { OddsEventSchema, type OddsEvent } from "@/domain/odds/schemas";
 
@@ -204,4 +204,13 @@ export async function getCachedExtendedEvents(): Promise<CachedEventsResult> {
 /** Oldest live row's fetched_at from cached_extended_odds; null if the table is empty (D-16). */
 export async function getExtendedOddsFreshness(): Promise<Date | null> {
   return getOldestLiveFetchedAt(cachedExtendedOdds);
+}
+
+/**
+ * Every user id, ascending. Used only by the morning job's per-member
+ * observation pass (Phase 6 D-18); ids come from the DB, never from input.
+ */
+export async function listUserIds(): Promise<number[]> {
+  const rows = await getDb().select({ id: users.id }).from(users).orderBy(users.id);
+  return rows.map((r) => r.id);
 }
