@@ -493,6 +493,16 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
     );
   });
 
+  it("records observations at whole precision even when the member views cents (WR-01)", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    await getOpportunities({ precision: "whole" });
+    const wholeEntries = mockRecordMemberProfitObservations.mock.calls[0][1];
+    mockRecordMemberProfitObservations.mockClear();
+    await getOpportunities({ precision: "cents" });
+    expect(mockRecordMemberProfitObservations).toHaveBeenCalledTimes(1);
+    expect(mockRecordMemberProfitObservations.mock.calls[0][1]).toEqual(wholeEntries);
+  });
+
   it("maps a missing table to not-ready and keeps the feed", async () => {
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     mockGetMemberProfitHistory.mockResolvedValue({ status: "not-ready" });

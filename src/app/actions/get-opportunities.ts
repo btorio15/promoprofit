@@ -65,13 +65,25 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     : null;
   if (feed) {
     // Record BEFORE building the series so today's number is included (D-05, D-07).
+    // Always at "whole" precision (same as the morning job) so the recorded best
+    // does not depend on the precision the member happens to be viewing (WR-01).
+    let recordCtx = ctx;
+    let recordFeed = feed;
+    if (precision !== "whole") {
+      recordCtx = await loadMemberFeedContext({ userId: user.userId, precision: "whole", now });
+      recordFeed = computeMemberFeed({
+        feedPromos: recordCtx.feedPromos,
+        rankOpts: recordCtx.rankOpts,
+        userBookSet: recordCtx.userBookSet,
+      });
+    }
     await recordMemberProfitObservations(
       user.userId,
       buildMemberObservationEntries({
         denverDate: denverDate(now),
-        singles: feed.singles,
-        chosenPairs: feed.chosenPairs,
-        userBookSet: ctx.userBookSet,
+        singles: recordFeed.singles,
+        chosenPairs: recordFeed.chosenPairs,
+        userBookSet: recordCtx.userBookSet,
       }),
       now,
     );
