@@ -4,7 +4,8 @@ import { z } from "zod";
 import Decimal from "decimal.js";
 import { requireUser } from "@/lib/session";
 import { getHedgeBookKeys } from "@/db/queries";
-import { loadAvailableProfit, loadMemberFeedContext } from "@/db/feedContext";
+import { loadAvailableProfit, loadMemberFeedContext, loadProfitSeries } from "@/db/feedContext";
+import { recordMemberProfitObservations } from "@/db/memberObservations";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO } from "@/domain/promos/promoRowDto";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
@@ -12,8 +13,9 @@ import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
 import { rankArbs } from "@/domain/hedge/rankArbs";
 import { SPORT_KEYS } from "@/config/sports";
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
-import { sumPortfolioProfit } from "@/domain/promos/profitTotals";
-import { findPairCandidates, selectPairs, singleProfitMap } from "@/domain/promos/pairPromos";
+import { denverDate, sumPortfolioProfit } from "@/domain/promos/profitTotals";
+import { computeMemberFeed } from "@/domain/promos/memberFeed";
+import { buildMemberObservationEntries } from "@/domain/promos/memberObservationEntries";
 import { toPairRowDTO, type PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import {
@@ -56,6 +58,26 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   const oddsFetchedAt = ctx.oddsFetchedAt ? ctx.oddsFetchedAt.toISOString() : null;
   const extendedOddsFetchedAt = ctx.extendedOddsFetchedAt ? ctx.extendedOddsFetchedAt.toISOString() : null;
 
+  const hasOdds = !(ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null);
+  // D-06: one shared copy of the singles + pair rule feeds both the screen and the recorder.
+  const feed = hasOdds
+    ? computeMemberFeed({ feedPromos: ctx.feedPromos, rankOpts: ctx.rankOpts, userBookSet: ctx.userBookSet })
+    : null;
+  if (feed) {
+    // Record BEFORE building the series so today's number is included (D-05, D-07).
+    await recordMemberProfitObservations(
+      user.userId,
+      buildMemberObservationEntries({
+        denverDate: denverDate(now),
+        singles: feed.singles,
+        chosenPairs: feed.chosenPairs,
+        userBookSet: ctx.userBookSet,
+      }),
+      now,
+    );
+  }
+  const profitSeries = await loadProfitSeries({ userId: user.userId, now, completions: ctx.completions });
+
   const respond = (
     emptyVariant: OpportunitiesEmptyVariant | null,
     totalProfit: string,
@@ -66,10 +88,11 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     oddsFetchedAt,
     extendedOddsFetchedAt,
     totals: { totalProfit, totalExtracted: ctx.totalExtracted, availableProfit },
+    profitSeries,
     sources,
   });
 
-  if (ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null) {
+  if (!feed) {
     return respond("no-odds", "0.00", [
       { id: "promos", items: [] },
       { id: "pairs", items: [] },
@@ -83,7 +106,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   });
 
   // D-17: rankOpts.hedgeBookKeys is the member's own hedge books only.
-  const singles = rankPromoHedges(ctx.feedPromos, ctx.rankOpts);
+  const singles = feed.singles;
   // D-16: promos at books the member lacks are excluded entirely.
   const rows: PromoRowDTO[] = singles
     .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet, priceAge))
@@ -101,12 +124,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   // D-08/D-10/D-18: pairs of promos at two member books that beat hedging
   // each separately, each promo in at most one pair. Paired promos stay in
   // the promos source too (D-20).
-  const chosenPairs = selectPairs(
-    findPairCandidates(ctx.feedPromos, singleProfitMap(singles), {
-      ...ctx.rankOpts,
-      memberBookKeys: ctx.userBookSet,
-    }),
-  );
+  const chosenPairs = feed.chosenPairs;
   const pairRows: PairRowDTO[] = chosenPairs.map((c) => toPairRowDTO(c, ctx.bookNames, priceAge));
   const pairItems: OpportunityItem<PairRowDTO>[] = pairRows.map((row) => ({
     rowKey: row.rowKey,

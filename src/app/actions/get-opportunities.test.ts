@@ -16,6 +16,8 @@ const {
   mockGetPromoCompletions,
   mockGetProfitObservationsSince,
   mockRecordCurrentProfitObservations,
+  mockRecordMemberProfitObservations,
+  mockGetMemberProfitHistory,
 } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
   mockGetActivePromos: vi.fn(),
@@ -27,6 +29,8 @@ const {
   mockGetPromoCompletions: vi.fn(),
   mockGetProfitObservationsSince: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
+  mockRecordMemberProfitObservations: vi.fn(),
+  mockGetMemberProfitHistory: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
@@ -44,6 +48,10 @@ vi.mock("@/db/promoTracking", () => ({
 }));
 vi.mock("@/db/promoObservations", () => ({
   recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
+}));
+vi.mock("@/db/memberObservations", () => ({
+  recordMemberProfitObservations: mockRecordMemberProfitObservations,
+  getMemberProfitHistory: mockGetMemberProfitHistory,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -148,6 +156,8 @@ beforeEach(() => {
   mockGetPromoCompletions.mockResolvedValue([]);
   mockGetProfitObservationsSince.mockResolvedValue([]);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
+  mockRecordMemberProfitObservations.mockResolvedValue(undefined);
+  mockGetMemberProfitHistory.mockResolvedValue({ status: "ready", graphStartDay: null, rows: [] });
 });
 
 describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
@@ -162,6 +172,8 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
   it("returns invalid for bad or extra input without reading the db", async () => {
     expect(await getOpportunities({ precision: "bogus" })).toEqual({ status: "invalid" });
     expect(await getOpportunities({ precision: "whole", userId: 9 })).toEqual({ status: "invalid" });
+    expect(await getOpportunities({ precision: "whole", userId: 2 })).toEqual({ status: "invalid" });
+    expect(await getOpportunities({ precision: "whole", range: "7d" })).toEqual({ status: "invalid" });
     expect(mockGetActivePromos).not.toHaveBeenCalled();
   });
 
@@ -445,5 +457,64 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports"]) {
       expect(src).not.toContain(banned);
     }
+  });
+});
+
+describe("getOpportunities profitSeries (STATS-01..03)", () => {
+  it("carries profitSeries in the no-odds branch without recording", async () => {
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.profitSeries.status).toBe("ready");
+    expect(mockRecordMemberProfitObservations).not.toHaveBeenCalled();
+  });
+
+  it("carries profitSeries in the nothing-profitable / none-scraped branches", async () => {
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("none-scraped");
+    expect(result.profitSeries).toBeDefined();
+  });
+
+  it("records the member feed with the session id before reading history", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.profitSeries.status).toBe("ready");
+    expect(mockRecordMemberProfitObservations).toHaveBeenCalledTimes(1);
+    const [uid, entries, at] = mockRecordMemberProfitObservations.mock.calls[0];
+    expect(uid).toBe(1);
+    expect(Array.isArray(entries)).toBe(true);
+    expect(at).toBeInstanceOf(Date);
+    expect(mockGetMemberProfitHistory).toHaveBeenCalledWith(1);
+    expect(mockRecordMemberProfitObservations.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGetMemberProfitHistory.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("maps a missing table to not-ready and keeps the feed", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetMemberProfitHistory.mockResolvedValue({ status: "not-ready" });
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.profitSeries).toEqual({ status: "not-ready" });
+    expect(result.sources).toHaveLength(3);
+  });
+
+  it("maps a history failure to error while the feed still loads", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetMemberProfitHistory.mockRejectedValue(new Error("boom"));
+    const result = await getOpportunities({ precision: "whole" });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.profitSeries).toEqual({ status: "error" });
+  });
+
+  it("starts the graph today when the table is empty", async () => {
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok" || result.profitSeries.status !== "ready") throw new Error("unreachable");
+    expect(result.profitSeries.graphStartDay).toBe(denverDate(new Date()));
+    expect(result.profitSeries.days).toHaveLength(1);
   });
 });
