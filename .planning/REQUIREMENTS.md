@@ -8,12 +8,12 @@
 
 ### Profit graph
 
-- [ ] **STATS-01**: Member sees a cumulative profit graph at the top of the Opportunities (home) page
+- [x] **STATS-01**: Member sees a cumulative profit graph at the top of the Opportunities (home) page
 - [x] **STATS-02**: Grey line = running total of profit available at the member's books — each promo counted once, at its best observed guaranteed profit, on the Denver day it was first seen
 - [x] **STATS-03**: Green line = running total of profit the member personally extracted (Mark done), by Denver day of completion
 - [x] **STATS-04**: Member can switch the graph between Last 7 days, Last 30 days, and All time
-- [ ] **STATS-05**: Hovering/tapping a day shows that date with both running totals, exact to the cent
-- [ ] **STATS-06**: Graph is readable on a phone; a member with no history sees a short "nothing yet" message instead of an empty chart
+- [x] **STATS-05**: Hovering/tapping a day shows that date with both running totals, exact to the cent
+- [x] **STATS-06**: Graph is readable on a phone; a member with no history sees a short "nothing yet" message instead of an empty chart
 
 ### Dashboard
 
@@ -47,12 +47,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STATS-01 | Phase 6 | Pending |
+| STATS-01 | Phase 6 | Complete |
 | STATS-02 | Phase 6 | Complete |
 | STATS-03 | Phase 6 | Complete |
 | STATS-04 | Phase 6 | Complete |
-| STATS-05 | Phase 6 | Pending |
-| STATS-06 | Phase 6 | Pending |
+| STATS-05 | Phase 6 | Complete |
+| STATS-06 | Phase 6 | Complete |
 | STATS-07 | Phase 7 | Pending |
 | STATS-08 | Phase 7 | Pending |
 | STATS-09 | Phase 7 | Pending |

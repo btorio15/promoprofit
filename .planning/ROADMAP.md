@@ -24,7 +24,7 @@
 
 **Milestone goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
 
-- [ ] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page
+- [x] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page (completed 2026-10-13)
 - [ ] **Phase 7: Dashboard** - Opportunities tab becomes the Dashboard: headline totals and counts above the profit graph, full feed below; profit summary leaves the Promos tab
 
 ## Phase Details
@@ -58,7 +58,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 06-07-PLAN.md — Mount on Opportunities, owner applies migration 0012, phone check
+- [x] 06-07-PLAN.md — Mount on Opportunities, owner applies migration 0012, phone check
 
 **UI hint**: yes
 
@@ -83,7 +83,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
-| 6. Profit Graph | v1.1 | 6/7 | In Progress|  |
+| 6. Profit Graph | v1.1 | 7/7 | Complete   | 2026-10-13 |
 | 7. Dashboard | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
