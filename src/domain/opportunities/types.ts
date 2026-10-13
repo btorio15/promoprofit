@@ -2,6 +2,7 @@ import type { PromoRowDTO } from "@/domain/promos/dto";
 import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
 import type { AvailableProfit } from "@/domain/promos/profitTotals";
+import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
 
 /** D-13: the Opportunities sort switch. */
 export type SortKey = "profit" | "roi";
@@ -46,6 +47,8 @@ export type OpportunitiesResponse =
       oddsFetchedAt: string | null;
       extendedOddsFetchedAt: string | null;
       totals: OpportunitiesTotals;
+      /** Phase 6 STATS-01: the member's own all-time daily gains; the client slices per range, no refetch. */
+      profitSeries: ProfitSeriesDTO;
       sources: OpportunitySourceDTO[];
     };
 
