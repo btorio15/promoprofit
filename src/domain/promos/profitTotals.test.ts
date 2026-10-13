@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addDays,
   denverDate,
   periodStartDates,
   summarizeAvailableProfit,
@@ -232,5 +233,17 @@ describe("summarizeAvailableProfit excludeFromToday (quick-260930-fge)", () => {
   it("every promo Done -> today 0.00, week/month non-zero", () => {
     const r = summarizeAvailableProfit([obs(1, "2026-09-27", "6.00")], ownBooks, now, new Set([1]));
     expect(r).toEqual({ today: "0.00", week: "6.00", month: "6.00" });
+  });
+});
+
+describe("addDays", () => {
+  it.each([
+    ["2026-10-03", -6, "2026-09-27"],
+    ["2026-03-01", -1, "2026-02-28"],
+    ["2028-03-01", -1, "2028-02-29"],
+    ["2026-12-31", 1, "2027-01-01"],
+    ["2026-10-03", 0, "2026-10-03"],
+  ])("addDays(%s, %i) = %s", (d, n, expected) => {
+    expect(addDays(d, n)).toBe(expected);
   });
 });

@@ -95,12 +95,19 @@ export interface PeriodStartDates {
  */
 export function periodStartDates(now: Date): PeriodStartDates {
   const today = denverDate(now);
-  const [year, month, day] = today.split("-").map((n) => parseInt(n, 10));
-
-  const weekStart = toDateString(new Date(Date.UTC(year, month - 1, day - 6)));
-  const monthStart = toDateString(new Date(Date.UTC(year, month - 1, day - 29)));
+  const weekStart = addDays(today, -6);
+  const monthStart = addDays(today, -29);
 
   return { today, weekStart, monthStart };
+}
+
+/**
+ * Add n (may be negative) calendar days to a "YYYY-MM-DD" string. Uses
+ * Date.UTC on the date string so the machine's timezone never leaks in.
+ */
+export function addDays(date: string, n: number): string {
+  const [year, month, day] = date.split("-").map((v) => parseInt(v, 10));
+  return toDateString(new Date(Date.UTC(year, month - 1, day + n)));
 }
 
 function toDateString(d: Date): string {
