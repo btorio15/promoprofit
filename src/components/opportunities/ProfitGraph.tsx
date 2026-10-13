@@ -6,6 +6,7 @@ import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YA
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 import {
   GRAPH_RANGE_LABELS,
   parseGraphRange,
@@ -118,7 +119,22 @@ export function ProfitGraph({ series, loading }: { series: ProfitSeriesDTO | nul
           }}
         >
           {RANGES.map((r) => (
-            <ToggleGroupItem key={r} value={r} className="min-h-11 min-w-11 px-4 text-sm">
+            // The card is bg-secondary, the same grey as the toggle's default
+            // pressed bg-muted, so the selected range needs its own contrast
+            // (UI-SPEC: --foreground on --background, not green). Styled from
+            // our own `range` state, and aria-pressed:bg-background is repeated
+            // because the base toggle's aria-pressed:bg-muted is more specific
+            // than a plain bg class and would repaint the chip card-grey.
+            <ToggleGroupItem
+              key={r}
+              value={r}
+              className={cn(
+                "min-h-11 min-w-11 px-4 text-sm",
+                r === range
+                  ? "bg-background font-semibold text-foreground shadow-sm hover:bg-background aria-pressed:bg-background"
+                  : "text-muted-foreground",
+              )}
+            >
               {GRAPH_RANGE_LABELS[r]}
             </ToggleGroupItem>
           ))}
