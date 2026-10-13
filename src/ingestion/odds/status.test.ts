@@ -301,4 +301,43 @@ describe("getOddsStatus combined meter (several keys)", () => {
     const status = await getOddsStatus(NOW);
     expect(status.lastRefreshAt).toBe(NOW.toISOString());
   });
+
+  it("WR-02: one configured key with the key_id column uses that key's own row, not the newest row of a removed key", async () => {
+    setup({ [A]: row(100, 400), "test-key-removed": row(450, 50) });
+    vi.stubEnv("ODDS_API_KEYS", A);
+    mockGetLatestCreditUsage.mockResolvedValue(row(450, 50)); // newest overall = removed key
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBe(100);
+    expect(status.total).toBe(500);
+    expect(status.bestKeyRemaining).toBe(100);
+  });
+
+  it("WR-02: one configured key with no rows of its own stays unknown", async () => {
+    setup({ "test-key-removed": row(450, 50) });
+    vi.stubEnv("ODDS_API_KEYS", A);
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBeNull();
+    expect(status.level).toBe("unknown");
+  });
+
+  it("WR-03: 60 + 60 shows 120 combined, but the best single key (60) drives level and bestKeyRemaining", async () => {
+    setup({ [A]: row(60, 440), [B]: row(60, 440), [C]: row(0, 500) });
+    vi.stubEnv("ODDS_API_KEYS", `${A},${B}`);
+    const status = await getOddsStatus(NOW);
+    expect(status.remaining).toBe(120);
+    expect(status.bestKeyRemaining).toBe(60);
+    expect(status.level).toBe("warning");
+    // A 70-credit refresh does not fit on any single key.
+    expect(status.bestKeyRemaining!).toBeLessThan(70);
+  });
+
+  it("WR-04: ODDS_API_KEY not in ODDS_API_KEYS -> legacy rows are credited to the first listed key", async () => {
+    setup({}, row(100, 400));
+    vi.stubEnv("ODDS_API_KEYS", `${A},${B}`);
+    vi.stubEnv("ODDS_API_KEY", "test-key-not-listed");
+    const status = await getOddsStatus(NOW);
+    // A: legacy 100, B: fresh 500
+    expect(status.remaining).toBe(600);
+    expect(status.bestKeyRemaining).toBe(500);
+  });
 });

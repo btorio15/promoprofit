@@ -14,7 +14,7 @@ export function CreditBanner({ status }: CreditBannerProps) {
     return (
       <Alert>
         <AlertDescription className="num text-warning">
-          Only {status.remaining} credits remaining this month — a refresh uses approximately{" "}
+          Only {status.bestKeyRemaining ?? status.remaining} credits remaining this month — a refresh uses approximately{" "}
           {status.estimatedRefreshCredits} credits.
         </AlertDescription>
       </Alert>
@@ -25,7 +25,7 @@ export function CreditBanner({ status }: CreditBannerProps) {
     return (
       <Alert variant="destructive">
         <AlertDescription className="num">
-          Only {status.remaining} credits left — refresh is disabled until next month&apos;s
+          Only {status.bestKeyRemaining ?? status.remaining} credits left — refresh is disabled until next month&apos;s
           reset (1st).
         </AlertDescription>
       </Alert>

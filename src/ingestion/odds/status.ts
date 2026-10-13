@@ -31,6 +31,8 @@ export interface OddsStatus {
   oddsFetchedAt: string | null;
   lastRefreshAt: string | null;
   remaining: number | null;
+  /** Balance of the best single key (what one refresh can spend); equals remaining for one key. */
+  bestKeyRemaining: number | null;
   total: number;
   level: CreditLevel;
   estimatedRefreshCredits: number;
@@ -66,28 +68,43 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     latest && remaining !== null ? latest.requestsRemaining + latest.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
   let level = creditLevel(remaining);
 
-  // Several configured keys (and migration 0013 applied): the meter shows the
-  // combined balance. The level follows the balance the NEXT refresh would be
-  // gated on (the best key), so it is "blocked" exactly when every key is
-  // below the block threshold -- the refresh button is disabled only then.
-  // One key, or no key_id column yet: unchanged single-key behavior.
+  // key_id column present (migration 0013 applied) and >= 1 key configured:
+  // the meter follows the configured keys only (a removed key's rows are
+  // ignored). Several keys show the combined balance for display, but the
+  // level and bestKeyRemaining follow the balance the NEXT refresh would be
+  // gated on (the best single key: a refresh cannot span keys), so it is
+  // "blocked" exactly when every key is below the block threshold. One key
+  // keeps its nullable "unknown" balance. Pre-0013 or no keys: global latest.
+  let bestKeyRemaining: number | null = remaining;
   const keys = configuredOddsKeys();
-  if (byKey.keyColumn && keys.length > 1) {
+  if (byKey.keyColumn && keys.length > 0) {
     const legacyId = legacyKeyId();
     let sumRemaining = 0;
     let sumTotal = 0;
     let best = -Infinity;
+    let bestEff: number | null = null;
     for (const k of keys) {
       const row = latestRowForKey(byKey.byKeyId, k.id, legacyId);
       const eff = effectiveRemaining(row, now);
       const keyRemaining = eff ?? FREE_TIER_MONTHLY_CREDITS;
       sumRemaining += keyRemaining;
       sumTotal += eff !== null && row ? row.requestsRemaining + row.requestsUsed : FREE_TIER_MONTHLY_CREDITS;
-      best = Math.max(best, keyRemaining);
+      if (keyRemaining > best) {
+        best = keyRemaining;
+        bestEff = eff;
+      }
     }
-    remaining = sumRemaining;
-    total = sumTotal;
-    level = creditLevel(best);
+    if (keys.length === 1) {
+      remaining = bestEff;
+      total = sumTotal;
+      bestKeyRemaining = bestEff;
+      level = creditLevel(bestEff);
+    } else {
+      remaining = sumRemaining;
+      total = sumTotal;
+      bestKeyRemaining = best;
+      level = creditLevel(best);
+    }
   }
 
   // Never hardcode the estimate (research pitfall -- never a literal like
@@ -111,6 +128,7 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
     oddsFetchedAt: oddsFetchedAt ? oddsFetchedAt.toISOString() : null,
     lastRefreshAt: latest ? latest.recordedAt.toISOString() : null,
     remaining,
+    bestKeyRemaining,
     total,
     level,
     estimatedRefreshCredits,
