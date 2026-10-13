@@ -97,7 +97,7 @@ describe("client (Odds API v4 wrapper)", () => {
       bookmakerKeys: ["draftkings", "fanduel"],
       commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
       commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
-    });
+    }, SENTINEL_KEY);
 
     expect(events).toHaveLength(1);
     expect(events[0].home_team).toBe("Denver Nuggets");
@@ -114,6 +114,20 @@ describe("client (Odds API v4 wrapper)", () => {
     expect(calledUrl).toContain("commenceTimeTo=2026-10-02T00%3A00%3A00Z");
   });
 
+  it("fetchSportOdds rejects an empty key without falling back or fetching (IN-02)", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchSportOdds } = await import("./client");
+    await expect(
+      fetchSportOdds(
+        "basketball_nba",
+        { bookmakerKeys: ["draftkings"], commenceTimeFrom: new Date(), commenceTimeTo: new Date() },
+        "",
+      ),
+    ).rejects.toThrow("ODDS_API_KEY is not set");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("fetchSportOdds defaults to markets=h2h when markets is not given (SC1: no extra credits)", async () => {
     const fetchMock = vi.fn().mockResolvedValue(makeOddsResponse());
     vi.stubGlobal("fetch", fetchMock);
@@ -123,7 +137,7 @@ describe("client (Odds API v4 wrapper)", () => {
       bookmakerKeys: ["draftkings"],
       commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
       commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
-    });
+    }, SENTINEL_KEY);
 
     const calledUrl = String(fetchMock.mock.calls[0][0]);
     expect(calledUrl).toContain("markets=h2h");
@@ -140,7 +154,7 @@ describe("client (Odds API v4 wrapper)", () => {
       commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
       commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
       markets: ["h2h", "spreads", "totals"],
-    });
+    }, SENTINEL_KEY);
 
     const calledUrl = String(fetchMock.mock.calls[0][0]);
     const decodedUrl = decodeURIComponent(calledUrl);
@@ -199,7 +213,7 @@ describe("client (Odds API v4 wrapper)", () => {
     const { event, quota } = await fetchEventOdds("americanfootball_nfl", "evt/1", {
       bookmakerKeys: ["draftkings", "fanduel"],
       markets: ["alternate_spreads"],
-    });
+    }, SENTINEL_KEY);
 
     expect(event?.id).toBe("evt/1");
     expect(quota).toEqual({ remaining: 400, used: 100, last: 1 });
@@ -218,12 +232,12 @@ describe("client (Odds API v4 wrapper)", () => {
     const { fetchEventOdds, OddsApiError } = await import("./client");
     const opts = { bookmakerKeys: ["draftkings"], markets: ["alternate_spreads"] };
 
-    const r = await fetchEventOdds("americanfootball_nfl", "e1", opts);
+    const r = await fetchEventOdds("americanfootball_nfl", "e1", opts, SENTINEL_KEY);
     expect(r.event).toBeNull();
 
     fetchMock.mockResolvedValue(new Response("boom", { status: 500 }));
     try {
-      await fetchEventOdds("americanfootball_nfl", "e1", opts);
+      await fetchEventOdds("americanfootball_nfl", "e1", opts, SENTINEL_KEY);
       expect.unreachable();
     } catch (err) {
       expect(err).toBeInstanceOf(OddsApiError);
@@ -232,7 +246,7 @@ describe("client (Odds API v4 wrapper)", () => {
     }
 
     fetchMock.mockResolvedValue(new Response(JSON.stringify([1]), { status: 200 }));
-    await expect(fetchEventOdds("americanfootball_nfl", "e1", opts)).rejects.toThrow(
+    await expect(fetchEventOdds("americanfootball_nfl", "e1", opts, SENTINEL_KEY)).rejects.toThrow(
       "Odds API returned an unexpected response shape",
     );
   });
@@ -255,7 +269,7 @@ describe("client (Odds API v4 wrapper)", () => {
         bookmakerKeys: ["draftkings"],
         commenceTimeFrom: new Date(),
         commenceTimeTo: new Date(),
-      });
+      }, SENTINEL_KEY);
       expect.unreachable();
     } catch (err) {
       expect(String(err)).not.toContain(SENTINEL_KEY);
@@ -272,16 +286,12 @@ describe("client (Odds API v4 wrapper)", () => {
     expect(calledUrl).not.toContain(SENTINEL_KEY);
   });
 
-  it("defaults to the first configured key when ODDS_API_KEYS is set", async () => {
+  it("listSports defaults to the first configured key when ODDS_API_KEYS is set (CLI only)", async () => {
     vi.stubEnv("ODDS_API_KEYS", "test-key-first, test-key-second");
-    const fetchMock = vi.fn().mockResolvedValue(makeOddsResponse());
+    const fetchMock = vi.fn().mockResolvedValue(makeSportsResponse());
     vi.stubGlobal("fetch", fetchMock);
-    const { fetchSportOdds } = await import("./client");
-    await fetchSportOdds("basketball_nba", {
-      bookmakerKeys: ["draftkings"],
-      commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
-      commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
-    });
+    const { listSports } = await import("./client");
+    await listSports();
     expect(String(fetchMock.mock.calls[0][0])).toContain("apiKey=test-key-first");
     vi.unstubAllEnvs();
   });

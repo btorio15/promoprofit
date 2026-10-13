@@ -10,6 +10,7 @@
  * free-tier books and additionally checks that spreads/totals come back
  * with usable half-point lines (D-08).
  */
+import { configuredOddsKeys } from "../src/ingestion/odds/oddsKeys";
 import { listSports, fetchSportOdds } from "../src/ingestion/odds/client";
 import { COLORADO_BOOKS, smokeTestBookKeys, usableOddsBooks } from "../src/config/books";
 import { SPORT_KEYS } from "../src/config/sports";
@@ -19,11 +20,15 @@ const WINDOW_DAYS = 7;
 const EXTENDED_MARKETS = ["h2h", "spreads", "totals"] as const;
 
 async function main() {
+  console.warn(
+    "WARNING: this script spends REAL Odds API credits on the FIRST configured key and does NOT record them in credit_usage (the meter will not see this spend).",
+  );
   const argv = process.argv.slice(2);
   const extended = argv.includes("--extended");
   const requestedSport = argv.find((a) => !a.startsWith("--"));
 
-  const sports = await listSports();
+  const smokeKey = configuredOddsKeys()[0]?.key ?? ""; // explicit: first configured key
+  const sports = await listSports(smokeKey);
   const activeD01 = sports.filter((s) => s.active && SPORT_KEYS.includes(s.key));
 
   console.log(`Active D-01 sports (${activeD01.length}/${SPORT_KEYS.length}):`);
@@ -53,7 +58,7 @@ async function main() {
       commenceTimeFrom: now,
       commenceTimeTo: to,
       markets: EXTENDED_MARKETS,
-    });
+    }, smokeKey);
 
     console.log(`\nEvents returned: ${events.length}`);
 
@@ -102,7 +107,7 @@ async function main() {
     bookmakerKeys,
     commenceTimeFrom: now,
     commenceTimeTo: to,
-  });
+  }, smokeKey);
 
   const seenKeys = new Set<string>();
   for (const event of events) {

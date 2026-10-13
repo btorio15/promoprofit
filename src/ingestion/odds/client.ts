@@ -1,9 +1,10 @@
 /**
  * Thin, quota-aware Odds API v4 REST client (ODDS-01, ODDS-05). Server-only:
- * takes the key as an explicit argument (default: the first configured key,
- * read from process.env at call time) (never NEXT_PUBLIC_), and
- * never lets the key reach a thrown error message or the browser bundle
- * (T-01-13). Every response is validated with the shared Zod schemas before
+ * takes the key as an explicit argument (the fetch functions require it;
+ * only listSports, used by the CLI smoke script, defaults to the first
+ * configured key read from process.env at call time). The key is never
+ * NEXT_PUBLIC_ and never reaches a thrown error message or the browser
+ * bundle (T-01-13). Every response is validated with the shared Zod schemas before
  * being trusted (T-01-14).
  */
 import {
@@ -41,6 +42,12 @@ function resolveKey(apiKey?: string): string {
     throw new Error(MISSING_KEY_MESSAGE);
   }
   return first.key;
+}
+
+/** A required key must be a non-empty string: no silent fallback to key 0. */
+function requireKey(apiKey: string): string {
+  if (!apiKey) throw new Error(MISSING_KEY_MESSAGE);
+  return apiKey;
 }
 
 function parseIntHeader(value: string | null): number | null {
@@ -118,9 +125,9 @@ export interface FetchSportOddsOptions {
 export async function fetchSportOdds(
   sportKey: string,
   opts: FetchSportOddsOptions,
-  apiKey?: string,
+  apiKey: string,
 ): Promise<{ events: OddsEvent[]; quota: QuotaHeaders }> {
-  const key = resolveKey(apiKey);
+  const key = requireKey(apiKey);
   const url = new URL(`${BASE_URL}/sports/${sportKey}/odds/`);
   url.searchParams.set("apiKey", key);
   url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
@@ -169,9 +176,9 @@ export async function fetchEventOdds(
   sportKey: string,
   eventId: string,
   opts: FetchEventOddsOptions,
-  apiKey?: string,
+  apiKey: string,
 ): Promise<{ event: OddsEvent | null; quota: QuotaHeaders }> {
-  const key = resolveKey(apiKey);
+  const key = requireKey(apiKey);
   const url = new URL(`${BASE_URL}/sports/${sportKey}/events/${encodeURIComponent(eventId)}/odds`);
   url.searchParams.set("apiKey", key);
   url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
