@@ -92,6 +92,13 @@
       "when": 1791930572669,
       "tag": "0012_member_profit_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1791933777585,
+      "tag": "0013_credit_usage_key_id",
+      "breakpoints": true
     }
   ]
 }

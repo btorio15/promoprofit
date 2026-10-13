@@ -11,9 +11,10 @@
  * the persisted credit meter (D-11's thresholds read the latest row, never
  * a fresh API call).
  */
-import { and, desc, eq, lt, lte } from "drizzle-orm";
+import { and, desc, eq, lt, lte, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "@/db/client";
+import { isUndefinedColumnErrorFor } from "@/db/undefinedColumn";
 import { cachedExtendedOdds, cachedOdds, creditUsage, refreshLock, users } from "@/db/schema";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
@@ -35,6 +36,11 @@ export interface CreditUsageRow {
    * existed.
    */
   triggeredByUserId?: number | null;
+  /**
+   * 8-hex sha256 fingerprint of the Odds API key that spent these credits
+   * (never the key). Null/absent = legacy row (belongs to legacyKeyId).
+   */
+  keyId?: string | null;
 }
 
 /** One sport's freshly-fetched (already Zod-validated) events. */
@@ -165,33 +171,116 @@ export async function commitPromoSportsRefresh(
   await db.batch([first, ...rest]);
 }
 
-/** Persists one row per refresh from the Odds API's own x-requests-* headers. */
+/**
+ * Persists one row per refresh from the Odds API's own x-requests-* headers.
+ * Before migration 0013 (no key_id column) retries once without key_id.
+ */
 export async function recordCreditUsage(row: CreditUsageRow): Promise<void> {
   const db = getDb();
-  await db.insert(creditUsage).values({
-    requestsRemaining: row.requestsRemaining,
-    requestsUsed: row.requestsUsed,
-    refreshCost: row.refreshCost,
-    sportsFetched: row.sportsFetched,
-    recordedAt: row.recordedAt,
-    triggeredByUserId: row.triggeredByUserId ?? null,
-  });
+  try {
+    await db.insert(creditUsage).values({
+      requestsRemaining: row.requestsRemaining,
+      requestsUsed: row.requestsUsed,
+      refreshCost: row.refreshCost,
+      sportsFetched: row.sportsFetched,
+      recordedAt: row.recordedAt,
+      triggeredByUserId: row.triggeredByUserId ?? null,
+      keyId: row.keyId ?? null,
+    });
+  } catch (err) {
+    if (!isUndefinedColumnErrorFor(err, "key_id")) throw err;
+    await db.execute(
+      sql`insert into credit_usage (requests_remaining, requests_used, refresh_cost, sports_fetched, recorded_at, triggered_by_user_id) values (${row.requestsRemaining}, ${row.requestsUsed}, ${row.refreshCost}, ${row.sportsFetched}, ${row.recordedAt.toISOString()}, ${row.triggeredByUserId ?? null})`,
+    );
+  }
 }
 
-/** Most recent credit_usage row, or null if no refresh has ever run. */
-export async function getLatestCreditUsage(): Promise<CreditUsageRow | null> {
-  const db = getDb();
-  const rows = await db.select().from(creditUsage).orderBy(desc(creditUsage.recordedAt)).limit(1);
-  const row = rows[0];
-  if (!row) return null;
-
+function toCreditRow(row: {
+  requestsRemaining: number;
+  requestsUsed: number;
+  refreshCost: number;
+  sportsFetched: number;
+  recordedAt: Date | string;
+  keyId?: string | null;
+}): CreditUsageRow {
   return {
     requestsRemaining: row.requestsRemaining,
     requestsUsed: row.requestsUsed,
     refreshCost: row.refreshCost,
     sportsFetched: row.sportsFetched,
     recordedAt: row.recordedAt instanceof Date ? row.recordedAt : new Date(row.recordedAt),
+    ...(row.keyId !== undefined ? { keyId: row.keyId } : {}),
   };
+}
+
+/**
+ * Most recent credit_usage row across ALL keys (the global confirm window and
+ * sports estimate), or null if no refresh has ever run. Explicit columns so
+ * it keeps working before migration 0013.
+ */
+export async function getLatestCreditUsage(): Promise<CreditUsageRow | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      requestsRemaining: creditUsage.requestsRemaining,
+      requestsUsed: creditUsage.requestsUsed,
+      refreshCost: creditUsage.refreshCost,
+      sportsFetched: creditUsage.sportsFetched,
+      recordedAt: creditUsage.recordedAt,
+    })
+    .from(creditUsage)
+    .orderBy(desc(creditUsage.recordedAt))
+    .limit(1);
+  const row = rows[0];
+  return row ? toCreditRow(row) : null;
+}
+
+export type LatestCreditUsageByKey =
+  | { keyColumn: true; byKeyId: Map<string | null, CreditUsageRow> }
+  | { keyColumn: false };
+
+/**
+ * Latest credit_usage row per key fingerprint (null key = legacy rows).
+ * Returns { keyColumn: false } when migration 0013 has not been applied.
+ */
+export async function getLatestCreditUsageByKey(): Promise<LatestCreditUsageByKey> {
+  const db = getDb();
+  try {
+    const rows = await db
+      .selectDistinctOn([creditUsage.keyId], {
+        requestsRemaining: creditUsage.requestsRemaining,
+        requestsUsed: creditUsage.requestsUsed,
+        refreshCost: creditUsage.refreshCost,
+        sportsFetched: creditUsage.sportsFetched,
+        recordedAt: creditUsage.recordedAt,
+        keyId: creditUsage.keyId,
+      })
+      .from(creditUsage)
+      .orderBy(creditUsage.keyId, desc(creditUsage.recordedAt));
+    const byKeyId = new Map<string | null, CreditUsageRow>();
+    for (const r of rows) byKeyId.set(r.keyId, toCreditRow(r));
+    return { keyColumn: true, byKeyId };
+  } catch (err) {
+    if (isUndefinedColumnErrorFor(err, "key_id")) return { keyColumn: false };
+    throw err;
+  }
+}
+
+/**
+ * The latest row for key `id`. When id is the legacy key, legacy null-key
+ * rows count too (whichever is more recent).
+ */
+export function latestRowForKey(
+  byKeyId: Map<string | null, CreditUsageRow>,
+  id: string,
+  legacyId: string | null,
+): CreditUsageRow | null {
+  const own = byKeyId.get(id) ?? null;
+  if (id !== legacyId) return own;
+  const legacy = byKeyId.get(null) ?? null;
+  if (!own) return legacy;
+  if (!legacy) return own;
+  return legacy.recordedAt.getTime() > own.recordedAt.getTime() ? legacy : own;
 }
 
 /**

@@ -147,6 +147,9 @@ export const creditUsage = pgTable("credit_usage", {
   sportsFetched: integer("sports_fetched").notNull(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
   triggeredByUserId: integer("triggered_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  // sha256 fingerprint (8 hex) of the Odds API key that spent these credits,
+  // never the key itself. Null = legacy row (belongs to legacyKeyId).
+  keyId: text("key_id"),
 });
 
 /**

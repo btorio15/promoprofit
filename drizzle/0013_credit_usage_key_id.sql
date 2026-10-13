@@ -1,0 +1,1 @@
+ALTER TABLE "credit_usage" ADD COLUMN "key_id" text;
