@@ -46,8 +46,8 @@
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Pure series math: daily gains, Denver days, ranges, $0 starts (TDD)
-- [ ] 06-02-PLAN.md — Shared feed helper (one pair rule) + per-member observation rows with exact pair shares
+- [x] 06-01-PLAN.md — Pure series math: daily gains, Denver days, ranges, $0 starts (TDD)
+- [x] 06-02-PLAN.md — Shared feed helper (one pair rule) + per-member observation rows with exact pair shares
 - [ ] 06-03-PLAN.md — member_profit_observations table, migration 0012 (generated, not applied), tolerant record/read
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -83,7 +83,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
-| 6. Profit Graph | v1.1 | 0/7 | Planned | - |
+| 6. Profit Graph | v1.1 | 2/7 | In Progress|  |
 | 7. Dashboard | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
