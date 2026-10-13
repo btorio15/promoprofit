@@ -8,11 +8,17 @@ vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
 
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
+  listSportsWithQuota: vi.fn(),
+  OddsApiError: class OddsApiError extends Error {
+    status: number | null = null;
+  },
   fetchSportOdds: vi.fn(),
 }));
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
+  getLatestCreditUsageByKey: vi.fn(),
+  latestRowForKey: vi.fn(),
   commitOddsRefresh: vi.fn(),
   commitSpreadsTotalsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
@@ -21,10 +27,11 @@ vi.mock("@/ingestion/odds/store", () => ({
 }));
 
 import { revalidatePath } from "next/cache";
-import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
+import { listSports, listSportsWithQuota, fetchSportOdds } from "@/ingestion/odds/client";
 import {
   commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
+  getLatestCreditUsageByKey,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
@@ -46,6 +53,15 @@ function sport(key: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("ODDS_API_KEY", "test-key-single");
+  vi.stubEnv("ODDS_API_KEYS", "");
+  // Key selection runs for real: the free probe reports no balance headers and
+  // the pre-0013 store shape keeps the gate on the DB row, as before.
+  vi.mocked(listSportsWithQuota).mockImplementation(async () => ({
+    sports: await mockListSports(),
+    quota: { remaining: null, used: null, last: null },
+  }));
+  vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({ keyColumn: false });
   mockCommitSpreadsTotalsRefresh.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);

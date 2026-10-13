@@ -3,12 +3,13 @@
  * Callable from the refreshOdds server action or `npm run odds:refresh` --
  * and only from there. This module never triggers itself automatically.
  */
-import { fetchSportOdds, listSports } from "./client";
-import { effectiveRemaining, estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
+import { fetchSportOdds } from "./client";
+import { MISSING_KEY_MESSAGE } from "./oddsKeys";
+import { selectOddsKeyForRefresh } from "./keySelection";
+import { estimateRefreshCredits, evaluateRefreshGate, nextMonthlyReset } from "./quota";
 import { randomUUID } from "node:crypto";
 import {
   commitOddsRefresh,
-  getLatestCreditUsage,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
@@ -18,7 +19,6 @@ import { usableOddsBooks } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 
 const FETCH_WINDOW_DAYS = 7;
-const MISSING_KEY_MESSAGE = "ODDS_API_KEY is not set";
 const GENERIC_FAILURE_MESSAGE = "Couldn't refresh odds: the Odds API didn't respond.";
 const BUSY_MESSAGE = "Another odds refresh is already running. Try again in a minute.";
 /**
@@ -92,32 +92,26 @@ async function runGuardedRefresh(opts: {
 }): Promise<RefreshOutcome> {
   const now = opts.now ?? new Date();
 
-  let latest;
+  // Chosen AFTER the refresh lock is held: one key for the whole refresh.
+  let selected;
   try {
-    latest = await getLatestCreditUsage();
+    selected = await selectOddsKeyForRefresh(now); // free /sports probes only (D-04)
   } catch (err) {
     return { status: "error", message: safeMessage(err) };
   }
 
-  let sports;
-  try {
-    sports = await listSports(); // 0 credits (D-04)
-  } catch (err) {
-    return { status: "error", message: safeMessage(err) };
-  }
-
+  const sports = selected.sports;
   const inSeason = sports.filter((s) => s.active && SPORT_KEYS.includes(s.key));
   const bookKeys = usableOddsBooks().map((b) => b.key); // D-15, never paid_only
   const estimatedCredits = estimateRefreshCredits(inSeason.length, bookKeys.length);
 
-  // A row from before the last monthly reset is last month's balance:
-  // treat it as unknown so the low-credit block lifts on the 1st (CR-01).
-  const priorRemaining = effectiveRemaining(latest, now);
-  const priorUsed = priorRemaining === null ? null : (latest?.requestsUsed ?? null);
+  // The chosen key's balance (monthly-reset aware, free /sports probe first).
+  const { priorRemaining, priorUsed } = selected;
 
   const gate = evaluateRefreshGate({
     remaining: priorRemaining,
-    lastRefreshAt: latest?.recordedAt ?? null,
+    // The 15-minute confirm window is global across keys.
+    lastRefreshAt: selected.globalLatest?.recordedAt ?? null,
     estimatedCredits,
     now,
     confirmed: opts.confirmed,
@@ -162,7 +156,7 @@ async function runGuardedRefresh(opts: {
         bookmakerKeys: bookKeys,
         commenceTimeFrom,
         commenceTimeTo,
-      });
+      }, selected.key);
 
       // Capture the quota as soon as the fetch returns -- the credits are
       // spent at this point, even if the cache commit below fails (WR-02).
@@ -205,6 +199,7 @@ async function runGuardedRefresh(opts: {
           sportsFetched: inSeason.length,
           recordedAt: now,
           triggeredByUserId: opts.triggeredByUserId ?? null,
+          keyId: selected.id,
         });
       } catch {
         // Best-effort: a credit-recording failure must not mask the

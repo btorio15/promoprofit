@@ -261,4 +261,53 @@ describe("client (Odds API v4 wrapper)", () => {
       expect(String(err)).not.toContain(SENTINEL_KEY);
     }
   });
+
+  it("sends the explicitly passed key instead of the configured one", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeSportsResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const { listSports } = await import("./client");
+    await listSports("test-key-explicit");
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain("apiKey=test-key-explicit");
+    expect(calledUrl).not.toContain(SENTINEL_KEY);
+  });
+
+  it("defaults to the first configured key when ODDS_API_KEYS is set", async () => {
+    vi.stubEnv("ODDS_API_KEYS", "test-key-first, test-key-second");
+    const fetchMock = vi.fn().mockResolvedValue(makeOddsResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchSportOdds } = await import("./client");
+    await fetchSportOdds("basketball_nba", {
+      bookmakerKeys: ["draftkings"],
+      commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
+      commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
+    });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("apiKey=test-key-first");
+    vi.unstubAllEnvs();
+  });
+
+  it("listSportsWithQuota returns the sports and the parsed x-requests-* headers", async () => {
+    const res = new Response(
+      JSON.stringify([{ key: "basketball_nba", group: "Basketball", title: "NBA", active: true }]),
+      { status: 200, headers: { "x-requests-remaining": "321", "x-requests-used": "179", "x-requests-last": "0" } },
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(res));
+    const { listSportsWithQuota } = await import("./client");
+    const out = await listSportsWithQuota("test-key-a");
+    expect(out.sports).toHaveLength(1);
+    expect(out.quota).toEqual({ remaining: 321, used: 179, last: 0 });
+  });
+
+  it("never leaks any key of a multi-key env, including via listSportsWithQuota", async () => {
+    vi.stubEnv("ODDS_API_KEYS", "test-key-m1,test-key-m2");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("nope", { status: 401 })));
+    const { listSportsWithQuota } = await import("./client");
+    try {
+      await listSportsWithQuota("test-key-m2");
+      expect.unreachable();
+    } catch (err) {
+      expect(String(err)).not.toContain("test-key-m");
+    }
+    vi.unstubAllEnvs();
+  });
 });

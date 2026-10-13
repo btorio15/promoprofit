@@ -1,14 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { keyFingerprint } from "@/ingestion/odds/oddsKeys";
+
+const KEY_ID = keyFingerprint("test-key-single");
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
+  listSportsWithQuota: vi.fn(),
+  OddsApiError: class OddsApiError extends Error {
+    status: number | null = null;
+  },
   fetchSportOdds: vi.fn(),
   fetchEventOdds: vi.fn(),
 }));
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
+  getLatestCreditUsageByKey: vi.fn(),
+  latestRowForKey: vi.fn(),
   commitOddsRefresh: vi.fn(),
   commitSpreadsTotalsRefresh: vi.fn(),
   commitPromoSportsRefresh: vi.fn(),
@@ -17,12 +26,13 @@ vi.mock("@/ingestion/odds/store", () => ({
   releaseRefreshLock: vi.fn(),
 }));
 
-import { listSports, fetchSportOdds, fetchEventOdds } from "@/ingestion/odds/client";
+import { listSports, listSportsWithQuota, fetchSportOdds, fetchEventOdds } from "@/ingestion/odds/client";
 import {
   commitOddsRefresh,
   commitPromoSportsRefresh,
   commitSpreadsTotalsRefresh,
   getLatestCreditUsage,
+  getLatestCreditUsageByKey,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
@@ -57,6 +67,15 @@ function eventWith(id: string, markets: { key: string; outcomes: { name: string;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("ODDS_API_KEY", "test-key-single");
+  vi.stubEnv("ODDS_API_KEYS", "");
+  // Key selection runs for real: the free probe reports no balance headers and
+  // the pre-0013 store shape keeps the gate on the DB row, as before.
+  vi.mocked(listSportsWithQuota).mockImplementation(async () => ({
+    sports: await mockListSports(),
+    quota: { remaining: null, used: null, last: null },
+  }));
+  vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({ keyColumn: false });
   mockCommitOddsRefresh.mockResolvedValue(undefined);
   mockCommitSpreadsTotalsRefresh.mockResolvedValue(undefined);
   vi.mocked(commitPromoSportsRefresh).mockResolvedValue(undefined);
@@ -266,6 +285,7 @@ describe("runSpreadsTotalsRefresh", () => {
       sportsFetched: 2,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
 
     expect(outcome).toEqual({
@@ -588,6 +608,7 @@ describe("runSpreadsTotalsRefresh", () => {
       sportsFetched: 2,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
 
     expect(outcome.status).toBe("error");
@@ -633,6 +654,7 @@ describe("runSpreadsTotalsRefresh", () => {
       sportsFetched: 2,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
     expect(mockReleaseRefreshLock).toHaveBeenCalledTimes(1);
   });

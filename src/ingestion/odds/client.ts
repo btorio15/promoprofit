@@ -1,6 +1,7 @@
 /**
  * Thin, quota-aware Odds API v4 REST client (ODDS-01, ODDS-05). Server-only:
- * reads ODDS_API_KEY from process.env at call time (never NEXT_PUBLIC_), and
+ * takes the key as an explicit argument (default: the first configured key,
+ * read from process.env at call time) (never NEXT_PUBLIC_), and
  * never lets the key reach a thrown error message or the browser bundle
  * (T-01-13). Every response is validated with the shared Zod schemas before
  * being trusted (T-01-14).
@@ -12,6 +13,7 @@ import {
   type Sport,
   type OddsEvent,
 } from "@/domain/odds/schemas";
+import { configuredOddsKeys, MISSING_KEY_MESSAGE } from "./oddsKeys";
 
 const BASE_URL = "https://api.the-odds-api.com/v4";
 
@@ -31,12 +33,14 @@ export class OddsApiError extends Error {
   }
 }
 
-function getApiKey(): string {
-  const key = process.env.ODDS_API_KEY;
-  if (!key) {
-    throw new Error("ODDS_API_KEY is not set");
+/** The explicit key if given, else the first configured key, else throw. */
+function resolveKey(apiKey?: string): string {
+  if (apiKey) return apiKey;
+  const first = configuredOddsKeys()[0];
+  if (!first) {
+    throw new Error(MISSING_KEY_MESSAGE);
   }
-  return key;
+  return first.key;
 }
 
 function parseIntHeader(value: string | null): number | null {
@@ -59,11 +63,17 @@ function formatDateParam(d: Date): string {
   return d.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-/** GET /v4/sports/ -- zero-credit cost. Used for D-04's in-season check. */
-export async function listSports(): Promise<Sport[]> {
-  const apiKey = getApiKey();
+/**
+ * GET /v4/sports/ -- zero-credit cost. Returns the sports plus the key's
+ * x-requests-* balance headers (also free), so a key can be probed without
+ * spending anything.
+ */
+export async function listSportsWithQuota(
+  apiKey: string,
+): Promise<{ sports: Sport[]; quota: QuotaHeaders }> {
+  const key = resolveKey(apiKey);
   const url = new URL(`${BASE_URL}/sports/`);
-  url.searchParams.set("apiKey", apiKey);
+  url.searchParams.set("apiKey", key);
 
   let res: Response;
   try {
@@ -76,13 +86,19 @@ export async function listSports(): Promise<Sport[]> {
     throw new OddsApiError("Odds API returned an error for /sports", res.status);
   }
 
+  const quota = parseQuotaHeaders(res.headers);
   const body = await res.json();
   const parsed = SportListSchema.safeParse(body);
   if (!parsed.success) {
     throw new OddsApiError("Odds API returned an unexpected response shape", res.status);
   }
 
-  return parsed.data;
+  return { sports: parsed.data, quota };
+}
+
+/** GET /v4/sports/ -- zero-credit cost. Used for D-04's in-season check. */
+export async function listSports(apiKey?: string): Promise<Sport[]> {
+  return (await listSportsWithQuota(resolveKey(apiKey))).sports;
 }
 
 export interface FetchSportOddsOptions {
@@ -102,10 +118,11 @@ export interface FetchSportOddsOptions {
 export async function fetchSportOdds(
   sportKey: string,
   opts: FetchSportOddsOptions,
+  apiKey?: string,
 ): Promise<{ events: OddsEvent[]; quota: QuotaHeaders }> {
-  const apiKey = getApiKey();
+  const key = resolveKey(apiKey);
   const url = new URL(`${BASE_URL}/sports/${sportKey}/odds/`);
-  url.searchParams.set("apiKey", apiKey);
+  url.searchParams.set("apiKey", key);
   url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
   url.searchParams.set("markets", (opts.markets ?? ["h2h"]).join(","));
   url.searchParams.set("oddsFormat", "american");
@@ -152,10 +169,11 @@ export async function fetchEventOdds(
   sportKey: string,
   eventId: string,
   opts: FetchEventOddsOptions,
+  apiKey?: string,
 ): Promise<{ event: OddsEvent | null; quota: QuotaHeaders }> {
-  const apiKey = getApiKey();
+  const key = resolveKey(apiKey);
   const url = new URL(`${BASE_URL}/sports/${sportKey}/events/${encodeURIComponent(eventId)}/odds`);
-  url.searchParams.set("apiKey", apiKey);
+  url.searchParams.set("apiKey", key);
   url.searchParams.set("bookmakers", opts.bookmakerKeys.join(","));
   url.searchParams.set("markets", opts.markets.join(","));
   url.searchParams.set("oddsFormat", "american");

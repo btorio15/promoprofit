@@ -27,10 +27,11 @@
  * and fetched_at untouched) and records one credit_usage row.
  */
 import { randomUUID } from "node:crypto";
-import { fetchEventOdds, fetchSportOdds, listSports } from "./client";
+import { fetchEventOdds, fetchSportOdds } from "./client";
+import { MISSING_KEY_MESSAGE } from "./oddsKeys";
+import { selectOddsKeyForRefresh } from "./keySelection";
 import {
   CREDIT_BLOCK_THRESHOLD,
-  effectiveRemaining,
   estimateRefreshCredits,
   evaluateRefreshGate,
   nextMonthlyReset,
@@ -47,7 +48,6 @@ import { REFRESH_LOCK_TTL_MS } from "./refresh";
 import {
   commitPromoSportsRefresh,
   commitSpreadsTotalsRefresh,
-  getLatestCreditUsage,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
@@ -58,7 +58,6 @@ import { SPORT_KEYS } from "@/config/sports";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 const FETCH_WINDOW_DAYS = 7;
-const MISSING_KEY_MESSAGE = "ODDS_API_KEY is not set";
 const GENERIC_FAILURE_MESSAGE = "Couldn't search spreads & totals: the Odds API didn't respond.";
 const PROMO_GENERIC_FAILURE_MESSAGE = "Couldn't refresh promo odds: the Odds API didn't respond.";
 const NO_PROMOS_MESSAGE = "No active promos to refresh.";
@@ -225,20 +224,15 @@ async function runGuardedSpreadsTotalsRefresh(
   const now = opts.now ?? new Date();
   const scoped = scope !== undefined;
 
-  let latest;
+  // Chosen AFTER the refresh lock is held: one key for the whole refresh.
+  let selected;
   try {
-    latest = await getLatestCreditUsage();
+    selected = await selectOddsKeyForRefresh(now); // free /sports probes only
   } catch (err) {
     return { status: "error", message: safeMessage(err, scoped) };
   }
 
-  let sports;
-  try {
-    sports = await listSports(); // 0 credits
-  } catch (err) {
-    return { status: "error", message: safeMessage(err, scoped) };
-  }
-
+  const sports = selected.sports;
   const inSeason = sports.filter((s) => s.active && SPORT_KEYS.includes(s.key));
   // D-01: a scoped run fetches only the promo sports that are in season.
   const targets = scope ? inSeason.filter((s) => scope.sportKeys.includes(s.key)) : inSeason;
@@ -253,14 +247,13 @@ async function runGuardedSpreadsTotalsRefresh(
     ? mainEstimate + scope.altGameEstimate * Math.ceil(bookKeys.length / 10)
     : mainEstimate;
 
-  // A row from before the last monthly reset is last month's balance:
-  // treat it as unknown so the low-credit block lifts on the 1st (CR-01).
-  const priorRemaining = effectiveRemaining(latest, now);
-  const priorUsed = priorRemaining === null ? null : (latest?.requestsUsed ?? null);
+  // The chosen key's balance (monthly-reset aware, free /sports probe first).
+  const { priorRemaining, priorUsed } = selected;
 
   const gate = evaluateRefreshGate({
     remaining: priorRemaining,
-    lastRefreshAt: latest?.recordedAt ?? null,
+    // The 15-minute confirm window is global across keys.
+    lastRefreshAt: selected.globalLatest?.recordedAt ?? null,
     estimatedCredits: mainEstimate,
     now,
     confirmed: opts.confirmed,
@@ -327,7 +320,7 @@ async function runGuardedSpreadsTotalsRefresh(
         commenceTimeFrom,
         commenceTimeTo,
         markets: EXTENDED_MARKETS,
-      });
+      }, selected.key);
 
       // Capture the quota as soon as the fetch returns -- the credits are
       // spent at this point, even if the cache commit below fails (WR-02).
@@ -384,7 +377,7 @@ async function runGuardedSpreadsTotalsRefresh(
             const { event: altEvent, quota } = await fetchEventOdds(target.sportKey, target.eventId, {
               bookmakerKeys: bookKeys,
               markets: [ALT_SPREADS_MARKET],
-            });
+            }, selected.key);
             quotaCaptured = true;
             if (quota.last !== null) refreshCost += quota.last;
             if (quota.remaining !== null) lastRemaining = quota.remaining;
@@ -440,6 +433,7 @@ async function runGuardedSpreadsTotalsRefresh(
           sportsFetched: inSeason.length,
           recordedAt: now,
           triggeredByUserId: opts.triggeredByUserId ?? null,
+          keyId: selected.id,
         });
       } catch {
         // Best-effort: a credit-recording failure must not mask the

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { keyFingerprint } from "@/ingestion/odds/oddsKeys";
+
+const KEY_ID = keyFingerprint("test-key-single");
 import { buildFixtureEvents } from "@/test/fixtures/oddsEvents";
 import { usableOddsBooks } from "@/config/books";
 import type { OddsEvent } from "@/domain/odds/schemas";
@@ -11,11 +14,17 @@ vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
 
 vi.mock("@/ingestion/odds/client", () => ({
   listSports: vi.fn(),
+  listSportsWithQuota: vi.fn(),
+  OddsApiError: class OddsApiError extends Error {
+    status: number | null = null;
+  },
   fetchSportOdds: vi.fn(),
 }));
 
 vi.mock("@/ingestion/odds/store", () => ({
   getLatestCreditUsage: vi.fn(),
+  getLatestCreditUsageByKey: vi.fn(),
+  latestRowForKey: vi.fn(),
   commitOddsRefresh: vi.fn(),
   recordCreditUsage: vi.fn(),
   tryAcquireRefreshLock: vi.fn(),
@@ -32,10 +41,12 @@ vi.mock("@/db/queries", () => ({
   getUserBookKeys: vi.fn(),
 }));
 
-import { listSports, fetchSportOdds } from "@/ingestion/odds/client";
+import { listSports, listSportsWithQuota, fetchSportOdds } from "@/ingestion/odds/client";
 import {
   commitOddsRefresh,
   getLatestCreditUsage,
+  getLatestCreditUsageByKey,
+  latestRowForKey,
   recordCreditUsage,
   releaseRefreshLock,
   tryAcquireRefreshLock,
@@ -59,6 +70,15 @@ const mockGetUserBookKeys = vi.mocked(getUserBookKeys);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("ODDS_API_KEY", "test-key-single");
+  vi.stubEnv("ODDS_API_KEYS", "");
+  // Key selection runs for real: the free probe reports no balance headers and
+  // the pre-0013 store shape keeps the gate on the DB row, as before.
+  vi.mocked(listSportsWithQuota).mockImplementation(async () => ({
+    sports: await mockListSports(),
+    quota: { remaining: null, used: null, last: null },
+  }));
+  vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({ keyColumn: false });
   mockCommitOddsRefresh.mockResolvedValue(undefined);
   mockRecordCreditUsage.mockResolvedValue(undefined);
   mockTryAcquireRefreshLock.mockResolvedValue(true);
@@ -112,8 +132,50 @@ describe("runOddsRefresh", () => {
       sportsFetched: 2,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
     expect(outcome.status).toBe("ok");
+  });
+
+  it("multi-key: one chosen key serves every fetch, is recorded as keyId, and the confirm window stays global", async () => {
+    const now = new Date("2026-10-13T12:00:00.000Z");
+    const [KA, KB, KC] = ["test-key-a", "test-key-b", "test-key-c"];
+    vi.stubEnv("ODDS_API_KEY", "");
+    vi.stubEnv("ODDS_API_KEYS", `${KA},${KB},${KC}`);
+    const fiveMinAgo = {
+      requestsRemaining: 300,
+      requestsUsed: 200,
+      refreshCost: 2,
+      sportsFetched: 2,
+      recordedAt: new Date(now.getTime() - 5 * 60_000),
+    };
+    mockGetLatestCreditUsage.mockResolvedValue(fiveMinAgo);
+    vi.mocked(getLatestCreditUsageByKey).mockResolvedValue({
+      keyColumn: true,
+      byKeyId: new Map([[keyFingerprint(KA), fiveMinAgo]]),
+    });
+    vi.mocked(latestRowForKey).mockImplementation((m, id) => m.get(id) ?? null);
+    mockListSports.mockResolvedValue([
+      { key: "basketball_nba", group: "Basketball", title: "NBA", active: true },
+      { key: "baseball_mlb", group: "Baseball", title: "MLB", active: true },
+    ]);
+    vi.mocked(listSportsWithQuota).mockImplementation(async (k: string) => ({
+      sports: await mockListSports(),
+      quota: { remaining: k === KA ? 300 : k === KB ? 450 : 500, used: null, last: 0 },
+    }));
+    mockFetchSportOdds.mockResolvedValue({ events: [], quota: { remaining: 498, used: 2, last: 1 } });
+
+    // A refresh 5 minutes ago on key A still forces confirm when key C is best.
+    const unconfirmed = await runOddsRefresh({ confirmed: false, now });
+    expect(unconfirmed.status).toBe("confirm_required");
+    expect(mockFetchSportOdds).not.toHaveBeenCalled();
+
+    const outcome = await runOddsRefresh({ confirmed: true, now });
+    expect(outcome.status).toBe("ok");
+    expect(mockFetchSportOdds).toHaveBeenCalledTimes(2);
+    for (const call of mockFetchSportOdds.mock.calls) expect(call[2]).toBe(KC);
+    expect(mockRecordCreditUsage).toHaveBeenCalledWith(expect.objectContaining({ keyId: keyFingerprint(KC) }));
+    vi.unstubAllEnvs();
   });
 
   it("blocks the refresh (low_credits) when remaining is below the threshold, without calling fetchSportOdds", async () => {
@@ -164,6 +226,7 @@ describe("runOddsRefresh", () => {
       sportsFetched: 1,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
   });
 
@@ -189,6 +252,7 @@ describe("runOddsRefresh", () => {
       sportsFetched: 1,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
   });
 
@@ -276,6 +340,7 @@ describe("runOddsRefresh", () => {
       sportsFetched: 2,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
     expect(outcome.status).toBe("error");
     if (outcome.status === "error") {
@@ -325,6 +390,7 @@ describe("runOddsRefresh credit capture (WR-02)", () => {
       sportsFetched: 1,
       recordedAt: now,
       triggeredByUserId: null,
+      keyId: KEY_ID,
     });
   });
 });

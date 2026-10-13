@@ -1,3 +1,4 @@
+import { configuredOddsKeys } from "./oddsKeys";
 import { runOddsRefresh, type RefreshOutcome } from "./refresh";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { listUserIds } from "@/db/queries";
@@ -87,7 +88,7 @@ export async function runMorningObservation(opts: {
 }): Promise<MorningObserveResult> {
   const now = opts.now ?? new Date();
   const force = opts.force ?? false;
-  const hasApiKey = opts.hasApiKey ?? Boolean(process.env.ODDS_API_KEY);
+  const hasApiKey = opts.hasApiKey ?? configuredOddsKeys().length > 0;
 
   if (!force && !isMorningObservationWindow(now)) {
     return { status: "skipped", reason: "not-morning-window" };

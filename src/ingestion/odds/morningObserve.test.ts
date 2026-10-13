@@ -92,6 +92,24 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     expect(mockRecordCurrentProfitObservations).not.toHaveBeenCalled();
   });
 
+  it("detects the key from ODDS_API_KEYS alone (no ODDS_API_KEY)", async () => {
+    vi.stubEnv("ODDS_API_KEY", "");
+    vi.stubEnv("ODDS_API_KEYS", "test-key-a,test-key-b");
+    const result = await runMorningObservation({ now: MORNING_INSTANT });
+    expect(result.status).not.toBe("skipped");
+    expect(mockRunOddsRefresh).toHaveBeenCalledTimes(1);
+    vi.unstubAllEnvs();
+  });
+
+  it("skips (missing-api-key) when neither ODDS_API_KEY nor ODDS_API_KEYS is set", async () => {
+    vi.stubEnv("ODDS_API_KEY", "");
+    vi.stubEnv("ODDS_API_KEYS", "");
+    const result = await runMorningObservation({ now: MORNING_INSTANT });
+    expect(result).toEqual({ status: "skipped", reason: "missing-api-key" });
+    expect(mockRunOddsRefresh).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
+  });
+
   it("runs the moneyline-only refresh (confirmed, no triggering user) and records observations on success", async () => {
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
 
