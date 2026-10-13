@@ -41,12 +41,17 @@ export function configuredOddsKeys(env: Env = process.env): OddsKey[] {
 
 /**
  * Owner of legacy (null key_id) credit rows: ODDS_API_KEY's fingerprint when
- * set, else the first ODDS_API_KEYS entry, else null.
+ * it is one of the configured keys; otherwise (ODDS_API_KEY unset or not in
+ * ODDS_API_KEYS) the FIRST configured key; null when no key is configured.
  */
 export function legacyKeyId(env: Env = process.env): string | null {
+  const keys = configuredOddsKeys(env);
   const single = env.ODDS_API_KEY?.trim();
-  if (single) return keyFingerprint(single);
-  return configuredOddsKeys(env)[0]?.id ?? null;
+  if (single) {
+    const id = keyFingerprint(single);
+    if (keys.some((k) => k.id === id)) return id;
+  }
+  return keys[0]?.id ?? null;
 }
 
 /**

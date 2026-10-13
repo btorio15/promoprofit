@@ -29,10 +29,15 @@ describe("keyFingerprint", () => {
 });
 
 describe("legacyKeyId", () => {
-  it("prefers ODDS_API_KEY, then the first ODDS_API_KEYS entry, else null", () => {
-    expect(legacyKeyId({ ODDS_API_KEY: "test-key-z", ODDS_API_KEYS: "test-key-a" })).toBe(
-      keyFingerprint("test-key-z"),
+  it("prefers ODDS_API_KEY when configured, else the first ODDS_API_KEYS entry, else null", () => {
+    expect(legacyKeyId({ ODDS_API_KEY: "test-key-b", ODDS_API_KEYS: "test-key-a,test-key-b" })).toBe(
+      keyFingerprint("test-key-b"),
     );
+    // WR-04: ODDS_API_KEY not in the list -> legacy rows belong to the first listed key.
+    expect(legacyKeyId({ ODDS_API_KEY: "test-key-z", ODDS_API_KEYS: "test-key-a" })).toBe(
+      keyFingerprint("test-key-a"),
+    );
+    expect(legacyKeyId({ ODDS_API_KEY: "test-key-z" })).toBe(keyFingerprint("test-key-z"));
     expect(legacyKeyId({ ODDS_API_KEYS: "test-key-a,test-key-b" })).toBe(keyFingerprint("test-key-a"));
     expect(legacyKeyId({})).toBeNull();
   });
