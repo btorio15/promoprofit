@@ -23,11 +23,12 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
     expect(code).not.toContain("7 14,18,23");
   });
 
-  it("runs the already-ran check and the odds observe only on the 15:37 backup, never the afternoon passes", () => {
-    const checkGate = lines.find((l) => l.includes("github.event_name == 'schedule' &&"));
-    const observeGate = lines.find((l) => l.includes("steps.today.outputs.observe_done != 'true'"));
-    expect(checkGate).toContain("github.event.schedule == '37 15 * * *'");
-    expect(observeGate).toContain("github.event.schedule == '37 15 * * *'");
+  it("runs the odds observe on every scheduled run, always forced (three odds snapshots a day)", () => {
+    const observeRun = lines.find((l) => l.includes("npm run odds:morning-observe"));
+    expect(observeRun).toBeDefined();
+    expect(observeRun).toContain("github.event_name == 'schedule'");
+    expect(observeRun).toContain("'--force'");
+    expect(code).not.toContain("steps.today");
   });
 
   it("declares skip_morning_observe and the observe step honours it (WR-01 duplicate cron guard)", () => {
@@ -46,14 +47,8 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
     expect(lines.some((l) => l.includes("timezone:"))).toBe(false);
   });
 
-  it("gates scrape and observe on the already-ran check, schedule only", () => {
-    expect(code).toContain("id: today");
-    expect(code).toContain("npm run scrape:already-ran-today");
-    const scrapeGate = lines.find((l) => l.includes("steps.today.outputs.scrape_done != 'true'"));
-    const observeGate = lines.find((l) => l.includes("steps.today.outputs.observe_done != 'true'"));
-    expect(scrapeGate).toBeDefined();
-    expect(observeGate).toBeDefined();
-    expect(scrapeGate).toContain("github.event_name != 'schedule'");
-    expect(observeGate).toContain("github.event_name != 'schedule'");
+  it("runs the promo scrape on every run, with no already-ran skip", () => {
+    expect(code).toContain("npm run scrape:promos");
+    expect(code).not.toContain("scrape:already-ran-today");
   });
 });

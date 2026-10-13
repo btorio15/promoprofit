@@ -451,3 +451,36 @@ export const memberProfitObservations = pgTable(
     index("member_profit_observations_user_date_idx").on(table.userId, table.denverDate),
   ],
 );
+
+/**
+ * Dashboard time series: one row per profitable promo per scheduled odds
+ * snapshot (the three scrape-promos.yml runs each day). Unlike
+ * promo_profit_observations (one row per promo per Denver day), capturedAt
+ * and denverHour keep WHEN the profit was seen, so the dashboard can show
+ * which time of day has the most profit. gameAt is the event's commence time
+ * (or the sport window start for sport-wide promos) and drives the sport x
+ * game-weekday view. guaranteedProfit is the group-level best profit, the
+ * same number recordCurrentProfitObservations stores. Never backfilled.
+ */
+export const profitSnapshots = pgTable(
+  "profit_snapshots",
+  {
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    denverDate: text("denver_date").notNull(),
+    denverHour: integer("denver_hour").notNull(),
+    sportKey: text("sport_key").notNull(),
+    gameAt: timestamp("game_at", { withTimezone: true }),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    guaranteedProfit: numeric("guaranteed_profit", { precision: 10, scale: 2 }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.promoId, table.capturedAt] }),
+    index("profit_snapshots_captured_at_idx").on(table.capturedAt),
+    index("profit_snapshots_sport_game_idx").on(table.sportKey, table.gameAt),
+  ],
+);

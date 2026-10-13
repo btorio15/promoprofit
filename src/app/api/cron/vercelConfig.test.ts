@@ -11,20 +11,12 @@ describe("vercel.json cron config", () => {
 
   const config = JSON.parse(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8"));
 
-  it("declares exactly one cron targeting the scrape route", () => {
-    expect(config.crons).toHaveLength(1);
-    expect(config.crons[0].path).toBe("/api/cron/scrape");
+  it("declares no Vercel cron: the GitHub Actions schedule runs the three daily scrape + odds passes", () => {
+    // The scrape-promos workflow's three schedules each refresh odds, so a
+    // Vercel cron would add a fourth odds spend per day. The cron route stays
+    // in place and can still be called manually.
+    expect(config.crons ?? []).toHaveLength(0);
     expect(existsSync(join(REPO_ROOT, "src/app/api/cron/scrape/route.ts"))).toBe(true);
-  });
-
-  it("runs once a day in the 13:00 UTC hour", () => {
-    const f = config.crons[0].schedule.trim().split(/\s+/);
-    expect(f).toHaveLength(5);
-    expect(f[1]).toBe("13");
-    expect(Number.isInteger(Number(f[0]))).toBe(true);
-    expect(Number(f[0])).toBeGreaterThanOrEqual(0);
-    expect(Number(f[0])).toBeLessThanOrEqual(59);
-    expect(f.slice(2)).toEqual(["*", "*", "*"]);
   });
 
   it("has no buildCommand and the build does not migrate", () => {

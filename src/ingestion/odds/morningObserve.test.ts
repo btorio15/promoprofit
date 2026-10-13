@@ -20,7 +20,10 @@ const {
 }));
 
 vi.mock("./refresh", () => ({ runOddsRefresh: mockRunOddsRefresh }));
-vi.mock("@/db/promoObservations", () => ({ recordCurrentProfitObservations: mockRecordCurrentProfitObservations }));
+vi.mock("@/db/promoObservations", () => ({
+  recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
+  recordCurrentProfitSnapshots: vi.fn(async () => undefined),
+}));
 vi.mock("@/db/queries", () => ({ listUserIds: mockListUserIds }));
 vi.mock("@/db/feedContext", () => ({ loadMemberFeedContext: mockLoadCtx }));
 vi.mock("@/db/memberObservations", () => ({ recordMemberProfitObservations: mockRecordMember }));
