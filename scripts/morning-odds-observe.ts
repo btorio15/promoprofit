@@ -25,6 +25,7 @@ async function main() {
 
   console.log("odds:morning-observe: refresh outcome", JSON.stringify(result.refreshOutcome));
   console.log("odds:morning-observe: recorded profit observations from cached odds");
+  console.log("odds:morning-observe: recorded member observations", JSON.stringify(result.memberObservations));
   process.exit(0);
 }
 
