@@ -25,7 +25,7 @@
 **Milestone goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
 
 - [ ] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page
-- [ ] **Phase 7: Stats Page** - Stats page in main navigation with the same graph, headline totals, and counts; profit summary leaves the Promos tab
+- [ ] **Phase 7: Dashboard** - Opportunities tab becomes the Dashboard: headline totals and counts above the profit graph, full feed below; profit summary leaves the Promos tab
 
 ## Phase Details
 
@@ -62,17 +62,18 @@ Plans:
 
 **UI hint**: yes
 
-### Phase 7: Stats Page
+### Phase 7: Dashboard
 
-**Goal**: A member can open a dedicated Stats page that shows the graph plus headline totals and simple counts, and the Promos tab no longer carries the profit summary
+**Goal**: The Opportunities tab becomes the Dashboard: a member sees headline totals and simple counts above the profit graph, with the full ranked feed below, and the Promos tab no longer carries the profit summary
 **Depends on**: Phase 6
 **Requirements**: STATS-07, STATS-08, STATS-09, STATS-10
 **Success Criteria** (what must be TRUE):
 
-  1. Member opens Stats from the main navigation and sees the same graph and range picker as on the Opportunities page
-  2. Stats page shows headline totals: total profit extracted, total profit available, last 7 days, and last 30 days, exact to the cent
-  3. Stats page shows promos completed, average profit per completed promo, and best single promo
-  4. Promos tab no longer shows the profit summary; those numbers appear only on the Stats page
+  1. The main navigation reads Dashboard · Arbitrage · Promos · Tools; Dashboard is the home tab and shows the Phase 6 graph and range picker above the full ranked feed (no separate Stats page)
+  2. Dashboard shows headline totals above the graph: total profit extracted, total profit available, last 7 days, and last 30 days, exact to the cent
+  3. Dashboard shows promos completed, average profit per completed promo, and best single promo
+  4. Promos tab no longer shows the profit summary; those numbers appear only on the Dashboard
+  5. On a phone, the totals stay compact enough that the first opportunity is still visible without much scrolling
 
 **Plans**: TBD
 **UI hint**: yes
@@ -83,7 +84,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 0/7 | Planned | - |
-| 7. Stats Page | v1.1 | 0/0 | Not started | - |
+| 7. Dashboard | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
 

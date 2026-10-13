@@ -15,12 +15,12 @@
 - [ ] **STATS-05**: Hovering/tapping a day shows that date with both running totals, exact to the cent
 - [ ] **STATS-06**: Graph is readable on a phone; a member with no history sees a short "nothing yet" message instead of an empty chart
 
-### Stats page
+### Dashboard
 
-- [ ] **STATS-07**: Member can open a Stats page from the main navigation; it shows the same graph and range picker
-- [ ] **STATS-08**: Stats page shows headline totals: total profit extracted, total profit available, last 7 days, last 30 days
-- [ ] **STATS-09**: Stats page shows simple counts: promos completed, average profit per completed promo, best single promo
-- [ ] **STATS-10**: Promos tab no longer shows the profit summary — those numbers live on the Stats page
+- [ ] **STATS-07**: The Opportunities tab is renamed Dashboard in the main navigation; graph, totals and counts sit above the full ranked feed (no separate Stats page)
+- [ ] **STATS-08**: Dashboard shows headline totals: total profit extracted, total profit available, last 7 days, last 30 days
+- [ ] **STATS-09**: Dashboard shows simple counts: promos completed, average profit per completed promo, best single promo
+- [ ] **STATS-10**: Promos tab no longer shows the profit summary — those numbers live on the Dashboard
 
 ## Future Requirements
 
