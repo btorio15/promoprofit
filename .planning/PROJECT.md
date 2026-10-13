@@ -14,8 +14,8 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Target features:**
 - Two-line cumulative profit graph at the top of Opportunities (home): grey = profit available at the member's books (each promo counted once at its best observed profit), green = profit the member personally extracted (Mark done); 7 days / 30 days / All time picker
-- New Stats page: same graph and picker, plus headline totals (total extracted, total available, last 7 days, last 30 days) and simple counts (promos completed, average profit per promo, best single promo)
-- Profit summary moves off the Promos tab to the Stats page
+- Opportunities tab becomes the Dashboard: headline totals (total extracted, total available, last 7 days, last 30 days) and simple counts (promos completed, average profit per promo, best single promo) above the graph, full ranked feed below (no separate Stats page)
+- Profit summary moves off the Promos tab to the Dashboard
 
 **Key context:** own numbers only (no group totals or leaderboard), no per-book/type/sport breakdowns. Both lines come from data already stored (`promo_profit_observations` since 2026-09-27; `promo_completions`) — no schema change expected. Undo of Mark done deletes the completion, so undone promos leave no green-line history. Admin page stays in backlog (999.1).
 
@@ -44,8 +44,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 ### Active
 
 - [ ] Cumulative profit graph (available vs extracted) on Opportunities, with time range picker
-- [ ] Stats page: graph, headline totals, simple counts
-- [ ] Profit summary moved from Promos tab to Stats page
+- [ ] Dashboard (renamed Opportunities tab): headline totals, simple counts, graph, full feed
+- [ ] Profit summary moved from Promos tab to Dashboard
 
 ### Out of Scope
 
