@@ -17,6 +17,8 @@ export const STORAGE_KEYS = {
   arbTotalStake: "promoprofit.arb.totalStake",
   arbPrecision: "promoprofit.arb.precision",
   sortMode: "promoprofit.opportunities.sort",
+  profitGraphRange: "promoprofit.profitGraph.range",
+  profitGraphHidden: "promoprofit.profitGraph.hidden",
 } as const;
 
 type ReadableStorage = Pick<Storage, "getItem">;
