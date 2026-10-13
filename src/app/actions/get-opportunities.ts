@@ -67,16 +67,17 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     // Record BEFORE building the series so today's number is included (D-05, D-07).
     // Always at "whole" precision (same as the morning job) so the recorded best
     // does not depend on the precision the member happens to be viewing (WR-01).
-    let recordCtx = ctx;
-    let recordFeed = feed;
-    if (precision !== "whole") {
-      recordCtx = await loadMemberFeedContext({ userId: user.userId, precision: "whole", now });
-      recordFeed = computeMemberFeed({
-        feedPromos: recordCtx.feedPromos,
-        rankOpts: recordCtx.rankOpts,
-        userBookSet: recordCtx.userBookSet,
-      });
-    }
+    // Precision only changes rankOpts, so re-rank the already-loaded context
+    // instead of reading the promos and both odds caches a second time.
+    const recordCtx = ctx;
+    const recordFeed =
+      precision === "whole"
+        ? feed
+        : computeMemberFeed({
+            feedPromos: ctx.feedPromos,
+            rankOpts: { ...ctx.rankOpts, precision: "whole" },
+            userBookSet: ctx.userBookSet,
+          });
     await recordMemberProfitObservations(
       user.userId,
       buildMemberObservationEntries({
