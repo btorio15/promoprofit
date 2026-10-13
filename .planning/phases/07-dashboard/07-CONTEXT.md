@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-The Opportunities tab becomes the **Dashboard** (tabs: Dashboard · Arbitrage · Promos · Tools; Dashboard stays the home tab). At the top: a totals card (headline totals + simple counts), then the existing Phase 6 profit graph card, then the full ranked opportunities feed. The old separate profit summary card (`ProfitSummary`, today rendered on the Opportunities screen below the graph — it is already gone from the Promos tab) is replaced by the new totals card. Requirements STATS-07..STATS-10.
+The Opportunities tab becomes the **Dashboard** (tabs: Dashboard · Stats · Arbitrage · Promos · Tools; Dashboard stays the home tab; the teammate's separate stats tab is renamed Stats, D-15). At the top: a totals card (headline totals + simple counts), then the existing Phase 6 profit graph card, then the full ranked opportunities feed. The old separate profit summary card (`ProfitSummary`, today rendered on the Opportunities screen below the graph — it is already gone from the Promos tab) is replaced by the new totals card. Requirements STATS-07..STATS-10.
 
 Out of scope: new stats beyond those listed (by-book / by-type breakdowns, history tables), changing the graph's math or start day, the feed's ranking.
 </domain>
@@ -35,6 +35,12 @@ Out of scope: new stats beyond those listed (by-book / by-type breakdowns, histo
 - **D-12:** The tab trigger reads **"Dashboard"** (internal tab id may stay `opportunities` if renaming adds risk — Claude's discretion).
 - **D-13:** Page heading: **"Dashboard"** with subtitle **"Your profit so far, and the best money available right now at your books."**
 - **D-14:** The feed gets a small **"Opportunities"** section heading above the "Sort by" row.
+
+
+### Teammate's Dashboard tab (added 2026-10-13 after commit 456ea6e by teammate dico1108)
+- **D-15:** The teammate's separate "Dashboard" tab (`src/components/dashboard/DashboardScreen.tsx`, `get-dashboard-stats.ts`: average profit available by Denver hour, profit by sport and game weekday, from `profit_snapshots`) is **renamed "Stats"** and kept as its own tab. Phase 7's Dashboard is still the renamed Opportunities tab (D-12..D-14). Tab id/labels must not collide: internal id for theirs becomes `stats`.
+- **D-16:** Tab order: Dashboard · Stats · Arbitrage · Promos · Tools (Stats keeps the slot the teammate gave it, right after the home tab) — Claude may adjust only if it hurts phone tab-bar fit.
+- **D-17:** Owner accepts the teammate's schedule change: every scheduled scrape run (15:37, 18:37, 22:37 UTC) also runs the moneyline odds refresh + profit recording (~4 credits/run, ~360 of 1,000 credits/month with key rotation), and the Vercel cron is removed (GitHub schedule is the only daily trigger). Phase 7 must not add any further automatic Odds API spending.
 
 ### Claude's Discretion
 - Best promo when it is a pair: label as "<BookA> + <BookB> pair" with the pair's profit.

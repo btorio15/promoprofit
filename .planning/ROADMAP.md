@@ -69,7 +69,7 @@ Plans:
 **Requirements**: STATS-07, STATS-08, STATS-09, STATS-10
 **Success Criteria** (what must be TRUE):
 
-  1. The main navigation reads Dashboard · Arbitrage · Promos · Tools; Dashboard is the home tab and shows the Phase 6 graph and range picker above the full ranked feed (no separate Stats page)
+  1. The main navigation reads Dashboard · Stats · Arbitrage · Promos · Tools (the teammate's hour/sport/weekday tab is renamed Stats); Dashboard is the home tab and shows the Phase 6 graph and range picker above the full ranked feed (no separate Stats page)
   2. Dashboard shows headline totals above the graph: total profit extracted, total profit available, last 7 days, and last 30 days, exact to the cent
   3. Dashboard shows promos completed, average profit per completed promo, and best single promo
   4. Promos tab no longer shows the profit summary; those numbers appear only on the Dashboard
