@@ -25,6 +25,7 @@ import { formatUsd } from "@/lib/format";
 import { describeOddsAge, STALE_AFTER_MINUTES } from "@/components/finder/oddsAge";
 import { OpportunitySection } from "./OpportunitySection";
 import { PairCard } from "./PairCard";
+import { ProfitGraph } from "./ProfitGraph";
 import { SortSwitch } from "./SortSwitch";
 
 export interface OpportunitiesScreenProps {
@@ -155,6 +156,17 @@ export function OpportunitiesScreen({
         <h1 className="text-xl font-semibold">Opportunities</h1>
         <p className="text-sm text-muted-foreground">The best money available right now at your books.</p>
       </header>
+
+      <ProfitGraph
+        loading={showSkeleton}
+        series={
+          ok
+            ? ok.profitSeries
+            : (loadFailed && !isPending) || response?.status === "invalid"
+              ? { status: "error" }
+              : null
+        }
+      />
 
       {stale ? (
         <p className="flex items-center gap-2 text-sm text-warning">
