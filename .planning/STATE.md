@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Profit Stats
-status: executing
-stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-10-13T23:04:34.087Z"
+status: ready_to_plan
+stopped_at: Phase 6 complete (7/7) — ready to discuss Phase 999.1
+last_updated: 2026-10-13T23:10:08.852Z
 last_activity: 2026-10-13
 progress:
   total_phases: 3
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 06 — profit-graph
+**Current focus:** Phase 999.1 — admin page
 
 ## Current Position
 
-Phase: 06 (profit-graph) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-10-13
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 61
+- Total plans completed: 68
 - Average duration: - min
 - Total execution time: 0 hours
 
@@ -49,6 +49,7 @@ Last activity: 2026-10-13
 | 4 | 9 | - | - |
 | 5 | 10 | - | - |
 | 05.1 | 5 | - | - |
+| 6 | 7 | - | - |
 
 **Recent Trend:**
 

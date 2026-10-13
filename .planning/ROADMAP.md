@@ -83,7 +83,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
-| 6. Profit Graph | v1.1 | 7/7 | Complete   | 2026-10-13 |
+| 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 0/0 | Not started | - |
 
 ## Backlog
