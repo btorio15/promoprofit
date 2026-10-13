@@ -64,7 +64,7 @@ beforeEach(() => {
   }));
   mockComputeFeed.mockReturnValue({ singles: ["s"], chosenPairs: ["p"] });
   mockBuildEntries.mockImplementation(() => [{ entry: true }]);
-  mockRecordMember.mockResolvedValue(undefined);
+  mockRecordMember.mockResolvedValue(true);
 });
 
 describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
@@ -163,6 +163,12 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     expect(mockRecordMember).toHaveBeenCalledWith(2, expect.anything(), MORNING_INSTANT);
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();
+  });
+
+  it("counts a member whose write reports failure as failed, not recorded (WR-02)", async () => {
+    mockRecordMember.mockResolvedValueOnce(false);
+    const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+    expect(result).toMatchObject({ status: "ran", memberObservations: { recorded: 1, failed: 1 } });
   });
 
   it("skips a member whose context has no cached odds", async () => {

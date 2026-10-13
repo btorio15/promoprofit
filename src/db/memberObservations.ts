@@ -23,14 +23,15 @@ export type MemberObservationWrite = {
 
 /**
  * Upserts a member's observations: one multi-row statement that only raises
- * profit (GREATEST). Never throws (covers the table missing before migration 0012).
+ * profit (GREATEST). Never throws (covers the table missing before migration 0012);
+ * returns true when the write succeeded (or there was nothing to write), false when it failed.
  */
 export async function recordMemberProfitObservations(
   userId: number,
   entries: MemberObservationWrite[],
   now: Date,
-): Promise<void> {
-  if (entries.length === 0) return;
+): Promise<boolean> {
+  if (entries.length === 0) return true;
   try {
     const t = memberProfitObservations;
     await getDb()
@@ -54,8 +55,10 @@ export async function recordMemberProfitObservations(
           lastObservedAt: sql`excluded.last_observed_at`,
         },
       });
+    return true;
   } catch (err) {
     console.error("recordMemberProfitObservations: failed to write member observations", err);
+    return false;
   }
 }
 

@@ -66,8 +66,12 @@ export async function recordAllMembersObservations(
         chosenPairs: feed.chosenPairs,
         userBookSet: ctx.userBookSet,
       });
-      await recordMemberProfitObservations(id, entries, now);
-      recorded++;
+      const ok = await recordMemberProfitObservations(id, entries, now);
+      if (ok) {
+        recorded++;
+      } else {
+        failed++;
+      }
     } catch (err) {
       console.error("recordAllMembersObservations: member " + id + " failed", err);
       failed++;
