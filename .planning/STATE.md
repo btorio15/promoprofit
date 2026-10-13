@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 7 (Dashboard)
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-13
+Last activity: 2026-10-13 - Completed quick task 261013-ny2: Rotate across multiple Odds API keys
 
 ## Performance Metrics
 
@@ -190,6 +190,7 @@ Recent decisions affecting current work:
 | fast | Profit summary: "This week"/"This month" → "Last 7 days"/"Last 30 days" (rolling Denver days incl. today, was Monday-start week / calendar month) | 2026-10-03 | eb248cc | ✅ | - |
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
+| 261013-ny2 | Rotate across multiple Odds API keys (most credits left; per-key ledger, migration 0013 generated not applied; combined meter) | 2026-10-13 | a85e634 | Verified | [261013-ny2-rotate-across-multiple-odds-api-keys](./quick/261013-ny2-rotate-across-multiple-odds-api-keys/) |
 
 ## Deferred Items
 
