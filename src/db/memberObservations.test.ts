@@ -54,6 +54,20 @@ describe("isUndefinedTableErrorFor", () => {
     expect(isUndefinedTableErrorFor(null, T)).toBe(false);
     expect(isUndefinedTableErrorFor(new Error('relation "other" does not exist'), T)).toBe(false);
   });
+  it("does not treat a 42P01 for a different table as this table (WR-03)", () => {
+    expect(
+      isUndefinedTableErrorFor(Object.assign(new Error('relation "users" does not exist'), { code: "42P01" }), T),
+    ).toBe(false);
+    expect(
+      isUndefinedTableErrorFor(
+        Object.assign(new Error("Failed query"), { cause: Object.assign(new Error('relation "promo_completions" does not exist'), { code: "42P01" }) }),
+        T,
+      ),
+    ).toBe(false);
+    expect(
+      isUndefinedTableErrorFor(Object.assign(new Error(`relation "${T}" does not exist`), { code: "42P01" }), T),
+    ).toBe(true);
+  });
 });
 
 describe("recordMemberProfitObservations", () => {
@@ -67,13 +81,13 @@ describe("recordMemberProfitObservations", () => {
 
   it("does not touch the db for empty entries", async () => {
     const m = mockInsert();
-    await recordMemberProfitObservations(7, [], NOW);
+    await expect(recordMemberProfitObservations(7, [], NOW)).resolves.toBe(true);
     expect(m.insert).not.toHaveBeenCalled();
   });
 
   it("inserts once with userId and lastObservedAt on every value", async () => {
     const m = mockInsert();
-    await recordMemberProfitObservations(7, [entry, { ...entry, promoId: 4 }], NOW);
+    await expect(recordMemberProfitObservations(7, [entry, { ...entry, promoId: 4 }], NOW)).resolves.toBe(true);
     expect(m.insert).toHaveBeenCalledTimes(1);
     const rows = (m.values.mock.calls[0] as unknown as [Record<string, unknown>[]])[0];
     expect(rows).toHaveLength(2);
@@ -83,11 +97,11 @@ describe("recordMemberProfitObservations", () => {
     }
   });
 
-  it("never throws, on 42P01 or any other error", async () => {
+  it("never throws, and reports false, on 42P01 or any other error", async () => {
     mockInsert({ code: "42P01" });
-    await expect(recordMemberProfitObservations(7, [entry], NOW)).resolves.toBeUndefined();
+    await expect(recordMemberProfitObservations(7, [entry], NOW)).resolves.toBe(false);
     mockInsert(new Error("boom"));
-    await expect(recordMemberProfitObservations(7, [entry], NOW)).resolves.toBeUndefined();
+    await expect(recordMemberProfitObservations(7, [entry], NOW)).resolves.toBe(false);
     expect(console.error).toHaveBeenCalled();
   });
 });

@@ -14,8 +14,12 @@ export function isUndefinedTableErrorFor(err: unknown, tableName: string): boole
   let current: unknown = err;
   for (let depth = 0; depth < 5 && current !== null && typeof current === "object"; depth++) {
     const e = current as { code?: unknown; message?: unknown; cause?: unknown };
-    if (e.code === UNDEFINED_TABLE) return true;
-    if (typeof e.message === "string" && messageRe.test(e.message)) return true;
+    const message = typeof e.message === "string" ? e.message : null;
+    if (message !== null && messageRe.test(message)) return true;
+    // A bare 42P01 (no message to check) is accepted; one that names a different relation is not.
+    if (e.code === UNDEFINED_TABLE && (message === null || !/relation ".*" does not exist/.test(message))) {
+      return true;
+    }
     current = e.cause;
   }
   return false;
