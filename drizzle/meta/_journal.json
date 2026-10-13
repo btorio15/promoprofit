@@ -85,6 +85,13 @@
       "when": 1790869789802,
       "tag": "0011_user_promo_caps",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791930572669,
+      "tag": "0012_member_profit_observations",
+      "breakpoints": true
     }
   ]
 }

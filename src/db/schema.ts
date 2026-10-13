@@ -418,3 +418,33 @@ export const promoProfitObservations = pgTable(
     index("promo_profit_observations_denver_date_idx").on(table.denverDate),
   ],
 );
+
+/**
+ * Phase 6 D-18: one row per member, promo and Denver day. profit is the
+ * promo's single profit or its exact share of a chosen pair, as that member's
+ * own feed computed it (own books, Your cap, private promos). Written going
+ * forward only, no backfill. denver_date is TEXT for the same reason as
+ * promo_profit_observations. Migration 0012 is applied manually with owner OK.
+ */
+export const memberProfitObservations = pgTable(
+  "member_profit_observations",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    denverDate: text("denver_date").notNull(),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    profit: numeric("profit", { precision: 10, scale: 2 }).notNull(),
+    partnerPromoId: integer("partner_promo_id"),
+    lastObservedAt: timestamp("last_observed_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.promoId, table.denverDate] }),
+    index("member_profit_observations_user_date_idx").on(table.userId, table.denverDate),
+  ],
+);
