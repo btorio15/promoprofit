@@ -2,12 +2,14 @@
 
 import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
+import { loadDailyProfitHistory } from "@/db/profitHistory";
 import {
   sportWeekdayStats,
   timeOfDayStats,
   type HourOfDayStat,
   type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
+import { dailyHistoryStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
 
 export interface StatsDTO {
   /** Scheduled odds runs that have recorded at least one snapshot. */
@@ -16,6 +18,8 @@ export interface StatsDTO {
   lastCapturedAt: string | null;
   timeOfDay: HourOfDayStat[];
   sportWeekday: SportWeekdayStats;
+  /** Older daily data from before the scheduled snapshots (Since Sep 27). */
+  history: DailyHistoryStats;
 }
 
 /**
@@ -26,7 +30,7 @@ export interface StatsDTO {
 export async function getStats(): Promise<StatsDTO> {
   await requireUser();
 
-  const rows = await loadProfitSnapshotRows();
+  const [rows, historyRows] = await Promise.all([loadProfitSnapshotRows(), loadDailyProfitHistory()]);
   const runTimes = new Set(rows.map((row) => row.capturedAt.getTime()));
   let first: number | null = null;
   let last: number | null = null;
@@ -41,5 +45,6 @@ export async function getStats(): Promise<StatsDTO> {
     lastCapturedAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows),
     sportWeekday: sportWeekdayStats(rows),
+    history: dailyHistoryStats(historyRows),
   };
 }

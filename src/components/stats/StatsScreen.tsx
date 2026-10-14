@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
 import { WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
+import { HistorySection } from "@/components/stats/HistorySection";
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Denver",
@@ -66,14 +67,17 @@ export function StatsScreen({ active }: { active: boolean }) {
   }
   if (stats.snapshotRuns === 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No snapshots yet</CardTitle>
-          <CardDescription>
-            This tab fills in after the first scheduled run (three times a day) records profit.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="flex flex-col gap-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>No snapshots yet</CardTitle>
+            <CardDescription>
+              This tab fills in after the first scheduled run (three times a day) records profit.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+        <HistorySection history={stats.history} />
+      </div>
     );
   }
 
@@ -184,6 +188,8 @@ export function StatsScreen({ active }: { active: boolean }) {
           ) : null}
         </CardContent>
       </Card>
+
+      <HistorySection history={stats.history} />
     </div>
   );
 }
