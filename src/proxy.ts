@@ -10,18 +10,12 @@ import { SESSION_COOKIE_NAME } from "@/lib/sessionCookie";
  * requireUser() in every protected page and server action instead).
  * Imports only @/lib/sessionCookie (a dependency-free constant module) --
  * never @/lib/session, which pulls in next/headers/iron-session and is
- * unnecessary here. Routes under /api/cron/ authenticate themselves with
- * the CRON_SECRET bearer check because Vercel Cron has no session cookie
- * and does not follow redirects.
+ * unnecessary here.
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname === "/login" ||
-    pathname.startsWith("/invite/") ||
-    pathname.startsWith("/api/cron/")
-  ) {
+  if (pathname === "/login" || pathname.startsWith("/invite/")) {
     return NextResponse.next();
   }
 

@@ -16,7 +16,6 @@ describe("vercel.json cron config", () => {
     // Vercel cron would add a fourth odds spend per day. The cron route stays
     // in place and can still be called manually.
     expect(config.crons ?? []).toHaveLength(0);
-    expect(existsSync(join(REPO_ROOT, "src/app/api/cron/scrape/route.ts"))).toBe(true);
   });
 
   it("has no buildCommand and the build does not migrate", () => {

@@ -5,10 +5,10 @@ import { proxy } from "./proxy";
 const call = (path: string) => proxy(new NextRequest(`https://x.test${path}`));
 
 describe("proxy", () => {
-  it("lets /api/cron/scrape through without a cookie", () => {
+  it("redirects /api/cron/scrape to /login now that the route is gone", () => {
     const res = call("/api/cron/scrape");
-    expect(res.status).not.toBe(307);
-    expect(res.headers.get("location")).toBeNull();
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toMatch(/\/login$/);
   });
   it("redirects / to /login", () => {
     const res = call("/");
