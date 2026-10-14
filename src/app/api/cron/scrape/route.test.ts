@@ -93,16 +93,16 @@ describe("GET /api/cron/scrape", () => {
     expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(true);
   });
 
-  it("does not force the observe when it already ran today (duplicate delivery)", async () => {
+  it("still forces the observe after today's run already happened (each of the three daily triggers records a snapshot)", async () => {
     mockStatus.mockResolvedValue({ scrapeDone: true, observeDone: true });
     mockDispatch.mockResolvedValue({ ok: true });
     const res = await GET(req(`Bearer ${SECRET}`));
     expect(res.status).toBe(200);
     expect(mockDispatch).toHaveBeenCalledTimes(1);
-    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(false);
+    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(true);
   });
 
-  it("fails open to a single forced dispatch when the DB check throws", async () => {
+  it("dispatches even when the DB is down, since it no longer checks the DB", async () => {
     mockStatus.mockRejectedValue(new Error("db down"));
     mockDispatch.mockResolvedValue({ ok: true });
     const res = await GET(req(`Bearer ${SECRET}`));
