@@ -75,7 +75,27 @@ Plans:
   4. Promos tab no longer shows the profit summary; those numbers appear only on the Dashboard
   5. On a phone, the totals stay compact enough that the first opportunity is still visible without much scrolling
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 07-01-PLAN.md — Pure totals and counts math: extracted incl. pre-start, member-series available, promos done/avg/best (TDD)
+- [ ] 07-02-PLAN.md — Tab rename: Opportunities label to Dashboard, teammate tab to Stats (id stats), tab-order guard
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07-03-PLAN.md — getOpportunities returns the dashboard totals; drop the group-wide available read
+- [ ] 07-04-PLAN.md — Totals card copy view model + graph "since <day>" suffix
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 07-05-PLAN.md — Totals card component on the Dashboard, Opportunities heading, ProfitSummary removed with guards
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 07-06-PLAN.md — Full gate, validation map, owner phone-width check
+
 **UI hint**: yes
 
 ## Progress
@@ -84,7 +104,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
-| 7. Dashboard | v1.1 | 0/0 | Not started | - |
+| 7. Dashboard | v1.1 | 0/6 | Planned | - |
 
 ## Backlog
 
