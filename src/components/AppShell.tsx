@@ -64,10 +64,10 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
         >
           <TabsList variant="line" aria-label="Select a tab" className="mt-2">
             <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap">
-              Opportunities
+              Dashboard
             </TabsTrigger>
             <TabsTrigger value="stats" className="min-h-11 whitespace-nowrap">
-              Stats
+              Statistics
             </TabsTrigger>
             <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap">
               Arbitrage
