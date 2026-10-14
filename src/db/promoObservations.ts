@@ -61,7 +61,7 @@ export async function recordCurrentProfitObservations(
 }
 
 /**
- * Dashboard time series (see profitSnapshots in schema.ts). Called only from
+ * Stats time series (see profitSnapshots in schema.ts). Called only from
  * the scheduled odds run, so each scrape-promos.yml run adds one snapshot per
  * profitable promo. Same ranking as recordCurrentProfitObservations, but the
  * row keeps capturedAt, the Denver hour and the game time. A write failure is

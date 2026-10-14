@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 
 /**
- * Pure aggregation for the Dashboard (profit_snapshots rows -> view numbers).
+ * Pure aggregation for the Stats tab (profit_snapshots rows -> view numbers).
  * No I/O. All money is summed with decimal.js and returned as two-decimal
  * strings, matching how every other profit figure in the app is shown.
  */

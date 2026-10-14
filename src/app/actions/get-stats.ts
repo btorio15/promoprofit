@@ -9,7 +9,7 @@ import {
   type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
 
-export interface DashboardStatsDTO {
+export interface StatsDTO {
   /** Scheduled odds runs that have recorded at least one snapshot. */
   snapshotRuns: number;
   firstCapturedAt: string | null;
@@ -19,11 +19,11 @@ export interface DashboardStatsDTO {
 }
 
 /**
- * Dashboard figures from every stored snapshot (long-term, never trimmed).
+ * Stats figures from every stored snapshot (long-term, never trimmed).
  * Group-level, so the same for every member. requireUser() is the literal
  * first statement, so only signed-in members can read it.
  */
-export async function getDashboardStats(): Promise<DashboardStatsDTO> {
+export async function getStats(): Promise<StatsDTO> {
   await requireUser();
 
   const rows = await loadProfitSnapshotRows();

@@ -100,7 +100,7 @@ export async function runMorningObservation(opts: {
 
   const refreshOutcome = await runOddsRefresh({ confirmed: true, triggeredByUserId: null, now });
   await recordCurrentProfitObservations(now);
-  // Dashboard time series: one snapshot per profitable promo for this run.
+  // Stats time series: one snapshot per profitable promo for this run.
   await recordCurrentProfitSnapshots(now);
 
   const memberObservations = await recordAllMembersObservations(now);

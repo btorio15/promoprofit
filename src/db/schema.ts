@@ -453,10 +453,10 @@ export const memberProfitObservations = pgTable(
 );
 
 /**
- * Dashboard time series: one row per profitable promo per scheduled odds
+ * Stats time series: one row per profitable promo per scheduled odds
  * snapshot (the three scrape-promos.yml runs each day). Unlike
  * promo_profit_observations (one row per promo per Denver day), capturedAt
- * and denverHour keep WHEN the profit was seen, so the dashboard can show
+ * and denverHour keep WHEN the profit was seen, so the Stats tab can show
  * which time of day has the most profit. gameAt is the event's commence time
  * (or the sport window start for sport-wide promos) and drives the sport x
  * game-weekday view. guaranteedProfit is the group-level best profit, the

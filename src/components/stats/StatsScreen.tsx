@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { getDashboardStats, type DashboardStatsDTO } from "@/app/actions/get-dashboard-stats";
+import { getStats, type StatsDTO } from "@/app/actions/get-stats";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,23 +29,23 @@ function formatWhen(iso: string | null): string {
 }
 
 /**
- * Dashboard tab: long-term theoretical profit from the scheduled odds runs.
+ * Stats tab: long-term theoretical profit from the scheduled odds runs.
  * Money stays as decimal strings (formatUsd); numbers are used only to plot
  * bar heights. Times are Denver time, matching the rest of the app.
  */
-export function DashboardScreen({ active }: { active: boolean }) {
-  const [stats, setStats] = useState<DashboardStatsDTO | null>(null);
+export function StatsScreen({ active }: { active: boolean }) {
+  const [stats, setStats] = useState<StatsDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!active || stats !== null) return;
     let cancelled = false;
-    getDashboardStats()
+    getStats()
       .then((dto) => {
         if (!cancelled) setStats(dto);
       })
       .catch(() => {
-        if (!cancelled) setError("Couldn't load the dashboard. Try again in a moment.");
+        if (!cancelled) setError("Couldn't load the Stats tab. Try again in a moment.");
       });
     return () => {
       cancelled = true;
@@ -70,7 +70,7 @@ export function DashboardScreen({ active }: { active: boolean }) {
         <CardHeader>
           <CardTitle>No snapshots yet</CardTitle>
           <CardDescription>
-            The dashboard fills in after the first scheduled run (three times a day) records profit.
+            This tab fills in after the first scheduled run (three times a day) records profit.
           </CardDescription>
         </CardHeader>
       </Card>

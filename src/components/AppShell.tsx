@@ -12,7 +12,7 @@ import { OpportunitiesScreen } from "@/components/opportunities/OpportunitiesScr
 import { countLabel } from "@/lib/sortPreference";
 import { PromosScreen, type PromosView } from "@/components/promos/PromosScreen";
 import { ToolsScreen } from "@/components/tools/ToolsScreen";
-import { DashboardScreen } from "@/components/dashboard/DashboardScreen";
+import { StatsScreen } from "@/components/stats/StatsScreen";
 
 export interface AppShellProps {
   status: OddsStatus;
@@ -21,7 +21,7 @@ export interface AppShellProps {
   displayName: string;
 }
 
-type ActiveTab = "opportunities" | "dashboard" | "arbitrage" | "promos" | "tools";
+type ActiveTab = "opportunities" | "stats" | "arbitrage" | "promos" | "tools";
 
 /**
  * Page shell (D-09, D-01): one sticky status bar + credit banner shared
@@ -66,8 +66,8 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
             <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap">
               Opportunities
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="min-h-11 whitespace-nowrap">
-              Dashboard
+            <TabsTrigger value="stats" className="min-h-11 whitespace-nowrap">
+              Stats
             </TabsTrigger>
             <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap">
               Arbitrage
@@ -103,8 +103,8 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
             />
           </TabsContent>
 
-          <TabsContent value="dashboard" keepMounted>
-            <DashboardScreen active={activeTab === "dashboard"} />
+          <TabsContent value="stats" keepMounted>
+            <StatsScreen active={activeTab === "stats"} />
           </TabsContent>
 
           <TabsContent value="arbitrage" keepMounted>
