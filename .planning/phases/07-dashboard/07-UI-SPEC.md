@@ -1,7 +1,8 @@
 ---
 phase: 7
 slug: dashboard
-status: draft
+status: approved
+reviewed_at: 2026-10-14
 shadcn_initialized: true
 preset: base-nova (components.json present, neutral base color, CSS variables)
 created: 2026-10-14
@@ -174,11 +175,11 @@ The owner locked D-01..D-17 and picked layout B from mockups (not re-asked). The
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG (non-blocking: 18px values vs 20px headings are close; kept for Phase 6 consistency)
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-14
