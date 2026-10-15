@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Decimal from "decimal.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,6 +92,7 @@ export function HistorySection({
   /** Range name shown in the title, e.g. "7 days" or "All time". */
   label: string;
 }) {
+  const [showNotExtracted, setShowNotExtracted] = useState(true);
   if (history.promoCount === 0 || history.days.length === 0) {
     return (
       <Card>
@@ -166,10 +168,14 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo; color = marked done (by sport), white = available only; gaps separate each bet"
+          description="One block per promo; color = extracted (by sport), white = not extracted; gaps separate each bet"
           defaultOpen
         >
-          <SportLegend sportKeys={sportsInRange} />
+          <SportLegend
+            sportKeys={sportsInRange}
+            showNotExtracted={showNotExtracted}
+            onToggleNotExtracted={() => setShowNotExtracted((shown) => !shown)}
+          />
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -178,7 +184,12 @@ export function HistorySection({
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
                 <Tooltip content={(props) => <DayTotalsTooltip {...props} />} />
                 {segmentKeys.map((key) => (
-                  <Bar key={key} dataKey={key} stackId="profit" shape={segmentShape} />
+                  <Bar
+                    key={key}
+                    dataKey={key}
+                    stackId="profit"
+                    shape={(props: SegmentShapeProps) => segmentShape(props, showNotExtracted)}
+                  />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -259,14 +270,16 @@ type SegmentShapeProps = {
 };
 
 /** Draws one promo block inside a day's stacked bar, colored by its sport, with a gap above and below. */
-function segmentShape(props: SegmentShapeProps) {
+function segmentShape(props: SegmentShapeProps, showNotExtracted: boolean) {
   const { x = 0, y = 0, width = 0, height = 0 } = props;
   if (height <= 0 || width <= 0) return <g />;
   const key = String(props.dataKey);
   const payload = (props.payload ?? {}) as Record<string, unknown>;
   const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
-  // Only promos marked done get their sport color; available-but-not-done promos stay neutral grey.
-  const fill = payload[`${key}Done`] === true ? colorFor(sport) : NOT_DONE_COLOR;
+  const done = payload[`${key}Done`] === true;
+  // Blocks not yet extracted are white; the key can hide them.
+  if (!done && !showNotExtracted) return <g />;
+  const fill = done ? colorFor(sport) : NOT_DONE_COLOR;
   const blockHeight = Math.max(height - SEGMENT_GAP, 1);
   return <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={fill} />;
 }
@@ -299,18 +312,34 @@ function DayTotalsTooltip({
   );
 }
 
-function SportLegend({ sportKeys }: { sportKeys: string[] }) {
+function SportLegend({
+  sportKeys,
+  showNotExtracted,
+  onToggleNotExtracted,
+}: {
+  sportKeys: string[];
+  showNotExtracted: boolean;
+  onToggleNotExtracted: () => void;
+}) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Key">
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" aria-label="Key">
       {sportKeys.map((key) => (
         <li key={key} className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
           {sportName(key)}
         </li>
       ))}
-      <li className="flex items-center gap-1.5">
-        <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
-        White: available, not marked done
+      <li>
+        <button
+          type="button"
+          aria-pressed={showNotExtracted}
+          onClick={onToggleNotExtracted}
+          className={`flex min-h-8 items-center gap-1.5 rounded-md px-2 ${showNotExtracted ? "" : "opacity-50"}`}
+        >
+          <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
+          Not extracted
+          <span className="text-muted-foreground">({showNotExtracted ? "shown" : "hidden"})</span>
+        </button>
       </li>
     </ul>
   );
