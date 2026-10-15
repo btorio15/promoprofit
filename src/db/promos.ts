@@ -18,8 +18,9 @@ import type { PromoScope } from "@/domain/promos/scope";
 import type { RankablePromo } from "@/domain/promos/rankPromoHedges";
 import { getSportLabel } from "@/config/sports";
 import { etDayLabel } from "@/domain/promos/etTime";
-import { applyMemberCaps } from "@/domain/promos/yourCap";
+import { applyMemberCaps, type CapSource } from "@/domain/promos/yourCap";
 import { getMemberPromoCaps } from "./promoCaps";
+import { getMemberBookCaps } from "./bookCaps";
 
 export interface ScrapeStatusRow {
   lastOkAt: Date | null;
@@ -86,6 +87,11 @@ export interface ActivePromo extends RankablePromo {
   promoMaxStake?: string | null;
   /** quick-261001-dhn: the viewer's "Your cap" override, or null (set when a viewer's caps were applied). */
   capOverride?: string | null;
+  /** quick-261014-u6k: which rule set the effective cap (viewer's caps applied only). */
+  capSource?: CapSource | null;
+  /** quick-261014-u6k: the cap in effect with no per-promo override, and its source. */
+  fallbackCap?: string | null;
+  fallbackSource?: Exclude<CapSource, "your_promo_cap"> | null;
 }
 
 const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
@@ -339,9 +345,10 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
     .leftJoin(capEnteredByUsers, eq(promos.capEnteredByUserId, capEnteredByUsers.id))
     .where(activePromoWhere(now, viewerUserId));
 
-  const [rows, caps] = await Promise.all([
+  const [rows, caps, bookCaps] = await Promise.all([
     rowsQuery,
     viewerUserId !== undefined ? getMemberPromoCaps(viewerUserId) : Promise.resolve(null),
+    viewerUserId !== undefined ? getMemberBookCaps(viewerUserId) : Promise.resolve(null),
   ]);
 
   const activePromos: ActivePromo[] = [];
@@ -349,5 +356,5 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
     const mapped = mapActivePromoRow(row, viewerUserId);
     if (mapped) activePromos.push(mapped);
   }
-  return caps === null ? activePromos : applyMemberCaps(activePromos, caps);
+  return caps === null || bookCaps === null ? activePromos : applyMemberCaps(activePromos, caps, bookCaps);
 }

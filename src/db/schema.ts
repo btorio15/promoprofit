@@ -423,6 +423,29 @@ export const userPromoCaps = pgTable(
 );
 
 /**
+ * quick-261014-u6k: a member's max bet per sportsbook, set in Settings. It
+ * replaces the $25 default for that book's profit boosts (never above the
+ * promo's own cap). A SEPARATE table, not a column on user_books, because
+ * saveUserBooks deletes and re-inserts user_books rows on every save and
+ * would wipe it. The scraper never references it. ON DELETE CASCADE on the
+ * user FK; book_key references books.key.
+ */
+export const userBookCaps = pgTable(
+  "user_book_caps",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    maxStake: numeric("max_stake", { precision: 10, scale: 2 }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.bookKey] })],
+);
+
+/**
  * quick-260927-n12 (owner decision 3): the best guaranteed profit observed
  * for a promo on a given America/Denver calendar day, recorded by getPromos
  * on every Promos-tab load (never by the scraper -- see get-promos.ts's

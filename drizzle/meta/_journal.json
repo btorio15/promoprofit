@@ -113,6 +113,13 @@
       "when": 1792033736240,
       "tag": "0015_perpetual_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792041672547,
+      "tag": "0016_worthless_rockslide",
+      "breakpoints": true
     }
   ]
 }
