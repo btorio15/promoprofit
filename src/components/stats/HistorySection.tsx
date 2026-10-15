@@ -93,6 +93,14 @@ export function HistorySection({
   label: string;
 }) {
   const [showNotExtracted, setShowNotExtracted] = useState(true);
+  const [hiddenSports, setHiddenSports] = useState<Set<string>>(new Set());
+  const toggleSport = (sportKey: string) =>
+    setHiddenSports((hidden) => {
+      const next = new Set(hidden);
+      if (next.has(sportKey)) next.delete(sportKey);
+      else next.add(sportKey);
+      return next;
+    });
   if (history.promoCount === 0 || history.days.length === 0) {
     return (
       <Card>
@@ -106,19 +114,30 @@ export function HistorySection({
 
   const first = history.days[0].date;
   const last = history.days[history.days.length - 1].date;
-  // One stacked segment per promo record, so a day's bar shows each bet as a separate block.
-  const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.length));
+  // A block is shown unless its sport is hidden, or it is not extracted and not-extracted blocks are hidden.
+  // Hidden blocks are dropped before stacking, so the blocks below them move down to fill the gap.
+  const isVisible = (segment: { sportKey: string; done: boolean }) =>
+    !hiddenSports.has(segment.sportKey) && (segment.done || showNotExtracted);
+  // One stacked segment per visible promo record, so a day's bar shows each bet as a separate block.
+  const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.filter(isVisible).length));
   const segmentKeys = Array.from({ length: maxSegments }, (_, index) => `seg${index}`);
   const chartData = history.days.map((day) => {
-    const sportTotals = Object.entries(day.bySport)
-      .sort(([, a], [, b]) => Number(b) - Number(a))
-      .map(([sportKey, total]) => ({ sport: sportName(sportKey), total: formatUsd(total) }));
-    const row: Record<string, string | number | unknown> = {
+    const visible = day.segments.filter(isVisible);
+    const bySportVisible = new Map<string, Decimal>();
+    let dayTotal = new Decimal(0);
+    for (const segment of visible) {
+      dayTotal = dayTotal.plus(segment.profit);
+      bySportVisible.set(segment.sportKey, (bySportVisible.get(segment.sportKey) ?? new Decimal(0)).plus(segment.profit));
+    }
+    const sportTotals = [...bySportVisible.entries()]
+      .sort(([, a], [, b]) => b.comparedTo(a))
+      .map(([sportKey, total]) => ({ sport: sportName(sportKey), total: formatUsd(total.toFixed(2)) }));
+    const row: Record<string, unknown> = {
       day: dayLabel(day.date),
-      totalLabel: formatUsd(day.total),
+      totalLabel: formatUsd(dayTotal.toFixed(2)),
       sportTotals,
     };
-    day.segments.forEach((segment, index) => {
+    visible.forEach((segment, index) => {
       row[`seg${index}`] = Number(segment.profit);
       row[`seg${index}Sport`] = segment.sportKey;
       row[`seg${index}Done`] = segment.done;
@@ -168,11 +187,13 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo; color = extracted (by sport), white = not extracted; gaps separate each bet"
+          description="One block per promo; color = extracted (by sport), white = not extracted, click a key to show or hide it; gaps separate each bet"
           defaultOpen
         >
           <SportLegend
             sportKeys={sportsInRange}
+            hiddenSports={hiddenSports}
+            onToggleSport={toggleSport}
             showNotExtracted={showNotExtracted}
             onToggleNotExtracted={() => setShowNotExtracted((shown) => !shown)}
           />
@@ -184,12 +205,7 @@ export function HistorySection({
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
                 <Tooltip content={(props) => <DayTotalsTooltip {...props} />} />
                 {segmentKeys.map((key) => (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    stackId="profit"
-                    shape={(props: SegmentShapeProps) => segmentShape(props, showNotExtracted)}
-                  />
+                  <Bar key={key} dataKey={key} stackId="profit" shape={segmentShape} />
                 ))}
               </BarChart>
             </ResponsiveContainer>
@@ -270,15 +286,14 @@ type SegmentShapeProps = {
 };
 
 /** Draws one promo block inside a day's stacked bar, colored by its sport, with a gap above and below. */
-function segmentShape(props: SegmentShapeProps, showNotExtracted: boolean) {
+function segmentShape(props: SegmentShapeProps) {
   const { x = 0, y = 0, width = 0, height = 0 } = props;
   if (height <= 0 || width <= 0) return <g />;
   const key = String(props.dataKey);
   const payload = (props.payload ?? {}) as Record<string, unknown>;
   const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
   const done = payload[`${key}Done`] === true;
-  // Blocks not yet extracted are white; the key can hide them.
-  if (!done && !showNotExtracted) return <g />;
+  // Blocks not yet extracted are white.
   const fill = done ? colorFor(sport) : NOT_DONE_COLOR;
   const blockHeight = Math.max(height - SEGMENT_GAP, 1);
   return <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={fill} />;
@@ -314,21 +329,35 @@ function DayTotalsTooltip({
 
 function SportLegend({
   sportKeys,
+  hiddenSports,
+  onToggleSport,
   showNotExtracted,
   onToggleNotExtracted,
 }: {
   sportKeys: string[];
+  hiddenSports: Set<string>;
+  onToggleSport: (sportKey: string) => void;
   showNotExtracted: boolean;
   onToggleNotExtracted: () => void;
 }) {
   return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" aria-label="Key">
-      {sportKeys.map((key) => (
-        <li key={key} className="flex items-center gap-1.5">
-          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
-          {sportName(key)}
-        </li>
-      ))}
+    <ul className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label="Key">
+      {sportKeys.map((key) => {
+        const shown = !hiddenSports.has(key);
+        return (
+          <li key={key}>
+            <button
+              type="button"
+              aria-pressed={shown}
+              onClick={() => onToggleSport(key)}
+              className={`flex min-h-8 items-center gap-1.5 rounded-md px-2 ${shown ? "" : "opacity-50"}`}
+            >
+              <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
+              {sportName(key)}
+            </button>
+          </li>
+        );
+      })}
       <li>
         <button
           type="button"
@@ -338,7 +367,6 @@ function SportLegend({
         >
           <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
           Not extracted
-          <span className="text-muted-foreground">({showNotExtracted ? "shown" : "hidden"})</span>
         </button>
       </li>
     </ul>
