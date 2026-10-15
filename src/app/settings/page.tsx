@@ -3,7 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
+import { SettingsBookCapsForm } from "@/components/settings/SettingsBookCapsForm";
+import { getMemberBookCaps } from "@/db/bookCaps";
 import { getBonusBooks, getUsableUserBooks } from "@/db/queries";
+import { DEFAULT_MAX_STAKE } from "@/domain/promos/yourCap";
+import { formatUsd } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 
 // Always reads the user's live saved selection; never prerendered.
@@ -27,7 +31,11 @@ export default async function SettingsPage() {
   // predicate / and /onboarding/books use), so a stale saved key that no
   // longer renders as a checkbox is never seeded into initialKeys -- Save
   // changes can always succeed.
-  const [books, usableSaved] = await Promise.all([getBonusBooks(), getUsableUserBooks(user.userId)]);
+  const [books, usableSaved, bookCaps] = await Promise.all([
+    getBonusBooks(),
+    getUsableUserBooks(user.userId),
+    getMemberBookCaps(user.userId),
+  ]);
   const initialKeys = usableSaved.map((b) => b.key);
 
   return (
@@ -52,6 +60,15 @@ export default async function SettingsPage() {
           <Card className="p-6">
             <h2 className="text-xl font-semibold">My books</h2>
             <SettingsBooksForm books={books} initialKeys={initialKeys} />
+          </Card>
+
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold">Max bet per book</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Every profit boost uses a {formatUsd(DEFAULT_MAX_STAKE)} max bet unless you set one here. A boost&apos;s own
+              cap still applies if it&apos;s lower, and a cap you set on a single promo always wins.
+            </p>
+            <SettingsBookCapsForm books={usableSaved} caps={Object.fromEntries(bookCaps)} />
           </Card>
         </div>
       </main>

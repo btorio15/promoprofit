@@ -52,6 +52,8 @@ vi.mock("@/components/AppHeader", () => ({
 vi.mock("@/components/settings/OnboardingBooksForm", () => ({
   OnboardingBooksForm: () => null,
 }));
+vi.mock("@/db/bookCaps", () => ({ getMemberBookCaps: async () => new Map<string, string>() }));
+vi.mock("@/components/settings/SettingsBookCapsForm", () => ({ SettingsBookCapsForm: () => null }));
 vi.mock("@/components/settings/SettingsBooksForm", () => ({
   SettingsBooksForm: mockSettingsBooksForm,
 }));
