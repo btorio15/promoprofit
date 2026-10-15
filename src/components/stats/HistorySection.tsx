@@ -186,7 +186,7 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo; color = extracted (by sport), white = not extracted, click a key to show or hide it; gaps separate each bet"
+          description="One block per promo; white = not extracted. Click a key to show or hide it."
           defaultOpen
         >
           <SportLegend
