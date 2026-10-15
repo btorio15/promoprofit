@@ -82,6 +82,8 @@ function boost(id: number, bookKey: string, eventId: string, market: "moneyline"
     maxStake: "50",
     promoMaxStake: "50",
     capOverride: null,
+    fallbackCap: "50.00",
+    fallbackSource: "book_page",
     winningsCap: null,
     minOddsAmerican: null,
     finePrintNote: null,
@@ -177,8 +179,8 @@ describe("toPairRowDTO base price, yourCap and pricesAsOf", () => {
     const dto = toPairRowDTO(c, bookNames, ctx);
     expect(dto.legA.baseOddsAmerican).toBe(cachedPrice(c.selectionA, c.promoA.bookKey));
     expect(dto.legB.baseOddsAmerican).toBe(cachedPrice(c.selectionB, c.promoB.bookKey));
-    expect(dto.legA.yourCap).toEqual({ promoCap: "50", override: null });
-    expect(dto.legB.yourCap).toEqual({ promoCap: "50", override: null });
+    expect(dto.legA.yourCap).toEqual({ promoCap: "50", override: null, fallbackCap: "50.00", fallbackSource: "book_page" });
+    expect(dto.legB.yourCap).toEqual({ promoCap: "50", override: null, fallbackCap: "50.00", fallbackSource: "book_page" });
     expect(dto.pricesAsOf).toBe(ML_AT.toISOString());
   });
 

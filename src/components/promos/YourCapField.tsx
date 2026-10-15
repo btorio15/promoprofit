@@ -10,10 +10,13 @@ import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
 
 interface YourCapFieldProps {
   promoId: number;
-  /** The promo's own max stake (the book's page). */
-  promoCap: string;
+  /** The promo's own max stake (the book's page), or null when unknown. */
+  promoCap: string | null;
   /** The member's override, or null when none is set. */
   override: string | null;
+  /** quick-261014-u6k: the cap in effect with no per-promo override, and which rule set it. */
+  fallbackCap: string;
+  fallbackSource: "your_book_cap" | "default" | "book_page";
   onChanged: () => void;
   /** Input id prefix. Promos and Opportunities are both mounted, so ids must differ per tab. */
   idPrefix?: string;
@@ -30,7 +33,28 @@ interface YourCapFieldProps {
  * so the wrapper opts back in and stops click/pointer/key events so typing
  * or tapping never toggles the row's Collapsible.
  */
-export function YourCapField({ promoId, promoCap, override, onChanged, idPrefix = "your-cap" }: YourCapFieldProps) {
+function helperText(
+  promoCap: string | null,
+  override: string | null,
+  fallbackCap: string,
+  fallbackSource: YourCapFieldProps["fallbackSource"],
+): string {
+  if (override !== null) return `Using your cap (otherwise ${formatUsd(fallbackCap)})`;
+  const bookSays = promoCap !== null && promoCap !== fallbackCap ? ` (book says ${formatUsd(promoCap)})` : "";
+  if (fallbackSource === "your_book_cap") return `Your max bet for this book: ${formatUsd(fallbackCap)}${bookSays}`;
+  if (fallbackSource === "default") return `Default max bet: ${formatUsd(fallbackCap)}${bookSays}`;
+  return `Book's cap: ${formatUsd(fallbackCap)}`;
+}
+
+export function YourCapField({
+  promoId,
+  promoCap,
+  override,
+  fallbackCap,
+  fallbackSource,
+  onChanged,
+  idPrefix = "your-cap",
+}: YourCapFieldProps) {
   const [isPending, startTransition] = useTransition();
   const [value, setValue] = useState(override ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -77,7 +101,7 @@ export function YourCapField({ promoId, promoCap, override, onChanged, idPrefix 
           inputMode="decimal"
           autoComplete="off"
           className="min-h-10 w-24"
-          placeholder={formatUsd(promoCap).replace("$", "")}
+          placeholder={formatUsd(fallbackCap).replace("$", "")}
           value={value}
           disabled={isPending}
           onChange={(event) => setValue(event.target.value)}
@@ -101,14 +125,12 @@ export function YourCapField({ promoId, promoCap, override, onChanged, idPrefix 
             disabled={isPending}
             onClick={() => save(null)}
           >
-            Use book&apos;s cap
+            Clear
           </Button>
         ) : null}
       </div>
       <span className="text-sm text-muted-foreground">
-        {override === null
-          ? `Book's cap: ${formatUsd(promoCap)}`
-          : `Using your cap (book says ${formatUsd(promoCap)})`}
+        {helperText(promoCap, override, fallbackCap, fallbackSource)}
       </span>
       {errorMessage ? (
         <p role="alert" className="text-sm text-destructive">

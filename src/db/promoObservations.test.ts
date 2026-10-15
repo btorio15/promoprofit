@@ -90,7 +90,7 @@ describe("recordCurrentProfitObservations (quick-261001-dhn)", () => {
   });
 
   it("records the promo's own-cap profit even when the viewer's override is lower", async () => {
-    const [capped] = applyMemberCaps([boost], new Map([[20, "20.00"]]));
+    const [capped] = applyMemberCaps([boost], new Map([[20, "20.00"]]), new Map());
     expect(capped.maxStake).toBe("20.00");
 
     await recordCurrentProfitObservations(NOW, { activePromos: [capped], precision: "cents" });

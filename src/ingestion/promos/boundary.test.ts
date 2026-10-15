@@ -57,7 +57,7 @@ describe("scraper/app-router boundary", () => {
       for (const file of walkFiles(root)) {
         if (file.endsWith(".test.ts")) continue;
         const text = readFileSync(file, "utf8");
-        if (/userPromoCaps|user_promo_caps|@\/db\/promoCaps/.test(text)) {
+        if (/userPromoCaps|user_promo_caps|@\/db\/promoCaps|userBookCaps|user_book_caps|@\/db\/bookCaps/.test(text)) {
           offenders.push(file);
         }
       }

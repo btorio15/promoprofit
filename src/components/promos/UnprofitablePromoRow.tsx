@@ -66,6 +66,8 @@ export function UnprofitablePromoRow({ row, precision, onChanged, capEditable, a
                 promoId={row.promoId}
                 promoCap={row.yourCap.promoCap}
                 override={row.yourCap.override}
+                fallbackCap={row.yourCap.fallbackCap}
+                fallbackSource={row.yourCap.fallbackSource}
                 onChanged={onChanged}
               />
         ) : null}

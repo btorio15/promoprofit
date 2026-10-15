@@ -65,6 +65,8 @@ function LegLine({ leg, tieRisk, idPrefix, onChanged }: { leg: PairLegDTO; tieRi
           promoId={leg.promoId}
           promoCap={leg.yourCap.promoCap}
           override={leg.yourCap.override}
+          fallbackCap={leg.yourCap.fallbackCap}
+          fallbackSource={leg.yourCap.fallbackSource}
           onChanged={onChanged}
         />
       ) : null}

@@ -99,6 +99,8 @@ export function PromoRow({ row, precision, onChanged, capEditable, capFieldIdPre
                 promoId={row.promoId}
                 promoCap={row.yourCap.promoCap}
                 override={row.yourCap.override}
+                fallbackCap={row.yourCap.fallbackCap}
+                fallbackSource={row.yourCap.fallbackSource}
                 onChanged={onChanged}
               />
             ) : null}

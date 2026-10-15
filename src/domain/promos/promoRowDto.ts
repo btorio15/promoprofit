@@ -1,5 +1,6 @@
 import Decimal from "decimal.js";
-import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
+import type { PromoRowDTO, UnprofitablePromoRowDTO, YourCapDTO } from "./dto";
+import type { CapSource } from "./yourCap";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
@@ -24,6 +25,10 @@ export interface PresentablePromo extends RankablePromo {
   /** quick-261001-dhn: the promo's own max stake / the viewer's override (see ActivePromo). */
   promoMaxStake?: string | null;
   capOverride?: string | null;
+  /** quick-261014-u6k: which rule set the effective cap, and what applies with no per-promo override. */
+  capSource?: CapSource | null;
+  fallbackCap?: string | null;
+  fallbackSource?: Exclude<CapSource, "your_promo_cap"> | null;
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
 }
 
@@ -31,8 +36,16 @@ export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max
   const bookName = bookNames.get(promo.bookKey) ?? promo.bookKey;
 
   if (capBound === "max_stake" && promo.maxStake !== null) {
-    if (promo.capOverride != null && promo.promoMaxStake != null) {
-      return `Capped at your ${formatUsd(promo.capOverride)} max stake (${bookName}'s page says ${formatUsd(promo.promoMaxStake)}) — a smaller stake keeps guaranteed profit equal on both sides.`;
+    const tail = "— a smaller stake keeps guaranteed profit equal on both sides.";
+    if (promo.capOverride != null) {
+      const pageNote = promo.promoMaxStake != null ? ` (${bookName}'s page says ${formatUsd(promo.promoMaxStake)})` : "";
+      return `Capped at your ${formatUsd(promo.capOverride)} max stake${pageNote} ${tail}`;
+    }
+    if (promo.capSource === "your_book_cap") {
+      return `Capped at your ${formatUsd(promo.maxStake)} max bet for ${bookName} (set in Settings) ${tail}`;
+    }
+    if (promo.capSource === "default") {
+      return `Capped at the ${formatUsd(promo.maxStake)} default max bet (change it per book in Settings) ${tail}`;
     }
     return `Capped at ${bookName}'s ${formatUsd(promo.maxStake)} max stake — a smaller stake keeps guaranteed profit equal on both sides.`;
   }
@@ -44,10 +57,15 @@ export function capNoteFor(promo: PresentablePromo, capBound: "max_stake" | "max
   return null;
 }
 
-/** Promos-tab "Your cap" edit data; boosts whose own cap is known only. */
-export function yourCapFor(promo: PresentablePromo): { promoCap: string; override: string | null } | undefined {
-  if (promo.promoType !== "profit_boost" || typeof promo.promoMaxStake !== "string") return undefined;
-  return { promoCap: promo.promoMaxStake, override: promo.capOverride ?? null };
+/** Promos-tab "Your cap" edit data; every applied profit boost (promo cap may be unknown). */
+export function yourCapFor(promo: PresentablePromo): YourCapDTO | undefined {
+  if (promo.promoType !== "profit_boost" || typeof promo.fallbackCap !== "string" || !promo.fallbackSource) return undefined;
+  return {
+    promoCap: promo.promoMaxStake ?? null,
+    override: promo.capOverride ?? null,
+    fallbackCap: promo.fallbackCap,
+    fallbackSource: promo.fallbackSource,
+  };
 }
 
 function attributionLineFor(promo: PresentablePromo): string | null {
