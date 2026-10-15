@@ -6,7 +6,6 @@ import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, Table
 import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
 import {
-  SMALL_SAMPLE_THRESHOLD,
   UNKNOWN_SPORT,
   type DailyHistoryStats,
   type GroupTotal,
@@ -255,9 +254,6 @@ export function HistorySection({
                     <TableCell className="text-right num">{book.removed}</TableCell>
                     <TableCell className="text-right num">
                       {book.avgMaxStake === null ? "No data" : formatUsd(book.avgMaxStake)}
-                      {book.maxStakeKnown > 0 && book.maxStakeKnown < SMALL_SAMPLE_THRESHOLD ? (
-                        <span className="ml-1 text-xs text-muted-foreground">(small sample)</span>
-                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -410,7 +406,6 @@ function GroupTable({
                   />
                 ) : null}
                 {nameOf(group.key)}
-                {group.smallSample ? <span className="ml-2 text-xs text-muted-foreground">small sample</span> : null}
               </TableCell>
               <TableCell className="text-right num">{group.promos}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
