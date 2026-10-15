@@ -76,7 +76,7 @@ export function StatsScreen({ active }: { active: boolean }) {
             </CardDescription>
           </CardHeader>
         </Card>
-        <HistorySection history={stats.history} />
+        <HistorySection history={stats.history} funnel={stats.funnel} />
       </div>
     );
   }
@@ -189,7 +189,7 @@ export function StatsScreen({ active }: { active: boolean }) {
         </CardContent>
       </Card>
 
-      <HistorySection history={stats.history} />
+      <HistorySection history={stats.history} funnel={stats.funnel} />
     </div>
   );
 }

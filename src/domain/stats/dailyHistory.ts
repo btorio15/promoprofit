@@ -3,99 +3,197 @@ import Decimal from "decimal.js";
 /**
  * Totals for the "Since Sep 27" section, built from the older daily
  * promo_profit_observations table (one row per promo per Denver day). No I/O.
- * Each row is already one promo's best profit that day, so rows are summed
- * as they are. Money is summed with decimal.js and returned as two-decimal
- * strings.
+ * Money is summed with decimal.js and returned as two-decimal strings.
+ *
+ * Days with no observations between the first and last recorded day are
+ * counted as zero-profit days, so the average per day is over every calendar
+ * day in the span, not just the days that happened to have a row.
  */
 
 /** Key used for promos whose sport is unknown (no linked promo row). */
 export const UNKNOWN_SPORT = "unknown";
 
+/** Groups with fewer promo records than this are flagged as small samples. */
+export const SMALL_SAMPLE_THRESHOLD = 5;
+
+/**
+ * Bonus amounts above this are treated as data-entry errors and left out of
+ * conversion rates (e.g. a $250,000 bonus recorded for a $250 one).
+ */
+export const MAX_PLAUSIBLE_BONUS = new Decimal(1000);
+
 export interface HistoryRow {
   denverDate: string;
   sportKey: string | null;
+  bookKey: string;
+  promoType: string;
   profit: string;
+  bonusAmount: string | null;
+  maxStake: string | null;
 }
 
 export interface DailyPoint {
   date: string;
   total: string;
+  /** Running total up to and including this day. */
+  cumulative: string;
   /** Profit that day per sport key (UNKNOWN_SPORT for promos with no sport). */
   bySport: Record<string, string>;
+  /** True for a day in the span with no observations. */
+  zero: boolean;
 }
 
-export interface SportHistoryTotal {
-  sportKey: string | null;
+export interface GroupTotal {
+  key: string | null;
   total: string;
   promos: number;
-  /** Total divided by promo records. */
   avgPerPromo: string;
-  /** Total divided by days recorded (all days, not just days this sport appeared). */
-  avgPerDay: string;
+  smallSample: boolean;
+}
+
+export interface ConversionRate {
+  records: number;
+  /** Sum of profit over the sum of face value, as a percentage, or null if none. */
+  pct: string | null;
+  /** Records dropped for an implausible face value. */
+  excluded: number;
 }
 
 export interface DailyHistoryStats {
   days: DailyPoint[];
-  sports: SportHistoryTotal[];
+  sports: GroupTotal[];
+  types: GroupTotal[];
+  books: GroupTotal[];
+  bonusConversion: ConversionRate;
+  boostConversion: ConversionRate;
   grandTotal: string;
+  /** Calendar days from the first to the last recorded day, inclusive. */
   dayCount: number;
+  /** Days in the span with at least one observation. */
+  activeDayCount: number;
+  zeroDayCount: number;
   promoCount: number;
   avgPerPromo: string;
   avgPerDay: string;
 }
 
-function perDay(total: Decimal, days: number): string {
-  return days === 0 ? "0.00" : total.dividedBy(days).toDecimalPlaces(2).toFixed(2);
+function toPct(numerator: Decimal, denominator: Decimal): string | null {
+  return denominator.greaterThan(0) ? numerator.dividedBy(denominator).times(100).toDecimalPlaces(2).toFixed(2) : null;
+}
+
+/** Every calendar day from `start` to `end` (YYYY-MM-DD), inclusive, in order. */
+function calendarDays(start: string, end: string): string[] {
+  const days: string[] = [];
+  const cursor = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  while (cursor.getTime() <= last.getTime()) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+function groupTotals<K extends string | null>(
+  rows: HistoryRow[],
+  keyOf: (row: HistoryRow) => K,
+): GroupTotal[] {
+  const groups = new Map<K, { total: Decimal; promos: number }>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const group = groups.get(key) ?? { total: new Decimal(0), promos: 0 };
+    group.total = group.total.plus(row.profit);
+    group.promos += 1;
+    groups.set(key, group);
+  }
+  return [...groups.entries()]
+    .map(([key, group]) => ({
+      key,
+      total: group.total.toFixed(2),
+      promos: group.promos,
+      avgPerPromo: group.total.dividedBy(group.promos).toDecimalPlaces(2).toFixed(2),
+      smallSample: group.promos < SMALL_SAMPLE_THRESHOLD,
+    }))
+    .sort((a, b) => Number(b.total) - Number(a.total));
 }
 
 export function dailyHistoryStats(rows: HistoryRow[]): DailyHistoryStats {
   const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal> }>();
-  const bySport = new Map<string | null, { total: Decimal; promos: number }>();
   let grand = new Decimal(0);
 
   for (const row of rows) {
     const profit = new Decimal(row.profit);
     grand = grand.plus(profit);
-
     const day = byDay.get(row.denverDate) ?? { total: new Decimal(0), bySport: new Map() };
     day.total = day.total.plus(profit);
-    const sportKeyForDay = row.sportKey ?? UNKNOWN_SPORT;
-    day.bySport.set(sportKeyForDay, (day.bySport.get(sportKeyForDay) ?? new Decimal(0)).plus(profit));
+    const sportKey = row.sportKey ?? UNKNOWN_SPORT;
+    day.bySport.set(sportKey, (day.bySport.get(sportKey) ?? new Decimal(0)).plus(profit));
     byDay.set(row.denverDate, day);
-
-    const sport = bySport.get(row.sportKey) ?? { total: new Decimal(0), promos: 0 };
-    sport.total = sport.total.plus(profit);
-    sport.promos += 1;
-    bySport.set(row.sportKey, sport);
   }
 
-  const dayCount = byDay.size;
-
-  const days = [...byDay.entries()]
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([date, day]) => ({
+  const dates = [...byDay.keys()].sort();
+  const span = dates.length === 0 ? [] : calendarDays(dates[0], dates[dates.length - 1]);
+  let running = new Decimal(0);
+  const days: DailyPoint[] = span.map((date) => {
+    const day = byDay.get(date);
+    const total = day?.total ?? new Decimal(0);
+    running = running.plus(total);
+    return {
       date,
-      total: day.total.toFixed(2),
-      bySport: Object.fromEntries([...day.bySport.entries()].map(([key, value]) => [key, value.toFixed(2)])),
-    }));
+      total: total.toFixed(2),
+      cumulative: running.toFixed(2),
+      bySport: Object.fromEntries([...(day?.bySport ?? new Map()).entries()].map(([k, v]) => [k, v.toFixed(2)])),
+      zero: day === undefined,
+    };
+  });
 
-  const sports = [...bySport.entries()]
-    .map(([sportKey, value]) => ({
-      sportKey,
-      total: value.total.toFixed(2),
-      promos: value.promos,
-      avgPerPromo: value.total.dividedBy(value.promos).toDecimalPlaces(2).toFixed(2),
-      avgPerDay: perDay(value.total, dayCount),
-    }))
-    .sort((a, b) => Number(b.total) - Number(a.total));
+  const dayCount = span.length;
+  const activeDayCount = byDay.size;
+
+  let bonusNum = new Decimal(0);
+  let bonusDen = new Decimal(0);
+  let bonusRecords = 0;
+  let bonusExcluded = 0;
+  let boostNum = new Decimal(0);
+  let boostDen = new Decimal(0);
+  let boostRecords = 0;
+  let boostExcluded = 0;
+  for (const row of rows) {
+    const profit = new Decimal(row.profit);
+    if (row.promoType === "bonus_bet" && row.bonusAmount !== null) {
+      const face = new Decimal(row.bonusAmount);
+      if (face.greaterThan(0) && face.lessThanOrEqualTo(MAX_PLAUSIBLE_BONUS)) {
+        bonusNum = bonusNum.plus(profit);
+        bonusDen = bonusDen.plus(face);
+        bonusRecords += 1;
+      } else {
+        bonusExcluded += 1;
+      }
+    }
+    if (row.promoType === "profit_boost" && row.maxStake !== null) {
+      const stake = new Decimal(row.maxStake);
+      if (stake.greaterThan(0)) {
+        boostNum = boostNum.plus(profit);
+        boostDen = boostDen.plus(stake);
+        boostRecords += 1;
+      } else {
+        boostExcluded += 1;
+      }
+    }
+  }
 
   return {
     days,
-    sports,
+    sports: groupTotals(rows, (row) => row.sportKey ?? UNKNOWN_SPORT),
+    types: groupTotals(rows, (row) => row.promoType),
+    books: groupTotals(rows, (row) => row.bookKey),
+    bonusConversion: { records: bonusRecords, pct: toPct(bonusNum, bonusDen), excluded: bonusExcluded },
+    boostConversion: { records: boostRecords, pct: toPct(boostNum, boostDen), excluded: boostExcluded },
     grandTotal: grand.toFixed(2),
     dayCount,
+    activeDayCount,
+    zeroDayCount: dayCount - activeDayCount,
     promoCount: rows.length,
     avgPerPromo: rows.length === 0 ? "0.00" : grand.dividedBy(rows.length).toDecimalPlaces(2).toFixed(2),
-    avgPerDay: perDay(grand, dayCount),
+    avgPerDay: dayCount === 0 ? "0.00" : grand.dividedBy(dayCount).toDecimalPlaces(2).toFixed(2),
   };
 }

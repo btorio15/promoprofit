@@ -205,6 +205,8 @@ export const promos = pgTable(
       .references(() => books.key),
     dedupeKey: text("dedupe_key").notNull().unique(),
     promoType: text("promo_type").notNull(),
+    /** One-time sign-up bonus, reload promo, recurring promo, or unknown. Set by the owner at review. */
+    promoCategory: text("promo_category"),
     status: text("status").notNull(),
     reviewReason: text("review_reason"),
     autoMatched: boolean("auto_matched").notNull().default(false),
@@ -327,8 +329,74 @@ export const promoCompletions = pgTable(
     snapshot: jsonb("snapshot"),
     /** Guaranteed profit recorded at mark-done time, exact cents. Legacy rows default to 0. */
     profitExtracted: numeric("profit_extracted", { precision: 10, scale: 2 }).notNull().default("0"),
+    /** When the member saw the promo claimed at the sportsbook (entered by hand). */
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    /** "claimed", "not_claimed", or null when not recorded. */
+    claimStatus: text("claim_status"),
+    /** Minutes the member spent on the promo, entered by hand, for profit-per-hour. */
+    minutesSpent: integer("minutes_spent"),
   },
   (table) => [primaryKey({ columns: [table.userId, table.promoId] })],
+);
+
+/**
+ * Bets actually placed (not promos). One row per bet leg. hedge_group_id ties
+ * a promo bet to its hedge leg(s). Entered by hand until a sportsbook import
+ * exists. Settlement fields are filled when the bet settles.
+ */
+export const bets = pgTable(
+  "bets",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    promoId: integer("promo_id").references(() => promos.id, { onDelete: "set null" }),
+    hedgeGroupId: text("hedge_group_id"),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    sportKey: text("sport_key"),
+    eventId: text("event_id"),
+    market: text("market"),
+    side: text("side"),
+    oddsAmerican: integer("odds_american").notNull(),
+    stake: numeric("stake", { precision: 10, scale: 2 }).notNull(),
+    placedAt: timestamp("placed_at", { withTimezone: true }).notNull(),
+    /** open, won, lost, void, cashed_out. */
+    status: text("status").notNull().default("open"),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    payout: numeric("payout", { precision: 10, scale: 2 }),
+    notes: text("notes"),
+  },
+  (table) => [
+    index("bets_user_placed_idx").on(table.userId, table.placedAt),
+    index("bets_hedge_group_idx").on(table.hedgeGroupId),
+  ],
+);
+
+/**
+ * Per-member sportsbook account facts entered by hand: when the account was
+ * opened, money in and out, and the balance as of a date. Needed for account
+ * health, return on bankroll, and tax totals.
+ */
+export const bookAccounts = pgTable(
+  "book_accounts",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    depositsTotal: numeric("deposits_total", { precision: 10, scale: 2 }).notNull().default("0"),
+    withdrawalsTotal: numeric("withdrawals_total", { precision: 10, scale: 2 }).notNull().default("0"),
+    currentBalance: numeric("current_balance", { precision: 10, scale: 2 }),
+    balanceAsOf: timestamp("balance_as_of", { withTimezone: true }),
+    pendingWithdrawal: numeric("pending_withdrawal", { precision: 10, scale: 2 }).notNull().default("0"),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.bookKey] })],
 );
 
 /**

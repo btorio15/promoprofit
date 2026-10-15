@@ -1,9 +1,27 @@
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import Decimal from "decimal.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
-import { UNKNOWN_SPORT, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
+import {
+  SMALL_SAMPLE_THRESHOLD,
+  UNKNOWN_SPORT,
+  type DailyHistoryStats,
+  type GroupTotal,
+} from "@/domain/stats/dailyHistory";
+import type { PromoFunnelStats } from "@/domain/stats/promoFunnel";
 
 const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
@@ -23,6 +41,22 @@ const SPORT_COLORS: Record<string, string> = {
 };
 const FALLBACK_COLOR = "#64748b";
 
+const TYPE_LABELS: Record<string, string> = {
+  bonus_bet: "Bonus bet",
+  profit_boost: "Profit boost",
+  unknown: "Unknown type",
+};
+
+const BOOK_LABELS: Record<string, string> = {
+  draftkings: "DraftKings",
+  fanduel: "FanDuel",
+  ballybet: "BallyBet",
+  betmgm: "BetMGM",
+  espnbet: "theScore Bet",
+  hardrockbet: "Hard Rock Bet",
+  betrivers: "BetRivers",
+};
+
 function colorFor(sportKey: string): string {
   return SPORT_COLORS[sportKey] ?? FALLBACK_COLOR;
 }
@@ -32,9 +66,21 @@ function sportName(sportKey: string | null): string {
   return getSportLabel(sportKey);
 }
 
+function typeName(type: string | null): string {
+  return type === null ? TYPE_LABELS.unknown : (TYPE_LABELS[type] ?? type);
+}
+
+function bookName(bookKey: string | null): string {
+  return bookKey === null ? "Unknown book" : (BOOK_LABELS[bookKey] ?? bookKey);
+}
+
 /** "2026-09-27" -> "Sep 27". Parsed as UTC noon so the Denver date never shifts. */
 function dayLabel(date: string): string {
   return DAY_FORMATTER.format(new Date(`${date}T12:00:00Z`));
+}
+
+function pctLabel(pct: string | null): string {
+  return pct === null ? "No data" : `${pct}%`;
 }
 
 /**
@@ -42,7 +88,7 @@ function dayLabel(date: string): string {
  * shown next to the scheduled snapshot figures. Each day is one total, so
  * there is no time-of-day detail here.
  */
-export function HistorySection({ history }: { history: DailyHistoryStats }) {
+export function HistorySection({ history, funnel }: { history: DailyHistoryStats; funnel: PromoFunnelStats }) {
   if (history.dayCount === 0) {
     return (
       <Card>
@@ -56,98 +102,212 @@ export function HistorySection({ history }: { history: DailyHistoryStats }) {
 
   const first = history.days[0].date;
   const last = history.days[history.days.length - 1].date;
-  const sportKeys = history.sports.map((sport) => sport.sportKey ?? UNKNOWN_SPORT);
+  const sportKeys = history.sports.map((sport) => sport.key ?? UNKNOWN_SPORT);
   const chartData = history.days.map((day) => ({
     day: dayLabel(day.date),
     ...day.bySport,
+    total: Number(day.total),
+    cumulative: Number(day.cumulative),
     totalLabel: formatUsd(day.total),
+    cumulativeLabel: formatUsd(day.cumulative),
+    zero: day.zero,
   }));
+  const unknownSportPromos = history.sports.find((sport) => sport.key === UNKNOWN_SPORT)?.promos ?? 0;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Since Sep 27</CardTitle>
         <CardDescription>
-          Best profit per promo per day, from before scheduled snapshots began ({dayLabel(first)} to {dayLabel(last)}).
-          Each day is one total, so this section has no time-of-day detail.
+          Best profit per promo per day, from {dayLabel(first)} to {dayLabel(last)}. Days with no observations count as
+          zero. Each day is one total, so this section has no time-of-day detail.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
+      <CardContent className="flex flex-col gap-8">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
           <Figure label="Total profit" value={formatUsd(history.grandTotal)} />
-          <Figure label="Avg profit per day" value={formatUsd(history.avgPerDay)} />
-          <Figure label="Avg profit per promo" value={formatUsd(history.avgPerPromo)} />
-          <Figure label="Days / promo records" value={`${history.dayCount} / ${history.promoCount}`} />
+          <Figure
+            label="Avg profit per day"
+            value={formatUsd(history.avgPerDay)}
+            note={`over ${history.dayCount} days (${history.zeroDayCount} with no promos)`}
+          />
+          <Figure label="Avg profit per promo" value={formatUsd(history.avgPerPromo)} note={`${history.promoCount} records`} />
+          <Figure
+            label="Bonus conversion"
+            value={pctLabel(history.bonusConversion.pct)}
+            note={`${history.bonusConversion.records} bonus bets${history.bonusConversion.excluded ? `, ${history.bonusConversion.excluded} excluded` : ""}`}
+          />
+          <Figure
+            label="Boost return on max stake"
+            value={pctLabel(history.boostConversion.pct)}
+            note={`${history.boostConversion.records} boosts`}
+          />
         </section>
 
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
-              <Tooltip
-                formatter={(value, name) => [formatUsd(Number(value).toFixed(2)), sportName(String(name))]}
-                labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.totalLabel ?? ""} total`}
-              />
-              <Legend formatter={(value) => sportName(String(value))} />
-              {sportKeys.map((sportKey) => (
-                <Bar key={sportKey} dataKey={sportKey} stackId="profit" fill={colorFor(sportKey)} />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+        {unknownSportPromos > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {unknownSportPromos} promo record{unknownSportPromos === 1 ? "" : "s"} have no sport because the promo was never
+            matched to a game. They are counted in every total above and grouped as Unknown sport.
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold">Daily profit by sport</h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
+                <Tooltip
+                  formatter={(value, name) => [formatUsd(Number(value).toFixed(2)), sportName(String(name))]}
+                  labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.totalLabel ?? ""} total`}
+                />
+                <Legend formatter={(value) => sportName(String(value))} />
+                {sportKeys.map((sportKey) => (
+                  <Bar key={sportKey} dataKey={sportKey} stackId="profit" fill={colorFor(sportKey)} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Sport</TableHead>
-                <TableHead className="text-right">Promos</TableHead>
-                <TableHead className="text-right">Profit per promo</TableHead>
-                <TableHead className="text-right">Avg per day</TableHead>
-                <TableHead className="text-right">Total profit</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {history.sports.map((sport) => (
-                <TableRow key={sport.sportKey ?? UNKNOWN_SPORT}>
-                  <TableCell className="font-medium">
-                    <span
-                      className="mr-2 inline-block size-2.5 rounded-sm align-middle"
-                      style={{ backgroundColor: colorFor(sport.sportKey ?? UNKNOWN_SPORT) }}
-                      aria-hidden="true"
-                    />
-                    {sportName(sport.sportKey)}
-                  </TableCell>
-                  <TableCell className="text-right num">{sport.promos}</TableCell>
-                  <TableCell className="text-right num">{formatUsd(sport.avgPerPromo)}</TableCell>
-                  <TableCell className="text-right num">{formatUsd(sport.avgPerDay)}</TableCell>
-                  <TableCell className="text-right num">{formatUsd(sport.total)}</TableCell>
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold">Cumulative profit</h3>
+          <div className="h-56 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
+                <Tooltip formatter={(_value, _name, item) => [item.payload.cumulativeLabel, "Cumulative"]} />
+                <Line type="monotone" dataKey="cumulative" stroke="#6366f1" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <GroupTable title="By sport" groups={history.sports} nameOf={sportName} colorOf={(key) => colorFor(key ?? UNKNOWN_SPORT)} />
+        <GroupTable title="By promo type" groups={history.types} nameOf={typeName} />
+        <GroupTable title="By book" groups={history.books} nameOf={bookName} />
+
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Promo funnel</h3>
+          <section className="grid grid-cols-2 gap-4 sm:grid-cols-5" aria-label="Promo funnel">
+            <Figure label="Promos recorded" value={String(funnel.totals.total)} />
+            <Figure label="Available now" value={String(funnel.totals.available)} />
+            <Figure label="Marked done" value={String(funnel.totals.markedDone)} />
+            <Figure label="Expired unused" value={String(funnel.totals.expiredUnused)} />
+            <Figure label="Dismissed / pending" value={`${funnel.totals.dismissed} / ${funnel.totals.pendingReview}`} />
+          </section>
+          <p className="text-xs text-muted-foreground">
+            &quot;Marked done&quot; means a member marked the promo done in the app. Claims at the sportsbook are not tracked yet.
+          </p>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Book</TableHead>
+                  <TableHead className="text-right">Promos</TableHead>
+                  <TableHead className="text-right">Active</TableHead>
+                  <TableHead className="text-right">Removed</TableHead>
+                  <TableHead className="text-right">Avg max stake</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell className="font-semibold">All sports</TableCell>
-                <TableCell className="text-right num font-semibold">{history.promoCount}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatUsd(history.avgPerPromo)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatUsd(history.avgPerDay)}</TableCell>
-                <TableCell className="text-right num font-semibold">{formatUsd(history.grandTotal)}</TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {funnel.books.map((book) => (
+                  <TableRow key={book.bookKey}>
+                    <TableCell className="font-medium">{bookName(book.bookKey)}</TableCell>
+                    <TableCell className="text-right num">{book.promos}</TableCell>
+                    <TableCell className="text-right num">{book.active}</TableCell>
+                    <TableCell className="text-right num">{book.removed}</TableCell>
+                    <TableCell className="text-right num">
+                      {book.avgMaxStake === null ? "No data" : formatUsd(book.avgMaxStake)}
+                      {book.maxStakeKnown > 0 && book.maxStakeKnown < SMALL_SAMPLE_THRESHOLD ? (
+                        <span className="ml-1 text-xs text-muted-foreground">(small sample)</span>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function Figure({ label, value }: { label: string; value: string }) {
+function GroupTable({
+  title,
+  groups,
+  nameOf,
+  colorOf,
+}: {
+  title: string;
+  groups: GroupTotal[];
+  nameOf: (key: string | null) => string;
+  colorOf?: (key: string | null) => string;
+}) {
+  const promoCount = groups.reduce((sum, group) => sum + group.promos, 0);
+  const grand = groups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
+  const grandTotal = grand.toFixed(2);
+  const averagePerPromo = promoCount === 0 ? "0.00" : grand.dividedBy(promoCount).toDecimalPlaces(2).toFixed(2);
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead className="text-right">Promos</TableHead>
+              <TableHead className="text-right">Profit per promo</TableHead>
+              <TableHead className="text-right">Total profit</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {groups.map((group) => (
+              <TableRow key={group.key ?? "none"}>
+                <TableCell className="font-medium">
+                  {colorOf ? (
+                    <span
+                      className="mr-2 inline-block size-2.5 rounded-sm align-middle"
+                      style={{ backgroundColor: colorOf(group.key) }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  {nameOf(group.key)}
+                  {group.smallSample ? (
+                    <span className="ml-2 text-xs text-muted-foreground">small sample</span>
+                  ) : null}
+                </TableCell>
+                <TableCell className="text-right num">{group.promos}</TableCell>
+                <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
+                <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell className="font-semibold">All</TableCell>
+              <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
+              <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
+              <TableCell className="text-right num font-semibold">{formatUsd(grandTotal)}</TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-xl font-semibold num">{value}</span>
+      {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
     </div>
   );
 }
