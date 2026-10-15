@@ -19,17 +19,20 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
-/** One color per sport, so each day's stacked bar shows where its profit came from. */
+/**
+ * One color per sport, from the Okabe-Ito palette, which stays distinguishable
+ * for the common types of color blindness.
+ */
 const SPORT_COLORS: Record<string, string> = {
-  americanfootball_nfl: "#2563eb",
-  americanfootball_ncaaf: "#16a34a",
-  basketball_nba: "#f97316",
-  basketball_ncaab: "#9333ea",
-  baseball_mlb: "#dc2626",
-  icehockey_nhl: "#0891b2",
-  [UNKNOWN_SPORT]: "#9ca3af",
+  americanfootball_nfl: "#0072B2",
+  americanfootball_ncaaf: "#E69F00",
+  basketball_nba: "#009E73",
+  basketball_ncaab: "#CC79A7",
+  baseball_mlb: "#D55E00",
+  icehockey_nhl: "#56B4E9",
+  [UNKNOWN_SPORT]: "#999999",
 };
-const FALLBACK_COLOR = "#64748b";
+const FALLBACK_COLOR = "#999999";
 
 const TYPE_LABELS: Record<string, string> = {
   bonus_bet: "Bonus bet",
@@ -163,7 +166,7 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo; color = marked done (by sport), grey = available only; gaps separate each bet"
+          description="One block per promo; color = marked done (by sport), white = available only; gaps separate each bet"
           defaultOpen
         >
           <SportLegend sportKeys={sportsInRange} />
@@ -241,7 +244,7 @@ export function HistorySection({
 }
 
 /** Fill for promo blocks that are available but not marked done. */
-const NOT_DONE_COLOR = "#d4d4d8";
+const NOT_DONE_COLOR = "#ffffff";
 
 /** Pixels of background left between stacked promo blocks, so each bet reads as its own block. */
 const SEGMENT_GAP = 2;
