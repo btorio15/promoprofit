@@ -116,6 +116,7 @@ export function HistorySection({
     day.segments.forEach((segment, index) => {
       row[`seg${index}`] = Number(segment.profit);
       row[`seg${index}Sport`] = segment.sportKey;
+      row[`seg${index}Done`] = segment.done;
     });
     return row;
   });
@@ -133,7 +134,8 @@ export function HistorySection({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
-          <Figure label="Total profit" value={formatUsd(history.grandTotal)} />
+          <Figure label="Available profit" value={formatUsd(history.grandTotal)} note="best profit each promo showed" />
+          <Figure label="Extracted profit" value={formatUsd(history.extractedTotal)} note="recorded when marked done" />
           <Figure
             label="Avg profit per day"
             value={formatUsd(history.avgPerDay)}
@@ -161,7 +163,7 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo record, colored by sport; gaps separate each bet"
+          description="One block per promo; color = marked done (by sport), grey = available only; gaps separate each bet"
           defaultOpen
         >
           <SportLegend sportKeys={sportsInRange} />
@@ -238,6 +240,9 @@ export function HistorySection({
   );
 }
 
+/** Fill for promo blocks that are available but not marked done. */
+const NOT_DONE_COLOR = "#d4d4d8";
+
 /** Pixels of background left between stacked promo blocks, so each bet reads as its own block. */
 const SEGMENT_GAP = 2;
 
@@ -257,10 +262,10 @@ function segmentShape(props: SegmentShapeProps) {
   const key = String(props.dataKey);
   const payload = (props.payload ?? {}) as Record<string, unknown>;
   const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
+  // Only promos marked done get their sport color; available-but-not-done promos stay neutral grey.
+  const fill = payload[`${key}Done`] === true ? colorFor(sport) : NOT_DONE_COLOR;
   const blockHeight = Math.max(height - SEGMENT_GAP, 1);
-  return (
-    <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={colorFor(sport)} />
-  );
+  return <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={fill} />;
 }
 
 /** Hover text for a day's bar: the day's total, then each sport's total for that day. */
@@ -315,6 +320,7 @@ function GroupTable({
 }) {
   const promoCount = groups.reduce((sum, group) => sum + group.promos, 0);
   const grand = groups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
+  const grandExtracted = groups.reduce((sum, group) => sum.plus(group.extracted), new Decimal(0));
   const averagePerPromo = promoCount === 0 ? "0.00" : grand.dividedBy(promoCount).toDecimalPlaces(2).toFixed(2);
   return (
     <div className="overflow-x-auto">
@@ -324,7 +330,8 @@ function GroupTable({
             <TableHead>Name</TableHead>
             <TableHead className="text-right">Promos</TableHead>
             <TableHead className="text-right">Profit per promo</TableHead>
-            <TableHead className="text-right">Total profit</TableHead>
+            <TableHead className="text-right">Available profit</TableHead>
+            <TableHead className="text-right">Extracted profit</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -344,6 +351,7 @@ function GroupTable({
               <TableCell className="text-right num">{group.promos}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
+              <TableCell className="text-right num">{formatUsd(group.extracted)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -353,6 +361,7 @@ function GroupTable({
             <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(grand.toFixed(2))}</TableCell>
+            <TableCell className="text-right num font-semibold">{formatUsd(grandExtracted.toFixed(2))}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>

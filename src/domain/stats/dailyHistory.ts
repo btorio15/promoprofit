@@ -5,6 +5,11 @@ import Decimal from "decimal.js";
  * promo_profit_observations table (one row per promo per Denver day). No I/O.
  * Money is summed with decimal.js and returned as two-decimal strings.
  *
+ * Two kinds of profit are kept apart:
+ * - Available: the best profit each promo showed on a day (the observations).
+ * - Extracted: the profit members recorded when they marked a promo done
+ *   (the completions), counted on the day it was marked done.
+ *
  * Days with no observations between the first and last recorded day are
  * counted as zero-profit days, so the average per day is over every calendar
  * day in the span, not just the days that happened to have a row.
@@ -23,6 +28,7 @@ export const SMALL_SAMPLE_THRESHOLD = 5;
 export const MAX_PLAUSIBLE_BONUS = new Decimal(1000);
 
 export interface HistoryRow {
+  promoId: number;
   denverDate: string;
   sportKey: string | null;
   bookKey: string;
@@ -30,6 +36,25 @@ export interface HistoryRow {
   profit: string;
   bonusAmount: string | null;
   maxStake: string | null;
+}
+
+/** One "marked done" completion, with its promo's sport, type and book. */
+export interface CompletionRow {
+  promoId: number;
+  /** Denver day the promo was marked done. */
+  denverDate: string;
+  sportKey: string | null;
+  promoType: string;
+  bookKey: string;
+  profitExtracted: string;
+}
+
+export interface DaySegment {
+  promoId: number;
+  sportKey: string;
+  profit: string;
+  /** True when a member has marked this promo done. Only done segments get a sport color. */
+  done: boolean;
 }
 
 export interface DailyPoint {
@@ -45,14 +70,12 @@ export interface DailyPoint {
   zero: boolean;
 }
 
-export interface DaySegment {
-  sportKey: string;
-  profit: string;
-}
-
 export interface GroupTotal {
-  key: string | null;
+  key: string;
+  /** Available profit: the sum of each promo's best profit in the group. */
   total: string;
+  /** Extracted profit: what members recorded when they marked promos in the group done. */
+  extracted: string;
   promos: number;
   avgPerPromo: string;
   smallSample: boolean;
@@ -73,8 +96,11 @@ export interface DailyHistoryStats {
   books: GroupTotal[];
   bonusConversion: ConversionRate;
   boostConversion: ConversionRate;
+  /** Available profit in the window. */
   grandTotal: string;
-  /** Calendar days from the first to the last recorded day, inclusive. */
+  /** Extracted profit in the window. */
+  extractedTotal: string;
+  /** Calendar days from the first to the last recorded day, inclusive (or the window). */
   dayCount: number;
   /** Days in the span with at least one observation. */
   activeDayCount: number;
@@ -100,25 +126,35 @@ function calendarDays(start: string, end: string): string[] {
   return days;
 }
 
-function groupTotals<K extends string | null>(
-  rows: HistoryRow[],
-  keyOf: (row: HistoryRow) => K,
-): GroupTotal[] {
-  const groups = new Map<K, { total: Decimal; promos: number }>();
+type Keyed = { sportKey: string | null; promoType: string; bookKey: string };
+
+/** Available and extracted totals per group, from observations and completions. */
+function groupTotals(rows: HistoryRow[], completions: CompletionRow[], keyOf: (item: Keyed) => string): GroupTotal[] {
+  const groups = new Map<string, { total: Decimal; extracted: Decimal; promos: number }>();
+  const group = (key: string) => {
+    const existing = groups.get(key);
+    if (existing) return existing;
+    const created = { total: new Decimal(0), extracted: new Decimal(0), promos: 0 };
+    groups.set(key, created);
+    return created;
+  };
   for (const row of rows) {
-    const key = keyOf(row);
-    const group = groups.get(key) ?? { total: new Decimal(0), promos: 0 };
-    group.total = group.total.plus(row.profit);
-    group.promos += 1;
-    groups.set(key, group);
+    const entry = group(keyOf(row));
+    entry.total = entry.total.plus(row.profit);
+    entry.promos += 1;
+  }
+  for (const completion of completions) {
+    const entry = group(keyOf(completion));
+    entry.extracted = entry.extracted.plus(completion.profitExtracted);
   }
   return [...groups.entries()]
-    .map(([key, group]) => ({
+    .map(([key, entry]) => ({
       key,
-      total: group.total.toFixed(2),
-      promos: group.promos,
-      avgPerPromo: group.total.dividedBy(group.promos).toDecimalPlaces(2).toFixed(2),
-      smallSample: group.promos < SMALL_SAMPLE_THRESHOLD,
+      total: entry.total.toFixed(2),
+      extracted: entry.extracted.toFixed(2),
+      promos: entry.promos,
+      avgPerPromo: entry.promos === 0 ? "0.00" : entry.total.dividedBy(entry.promos).toDecimalPlaces(2).toFixed(2),
+      smallSample: entry.promos < SMALL_SAMPLE_THRESHOLD,
     }))
     .sort((a, b) => Number(b.total) - Number(a.total));
 }
@@ -127,10 +163,20 @@ function groupTotals<K extends string | null>(
  * Totals for the given window (inclusive Denver days). With a window, the
  * span is every calendar day in it, so zero-profit days count too. Without
  * one (all time), the span runs from the first recorded day to the last.
+ * Completions are filtered to the window by the day they were marked done.
+ * Any promo with a completion is "done" for the chart, whenever it was done.
  */
-export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: string; end: string }): DailyHistoryStats {
-  const rows = window ? allRows.filter((row) => row.denverDate >= window.start && row.denverDate <= window.end) : allRows;
-  const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal>; segments: { sportKey: string; profit: Decimal }[] }>();
+export function dailyHistoryStats(
+  allRows: HistoryRow[],
+  window?: { start: string; end: string },
+  allCompletions: CompletionRow[] = [],
+): DailyHistoryStats {
+  const inWindow = (date: string) => !window || (date >= window.start && date <= window.end);
+  const rows = allRows.filter((row) => inWindow(row.denverDate));
+  const completions = allCompletions.filter((completion) => inWindow(completion.denverDate));
+  const doneIds = new Set(allCompletions.map((completion) => completion.promoId));
+
+  const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal>; segments: DaySegment[] }>();
   let grand = new Decimal(0);
 
   for (const row of rows) {
@@ -139,12 +185,12 @@ export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: strin
     const day = byDay.get(row.denverDate) ?? {
       total: new Decimal(0),
       bySport: new Map<string, Decimal>(),
-      segments: [] as { sportKey: string; profit: Decimal }[],
+      segments: [] as DaySegment[],
     };
     day.total = day.total.plus(profit);
     const sportKey = row.sportKey ?? UNKNOWN_SPORT;
     day.bySport.set(sportKey, (day.bySport.get(sportKey) ?? new Decimal(0)).plus(profit));
-    day.segments.push({ sportKey, profit });
+    day.segments.push({ promoId: row.promoId, sportKey, profit: profit.toFixed(2), done: doneIds.has(row.promoId) });
     byDay.set(row.denverDate, day);
   }
 
@@ -166,8 +212,7 @@ export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: strin
       bySport: Object.fromEntries([...(day?.bySport ?? new Map()).entries()].map(([k, v]) => [k, v.toFixed(2)])),
       segments: (day?.segments ?? [])
         .slice()
-        .sort((a, b) => b.profit.comparedTo(a.profit))
-        .map((segment) => ({ sportKey: segment.sportKey, profit: segment.profit.toFixed(2) })),
+        .sort((a, b) => Number(b.profit) - Number(a.profit)),
       zero: day === undefined,
     };
   });
@@ -207,14 +252,17 @@ export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: strin
     }
   }
 
+  const extractedTotal = completions.reduce((sum, completion) => sum.plus(completion.profitExtracted), new Decimal(0));
+
   return {
     days,
-    sports: groupTotals(rows, (row) => row.sportKey ?? UNKNOWN_SPORT),
-    types: groupTotals(rows, (row) => row.promoType),
-    books: groupTotals(rows, (row) => row.bookKey),
+    sports: groupTotals(rows, completions, (item) => item.sportKey ?? UNKNOWN_SPORT),
+    types: groupTotals(rows, completions, (item) => item.promoType),
+    books: groupTotals(rows, completions, (item) => item.bookKey),
     bonusConversion: { records: bonusRecords, pct: toPct(bonusNum, bonusDen), excluded: bonusExcluded },
     boostConversion: { records: boostRecords, pct: toPct(boostNum, boostDen), excluded: boostExcluded },
     grandTotal: grand.toFixed(2),
+    extractedTotal: extractedTotal.toFixed(2),
     dayCount,
     activeDayCount,
     zeroDayCount: dayCount - activeDayCount,
