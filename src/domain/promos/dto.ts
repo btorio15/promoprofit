@@ -5,6 +5,14 @@ import type { DonePromoDTO } from "./doneSnapshot";
 
 export type { DonePromoDTO } from "./doneSnapshot";
 
+/** quick-261014-u6k: "Your cap" edit data for a profit boost (fallback = what applies with no per-promo cap). */
+export interface YourCapDTO {
+  promoCap: string | null;
+  override: string | null;
+  fallbackCap: string;
+  fallbackSource: "your_book_cap" | "default" | "book_page";
+}
+
 export type {
   CorrectionEventOption,
   CorrectionMarketOption,
@@ -104,7 +112,7 @@ export interface PromoRowDTO {
    * quick-261001-dhn: Promos-tab-only "Your cap" edit data for profit boosts.
    * Optional because frozen Done snapshots lack it.
    */
-  yourCap?: { promoCap: string; override: string | null };
+  yourCap?: YourCapDTO;
 }
 
 /**
@@ -138,7 +146,7 @@ export interface UnprofitablePromoRowDTO {
    * quick-261001-dhn: Promos-tab-only "Your cap" edit data for profit boosts.
    * Optional because frozen Done snapshots lack it.
    */
-  yourCap?: { promoCap: string; override: string | null };
+  yourCap?: YourCapDTO;
 }
 
 /**

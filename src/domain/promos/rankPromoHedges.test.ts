@@ -1457,7 +1457,7 @@ describe("member cap override (quick-261001-dhn)", () => {
 
   it("a member's $20 cap ranks to the cent exactly like the solver at $20 (and differs from $25)", () => {
     const [own] = rankPromoHedges([boost], opts);
-    const [capped] = rankPromoHedges(applyMemberCaps([boost], new Map([[20, "20.00"]])), opts);
+    const [capped] = rankPromoHedges(applyMemberCaps([boost], new Map([[20, "20.00"]]), new Map()), opts);
     if (own.result.kind !== "boost" || capped.result.kind !== "boost") throw new Error("expected boost results");
 
     // Hedge at betmgm away (+115) means the boost is on ballybet home (+120); otherwise away (-140).

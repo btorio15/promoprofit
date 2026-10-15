@@ -1,6 +1,7 @@
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { getSportLabel } from "@/config/sports";
 import type { PairLegResult } from "@/domain/hedge/pairMath";
+import type { YourCapDTO } from "./dto";
 import type { PairCandidate } from "./pairPromos";
 import { pricesAsOfFor, type PriceAgeContext } from "./priceAge";
 import { capNoteFor, promoTitle, yourCapFor, type PresentablePromo } from "./promoRowDto";
@@ -24,7 +25,7 @@ export interface PairLegDTO {
   /** quick-261001-e1j: the book's price before the boost (boost legs only). */
   baseOddsAmerican?: number | null;
   /** quick-261001-e1j: "Your cap" edit data, boost legs with a known promo cap only. */
-  yourCap?: { promoCap: string; override: string | null };
+  yourCap?: YourCapDTO;
   stake: string;
   payout: string;
   capNote: string | null;
