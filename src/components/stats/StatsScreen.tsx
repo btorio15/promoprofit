@@ -10,6 +10,7 @@ import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
 import { WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
 import { HistorySection } from "@/components/stats/HistorySection";
+import { StatsCard } from "@/components/stats/StatsCard";
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Denver",
@@ -101,15 +102,11 @@ export function StatsScreen({ active }: { active: boolean }) {
         <Stat label="Most profitable hour" value={bestHour ? hourLabel(bestHour.hour) : "None"} />
       </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Profit by time of day</CardTitle>
-          <CardDescription>
-            Average profit available in a scheduled run, by the Denver hour it ran. Each run totals every promo that was
-            profitable at that moment.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+      <StatsCard
+        title="Profit by time of day"
+        description="Average profit available per scheduled run, by Denver hour"
+      >
+        <div className="flex flex-col gap-4">
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -144,18 +141,14 @@ export function StatsScreen({ active }: { active: boolean }) {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </StatsCard>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Profit by sport and game day</CardTitle>
-          <CardDescription>
-            Each promo counts once, at its best profit seen, on the weekday its game starts (Denver time). The strongest
-            day for each sport is highlighted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+      <StatsCard
+        title="Profit by sport and game day"
+        description="Profit by weekday its game starts (Denver time); strongest day highlighted"
+      >
+        <div className="flex flex-col gap-3">
           {stats.sportWeekday.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No scheduled-game profit recorded yet.</p>
           ) : (
@@ -186,8 +179,8 @@ export function StatsScreen({ active }: { active: boolean }) {
               time and are not in this table.
             </p>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </StatsCard>
 
       <HistorySection history={stats.history} funnel={stats.funnel} />
     </div>

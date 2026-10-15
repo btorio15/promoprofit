@@ -22,6 +22,7 @@ import {
   type GroupTotal,
 } from "@/domain/stats/dailyHistory";
 import type { PromoFunnelStats } from "@/domain/stats/promoFunnel";
+import { StatsCard } from "@/components/stats/StatsCard";
 
 const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
@@ -85,8 +86,8 @@ function pctLabel(pct: string | null): string {
 
 /**
  * "Since Sep 27": the older daily promo profit (promo_profit_observations),
- * shown next to the scheduled snapshot figures. Each day is one total, so
- * there is no time-of-day detail here.
+ * shown next to the scheduled snapshot figures. The headline figures stay
+ * visible; the charts and tables open from their own dropdowns.
  */
 export function HistorySection({ history, funnel }: { history: DailyHistoryStats; funnel: PromoFunnelStats }) {
   if (history.dayCount === 0) {
@@ -123,7 +124,7 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
           zero. Each day is one total, so this section has no time-of-day detail.
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-8">
+      <CardContent className="flex flex-col gap-4">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
           <Figure label="Total profit" value={formatUsd(history.grandTotal)} />
           <Figure
@@ -151,8 +152,7 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">Daily profit by sport</h3>
+        <StatsCard title="Daily profit by sport" description="Stacked by sport, one bar per day" defaultOpen>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -170,10 +170,9 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </StatsCard>
 
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">Cumulative profit</h3>
+        <StatsCard title="Cumulative profit" description="Running total from the first day">
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -185,14 +184,21 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </StatsCard>
 
-        <GroupTable title="By sport" groups={history.sports} nameOf={sportName} colorOf={(key) => colorFor(key ?? UNKNOWN_SPORT)} />
-        <GroupTable title="By promo type" groups={history.types} nameOf={typeName} />
-        <GroupTable title="By book" groups={history.books} nameOf={bookName} />
+        <StatsCard title="By sport" description="Profit per promo and total for each sport">
+          <GroupTable groups={history.sports} nameOf={sportName} colorOf={(key) => colorFor(key ?? UNKNOWN_SPORT)} />
+        </StatsCard>
 
-        <div className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold">Promo funnel</h3>
+        <StatsCard title="By promo type" description="Bonus bets and profit boosts">
+          <GroupTable groups={history.types} nameOf={typeName} />
+        </StatsCard>
+
+        <StatsCard title="By book" description="Profit per promo and total for each sportsbook">
+          <GroupTable groups={history.books} nameOf={bookName} />
+        </StatsCard>
+
+        <StatsCard title="Promo funnel" description="Available, marked done, expired, and per-book stake limits">
           <section className="grid grid-cols-2 gap-4 sm:grid-cols-5" aria-label="Promo funnel">
             <Figure label="Promos recorded" value={String(funnel.totals.total)} />
             <Figure label="Available now" value={String(funnel.totals.available)} />
@@ -232,72 +238,64 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
               </TableBody>
             </Table>
           </div>
-        </div>
+        </StatsCard>
       </CardContent>
     </Card>
   );
 }
 
 function GroupTable({
-  title,
   groups,
   nameOf,
   colorOf,
 }: {
-  title: string;
   groups: GroupTotal[];
   nameOf: (key: string | null) => string;
   colorOf?: (key: string | null) => string;
 }) {
   const promoCount = groups.reduce((sum, group) => sum + group.promos, 0);
   const grand = groups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
-  const grandTotal = grand.toFixed(2);
   const averagePerPromo = promoCount === 0 ? "0.00" : grand.dividedBy(promoCount).toDecimalPlaces(2).toFixed(2);
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-semibold">{title}</h3>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="text-right">Promos</TableHead>
-              <TableHead className="text-right">Profit per promo</TableHead>
-              <TableHead className="text-right">Total profit</TableHead>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead className="text-right">Promos</TableHead>
+            <TableHead className="text-right">Profit per promo</TableHead>
+            <TableHead className="text-right">Total profit</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.map((group) => (
+            <TableRow key={group.key ?? "none"}>
+              <TableCell className="font-medium">
+                {colorOf ? (
+                  <span
+                    className="mr-2 inline-block size-2.5 rounded-sm align-middle"
+                    style={{ backgroundColor: colorOf(group.key) }}
+                    aria-hidden="true"
+                  />
+                ) : null}
+                {nameOf(group.key)}
+                {group.smallSample ? <span className="ml-2 text-xs text-muted-foreground">small sample</span> : null}
+              </TableCell>
+              <TableCell className="text-right num">{group.promos}</TableCell>
+              <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
+              <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {groups.map((group) => (
-              <TableRow key={group.key ?? "none"}>
-                <TableCell className="font-medium">
-                  {colorOf ? (
-                    <span
-                      className="mr-2 inline-block size-2.5 rounded-sm align-middle"
-                      style={{ backgroundColor: colorOf(group.key) }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  {nameOf(group.key)}
-                  {group.smallSample ? (
-                    <span className="ml-2 text-xs text-muted-foreground">small sample</span>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-right num">{group.promos}</TableCell>
-                <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
-                <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-          <TableFooter>
-            <TableRow>
-              <TableCell className="font-semibold">All</TableCell>
-              <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
-              <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
-              <TableCell className="text-right num font-semibold">{formatUsd(grandTotal)}</TableCell>
-            </TableRow>
-          </TableFooter>
-        </Table>
-      </div>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell className="font-semibold">All</TableCell>
+            <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
+            <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
+            <TableCell className="text-right num font-semibold">{formatUsd(grand.toFixed(2))}</TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
     </div>
   );
 }
