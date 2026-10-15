@@ -119,6 +119,24 @@ describe("dailyHistoryStats", () => {
     expect(stats.avgPerDay).toBe("0.86");
   });
 
+  it("lists each promo record as its own segment, largest first, and leaves empty days with none", () => {
+    const rows: HistoryRow[] = [
+      row({ denverDate: "2026-09-27", profit: "2.00", sportKey: "icehockey_nhl" }),
+      row({ denverDate: "2026-09-27", profit: "9.00", sportKey: "americanfootball_ncaaf" }),
+      row({ denverDate: "2026-09-27", profit: "4.00", sportKey: "basketball_nba" }),
+      row({ denverDate: "2026-09-29", profit: "1.00", sportKey: "icehockey_nhl" }),
+    ];
+
+    const stats = dailyHistoryStats(rows);
+    expect(stats.days[0].segments).toEqual([
+      { sportKey: "americanfootball_ncaaf", profit: "9.00" },
+      { sportKey: "basketball_nba", profit: "4.00" },
+      { sportKey: "icehockey_nhl", profit: "2.00" },
+    ]);
+    expect(stats.days[1].segments).toEqual([]);
+    expect(stats.days[2].segments).toEqual([{ sportKey: "icehockey_nhl", profit: "1.00" }]);
+  });
+
   it("keeps cents exact (no float drift)", () => {
     const rows: HistoryRow[] = Array.from({ length: 10 }, () => row({ denverDate: "2026-09-27", profit: "0.10" }));
     expect(dailyHistoryStats(rows).grandTotal).toBe("1.00");

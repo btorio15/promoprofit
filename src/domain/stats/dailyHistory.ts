@@ -39,8 +39,15 @@ export interface DailyPoint {
   cumulative: string;
   /** Profit that day per sport key (UNKNOWN_SPORT for promos with no sport). */
   bySport: Record<string, string>;
+  /** One entry per promo record that day, largest first. Drives the segmented bars. */
+  segments: DaySegment[];
   /** True for a day in the span with no observations. */
   zero: boolean;
+}
+
+export interface DaySegment {
+  sportKey: string;
+  profit: string;
 }
 
 export interface GroupTotal {
@@ -123,16 +130,21 @@ function groupTotals<K extends string | null>(
  */
 export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: string; end: string }): DailyHistoryStats {
   const rows = window ? allRows.filter((row) => row.denverDate >= window.start && row.denverDate <= window.end) : allRows;
-  const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal> }>();
+  const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal>; segments: { sportKey: string; profit: Decimal }[] }>();
   let grand = new Decimal(0);
 
   for (const row of rows) {
     const profit = new Decimal(row.profit);
     grand = grand.plus(profit);
-    const day = byDay.get(row.denverDate) ?? { total: new Decimal(0), bySport: new Map() };
+    const day = byDay.get(row.denverDate) ?? {
+      total: new Decimal(0),
+      bySport: new Map<string, Decimal>(),
+      segments: [] as { sportKey: string; profit: Decimal }[],
+    };
     day.total = day.total.plus(profit);
     const sportKey = row.sportKey ?? UNKNOWN_SPORT;
     day.bySport.set(sportKey, (day.bySport.get(sportKey) ?? new Decimal(0)).plus(profit));
+    day.segments.push({ sportKey, profit });
     byDay.set(row.denverDate, day);
   }
 
@@ -152,6 +164,10 @@ export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: strin
       total: total.toFixed(2),
       cumulative: running.toFixed(2),
       bySport: Object.fromEntries([...(day?.bySport ?? new Map()).entries()].map(([k, v]) => [k, v.toFixed(2)])),
+      segments: (day?.segments ?? [])
+        .slice()
+        .sort((a, b) => b.profit.comparedTo(a.profit))
+        .map((segment) => ({ sportKey: segment.sportKey, profit: segment.profit.toFixed(2) })),
       zero: day === undefined,
     };
   });

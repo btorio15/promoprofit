@@ -1,15 +1,4 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Decimal from "decimal.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -112,16 +101,18 @@ export function HistorySection({
 
   const first = history.days[0].date;
   const last = history.days[history.days.length - 1].date;
-  const sportKeys = history.sports.map((sport) => sport.key ?? UNKNOWN_SPORT);
-  const chartData = history.days.map((day) => ({
-    day: dayLabel(day.date),
-    ...day.bySport,
-    total: Number(day.total),
-    cumulative: Number(day.cumulative),
-    totalLabel: formatUsd(day.total),
-    cumulativeLabel: formatUsd(day.cumulative),
-    zero: day.zero,
-  }));
+  // One stacked segment per promo record, so a day's bar shows each bet as a separate block.
+  const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.length));
+  const segmentKeys = Array.from({ length: maxSegments }, (_, index) => `seg${index}`);
+  const chartData = history.days.map((day) => {
+    const row: Record<string, string | number> = { day: dayLabel(day.date), totalLabel: formatUsd(day.total) };
+    day.segments.forEach((segment, index) => {
+      row[`seg${index}`] = Number(segment.profit);
+      row[`seg${index}Sport`] = segment.sportKey;
+    });
+    return row;
+  });
+  const sportsInRange = history.sports.map((sport) => sport.key ?? UNKNOWN_SPORT);
   const unknownSportPromos = history.sports.find((sport) => sport.key === UNKNOWN_SPORT)?.promos ?? 0;
 
   return (
@@ -161,7 +152,12 @@ export function HistorySection({
           </p>
         ) : null}
 
-        <StatsCard title="Daily profit by sport" description="Stacked by sport, one bar per day" defaultOpen>
+        <StatsCard
+          title="Daily profit by sport"
+          description="One block per promo record, colored by sport; gaps separate each bet"
+          defaultOpen
+        >
+          <SportLegend sportKeys={sportsInRange} />
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -169,28 +165,16 @@ export function HistorySection({
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
                 <Tooltip
-                  formatter={(value, name) => [formatUsd(Number(value).toFixed(2)), sportName(String(name))]}
+                  formatter={(value, name, item) => [
+                    formatUsd(Number(value).toFixed(2)),
+                    sportName(String(item.payload[`${String(name)}Sport`] ?? UNKNOWN_SPORT)),
+                  ]}
                   labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.totalLabel ?? ""} total`}
                 />
-                <Legend formatter={(value) => sportName(String(value))} />
-                {sportKeys.map((sportKey) => (
-                  <Bar key={sportKey} dataKey={sportKey} stackId="profit" fill={colorFor(sportKey)} />
+                {segmentKeys.map((key) => (
+                  <Bar key={key} dataKey={key} stackId="profit" shape={segmentShape} />
                 ))}
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </StatsCard>
-
-        <StatsCard title="Cumulative profit" description="Running total from the first day">
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
-                <Tooltip formatter={(_value, _name, item) => [item.payload.cumulativeLabel, "Cumulative"]} />
-                <Line type="monotone" dataKey="cumulative" stroke="#6366f1" strokeWidth={2} dot={false} />
-              </LineChart>
             </ResponsiveContainer>
           </div>
         </StatsCard>
@@ -250,6 +234,44 @@ export function HistorySection({
         </StatsCard>
       </CardContent>
     </Card>
+  );
+}
+
+/** Pixels of background left between stacked promo blocks, so each bet reads as its own block. */
+const SEGMENT_GAP = 2;
+
+type SegmentShapeProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  dataKey?: unknown;
+  payload?: unknown;
+};
+
+/** Draws one promo block inside a day's stacked bar, colored by its sport, with a gap above and below. */
+function segmentShape(props: SegmentShapeProps) {
+  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  if (height <= 0 || width <= 0) return <g />;
+  const key = String(props.dataKey);
+  const payload = (props.payload ?? {}) as Record<string, unknown>;
+  const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
+  const blockHeight = Math.max(height - SEGMENT_GAP, 1);
+  return (
+    <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={colorFor(sport)} />
+  );
+}
+
+function SportLegend({ sportKeys }: { sportKeys: string[] }) {
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Sport colors">
+      {sportKeys.map((key) => (
+        <li key={key} className="flex items-center gap-1.5">
+          <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
+          {sportName(key)}
+        </li>
+      ))}
+    </ul>
   );
 }
 
