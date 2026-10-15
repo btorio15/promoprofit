@@ -30,7 +30,7 @@ const SPORT_COLORS: Record<string, string> = {
   basketball_ncaab: "#CC79A7",
   baseball_mlb: "#D55E00",
   icehockey_nhl: "#56B4E9",
-  [UNKNOWN_SPORT]: "#999999",
+  [UNKNOWN_SPORT]: "#5E3C99",
 };
 const FALLBACK_COLOR = "#999999";
 
@@ -301,13 +301,17 @@ function DayTotalsTooltip({
 
 function SportLegend({ sportKeys }: { sportKeys: string[] }) {
   return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Sport colors">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Key">
       {sportKeys.map((key) => (
         <li key={key} className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
           {sportName(key)}
         </li>
       ))}
+      <li className="flex items-center gap-1.5">
+        <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
+        White: available, not marked done
+      </li>
     </ul>
   );
 }
