@@ -89,13 +89,22 @@ function pctLabel(pct: string | null): string {
  * shown next to the scheduled snapshot figures. The headline figures stay
  * visible; the charts and tables open from their own dropdowns.
  */
-export function HistorySection({ history, funnel }: { history: DailyHistoryStats; funnel: PromoFunnelStats }) {
-  if (history.dayCount === 0) {
+export function HistorySection({
+  history,
+  funnel,
+  label,
+}: {
+  history: DailyHistoryStats;
+  funnel: PromoFunnelStats;
+  /** Range name shown in the title, e.g. "7 days" or "All time". */
+  label: string;
+}) {
+  if (history.promoCount === 0 || history.days.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Since Sep 27</CardTitle>
-          <CardDescription>No older daily profit data yet.</CardDescription>
+          <CardTitle>{label}</CardTitle>
+          <CardDescription>No older daily promo profit recorded in this range.</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -118,7 +127,7 @@ export function HistorySection({ history, funnel }: { history: DailyHistoryStats
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Since Sep 27</CardTitle>
+        <CardTitle>Daily promo profit: {label}</CardTitle>
         <CardDescription>
           Best profit per promo per day, from {dayLabel(first)} to {dayLabel(last)}. Days with no observations count as
           zero. Each day is one total, so this section has no time-of-day detail.

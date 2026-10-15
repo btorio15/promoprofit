@@ -11,6 +11,7 @@ import { formatUsd } from "@/lib/format";
 import { WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
 import { HistorySection } from "@/components/stats/HistorySection";
 import { StatsCard } from "@/components/stats/StatsCard";
+import { STATS_RANGES, STATS_RANGE_LABELS, type StatsRange } from "@/domain/stats/statsRange";
 
 const TIME_FORMATTER = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Denver",
@@ -36,15 +37,19 @@ function formatWhen(iso: string | null): string {
  * bar heights. Times are Denver time, matching the rest of the app.
  */
 export function StatsScreen({ active }: { active: boolean }) {
-  const [stats, setStats] = useState<StatsDTO | null>(null);
+  const [range, setRange] = useState<StatsRange>("all");
+  const [loaded, setLoaded] = useState<StatsDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!active || stats !== null) return;
+    if (!active || loaded?.range === range) return;
     let cancelled = false;
-    getStats()
+    getStats(range)
       .then((dto) => {
-        if (!cancelled) setStats(dto);
+        if (!cancelled) {
+          setLoaded(dto);
+          setError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Couldn't load the Stats tab. Try again in a moment.");
@@ -52,14 +57,24 @@ export function StatsScreen({ active }: { active: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [active, stats]);
+  }, [active, range, loaded?.range]);
+
+  // Only show figures for the range that is selected; while it loads, show a skeleton.
+  const stats = loaded?.range === range ? loaded : null;
+  const picker = <RangePicker value={range} onChange={setRange} />;
 
   if (error) {
-    return <p className="text-sm text-destructive">{error}</p>;
+    return (
+      <div className="flex flex-col gap-4">
+        {picker}
+        <p className="text-sm text-destructive">{error}</p>
+      </div>
+    );
   }
   if (stats === null) {
     return (
       <div className="flex flex-col gap-4" aria-busy="true">
+        {picker}
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -69,15 +84,16 @@ export function StatsScreen({ active }: { active: boolean }) {
   if (stats.snapshotRuns === 0) {
     return (
       <div className="flex flex-col gap-8">
+        {picker}
         <Card>
           <CardHeader>
-            <CardTitle>No snapshots yet</CardTitle>
+            <CardTitle>No scheduled runs in this range</CardTitle>
             <CardDescription>
-              This tab fills in after the first scheduled run (three times a day) records profit.
+              Scheduled runs (three times a day) record profit from the first run onward. Older daily data is below.
             </CardDescription>
           </CardHeader>
         </Card>
-        <HistorySection history={stats.history} funnel={stats.funnel} />
+        <HistorySection history={stats.history} funnel={stats.funnel} label={STATS_RANGE_LABELS[range]} />
       </div>
     );
   }
@@ -95,6 +111,7 @@ export function StatsScreen({ active }: { active: boolean }) {
 
   return (
     <div className="flex flex-col gap-8">
+      {picker}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Summary">
         <Stat label="Scheduled runs" value={String(stats.snapshotRuns)} />
         <Stat label="First run" value={formatWhen(stats.firstCapturedAt)} small />
@@ -182,7 +199,30 @@ export function StatsScreen({ active }: { active: boolean }) {
         </div>
       </StatsCard>
 
-      <HistorySection history={stats.history} funnel={stats.funnel} />
+      <HistorySection history={stats.history} funnel={stats.funnel} label={STATS_RANGE_LABELS[range]} />
+    </div>
+  );
+}
+
+function RangePicker({ value, onChange }: { value: StatsRange; onChange: (range: StatsRange) => void }) {
+  return (
+    <div role="group" aria-label="Time range" className="flex flex-wrap gap-2">
+      {STATS_RANGES.map((range) => {
+        const selected = range === value;
+        return (
+          <button
+            key={range}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(range)}
+            className={`min-h-11 rounded-md border px-4 text-sm font-medium transition-colors ${
+              selected ? "border-foreground bg-foreground text-background" : "border-border bg-secondary hover:bg-muted"
+            }`}
+          >
+            {STATS_RANGE_LABELS[range]}
+          </button>
+        );
+      })}
     </div>
   );
 }

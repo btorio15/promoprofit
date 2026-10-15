@@ -105,6 +105,20 @@ describe("dailyHistoryStats", () => {
     expect(dailyHistoryStats(rows).boostConversion).toEqual({ records: 2, pct: "5.33", excluded: 0 });
   });
 
+  it("with a window, drops rows outside it and counts every day in the window", () => {
+    const rows: HistoryRow[] = [
+      row({ denverDate: "2026-09-01", profit: "50.00" }),
+      row({ denverDate: "2026-10-10", profit: "4.00" }),
+      row({ denverDate: "2026-10-12", profit: "2.00" }),
+    ];
+
+    const stats = dailyHistoryStats(rows, { start: "2026-10-08", end: "2026-10-14" });
+    expect(stats.grandTotal).toBe("6.00");
+    expect(stats.dayCount).toBe(7);
+    expect(stats.zeroDayCount).toBe(5);
+    expect(stats.avgPerDay).toBe("0.86");
+  });
+
   it("keeps cents exact (no float drift)", () => {
     const rows: HistoryRow[] = Array.from({ length: 10 }, () => row({ denverDate: "2026-09-27", profit: "0.10" }));
     expect(dailyHistoryStats(rows).grandTotal).toBe("1.00");

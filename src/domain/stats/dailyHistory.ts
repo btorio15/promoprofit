@@ -116,7 +116,13 @@ function groupTotals<K extends string | null>(
     .sort((a, b) => Number(b.total) - Number(a.total));
 }
 
-export function dailyHistoryStats(rows: HistoryRow[]): DailyHistoryStats {
+/**
+ * Totals for the given window (inclusive Denver days). With a window, the
+ * span is every calendar day in it, so zero-profit days count too. Without
+ * one (all time), the span runs from the first recorded day to the last.
+ */
+export function dailyHistoryStats(allRows: HistoryRow[], window?: { start: string; end: string }): DailyHistoryStats {
+  const rows = window ? allRows.filter((row) => row.denverDate >= window.start && row.denverDate <= window.end) : allRows;
   const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal> }>();
   let grand = new Decimal(0);
 
@@ -131,7 +137,11 @@ export function dailyHistoryStats(rows: HistoryRow[]): DailyHistoryStats {
   }
 
   const dates = [...byDay.keys()].sort();
-  const span = dates.length === 0 ? [] : calendarDays(dates[0], dates[dates.length - 1]);
+  const span = window
+    ? calendarDays(window.start, window.end)
+    : dates.length === 0
+      ? []
+      : calendarDays(dates[0], dates[dates.length - 1]);
   let running = new Decimal(0);
   const days: DailyPoint[] = span.map((date) => {
     const day = byDay.get(date);
