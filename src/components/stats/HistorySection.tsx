@@ -105,7 +105,14 @@ export function HistorySection({
   const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.length));
   const segmentKeys = Array.from({ length: maxSegments }, (_, index) => `seg${index}`);
   const chartData = history.days.map((day) => {
-    const row: Record<string, string | number> = { day: dayLabel(day.date), totalLabel: formatUsd(day.total) };
+    const sportTotals = Object.entries(day.bySport)
+      .sort(([, a], [, b]) => Number(b) - Number(a))
+      .map(([sportKey, total]) => ({ sport: sportName(sportKey), total: formatUsd(total) }));
+    const row: Record<string, string | number | unknown> = {
+      day: dayLabel(day.date),
+      totalLabel: formatUsd(day.total),
+      sportTotals,
+    };
     day.segments.forEach((segment, index) => {
       row[`seg${index}`] = Number(segment.profit);
       row[`seg${index}Sport`] = segment.sportKey;
@@ -164,13 +171,7 @@ export function HistorySection({
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
-                <Tooltip
-                  formatter={(value, name, item) => [
-                    formatUsd(Number(value).toFixed(2)),
-                    sportName(String(item.payload[`${String(name)}Sport`] ?? UNKNOWN_SPORT)),
-                  ]}
-                  labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.totalLabel ?? ""} total`}
-                />
+                <Tooltip content={(props) => <DayTotalsTooltip {...props} />} />
                 {segmentKeys.map((key) => (
                   <Bar key={key} dataKey={key} stackId="profit" shape={segmentShape} />
                 ))}
@@ -259,6 +260,34 @@ function segmentShape(props: SegmentShapeProps) {
   const blockHeight = Math.max(height - SEGMENT_GAP, 1);
   return (
     <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={colorFor(sport)} />
+  );
+}
+
+/** Hover text for a day's bar: the day's total, then each sport's total for that day. */
+function DayTotalsTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: readonly { payload?: unknown }[];
+  label?: string | number;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = (payload[0]?.payload ?? {}) as Record<string, unknown>;
+  const totals = (row.sportTotals as { sport: string; total: string }[] | undefined) ?? [];
+  return (
+    <div className="rounded-md border border-border bg-background px-3 py-2 text-xs shadow-md">
+      <div className="mb-1 font-semibold">
+        {String(label)}: {String(row.totalLabel)} total
+      </div>
+      {totals.map((entry) => (
+        <div key={entry.sport} className="flex justify-between gap-4">
+          <span>{entry.sport}</span>
+          <span className="num">{entry.total}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
