@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 7 (Dashboard)
 Plan: Not started
 Status: Ready to execute
-Last activity: 2026-10-14 -- Phase 7 planning complete
+Last activity: 2026-10-15 - Completed quick task 261014-u6k: default $25 max bet with per-book override
 
 ## Performance Metrics
 
@@ -191,6 +191,7 @@ Recent decisions affecting current work:
 | fast | removed descriptor lines under Total profit possible / Total profit extracted | 2026-09-29 | 4b3af2a | | - |
 | fast | headline renamed Total profit possible -> Total profit available | 2026-09-29 | 84ed15b | | - |
 | 261013-ny2 | Rotate across multiple Odds API keys (most credits left; per-key ledger, migration 0013 generated not applied; combined meter) | 2026-10-13 | a85e634 | Verified | [261013-ny2-rotate-across-multiple-odds-api-keys](./quick/261013-ny2-rotate-across-multiple-odds-api-keys/) |
+| 261014-u6k | Default $25 max bet on every profit boost; per-book max bet in Settings (per-promo cap still wins, even above book cap; unknown-cap boosts now count at $25; migration 0016 generated not applied) | 2026-10-15 | 14744b2 | Needs Review (run npm run db:migrate) | [261014-u6k-set-the-max-bet-for-every-promo-at-25-do](./quick/261014-u6k-set-the-max-bet-for-every-promo-at-25-do/) |
 
 ## Deferred Items
 
