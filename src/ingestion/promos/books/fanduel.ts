@@ -22,7 +22,13 @@ import {
 } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromTags, sportFromText } from "@/ingestion/promos/sportHints";
-import { isPlausibleTeamName, splitTeams, stripTrailingSport } from "@/ingestion/promos/promoText";
+import {
+  isPlausibleTeamName,
+  mentionsSeveralGames,
+  splitGames,
+  splitTeams,
+  stripTrailingSport,
+} from "@/ingestion/promos/promoText";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
 const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
@@ -331,6 +337,40 @@ function parseGameScope(text: string): FanduelGameScope | null {
   };
 }
 
+/** "for the Jets @ Bills or Chiefs @ Raiders NFL Games on October 18th" -- a
+ * promo limited to a few named games. Bounded, non-greedy negated class
+ * (no nested quantifiers, T-pcc-02); splitGames validates the list and fails
+ * closed on anything that is not a clean list of team pairs. */
+const MULTI_GAME_SCOPE_RE =
+  /(?:for|on)\s+the\s+([^\n!?;:]{3,300}?)\s+Games?\s+on\s+([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)/i;
+
+interface FanduelMultiGameScope {
+  games: [string, string][];
+  dateText: string;
+  scopeText: string;
+}
+
+function parseMultiGameScope(text: string): FanduelMultiGameScope | null {
+  const match = MULTI_GAME_SCOPE_RE.exec(text);
+  if (!match) return null;
+  const games = splitGames(match[1]);
+  if (games === null) return null;
+  const dateText = match[2].trim();
+  return {
+    games,
+    dateText,
+    scopeText: truncate(`${games.map(([a, b]) => `${a} @ ${b}`).join(" or ")} games on ${dateText}`, MAX_SCOPE_TEXT_CHARS),
+  };
+}
+
+/** Teams for a scope phrase: a games list when it splits cleanly, else the single pair (existing behavior). */
+function teamsFromScope(scopeText: string): { teamsText: string[]; gamesText?: [string, string][] } {
+  const games = splitGames(scopeText);
+  if (games) return { teamsText: [], gamesText: games };
+  const pair = splitTeams(scopeText);
+  return { teamsText: pair ? [pair[0], pair[1]] : [] };
+}
+
 const EXPIRES_AT_YEAR_RE = /^(\d{4})-/;
 
 /** GAME_SCOPE_RE's dateText has no year ("September 28"), unlike
@@ -410,12 +450,19 @@ function buildCandidate(params: {
   // Precedence: multi-date span > SCOPE_PHRASE_RE (sport-wide, has its own
   // year) > single yearless span date > single-game team-pair phrase.
   const yearlessSpan = !multiDay && !scope && spanScope !== null ? spanScope : null;
-  const gameScope = multiDay || scope || yearlessSpan ? null : parseGameScope(text);
+  const multiGameScope = multiDay || scope || yearlessSpan ? null : parseMultiGameScope(text);
+  const gameScope = multiDay || scope || yearlessSpan || multiGameScope ? null : parseGameScope(text);
   const boostPercent = extractBoostPercent(text);
 
   let window: { start: string; end: string } | null = null;
   let scopeText: string;
   let teamsText: string[] = [];
+  let gamesText: [string, string][] | undefined;
+  const applyScopeTeams = (from: string) => {
+    const result = teamsFromScope(from);
+    teamsText = result.teamsText;
+    gamesText = result.gamesText;
+  };
 
   if (multiDay) {
     // Every named ET day, no expiry extension (the window is the days the
@@ -424,27 +471,27 @@ function buildCandidate(params: {
     const startBounds = etDayBounds(multiDay.startEtDate);
     const endBounds = etDayBounds(multiDay.endEtDate);
     window = startBounds && endBounds ? { start: startBounds.start, end: endBounds.end } : null;
-    const teamPair = splitTeams(scopeText);
-    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+    applyScopeTeams(scopeText);
   } else if (scope) {
     scopeText = scope.scopeText;
     window = slateWindow(scope.dateText, expiresAt);
-    const teamPair = splitTeams(scopeText);
-    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+    applyScopeTeams(scopeText);
   } else if (yearlessSpan) {
     scopeText = yearlessSpan.scopeText;
     const dayBounds = etDayBounds(yearlessSpan.startEtDate);
     window = dayBounds ? extendToExpiry(dayBounds, expiresAt) : null;
-    const teamPair = splitTeams(scopeText);
-    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+    applyScopeTeams(scopeText);
+  } else if (multiGameScope) {
+    scopeText = multiGameScope.scopeText;
+    gamesText = multiGameScope.games;
+    window = slateWindow(withInferredYear(multiGameScope.dateText, expiresAt), expiresAt);
   } else if (gameScope) {
     scopeText = gameScope.scopeText;
     teamsText = gameScope.teams;
     window = slateWindow(withInferredYear(gameScope.dateText, expiresAt), expiresAt);
   } else {
     scopeText = truncate(entry.name, MAX_SCOPE_TEXT_CHARS);
-    const teamPair = splitTeams(scopeText);
-    if (teamPair) teamsText = [teamPair[0], teamPair[1]];
+    applyScopeTeams(scopeText);
   }
 
   return {
@@ -457,6 +504,7 @@ function buildCandidate(params: {
     sportKeyHint: sportKey,
     scopeText,
     teamsText,
+    ...(gamesText ? { gamesText } : {}),
     windowStart: window ? window.start : null,
     windowEnd: window ? window.end : null,
     expiresAt,
@@ -581,6 +629,23 @@ function parse(
         : buildCandidateListOnly(entry, classification.sportKey, ctx.sourceUrl);
     } else {
       promo = buildCandidateListOnly(entry, classification.sportKey, ctx.sourceUrl);
+    }
+
+    // Never-widen guard: a promo naming several games that we could not
+    // parse into a games list must go to a human ("Needs a look"), never
+    // become a league-wide candidate.
+    if (
+      promo.gamesText === undefined &&
+      promo.teamsText.length === 0 &&
+      mentionsSeveralGames(`${promo.title}\n${promo.rawText}`)
+    ) {
+      skipped.push({
+        reason: "unrecognized",
+        externalId: entry.promoCode,
+        title: entry.title,
+        evidence: { rawText: truncate(promo.rawText, MAX_RAW_TEXT_CHARS), sourceUrl: promo.sourceUrl, expiresAt: promo.expiresAt, partial: promo },
+      });
+      continue;
     }
 
     const validated = ScrapedPromoSchema.safeParse(promo);

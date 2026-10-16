@@ -308,3 +308,56 @@ describe("ballybetScraper.parse — real fixture", () => {
     expect(result.skipped[0].evidence?.rawText).toContain("40% Profit Boost");
   });
 });
+
+describe("ballybetScraper.parse — multi-game promos", () => {
+  const KEY = "sbk-10-NFL-Multi-Profit-Boost";
+  const list = JSON.stringify({
+    sections: {
+      primaryContent: [
+        {
+          data: [
+            {
+              type: "promotion_content_card",
+              title: "10% NFL Profit Boost",
+              description: "<p>10% Profit Boost</p>",
+              link: { url: `/promotions/${KEY}` },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  const detail = (scope: string) =>
+    JSON.stringify({
+      sections: {
+        primaryContent: [
+          {
+            componentType: "promotion_details",
+            promotionIdentifier: KEY,
+            title: "10% NFL Profit Boost",
+            description: "<p>10% Profit Boost</p><p>Maximum Bet: $20</p><p>Minimum Odds: -+100</p><p>Any Wager</p>",
+            terms: `<p>Promotion claimable for ${scope} between September 27, 2026 at 12:00 AM ET and September 27, 2026 at 11:30 PM ET.  10% Profit Boost</p>`,
+          },
+        ],
+      },
+    });
+  const run = (scope: string) =>
+    ballybetScraper.parse({ listBody: list, detailBodies: { [KEY]: detail(scope) } }, CTX);
+
+  it("emits gamesText for 'A @ B or C @ D' and leaves teamsText empty", () => {
+    const result = run("Jets @ Bills or Chiefs @ Raiders");
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0].gamesText).toEqual([
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+    ]);
+    expect(result.candidates[0].teamsText).toEqual([]);
+  });
+
+  it("sends unsplittable several-game text to review, never league-wide", () => {
+    const result = run("Jets @ Bills or tonight's late Chiefs @ Raiders prime-time matchup of the week");
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("unrecognized");
+    expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
+  });
+});

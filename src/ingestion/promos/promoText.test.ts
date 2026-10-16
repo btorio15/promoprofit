@@ -159,6 +159,7 @@ describe("splitGames", () => {
 
   it("fails closed when any piece is not a plausible pair", () => {
     expect(splitGames("Jets @ Bills or tonight's big game")).toBeNull();
+    expect(splitGames("Jets @ Bills or tonight's late Chiefs @ Raiders prime-time matchup of the week")).toBeNull();
   });
 });
 

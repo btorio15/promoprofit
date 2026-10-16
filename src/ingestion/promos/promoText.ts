@@ -48,6 +48,12 @@ export function splitTeams(scopeText: string): [string, string] | null {
 /** Most games one promo may list (matches ScopeGuessSchema / ScrapedPromoSchema). */
 const MAX_LISTED_GAMES = 12;
 
+/** Longest real team name in words (e.g. "Texas Christian Horned Frogs"). */
+const MAX_TEAM_NAME_WORDS = 4;
+
+/** A lowercase list connector inside a "team name" means a sentence fragment. */
+const LIST_WORD_IN_NAME_RE = /\b(?:or|and)\b/;
+
 /** Separators between games in a list; comma forms first so ", and" is one cut. */
 const GAME_LIST_SEPARATOR_RE = /,\s+and\s+|,\s+or\s+|,\s+|\s+and\s+|\s+or\s+|\s+&\s+/i;
 
@@ -73,6 +79,10 @@ export function splitGames(scopeText: string): [string, string][] | null {
   for (const piece of pieces) {
     const pair = splitTeams(piece);
     if (pair === null) return null;
+    // Fail closed on sentence fragments posing as team names.
+    if (pair.some((name) => name.split(/\s+/).length > MAX_TEAM_NAME_WORDS || LIST_WORD_IN_NAME_RE.test(name))) {
+      return null;
+    }
     pairs.push(pair);
   }
   return pairs;

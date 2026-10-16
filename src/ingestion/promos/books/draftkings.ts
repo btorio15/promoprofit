@@ -14,6 +14,7 @@ import { slateWindow, parseEtDateTime } from "@/domain/promos/etTime";
 import { parseMaxStake, parseMaxWinnings, parseMinOdds, extractFinePrintNote } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
 import { sportFromText, sportFromTeamPair } from "@/ingestion/promos/sportHints";
+import { mentionsSeveralGames, splitGames } from "@/ingestion/promos/promoText";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
 const WINNINGS_CAP_KIND: WinningsCapKind = "boost_extra";
@@ -168,6 +169,27 @@ function parseGameScope(text: string): GameScope | null {
   return { teams: [away, home], dateText, timeText, scopeText: truncate(scopeTextRaw, 200) };
 }
 
+/** "for the NY Jets @ BUF Bills or KC Chiefs @ LV Raiders games on 9/27/2026
+ * (at 08:20 PM ET)?" -- a promo limited to a few named games. The list group
+ * is a bounded, non-greedy negated class (no nested quantifiers, T-pcc-02);
+ * splitGames then validates it, failing closed on anything that is not a
+ * clean list of team pairs. */
+const MULTI_GAME_SCOPE_RE =
+  /for the ([^\n!]{3,300}?) games? on (\d{1,2}\/\d{1,2}\/\d{4})(?: at \d{1,2}:\d{2}\s*[AP]M ET)?/i;
+
+interface MultiGameScope {
+  games: [string, string][];
+  dateText: string;
+}
+
+/** Pure helper: parses the MULTI_GAME_SCOPE_RE phrase into 2+ team pairs, or null. */
+function parseMultiGameScope(text: string): MultiGameScope | null {
+  const match = MULTI_GAME_SCOPE_RE.exec(text);
+  if (!match) return null;
+  const games = splitGames(match[1]);
+  return games === null ? null : { games, dateText: match[2] };
+}
+
 const OPT_IN_TEXT_RE = /\bopt-in\b/i;
 
 /** Every DK promo's `terms` field is the short, informative numbered list
@@ -275,19 +297,32 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
   const scopeMatch = SCOPE_RE.exec(text);
   // SCOPE_RE (sport-wide) wins when both phrases match -- only look for the
   // single-game phrase when the sport-wide one isn't present.
-  const gameScope = scopeMatch ? null : parseGameScope(text);
+  const multiGameScope = scopeMatch ? null : parseMultiGameScope(text);
+  const gameScope = scopeMatch || multiGameScope ? null : parseGameScope(text);
   const expiresAt = normalizeDkTimestamp(entry.expirationDate);
 
   let scopeText = title;
   let windowStart: string | null = null;
   let windowEnd: string | null = null;
   let teamsText: string[] = [];
+  let gamesText: [string, string][] | undefined;
 
   if (scopeMatch) {
     const sportWords = scopeMatch[1].trim();
     const dateText = scopeMatch[2];
     scopeText = truncate(`${sportWords} games on ${dateText}`, 200);
     const window = slateWindow(dateText, expiresAt);
+    if (window) {
+      windowStart = window.start;
+      windowEnd = window.end;
+    }
+  } else if (multiGameScope) {
+    gamesText = multiGameScope.games;
+    scopeText = truncate(
+      `${multiGameScope.games.map(([a, b]) => `${a} @ ${b}`).join(" or ")} games on ${multiGameScope.dateText}`,
+      200,
+    );
+    const window = slateWindow(multiGameScope.dateText, expiresAt);
     if (window) {
       windowStart = window.start;
       windowEnd = window.end;
@@ -328,6 +363,14 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
     const teamSportHint = sportFromTeamPair(teamsText[0], teamsText[1]);
     if (teamSportHint.kind === "supported") sportKeyHint = teamSportHint.sportKey;
   }
+  if (sportKeyHint === null && gamesText) {
+    // Hint only when every listed game agrees on one supported sport.
+    const keys = gamesText.map(([a, b]) => {
+      const hint = sportFromTeamPair(a, b);
+      return hint.kind === "supported" ? hint.sportKey : null;
+    });
+    if (keys.every((k) => k !== null && k === keys[0])) sportKeyHint = keys[0];
+  }
 
   const claimRequired: ScrapedPromo["claimRequired"] =
     entry.isOptInPromotion === true || OPT_IN_TEXT_RE.test(text) ? "opt_in" : null;
@@ -342,6 +385,7 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
     sportKeyHint,
     scopeText,
     teamsText,
+    ...(gamesText ? { gamesText } : {}),
     windowStart,
     windowEnd,
     expiresAt,
@@ -419,7 +463,7 @@ export const draftkingsScraper: BookScraper = {
         // No sport word in the text -- still let it through when it's a
         // single-game "for the A @ B game on <date>" boost (real fixture
         // 1126403); the team names, not a sport word, pin its scope.
-        if (parseGameScope(text) === null) {
+        if (parseGameScope(text) === null && parseMultiGameScope(text) === null) {
           skipped.push(skippedEntry("unrecognized", entry, title, text));
           continue;
         }
@@ -442,6 +486,19 @@ export const draftkingsScraper: BookScraper = {
       }
 
       const candidate = buildCandidate(entry, title, text);
+
+      // Never-widen guard: a promo naming several games that we could not
+      // parse into a games list must go to a human ("Needs a look"), never
+      // become a league-wide candidate.
+      if (
+        candidate.gamesText === undefined &&
+        candidate.teamsText.length === 0 &&
+        mentionsSeveralGames(`${title}\n${text}`)
+      ) {
+        skipped.push(skippedEntry("unrecognized", entry, title, text, candidate));
+        continue;
+      }
+
       const validated = ScrapedPromoSchema.safeParse(candidate);
       if (!validated.success) {
         console.warn(

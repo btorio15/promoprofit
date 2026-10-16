@@ -568,3 +568,40 @@ describe("draftkingsScraper — DK single-game 'for the A @ B game on <date>' bo
     expect(result.candidates[0].teamsText).toEqual([]);
   });
 });
+
+describe("draftkingsScraper — multi-game 'for the A @ B or C @ D games on <date>' boosts", () => {
+  const multiTerms = (games: string) =>
+    `1. Opt-in and get One (1) Profit Boost for the ${games} games on 10/18/2026!\n2. Profit Boost: 50% (Profit boost only applies to winnings, excluding original bet amount)\n3. Total bet odds must be -200 or longer.\n4. Max betting limits apply.`;
+  const parseTerms = (terms: string) =>
+    draftkingsScraper.parse(
+      { listBody: buildSyntheticBody({ terms, promotionDescription: "Get a 50% boost!" }), detailBodies: {} },
+      { now: new Date("2026-10-16T12:00:00.000Z"), sourceUrl: "https://api.draftkings.com/en/api/promotions/v3/promotions/query" },
+    );
+
+  it("emits gamesText for two listed games and leaves teamsText empty", () => {
+    const result = parseTerms(multiTerms("NY Jets @ BUF Bills or KC Chiefs @ LV Raiders"));
+    expect(result.candidates).toHaveLength(1);
+    const c = result.candidates[0];
+    expect(c.gamesText).toEqual([
+      ["NY Jets", "BUF Bills"],
+      ["KC Chiefs", "LV Raiders"],
+    ]);
+    expect(c.teamsText).toEqual([]);
+    expect(c.windowStart).toBe("2026-10-18T04:00:00.000Z");
+  });
+
+  it("emits three pairs for comma / 'and' wording", () => {
+    const result = parseTerms(multiTerms("NY Jets @ BUF Bills, KC Chiefs @ LV Raiders and PHI Eagles @ CHI Bears"));
+    expect(result.candidates[0].gamesText).toHaveLength(3);
+  });
+
+  it("sends unsplittable several-game text to review (unrecognized skip with evidence), never league-wide", () => {
+    const terms =
+      "1. Opt-in and get One (1) Profit Boost for NFL Jets @ Bills or tonight's Chiefs @ Raiders matchup!\n2. Profit Boost: 50%\n3. Total bet odds must be -200 or longer.";
+    const result = parseTerms(terms);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].reason).toBe("unrecognized");
+    expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
+  });
+});
