@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { AddPromoDraft, AddPromoFieldErrors } from "@/domain/promos/addPromoDraft";
 import type { CorrectionOptions } from "@/domain/promos/dto";
-import type { ScopeDraft } from "@/domain/promos/scopeDraft";
+import { singlePickedEventId, type ScopeDraft } from "@/domain/promos/scopeDraft";
 import { ExpiryField } from "./ExpiryField";
 import { ScopePicker } from "./ScopePicker";
 
@@ -56,10 +56,9 @@ export function BoostFields({ draft, onDraftChange, options, fieldErrors, disabl
     Boolean(expiresError) ||
     (!oddsMode && Boolean(pinError));
 
-  const selectedEvent =
-    draft.scope.mode === "game" && draft.scope.eventId
-      ? (options.events.find((e) => e.eventId === draft.scope.eventId) ?? null)
-      : null;
+  // A market can only be pinned when exactly one game is picked.
+  const pickedEventId = singlePickedEventId(draft.scope);
+  const selectedEvent = pickedEventId ? (options.events.find((e) => e.eventId === pickedEventId) ?? null) : null;
   const pickableMarkets = (selectedEvent?.markets ?? []).filter((m) => m.pinned !== null);
   const marketLabel = (value: string | null) =>
     value === null || value === "best"
@@ -67,7 +66,8 @@ export function BoostFields({ draft, onDraftChange, options, fieldErrors, disabl
       : (selectedEvent?.markets.find((m) => m.value === value)?.label ?? "Pick a bet");
 
   function changeScope(scope: ScopeDraft) {
-    const sameGame = scope.mode === "game" && draft.scope.mode === "game" && scope.eventId === draft.scope.eventId;
+    const nextPicked = singlePickedEventId(scope);
+    const sameGame = nextPicked !== null && nextPicked === singlePickedEventId(draft.scope);
     onDraftChange({ ...draft, scope, pinValue: sameGame ? draft.pinValue : null });
   }
 
@@ -102,7 +102,7 @@ export function BoostFields({ draft, onDraftChange, options, fieldErrors, disabl
         <p className="text-sm text-muted-foreground">Pick the exact bet this price is for.</p>
       ) : null}
       {selectedEvent === null ? (
-        <p className="text-sm text-muted-foreground">Choose One game above first.</p>
+        <p className="text-sm text-muted-foreground">Pick exactly one game above to choose a bet.</p>
       ) : null}
       <FieldError id="add-pin-error" message={pinError} />
     </div>
