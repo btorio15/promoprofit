@@ -46,7 +46,7 @@ created: 2026-10-14
 | STATS-08/09 | view-model copy: labels, derived "Available since <day>", singular/empty/"Not ready yet" | unit | `npx vitest run src/components/opportunities/dashboardTotalsView.test.ts` | ❌ W0 | ⬜ pending |
 | STATS-06/D-06 | graph "since <day>" suffix only for All range | unit | `npx vitest run src/components/opportunities/profitGraphView.test.ts` | ✅ extend | ⬜ pending |
 | STATS-08/09 | `getOpportunities` returns dashboard DTO in every ok branch; auth first; no `loadAvailableProfit` | unit (mocked) | `npx vitest run src/app/actions/get-opportunities.test.ts` | ✅ extend | ⬜ pending |
-| STATS-07 | tab order Dashboard · Stats · Arbitrage · Promos · Tools; `stats` id; no `value="dashboard"` | source-inspection | `npx vitest run src/components/appShellTabs.test.ts` | ❌ W0 | ⬜ pending |
+| STATS-07 | tab order Dashboard · Statistics · Arbitrage · Promos · Tools; `stats` id; no `value="dashboard"` | source-inspection | `npx vitest run src/components/appShellTabs.test.ts` | ❌ W0 | ⬜ pending |
 | STATS-10 | no `ProfitSummary` usage; Promos tab has no summary | source-inspection | `npx vitest run src/components/promos/noProfitSummary.test.ts` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*

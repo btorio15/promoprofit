@@ -42,6 +42,7 @@ Out of scope: new stats beyond those listed (by-book / by-type breakdowns, histo
 - **D-16:** Tab order: Dashboard · Stats · Arbitrage · Promos · Tools (Stats keeps the slot the teammate gave it, right after the home tab) — Claude may adjust only if it hurts phone tab-bar fit.
 - **D-17:** Owner accepts the teammate's schedule change: every scheduled scrape run (15:37, 18:37, 22:37 UTC) also runs the moneyline odds refresh + profit recording (~4 credits/run, ~360 of 1,000 credits/month with key rotation), and the Vercel cron is removed (GitHub schedule is the only daily trigger). Phase 7 must not add any further automatic Odds API spending.
 - **D-18:** (Added at planning, owner answer 2026-10-14) Extracted totals — all-time, last 7 days, last 30 days — count **every** completion by its Denver completion day, including ones before the graph start day (Oct 13). They are computed from raw completions, not from the graph series. The 30-day extracted figure on the card may therefore exceed the graph's 30-day headline; that is accepted.
+- **D-15a:** (2026-10-16) The teammate already shipped the rename with the label **"Statistics"** (id `stats`); keep it. Plan 07-02 is reduced to a guard test.
 - **D-19:** (Added at planning, owner answer 2026-10-14) "Promos done" and the average count **every** completed promo, including $0 ones (no-hedge and legacy $0 entries). Only pair-marker rows are excluded (owner check: 10 done, avg $3.31).
 
 ### Claude's Discretion
