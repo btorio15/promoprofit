@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ScopeGuessSchema, eventInScope, scopeFromGuess, type ScopeGuess } from "./scope";
+import { ScopeGuessSchema, eventInScope, gamesWindow, scopeFromGuess, type ScopeGuess } from "./scope";
 
 const validEventGuess: ScopeGuess = {
   kind: "event",
@@ -144,5 +144,62 @@ describe("eventInScope: any scope (D-07)", () => {
     expect(
       eventInScope({ id: "b", sport_key: "basketball_nba", commence_time: "2027-01-01T12:00:00Z" }, scope),
     ).toBe(true);
+  });
+});
+
+const gameA = { eventId: "A", homeTeam: "Buffalo Bills", awayTeam: "Kansas City Chiefs", commenceTime: "2026-09-27T17:00:00Z" };
+const gameB = { eventId: "B", homeTeam: "Dallas Cowboys", awayTeam: "Philadelphia Eagles", commenceTime: "2026-09-28T00:20:00Z" };
+const gamesGuess: ScopeGuess = { kind: "games", sportKey: "americanfootball_nfl", games: [gameA, gameB] };
+
+describe("games scope", () => {
+  it("accepts 2 games of one sport", () => {
+    expect(ScopeGuessSchema.safeParse(gamesGuess).success).toBe(true);
+  });
+
+  it("rejects 1 game, 13 games, duplicate ids, same teams, extra keys, bad sport", () => {
+    const bad = (v: unknown) => expect(ScopeGuessSchema.safeParse(v).success).toBe(false);
+    bad({ ...gamesGuess, games: [gameA] });
+    bad({
+      ...gamesGuess,
+      games: Array.from({ length: 13 }, (_, i) => ({ ...gameA, eventId: `g${i}` })),
+    });
+    bad({ ...gamesGuess, games: [gameA, { ...gameB, eventId: "A" }] });
+    bad({ ...gamesGuess, games: [gameA, { ...gameB, awayTeam: gameB.homeTeam }] });
+    bad({ ...gamesGuess, extra: 1 });
+    bad({ ...gamesGuess, sportKey: "hockey_nhl" });
+  });
+
+  it("gamesWindow returns earliest and latest commence time", () => {
+    expect(gamesWindow([gameB, gameA])).toEqual({
+      windowStart: gameA.commenceTime,
+      windowEnd: gameB.commenceTime,
+    });
+    expect(gamesWindow([gameA, { ...gameB, commenceTime: gameA.commenceTime }])).toEqual({
+      windowStart: gameA.commenceTime,
+      windowEnd: gameA.commenceTime,
+    });
+  });
+
+  it("scopeFromGuess builds a games PromoScope", () => {
+    expect(scopeFromGuess(gamesGuess)).toEqual({
+      kind: "games",
+      sportKey: "americanfootball_nfl",
+      eventIds: ["A", "B"],
+      windowStart: new Date(gameA.commenceTime),
+      windowEnd: new Date(gameB.commenceTime),
+    });
+  });
+
+  it("eventInScope: listed games true, a third game in between false, wrong sport false", () => {
+    const scope = scopeFromGuess(gamesGuess);
+    const ev = (id: string, sport_key = "americanfootball_nfl") => ({
+      id,
+      sport_key,
+      commence_time: "2026-09-27T20:00:00Z",
+    });
+    expect(eventInScope(ev("A"), scope)).toBe(true);
+    expect(eventInScope(ev("B"), scope)).toBe(true);
+    expect(eventInScope(ev("C"), scope)).toBe(false);
+    expect(eventInScope(ev("A", "basketball_nba"), scope)).toBe(false);
   });
 });
