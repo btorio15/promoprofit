@@ -104,6 +104,24 @@ const EventScopeInputSchema = z.strictObject({
   pinned: PinnedSelectionInputSchema.nullable(),
 });
 
+/** The most games one promo can cover (matches ScopeGuessSchema's games max). */
+export const MAX_PICKED_GAMES = 12;
+
+/**
+ * A promo limited to 2-12 specific games in one league. The ids are untrusted:
+ * the server re-resolves every one against the cached odds (teams, times and
+ * league always come from the cache). Never carries a market pin.
+ */
+export const GamesScopeInputSchema = z
+  .strictObject({
+    kind: z.literal("games"),
+    eventIds: z.array(z.string().min(1).max(100)).min(2).max(MAX_PICKED_GAMES),
+  })
+  .refine((v) => new Set(v.eventIds).size === v.eventIds.length, {
+    message: "game ids must be unique",
+    path: ["eventIds"],
+  });
+
 export const SportDayScopeInputSchema = z.strictObject({
   kind: z.literal("sport_day"),
   sportKey: z.enum(SPORT_KEYS as [string, ...string[]]),
@@ -130,22 +148,23 @@ const ClassifyEventScopeInputSchema = z.strictObject({
 export const ClassifyScopeInputSchema = z.discriminatedUnion("kind", [
   ClassifyEventScopeInputSchema,
   SportDayScopeInputSchema,
+  GamesScopeInputSchema,
 ]);
 
 export type ClassifyScopeInput = z.infer<typeof ClassifyScopeInputSchema>;
 
 /**
  * correctPromoMatch's input (D-14, T-03-09-01/02): a strict discriminated
- * union over the two scope kinds the Correct sub-panel can produce -- one
- * specific game (with an optional market/side pin) or a sport+ET-day
- * window. No userId field (IDOR guard, same discipline as PromoIdInputSchema
+ * union over the three scope kinds the Correct sub-panel can produce -- one
+ * specific game (with an optional market/side pin), 2-12 games in one league,
+ * or a sport+ET-day window. No userId field (IDOR guard, same discipline as PromoIdInputSchema
  * above). The action re-validates every value here against current cached
  * odds before writing (T-03-09-02) -- this schema only proves the SHAPE is
  * well-formed.
  */
 export const CorrectMatchInputSchema = z.strictObject({
   promoId: z.number().int().positive(),
-  scope: z.discriminatedUnion("kind", [EventScopeInputSchema, SportDayScopeInputSchema]),
+  scope: z.discriminatedUnion("kind", [EventScopeInputSchema, SportDayScopeInputSchema, GamesScopeInputSchema]),
 });
 
 export type CorrectMatchInput = z.infer<typeof CorrectMatchInputSchema>;

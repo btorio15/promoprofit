@@ -4,6 +4,7 @@ import { promoProfitObservations, promos } from "./schema";
 import { activePromoWhere } from "./promos";
 import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
 import type { AddedPromoEditValues } from "@/domain/promos/addedPromoInput";
+import { ScopeGuessSchema } from "@/domain/promos/scope";
 
 /** Inserts one member-added promo and returns its id (D-09: live immediately, no review queue). */
 export async function insertAddedPromo(values: AddedPromoInsert): Promise<number> {
@@ -84,6 +85,24 @@ export async function expireOwnAddedPromo(args: OwnPromoArgs): Promise<boolean> 
   return rows.length === 1;
 }
 
+/** Picked game ids of a games promo ordered by kickoff; null for other kinds or a corrupt list (never widened). */
+function gamesEventIds(row: {
+  id: number;
+  scopeKind: string | null;
+  sportKey: string | null;
+  scopeGames: unknown;
+}): string[] | null {
+  if (row.scopeKind !== "games") return null;
+  const parsed = ScopeGuessSchema.safeParse({ kind: "games", sportKey: row.sportKey, games: row.scopeGames });
+  if (!parsed.success || parsed.data.kind !== "games") {
+    console.warn(`promo ${row.id}: stored games scope failed validation; opening the editor without picks`);
+    return null;
+  }
+  return [...parsed.data.games]
+    .sort((a, b) => new Date(a.commenceTime).getTime() - new Date(b.commenceTime).getTime())
+    .map((g) => g.eventId);
+}
+
 /** This member's own ACTIVE added promo for editing; null for anyone else's, expired, deleted or missing (T-5-idor). */
 export async function getOwnActiveAddedPromo(promoId: number, userId: number): Promise<AddedPromoEditValues | null> {
   const db = getDb();
@@ -106,6 +125,7 @@ export async function getOwnActiveAddedPromo(promoId: number, userId: number): P
     minOddsAmerican: row.minOddsAmerican,
     scopeKind: row.scopeKind,
     eventId: row.eventId,
+    eventIds: gamesEventIds(row),
     sportKey: row.sportKey,
     windowStart: row.windowStart ? row.windowStart.toISOString() : null,
     windowEnd: row.windowEnd ? row.windowEnd.toISOString() : null,

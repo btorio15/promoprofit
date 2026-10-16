@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveMemberScope } from "./memberScope";
+import { memberScopeInputFrom, resolveMemberScope } from "./memberScope";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 const NOW = new Date("2026-09-27T12:00:00Z");
@@ -145,6 +145,75 @@ describe("resolveMemberScope", () => {
         status: "stale",
         message: "That day has already passed. Pick another.",
       });
+    });
+  });
+});
+
+describe("resolveMemberScope games", () => {
+  const later = futureEvent({ id: "nfl-2", commence_time: "2026-09-27T21:00:00Z", home_team: "Chiefs", away_team: "Raiders" });
+  const earlier = futureEvent({ id: "nfl-3", commence_time: "2026-09-27T16:00:00Z", home_team: "Bears", away_team: "Lions" });
+  const first = futureEvent();
+  const events = (...list: OddsEvent[]) => ({ moneyline: list, extended: [] as OddsEvent[] });
+  const STALE = "One of those games has started or is no longer in the cached odds. Remove it and try again.";
+
+  it("builds an ordered games scope from the cached events, event null", () => {
+    const result = resolveMemberScope(
+      { kind: "games", eventIds: ["nfl-2", "nfl-1", "nfl-3"] },
+      events(first, later, earlier),
+      NOW,
+    );
+    expect(result).toEqual({
+      status: "ok",
+      event: null,
+      scope: {
+        kind: "games",
+        sportKey: "americanfootball_nfl",
+        games: [
+          { eventId: "nfl-3", homeTeam: "Bears", awayTeam: "Lions", commenceTime: earlier.commence_time },
+          { eventId: "nfl-1", homeTeam: "Denver Broncos", awayTeam: "Los Angeles Rams", commenceTime: first.commence_time },
+          { eventId: "nfl-2", homeTeam: "Chiefs", awayTeam: "Raiders", commenceTime: later.commence_time },
+        ],
+      },
+    });
+  });
+
+  it("missing id -> stale", () => {
+    expect(resolveMemberScope({ kind: "games", eventIds: ["nfl-1", "nope"] }, events(first), NOW)).toEqual({
+      status: "stale",
+      message: STALE,
+    });
+  });
+
+  it("started game -> stale", () => {
+    const started = futureEvent({ id: "nfl-9", commence_time: "2026-09-27T11:00:00Z" });
+    expect(resolveMemberScope({ kind: "games", eventIds: ["nfl-1", "nfl-9"] }, events(first, started), NOW)).toEqual({
+      status: "stale",
+      message: STALE,
+    });
+  });
+
+  it("mixed leagues -> invalid", () => {
+    const nba = futureEvent({ id: "nba-1", sport_key: "basketball_nba", home_team: "A", away_team: "B" });
+    expect(resolveMemberScope({ kind: "games", eventIds: ["nfl-1", "nba-1"] }, events(first, nba), NOW)).toEqual({
+      status: "invalid",
+    });
+  });
+
+  it("duplicates, 1 id and 13 ids -> invalid", () => {
+    expect(resolveMemberScope({ kind: "games", eventIds: ["nfl-1", "nfl-1"] }, events(first), NOW).status).toBe("invalid");
+    expect(resolveMemberScope({ kind: "games", eventIds: ["nfl-1"] }, events(first), NOW).status).toBe("invalid");
+    const ids = Array.from({ length: 13 }, (_, i) => `g${i}`);
+    const many = ids.map((id) => futureEvent({ id, home_team: `H${id}`, away_team: `A${id}` }));
+    expect(resolveMemberScope({ kind: "games", eventIds: ids }, events(...many), NOW).status).toBe("invalid");
+  });
+
+  it("memberScopeInputFrom strips pins and omits undefined etEndDate", () => {
+    expect(memberScopeInputFrom({ kind: "event", eventId: "e", pinned: null } as never)).toEqual({ kind: "event", eventId: "e" });
+    expect(memberScopeInputFrom({ kind: "games", eventIds: ["a", "b"] })).toEqual({ kind: "games", eventIds: ["a", "b"] });
+    expect(memberScopeInputFrom({ kind: "sport_day", sportKey: "s", etDate: "2026-09-27" })).toEqual({
+      kind: "sport_day",
+      sportKey: "s",
+      etDate: "2026-09-27",
     });
   });
 });

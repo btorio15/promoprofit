@@ -83,3 +83,60 @@ describe("prepareAddedPromoValues expiry bounds (WR-06)", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("prepareAddedPromoValues games scope", () => {
+  const ev = (id: string, sport: string, commence: string) => ({
+    id,
+    sport_key: sport,
+    sport_title: "x",
+    commence_time: commence,
+    home_team: `Home ${id}`,
+    away_team: `Away ${id}`,
+    bookmakers: [],
+  });
+  const withGames = (eventIds: string[]) =>
+    ({ ...bonusAtMgm, bookKey: "fanduel", scope: { kind: "games", eventIds } }) as unknown as AddPromoInput;
+
+  it("saves a games scope built from the cached games", async () => {
+    mockGetCachedEvents.mockResolvedValue({
+      events: [ev("a", "americanfootball_nfl", "2026-10-03T18:00:00Z"), ev("b", "americanfootball_nfl", "2026-10-02T18:00:00Z")],
+      fetchedAt: NOW,
+    });
+    const r = await prepareAddedPromoValues({ userId: 7, data: withGames(["a", "b"]), now: NOW, dedupeKey: "k" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.values.scopeKind).toBe("games");
+      expect(r.values.scopeGames).toEqual([
+        { eventId: "b", homeTeam: "Home b", awayTeam: "Away b", commenceTime: "2026-10-02T18:00:00Z" },
+        { eventId: "a", homeTeam: "Home a", awayTeam: "Away a", commenceTime: "2026-10-03T18:00:00Z" },
+      ]);
+    }
+  });
+
+  it("mixed leagues -> invalid scope error", async () => {
+    mockGetCachedEvents.mockResolvedValue({
+      events: [ev("a", "americanfootball_nfl", "2026-10-03T18:00:00Z"), ev("b", "basketball_nba", "2026-10-02T18:00:00Z")],
+      fetchedAt: NOW,
+    });
+    const r = await prepareAddedPromoValues({ userId: 7, data: withGames(["a", "b"]), now: NOW, dedupeKey: "k" });
+    expect(r).toEqual({
+      ok: false,
+      response: { status: "invalid", fieldErrors: { scope: ["Pick 2 to 12 games from one league."] } },
+    });
+  });
+
+  it("started game -> stale", async () => {
+    mockGetCachedEvents.mockResolvedValue({
+      events: [ev("a", "americanfootball_nfl", "2026-10-03T18:00:00Z"), ev("b", "americanfootball_nfl", "2026-10-01T10:00:00Z")],
+      fetchedAt: NOW,
+    });
+    const r = await prepareAddedPromoValues({ userId: 7, data: withGames(["a", "b"]), now: NOW, dedupeKey: "k" });
+    expect(r).toEqual({
+      ok: false,
+      response: {
+        status: "stale",
+        message: "One of those games has started or is no longer in the cached odds. Remove it and try again.",
+      },
+    });
+  });
+});

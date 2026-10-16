@@ -4,6 +4,7 @@ import type { CorrectionOptions } from "./correctionOptions";
 import type { DuplicateCandidate } from "./duplicateHint";
 import {
   BOOST_PERCENT_PATTERN,
+  GamesScopeInputSchema,
   MONEY_PATTERN,
   PinnedSelectionInputSchema,
   SportDayScopeInputSchema,
@@ -25,6 +26,9 @@ export const MSG_EXPIRY_PASSED = "Pick an expiry that hasn't passed.";
 export const MSG_EXPIRY_TOO_FAR = `Pick a day in the next ${ADDED_PROMO_EXPIRY_DAYS} days.`;
 export const MSG_GAME_GONE = "That game isn't available any more. Pick another game.";
 export const MSG_GAME_INVALID = "Pick a game or a league and days.";
+export const MSG_GAMES_GONE =
+  "One of those games has started or is no longer in the cached odds. Remove it and try again.";
+export const MSG_GAMES_INVALID = "Pick 2 to 12 games from one league.";
 export const MSG_TOO_MANY = "You have 100 active promos you added. Delete some before adding more.";
 export const MSG_PICK_EXACT_BET = "Pick the exact bet this price is for.";
 export const MSG_MAX_STAKE = "Enter the max stake. Boosts can't be used without one.";
@@ -63,6 +67,7 @@ export const AddedEventScopeInputSchema = z.strictObject({
 export const AddedScopeInputSchema = z.discriminatedUnion("kind", [
   AddedEventScopeInputSchema,
   SportDayScopeInputSchema,
+  GamesScopeInputSchema,
 ]);
 
 export type AddedScopeInput = z.infer<typeof AddedScopeInputSchema>;
@@ -107,6 +112,7 @@ export const BoostEventScopeInputSchema = z.strictObject({
 export const BoostScopeInputSchema = z.discriminatedUnion("kind", [
   BoostEventScopeInputSchema,
   SportDayScopeInputSchema,
+  GamesScopeInputSchema,
 ]);
 
 export const AddProfitBoostInputSchema = z
@@ -196,6 +202,8 @@ export interface AddedPromoEditValues {
   minOddsAmerican: number | null;
   scopeKind: string | null;
   eventId: string | null;
+  /** Picked game ids of a games promo, ordered by kickoff; null otherwise. */
+  eventIds: string[] | null;
   sportKey: string | null;
   windowStart: string | null;
   windowEnd: string | null;

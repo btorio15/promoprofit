@@ -31,6 +31,7 @@ const baseEdit: AddedPromoEditValues = {
   minOddsAmerican: null,
   scopeKind: "any",
   eventId: null,
+  eventIds: null,
   sportKey: null,
   windowStart: null,
   windowEnd: null,
@@ -212,6 +213,7 @@ describe("bonusPayloadFromDraft", () => {
 const dayScope = {
   mode: "league" as const,
   eventId: null,
+  eventIds: null,
   sportKey: "americanfootball_nfl",
   fromEtDate: "2026-10-11",
   throughEtDate: null,

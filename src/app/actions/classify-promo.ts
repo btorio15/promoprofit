@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/session";
 import { ClassifyPromoInputSchema } from "@/domain/promos/reviewInput";
 import { getPendingPromo, applyClassification } from "@/db/promoReview";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
-import { resolveMemberScope } from "@/domain/promos/memberScope";
+import { memberScopeInputFrom, resolveMemberScope } from "@/domain/promos/memberScope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import { ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
 import { PROMO_MARKET_TYPES } from "@/domain/promos/types";
@@ -52,14 +52,7 @@ export async function classifyPromo(input: unknown): Promise<PromoReviewResponse
     ]);
 
     const scopeResult = resolveMemberScope(
-      data.scope.kind === "event"
-        ? { kind: "event", eventId: data.scope.eventId }
-        : {
-            kind: "sport_day",
-            sportKey: data.scope.sportKey,
-            etDate: data.scope.etDate,
-            ...(data.scope.etEndDate !== undefined ? { etEndDate: data.scope.etEndDate } : {}),
-          },
+      memberScopeInputFrom(data.scope),
       { moneyline: moneylineEvents, extended: extendedEvents },
       now,
     );

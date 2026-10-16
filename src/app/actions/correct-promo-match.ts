@@ -6,7 +6,7 @@ import { CorrectMatchInputSchema } from "@/domain/promos/reviewInput";
 import { getPendingPromo, applyCorrectedMatch } from "@/db/promoReview";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { resolveSelection } from "@/domain/promos/selection";
-import { resolveMemberScope } from "@/domain/promos/memberScope";
+import { memberScopeInputFrom, resolveMemberScope } from "@/domain/promos/memberScope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import type { PromoSelection } from "@/domain/promos/types";
 import type { OddsEvent } from "@/domain/odds/schemas";
@@ -51,21 +51,14 @@ export async function correctPromoMatch(input: unknown): Promise<PromoReviewResp
 
   let moneylineEvents: OddsEvent[] = [];
   let extendedEvents: OddsEvent[] = [];
-  if (scopeInput.kind === "event") {
+  if (scopeInput.kind === "event" || scopeInput.kind === "games") {
     const [moneyline, extended] = await Promise.all([getCachedEvents(), getCachedExtendedEvents()]);
     moneylineEvents = moneyline.events;
     extendedEvents = extended.events;
   }
 
   const scopeResult = resolveMemberScope(
-    scopeInput.kind === "event"
-      ? { kind: "event", eventId: scopeInput.eventId }
-      : {
-          kind: "sport_day",
-          sportKey: scopeInput.sportKey,
-          etDate: scopeInput.etDate,
-          ...(scopeInput.etEndDate !== undefined ? { etEndDate: scopeInput.etEndDate } : {}),
-        },
+    memberScopeInputFrom(scopeInput),
     { moneyline: moneylineEvents, extended: extendedEvents },
     now,
   );
