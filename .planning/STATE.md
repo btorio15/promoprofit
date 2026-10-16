@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 7 (Dashboard)
 Plan: Not started
 Status: Ready to execute
-Last activity: 2026-10-16 - Completed quick task 261016-1se (part 2): multi-game promo picker
+Last activity: 2026-10-16 - Completed quick task 261016-k8a: skip no-sweat promos
 
 ## Performance Metrics
 
@@ -195,6 +195,7 @@ Recent decisions affecting current work:
 | 261016-14m | Multi-game promo scope, part 1 of 3: new "games" scope (2-12 games, one league) honored by every matching path, never widened to league-wide; migration 0017 generated not applied. Next: part 3 parser, then part 2 picker | 2026-10-16 | 65aa581 | Needs Review (run npm run db:migrate before push) | [261016-14m-promos-limited-to-a-few-games-in-one-lea](./quick/261016-14m-promos-limited-to-a-few-games-in-one-lea/) |
 | 261016-1hh | Multi-game promo parser, part 3 of 3: DraftKings/FanDuel/Bally + AI reader capture "A @ B or C @ D" game lists as games scope; unreadable multi-game text goes to review, never league-wide (fixes live mis-scope bug). Next: part 2 picker | 2026-10-16 | 7f60683 | Needs Review (watch next scrape) | [261016-1hh-multi-game-promo-parser-part-3-scrapers-](./quick/261016-1hh-multi-game-promo-parser-part-3-scrapers-/) |
 | 261016-1se | Multi-game promo picker, part 2 of 3: add/edit/Correct/Classify pick 2-12 games from one league (search + checkboxes, league lock, remove list); server rejects unknown/started/mixed-league lists; started games must be removed on edit. Multi-game promo work complete | 2026-10-16 | a18872f | Needs Review (try adding a multi-game promo) | [261016-1se-multi-game-promo-picker-part-2-pick-seve](./quick/261016-1se-multi-game-promo-picker-part-2-pick-seve/) |
+| 261016-k8a | Skip no-sweat promos: new clear skip reason no_sweat (text or DK "No Sweat" category) the promo reader cannot override; reader prompt lists them as not usable | 2026-10-16 | f9f2a7d | Verified | [261016-k8a-skip-no-sweat-promos](./quick/261016-k8a-skip-no-sweat-promos/) |
 
 ## Deferred Items
 
