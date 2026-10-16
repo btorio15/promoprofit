@@ -1,22 +1,11 @@
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useState } from "react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import Decimal from "decimal.js";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
 import {
-  SMALL_SAMPLE_THRESHOLD,
   UNKNOWN_SPORT,
   type DailyHistoryStats,
   type GroupTotal,
@@ -30,17 +19,20 @@ const DAY_FORMATTER = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
-/** One color per sport, so each day's stacked bar shows where its profit came from. */
+/**
+ * One color per sport, from the Okabe-Ito palette, which stays distinguishable
+ * for the common types of color blindness.
+ */
 const SPORT_COLORS: Record<string, string> = {
-  americanfootball_nfl: "#2563eb",
-  americanfootball_ncaaf: "#16a34a",
-  basketball_nba: "#f97316",
-  basketball_ncaab: "#9333ea",
-  baseball_mlb: "#dc2626",
-  icehockey_nhl: "#0891b2",
-  [UNKNOWN_SPORT]: "#9ca3af",
+  americanfootball_nfl: "#0072B2",
+  americanfootball_ncaaf: "#E69F00",
+  basketball_nba: "#009E73",
+  basketball_ncaab: "#CC79A7",
+  baseball_mlb: "#D55E00",
+  icehockey_nhl: "#56B4E9",
+  [UNKNOWN_SPORT]: "#5E3C99",
 };
-const FALLBACK_COLOR = "#64748b";
+const FALLBACK_COLOR = "#999999";
 
 const TYPE_LABELS: Record<string, string> = {
   bonus_bet: "Bonus bet",
@@ -99,6 +91,15 @@ export function HistorySection({
   /** Range name shown in the title, e.g. "7 days" or "All time". */
   label: string;
 }) {
+  const [showNotExtracted, setShowNotExtracted] = useState(true);
+  const [hiddenSports, setHiddenSports] = useState<Set<string>>(new Set());
+  const toggleSport = (sportKey: string) =>
+    setHiddenSports((hidden) => {
+      const next = new Set(hidden);
+      if (next.has(sportKey)) next.delete(sportKey);
+      else next.add(sportKey);
+      return next;
+    });
   if (history.promoCount === 0 || history.days.length === 0) {
     return (
       <Card>
@@ -112,16 +113,37 @@ export function HistorySection({
 
   const first = history.days[0].date;
   const last = history.days[history.days.length - 1].date;
-  const sportKeys = history.sports.map((sport) => sport.key ?? UNKNOWN_SPORT);
-  const chartData = history.days.map((day) => ({
-    day: dayLabel(day.date),
-    ...day.bySport,
-    total: Number(day.total),
-    cumulative: Number(day.cumulative),
-    totalLabel: formatUsd(day.total),
-    cumulativeLabel: formatUsd(day.cumulative),
-    zero: day.zero,
-  }));
+  // A block is shown unless its sport is hidden, or it is not extracted and not-extracted blocks are hidden.
+  // Hidden blocks are dropped before stacking, so the blocks below them move down to fill the gap.
+  const isVisible = (segment: { sportKey: string; done: boolean }) =>
+    !hiddenSports.has(segment.sportKey) && (segment.done || showNotExtracted);
+  // One stacked segment per visible promo record, so a day's bar shows each bet as a separate block.
+  const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.filter(isVisible).length));
+  const segmentKeys = Array.from({ length: maxSegments }, (_, index) => `seg${index}`);
+  const chartData = history.days.map((day) => {
+    const visible = day.segments.filter(isVisible);
+    const bySportVisible = new Map<string, Decimal>();
+    let dayTotal = new Decimal(0);
+    for (const segment of visible) {
+      dayTotal = dayTotal.plus(segment.profit);
+      bySportVisible.set(segment.sportKey, (bySportVisible.get(segment.sportKey) ?? new Decimal(0)).plus(segment.profit));
+    }
+    const sportTotals = [...bySportVisible.entries()]
+      .sort(([, a], [, b]) => b.comparedTo(a))
+      .map(([sportKey, total]) => ({ sport: sportName(sportKey), total: formatUsd(total.toFixed(2)) }));
+    const row: Record<string, unknown> = {
+      day: dayLabel(day.date),
+      totalLabel: formatUsd(dayTotal.toFixed(2)),
+      sportTotals,
+    };
+    visible.forEach((segment, index) => {
+      row[`seg${index}`] = Number(segment.profit);
+      row[`seg${index}Sport`] = segment.sportKey;
+      row[`seg${index}Done`] = segment.done;
+    });
+    return row;
+  });
+  const sportsInRange = history.sports.map((sport) => sport.key ?? UNKNOWN_SPORT);
   const unknownSportPromos = history.sports.find((sport) => sport.key === UNKNOWN_SPORT)?.promos ?? 0;
 
   return (
@@ -135,7 +157,8 @@ export function HistorySection({
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
-          <Figure label="Total profit" value={formatUsd(history.grandTotal)} />
+          <Figure label="Available profit" value={formatUsd(history.grandTotal)} note="best profit each promo showed" />
+          <Figure label="Extracted profit" value={formatUsd(history.extractedTotal)} note="recorded when marked done" />
           <Figure
             label="Avg profit per day"
             value={formatUsd(history.avgPerDay)}
@@ -161,36 +184,29 @@ export function HistorySection({
           </p>
         ) : null}
 
-        <StatsCard title="Daily profit by sport" description="Stacked by sport, one bar per day" defaultOpen>
+        <StatsCard
+          title="Daily profit by sport"
+          description="One block per promo; white = not extracted. Click a key to show or hide it."
+          defaultOpen
+        >
+          <SportLegend
+            sportKeys={sportsInRange}
+            hiddenSports={hiddenSports}
+            onToggleSport={toggleSport}
+            showNotExtracted={showNotExtracted}
+            onToggleNotExtracted={() => setShowNotExtracted((shown) => !shown)}
+          />
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
-                <Tooltip
-                  formatter={(value, name) => [formatUsd(Number(value).toFixed(2)), sportName(String(name))]}
-                  labelFormatter={(label, payload) => `${label}: ${payload?.[0]?.payload?.totalLabel ?? ""} total`}
-                />
-                <Legend formatter={(value) => sportName(String(value))} />
-                {sportKeys.map((sportKey) => (
-                  <Bar key={sportKey} dataKey={sportKey} stackId="profit" fill={colorFor(sportKey)} />
+                <Tooltip content={(props) => <DayTotalsTooltip {...props} />} />
+                {segmentKeys.map((key) => (
+                  <Bar key={key} dataKey={key} stackId="profit" shape={segmentShape} />
                 ))}
               </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </StatsCard>
-
-        <StatsCard title="Cumulative profit" description="Running total from the first day">
-          <div className="h-56 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `$${v.toFixed(0)}`} width={56} />
-                <Tooltip formatter={(_value, _name, item) => [item.payload.cumulativeLabel, "Cumulative"]} />
-                <Line type="monotone" dataKey="cumulative" stroke="#6366f1" strokeWidth={2} dot={false} />
-              </LineChart>
             </ResponsiveContainer>
           </div>
         </StatsCard>
@@ -238,9 +254,6 @@ export function HistorySection({
                     <TableCell className="text-right num">{book.removed}</TableCell>
                     <TableCell className="text-right num">
                       {book.avgMaxStake === null ? "No data" : formatUsd(book.avgMaxStake)}
-                      {book.maxStakeKnown > 0 && book.maxStakeKnown < SMALL_SAMPLE_THRESHOLD ? (
-                        <span className="ml-1 text-xs text-muted-foreground">(small sample)</span>
-                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -250,6 +263,109 @@ export function HistorySection({
         </StatsCard>
       </CardContent>
     </Card>
+  );
+}
+
+/** Fill for promo blocks that are available but not marked done. */
+const NOT_DONE_COLOR = "#ffffff";
+
+/** Pixels of background left between stacked promo blocks, so each bet reads as its own block. */
+const SEGMENT_GAP = 2;
+
+type SegmentShapeProps = {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  dataKey?: unknown;
+  payload?: unknown;
+};
+
+/** Draws one promo block inside a day's stacked bar, colored by its sport, with a gap above and below. */
+function segmentShape(props: SegmentShapeProps) {
+  const { x = 0, y = 0, width = 0, height = 0 } = props;
+  if (height <= 0 || width <= 0) return <g />;
+  const key = String(props.dataKey);
+  const payload = (props.payload ?? {}) as Record<string, unknown>;
+  const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
+  const done = payload[`${key}Done`] === true;
+  // Blocks not yet extracted are white.
+  const fill = done ? colorFor(sport) : NOT_DONE_COLOR;
+  const blockHeight = Math.max(height - SEGMENT_GAP, 1);
+  return <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={fill} />;
+}
+
+/** Hover text for a day's bar: the day's total, then each sport's total for that day. */
+function DayTotalsTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: readonly { payload?: unknown }[];
+  label?: string | number;
+}) {
+  if (!active || !payload?.length) return null;
+  const row = (payload[0]?.payload ?? {}) as Record<string, unknown>;
+  const totals = (row.sportTotals as { sport: string; total: string }[] | undefined) ?? [];
+  return (
+    <div className="rounded-md border border-border bg-background px-3 py-2 text-xs shadow-md">
+      <div className="mb-1 font-semibold">
+        {String(label)}: {String(row.totalLabel)} total
+      </div>
+      {totals.map((entry) => (
+        <div key={entry.sport} className="flex justify-between gap-4">
+          <span>{entry.sport}</span>
+          <span className="num">{entry.total}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SportLegend({
+  sportKeys,
+  hiddenSports,
+  onToggleSport,
+  showNotExtracted,
+  onToggleNotExtracted,
+}: {
+  sportKeys: string[];
+  hiddenSports: Set<string>;
+  onToggleSport: (sportKey: string) => void;
+  showNotExtracted: boolean;
+  onToggleNotExtracted: () => void;
+}) {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label="Key">
+      {sportKeys.map((key) => {
+        const shown = !hiddenSports.has(key);
+        return (
+          <li key={key}>
+            <button
+              type="button"
+              aria-pressed={shown}
+              onClick={() => onToggleSport(key)}
+              className={`flex min-h-8 items-center gap-1.5 rounded-md px-2 ${shown ? "" : "opacity-50"}`}
+            >
+              <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colorFor(key) }} aria-hidden="true" />
+              {sportName(key)}
+            </button>
+          </li>
+        );
+      })}
+      <li>
+        <button
+          type="button"
+          aria-pressed={showNotExtracted}
+          onClick={onToggleNotExtracted}
+          className={`flex min-h-8 items-center gap-1.5 rounded-md px-2 ${showNotExtracted ? "" : "opacity-50"}`}
+        >
+          <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
+          Not extracted
+        </button>
+      </li>
+    </ul>
   );
 }
 
@@ -264,6 +380,7 @@ function GroupTable({
 }) {
   const promoCount = groups.reduce((sum, group) => sum + group.promos, 0);
   const grand = groups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
+  const grandExtracted = groups.reduce((sum, group) => sum.plus(group.extracted), new Decimal(0));
   const averagePerPromo = promoCount === 0 ? "0.00" : grand.dividedBy(promoCount).toDecimalPlaces(2).toFixed(2);
   return (
     <div className="overflow-x-auto">
@@ -273,7 +390,8 @@ function GroupTable({
             <TableHead>Name</TableHead>
             <TableHead className="text-right">Promos</TableHead>
             <TableHead className="text-right">Profit per promo</TableHead>
-            <TableHead className="text-right">Total profit</TableHead>
+            <TableHead className="text-right">Available profit</TableHead>
+            <TableHead className="text-right">Extracted profit</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -288,11 +406,11 @@ function GroupTable({
                   />
                 ) : null}
                 {nameOf(group.key)}
-                {group.smallSample ? <span className="ml-2 text-xs text-muted-foreground">small sample</span> : null}
               </TableCell>
               <TableCell className="text-right num">{group.promos}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
+              <TableCell className="text-right num">{formatUsd(group.extracted)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -302,6 +420,7 @@ function GroupTable({
             <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(grand.toFixed(2))}</TableCell>
+            <TableCell className="text-right num font-semibold">{formatUsd(grandExtracted.toFixed(2))}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>

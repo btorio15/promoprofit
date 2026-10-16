@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
-import { loadDailyProfitHistory, loadDonePromoIds, loadFunnelPromos } from "@/db/profitHistory";
+import { loadCompletionRows, loadDailyProfitHistory, loadDonePromoIds, loadFunnelPromos } from "@/db/profitHistory";
 import {
   sportWeekdayStats,
   timeOfDayStats,
@@ -43,9 +43,10 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
   const start = rangeStartDate(selected, today);
   const window = start === null ? undefined : { start, end: today };
 
-  const [allRows, historyRows, funnelPromos, doneIds] = await Promise.all([
+  const [allRows, historyRows, completionRows, funnelPromos, doneIds] = await Promise.all([
     loadProfitSnapshotRows(),
     loadDailyProfitHistory(),
+    loadCompletionRows(),
     loadFunnelPromos(),
     loadDonePromoIds(),
   ]);
@@ -66,7 +67,7 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     lastCapturedAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows),
     sportWeekday: sportWeekdayStats(rows),
-    history: dailyHistoryStats(historyRows, window),
+    history: dailyHistoryStats(historyRows, window, completionRows),
     funnel: promoFunnel(funnelPromos, doneIds),
   };
 }
