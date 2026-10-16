@@ -3,9 +3,15 @@ import type { CorrectionSportDayOption } from "./correctionOptions";
 import {
   EMPTY_SCOPE_DRAFT,
   fromDayOptions,
+  gamePickState,
   leagueOptions,
+  MAX_PICKED_GAMES,
+  pickedLeague,
   prefillScopeDraft,
+  removePickedGame,
   scopeInputFromDraft,
+  singlePickedEventId,
+  togglePickedGame,
   selectFromDay,
   selectLeague,
   type ScopeDraft,
@@ -36,7 +42,7 @@ describe("scopeInputFromDraft", () => {
   });
 
   it("game mode -> event", () => {
-    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventId: "e1" })).toStrictEqual({ kind: "event", eventId: "e1" });
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: ["e1"] })).toStrictEqual({ kind: "event", eventId: "e1" });
   });
 
   it.each([null, "", "2026-09-27"])("single day (through=%j) has no etEndDate key", (through) => {
@@ -56,7 +62,7 @@ describe("scopeInputFromDraft", () => {
   });
 
   it("uses only the active mode's fields", () => {
-    const both = league({ eventId: "e1", sportKey: "basketball_nba", fromEtDate: "2026-09-29" });
+    const both = league({ eventIds: ["e1"], sportKey: "basketball_nba", fromEtDate: "2026-09-29" });
     expect(scopeInputFromDraft(both)).toStrictEqual({ kind: "sport_day", sportKey: "basketball_nba", etDate: "2026-09-29" });
     expect(scopeInputFromDraft({ ...both, mode: "game" })).toStrictEqual({ kind: "event", eventId: "e1" });
   });
@@ -111,5 +117,69 @@ describe("prefillScopeDraft", () => {
     expect(
       prefillScopeDraft({ sportKey: "icehockey_nhl", startEtDate: "2026-09-27", endEtDate: "2026-09-28" }, DAYS, NOW),
     ).toBeNull();
+  });
+});
+
+describe("multi-select picking (quick-261016-1se)", () => {
+  const EVENTS = [
+    { eventId: "n1", sportKey: "americanfootball_nfl" },
+    { eventId: "n2", sportKey: "americanfootball_nfl" },
+    { eventId: "b1", sportKey: "basketball_nba" },
+  ];
+  const [n1, n2, b1] = EVENTS;
+
+  it("first pick sets game mode and locks the league", () => {
+    const d = togglePickedGame({ ...EMPTY_SCOPE_DRAFT, mode: "league" }, n1, EVENTS);
+    expect(d.mode).toBe("game");
+    expect(d.eventIds).toEqual(["n1"]);
+    expect(pickedLeague(d, EVENTS)).toBe("americanfootball_nfl");
+  });
+
+  it("another league is a no-op while locked", () => {
+    const d = togglePickedGame(EMPTY_SCOPE_DRAFT, n1, EVENTS);
+    expect(gamePickState(d, b1, EVENTS)).toBe("other_league");
+    expect(togglePickedGame(d, b1, EVENTS)).toBe(d);
+  });
+
+  it("toggling a picked game removes it; the last removal unlocks the league", () => {
+    const one = togglePickedGame(EMPTY_SCOPE_DRAFT, n1, EVENTS);
+    const two = togglePickedGame(one, n2, EVENTS);
+    expect(two.eventIds).toEqual(["n1", "n2"]);
+    expect(togglePickedGame(two, n2, EVENTS).eventIds).toEqual(["n1"]);
+    const none = removePickedGame(one, "n1");
+    expect(none.eventIds).toEqual([]);
+    expect(pickedLeague(none, EVENTS)).toBeNull();
+    expect(gamePickState(none, b1, EVENTS)).toBe("available");
+  });
+
+  it("caps at 12 picks", () => {
+    const many = Array.from({ length: MAX_PICKED_GAMES + 1 }, (_, i) => ({ eventId: `g${i}`, sportKey: "americanfootball_nfl" }));
+    let d: ScopeDraft = EMPTY_SCOPE_DRAFT;
+    for (const g of many) d = togglePickedGame(d, g, many);
+    expect(d.eventIds).toHaveLength(12);
+    expect(gamePickState(d, many[12], many)).toBe("full");
+    expect(togglePickedGame(d, many[12], many)).toBe(d);
+    expect(togglePickedGame(d, many[0], many).eventIds).toHaveLength(11);
+  });
+
+  it("pickedLeague ignores stale ids and uses the first known pick", () => {
+    const d: ScopeDraft = { ...EMPTY_SCOPE_DRAFT, eventIds: ["gone", "b1"] };
+    expect(pickedLeague(d, EVENTS)).toBe("basketball_nba");
+    expect(pickedLeague({ ...EMPTY_SCOPE_DRAFT, eventIds: ["gone"] }, EVENTS)).toBeNull();
+  });
+
+  it("scopeInputFromDraft: 0 -> null, 1 -> event, 2-12 -> games, 13 -> null", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `g${i}`);
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: [] })).toBeNull();
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: ids(1) })).toStrictEqual({ kind: "event", eventId: "g0" });
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: ids(2) })).toStrictEqual({ kind: "games", eventIds: ids(2) });
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: ids(12) })).toStrictEqual({ kind: "games", eventIds: ids(12) });
+    expect(scopeInputFromDraft({ ...EMPTY_SCOPE_DRAFT, eventIds: ids(13) })).toBeNull();
+  });
+
+  it("singlePickedEventId only for game mode with exactly one pick", () => {
+    expect(singlePickedEventId({ ...EMPTY_SCOPE_DRAFT, eventIds: ["a"] })).toBe("a");
+    expect(singlePickedEventId({ ...EMPTY_SCOPE_DRAFT, eventIds: ["a", "b"] })).toBeNull();
+    expect(singlePickedEventId({ ...EMPTY_SCOPE_DRAFT, mode: "league", eventIds: ["a"] })).toBeNull();
   });
 });

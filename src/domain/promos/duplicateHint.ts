@@ -31,6 +31,7 @@ export interface DuplicateEventRef {
 
 type DraftScope =
   | { kind: "event"; eventId: string; sportKey: string; commenceMs: number }
+  | { kind: "games"; sportKey: string; eventIds: string[]; commenceMs: number[] }
   | { kind: "window"; sportKey: string; startMs: number; endMs: number }
   | { kind: "any" };
 
@@ -45,8 +46,16 @@ function decimalEq(a: string, b: string | null, pattern: RegExp): boolean {
 function draftScope(draft: AddPromoDraft, events: readonly DuplicateEventRef[]): DraftScope | null {
   const s = draft.scope;
   if (s.mode === "game") {
-    if (!s.eventId) return { kind: "any" };
-    const ev = events.find((e) => e.eventId === s.eventId);
+    if (s.eventIds.length === 0) return { kind: "any" };
+    if (s.eventIds.length > 1) {
+      const refs = s.eventIds.map((id) => events.find((e) => e.eventId === id));
+      const known = refs.filter((r): r is DuplicateEventRef => r !== undefined);
+      if (known.length !== refs.length) return null;
+      const commenceMs = known.map((r) => Date.parse(r.commenceTime));
+      if (commenceMs.some((ms) => Number.isNaN(ms))) return null;
+      return { kind: "games", sportKey: known[0].sportKey, eventIds: known.map((r) => r.eventId), commenceMs };
+    }
+    const ev = events.find((e) => e.eventId === s.eventIds[0]);
     if (!ev) return null;
     const commenceMs = Date.parse(ev.commenceTime);
     if (Number.isNaN(commenceMs)) return null;
@@ -70,6 +79,12 @@ function scopesOverlap(
     if (c.kind === "games") return c.sportKey === d.sportKey && c.eventIds.includes(d.eventId);
     if (c.sportKey !== d.sportKey) return false;
     return d.commenceMs >= Date.parse(c.windowStart) && d.commenceMs <= Date.parse(c.windowEnd);
+  }
+  if (d.kind === "games") {
+    if (c.sportKey !== d.sportKey) return false;
+    if (c.kind === "event") return d.eventIds.includes(c.eventId);
+    if (c.kind === "games") return c.eventIds.some((id) => d.eventIds.includes(id));
+    return d.commenceMs.some((ms) => ms >= Date.parse(c.windowStart) && ms <= Date.parse(c.windowEnd));
   }
   if (c.kind === "event") {
     if (c.sportKey !== d.sportKey) return false;
