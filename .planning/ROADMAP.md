@@ -80,8 +80,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 07-01-PLAN.md — Pure totals and counts math: extracted incl. pre-start, member-series available, promos done/avg/best (TDD)
-- [ ] 07-02-PLAN.md — Tab rename: Opportunities label to Dashboard, teammate tab to Stats (id stats), tab-order guard
+- [x] 07-01-PLAN.md — Pure totals and counts math: extracted incl. pre-start, member-series available, promos done/avg/best (TDD)
+- [x] 07-02-PLAN.md — Tab rename: Opportunities label to Dashboard, teammate tab to Stats (id stats), tab-order guard
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -104,7 +104,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
-| 7. Dashboard | v1.1 | 0/6 | Planned | - |
+| 7. Dashboard | v1.1 | 2/6 | In Progress|  |
 
 ## Backlog
 
