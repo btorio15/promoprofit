@@ -113,3 +113,25 @@ describe("looksLikeDuplicate", () => {
     expect(looksLikeDuplicate(bonusDraft({ bonusAmount: "abc" }), [bonusCand], events)).toBe(false);
   });
 });
+
+describe("looksLikeDuplicate games-scoped candidate", () => {
+  const gamesScope: DuplicateCandidate["scope"] = {
+    kind: "games",
+    sportKey: "americanfootball_nfl",
+    eventIds: ["E1", "E9"],
+    windowStart: "2026-10-03T17:00:00.000Z",
+    windowEnd: "2026-10-04T00:20:00.000Z",
+  };
+
+  it("a game draft matches only when its event is one of the listed games", () => {
+    expect(looksLikeDuplicate(boostDraft({ scope: gameScope("E1") }), [boostCand(gamesScope)], events)).toBe(true);
+    expect(looksLikeDuplicate(boostDraft({ scope: gameScope("E2") }), [boostCand(gamesScope)], events)).toBe(false);
+  });
+
+  it("a league-window draft matches when a listed game falls in range, not otherwise", () => {
+    const hit = leagueScope("americanfootball_nfl", "2026-10-03", null);
+    const miss = leagueScope("americanfootball_nfl", "2026-10-10", null);
+    expect(looksLikeDuplicate(boostDraft({ scope: hit }), [boostCand(gamesScope)], events)).toBe(true);
+    expect(looksLikeDuplicate(boostDraft({ scope: miss }), [boostCand(gamesScope)], events)).toBe(false);
+  });
+});

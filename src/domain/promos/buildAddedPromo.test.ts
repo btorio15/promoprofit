@@ -40,6 +40,7 @@ function toActiveRow(values: AddedPromoInsert) {
     awayTeam: values.awayTeam ?? null,
     windowStart: values.windowStart ?? null,
     windowEnd: values.windowEnd ?? null,
+    scopeGames: values.scopeGames ?? null,
     marketType: values.marketType ?? null,
     line: values.line ?? null,
     side: values.side ?? null,
@@ -170,6 +171,14 @@ describe("buildAddedPromoRow", () => {
         sportKey: "americanfootball_nfl",
         windowStart: "2026-10-04T04:00:00.000Z",
         windowEnd: "2026-10-06T03:59:59.999Z",
+      },
+      {
+        kind: "games" as const,
+        sportKey: "americanfootball_nfl",
+        games: [
+          { eventId: "g1", homeTeam: "DEN Broncos", awayTeam: "LA Rams", commenceTime: "2026-10-04T17:00:00.000Z" },
+          { eventId: "g2", homeTeam: "DAL Cowboys", awayTeam: "PHI Eagles", commenceTime: "2026-10-05T00:20:00.000Z" },
+        ],
       },
     ]) {
       const result = build(scope);

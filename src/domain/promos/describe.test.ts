@@ -132,3 +132,31 @@ describe("scopeGuessLabel (03-UI-SPEC.md best-guess / matched line, without the 
     expect(scopeGuessLabel(guess)).toBe("any NCAAF game, Sep 25–27 (ET)");
   });
 });
+
+describe("scopeGuessLabel games scope", () => {
+  const game = (eventId: string, away: string, home: string, commenceTime: string) => ({
+    eventId,
+    awayTeam: away,
+    homeTeam: home,
+    commenceTime,
+  });
+  it("names up to 3 games joined by 'or'", () => {
+    const guess: ScopeGuess = {
+      kind: "games",
+      sportKey: "americanfootball_nfl",
+      games: [
+        game("a", "KC Chiefs", "BUF Bills", "2026-09-27T17:00:00Z"),
+        game("b", "PHI Eagles", "DAL Cowboys", "2026-09-28T00:20:00Z"),
+      ],
+    };
+    expect(scopeGuessLabel(guess)).toBe("KC Chiefs @ BUF Bills or PHI Eagles @ DAL Cowboys");
+  });
+
+  it("summarizes 4+ games by count and ET day", () => {
+    const games = ["a", "b", "c", "d"].map((id, i) =>
+      game(id, `Away ${id}`, `Home ${id}`, `2026-09-27T1${i}:00:00Z`),
+    );
+    const label = scopeGuessLabel({ kind: "games", sportKey: "americanfootball_nfl", games });
+    expect(label).toMatch(/^any of 4 NFL games, .* \(ET\)$/);
+  });
+});

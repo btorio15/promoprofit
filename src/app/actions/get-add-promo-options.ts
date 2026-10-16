@@ -52,7 +52,15 @@ export async function getAddPromoFormOptions(input: unknown): Promise<AddPromoFo
       boostPercent: p.boostPercent,
       boostedOddsAmerican: p.boostedOddsAmerican,
       scope:
-        p.scope.kind === "sport_window"
+        p.scope.kind === "games"
+          ? {
+              kind: "games" as const,
+              sportKey: p.scope.sportKey,
+              eventIds: p.scope.eventIds,
+              windowStart: p.scope.windowStart.toISOString(),
+              windowEnd: p.scope.windowEnd.toISOString(),
+            }
+          : p.scope.kind === "sport_window"
           ? {
               kind: "sport_window" as const,
               sportKey: p.scope.sportKey,

@@ -21,6 +21,9 @@ function scopeLabel(scope: ScopeGuess): string {
   if (scope.kind === "event") {
     return `event ${scope.eventId} (${scope.awayTeam} @ ${scope.homeTeam}, ${scope.commenceTime})`;
   }
+  if (scope.kind === "games") {
+    return `games ${scope.sportKey} [${scope.games.map((g) => g.eventId).join(", ")}]`;
+  }
   return `sport_window ${scope.sportKey} [${scope.windowStart} .. ${scope.windowEnd}]`;
 }
 
