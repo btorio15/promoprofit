@@ -202,15 +202,12 @@ describe("addPromo (profit boost)", () => {
     });
   });
 
-  it("rejects a boost with no max stake", async () => {
+  it("quick-261016-kyb: saves a boost with no max stake as null (ranked at the book cap / $25 default)", async () => {
     const { maxStake: omitted, ...rest } = boostInput;
     void omitted;
     const result = await addPromo(rest);
-    expect(result).toEqual({
-      status: "invalid",
-      fieldErrors: { maxStake: ["Enter the max stake. Boosts can't be used without one."] },
-    });
-    expect(mockInsertAddedPromo).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: "ok", promoId: 42 });
+    expect(mockInsertAddedPromo.mock.calls[0][0]).toMatchObject({ maxStake: null });
   });
 
   it("boosted odds with a pin present in cached odds stores the pin columns and the price", async () => {

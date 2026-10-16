@@ -120,7 +120,7 @@ export function buildAddedPromoRow(args: {
     } else {
       boostedOddsAmerican = input.boost.boostedOddsAmerican;
     }
-    maxStake = new Decimal(input.maxStake).toFixed(2);
+    maxStake = input.maxStake !== undefined ? new Decimal(input.maxStake).toFixed(2) : null;
     if (input.maxWinnings) {
       maxWinnings = { amount: new Decimal(input.maxWinnings.amount).toFixed(2), kind: input.maxWinnings.kind };
     }

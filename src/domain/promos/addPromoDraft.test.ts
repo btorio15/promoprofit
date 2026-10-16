@@ -250,7 +250,7 @@ describe("boostPayloadFromDraft", () => {
   it("reports every required field when empty", () => {
     const errors = errorsOf({ ...EMPTY_BONUS_DRAFT, promoType: "profit_boost", bookKey: "draftkings" });
     expect(errors.boostPercent).toEqual(["Enter a boost % or boosted odds."]);
-    expect(errors.maxStake).toEqual(["Enter the max stake. Boosts can't be used without one."]);
+    expect(errors.maxStake).toBeUndefined(); // quick-261016-kyb: optional
     expect(errors.scope).toEqual(["Pick a game or a league and days."]);
   });
 

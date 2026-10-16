@@ -94,16 +94,10 @@ describe("AddPromoInputSchema (profit boost)", () => {
     expect(AddPromoInputSchema.safeParse(validBoost).success).toBe(true);
   });
 
-  it("rejects a missing max stake with the boost message at maxStake", () => {
+  it("quick-261016-kyb: accepts a boost with no max stake", () => {
     const { maxStake: omitted, ...rest } = validBoost;
     void omitted;
-    const result = AddPromoInputSchema.safeParse(rest);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(fieldErrorsFromIssues(result.error.issues).maxStake).toEqual([
-        "Enter the max stake. Boosts can't be used without one.",
-      ]);
-    }
+    expect(AddPromoInputSchema.safeParse(rest).success).toBe(true);
   });
 
   it.each(["0", "1001", "abc"])("rejects boost percent %j", (boostPercent) => {

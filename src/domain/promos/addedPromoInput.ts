@@ -31,7 +31,7 @@ export const MSG_GAMES_GONE =
 export const MSG_GAMES_INVALID = "Pick 2 to 12 games from one league.";
 export const MSG_TOO_MANY = "You have 100 active promos you added. Delete some before adding more.";
 export const MSG_PICK_EXACT_BET = "Pick the exact bet this price is for.";
-export const MSG_MAX_STAKE = "Enter the max stake. Boosts can't be used without one.";
+export const MSG_MAX_STAKE = "Enter the max stake as a dollar amount, or leave it blank.";
 export const MSG_BOOST_REQUIRED = "Enter a boost % or boosted odds.";
 export const MSG_BOOSTED_ODDS = "Enter the boosted odds, like +250.";
 export const MSG_PIN_GONE = "That bet isn't in the current odds. Pick another.";
@@ -47,7 +47,7 @@ export const AddedMoneySchema = z
   // Refine skipped when the regex failed so Decimal never throws.
   .refine((value) => !MONEY_PATTERN.test(value) || new Decimal(value).gt(0), { message: MONEY_MESSAGE });
 
-/** Required max stake: a missing value gets the boost-specific message (CR-04). */
+/** Optional max stake (quick-261016-kyb): blank = the member's book cap or the $25 default. */
 const AddedMaxStakeSchema = z
   .string({ error: MSG_MAX_STAKE })
   .max(20, MONEY_MESSAGE)
@@ -124,7 +124,7 @@ export const AddProfitBoostInputSchema = z
       z.strictObject({ mode: z.literal("odds"), boostedOddsAmerican: BoostedOddsSchema }),
     ]),
     scope: BoostScopeInputSchema,
-    maxStake: AddedMaxStakeSchema,
+    maxStake: AddedMaxStakeSchema.optional(),
     maxWinnings: z
       .strictObject({ amount: AddedMoneySchema, kind: z.enum(["total_payout", "boost_extra"]) })
       .optional(),

@@ -23,10 +23,9 @@ const CONFLICT: PromoReviewResponse = { status: "conflict", message: "Someone el
  * ClassifyPromoInputSchema carries no userId field (IDOR guard, T-it1-02) --
  * the acting user always comes from the session. Any chosen scope is
  * re-resolved server-side via resolveMemberScope against the current cached
- * odds (T-it1-03), never trusted from the client. CR-04 is enforced twice:
- * statusAfterMatch routes a boost with no max stake to caps review here, and
- * applyClassification independently refuses (false, no write) if that
- * combination is ever reached with status "active" anyway.
+ * odds (T-it1-03), never trusted from the client. quick-261016-kyb: a boost
+ * with no max stake goes active and is ranked at the member's book cap or
+ * the $25 default.
  */
 export async function classifyPromo(input: unknown): Promise<PromoReviewResponse> {
   const user = await requireUser();

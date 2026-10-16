@@ -5,12 +5,11 @@ import type { ScrapedPromo } from "./scraped";
 
 /**
  * Status-after-match rule (D-18): a promo becomes active only when every
- * cap field the engine needs is parsed. A profit_boost always needs
- * maxStake -- the solver (profitBoost.ts) is never invoked without one --
- * so a null maxStake always routes to pending_review/caps even if the
- * scraper didn't separately flag it as unparsed. A bonus_bet has no such
- * requirement (its stake is the bonus amount itself); it only reviews when
- * the scraper explicitly couldn't parse a cap field (e.g. minOdds).
+ * cap field the engine needs is parsed. quick-261016-kyb: maxStake is never
+ * required -- a profit boost with no readable max stake goes live and is
+ * ranked at the member's book cap or the $25 default (yourCap.ts
+ * applyMemberCaps), so "maxStake" is dropped from the review fields. Other
+ * unparsed cap fields (e.g. minOdds) still route to pending_review/caps.
  */
 export function statusAfterMatch(p: {
   promoType: PromoType;
@@ -21,10 +20,7 @@ export function statusAfterMatch(p: {
   | { status: "active"; reviewReason: null; unparsedCapFields: [] }
   | { status: "pending_review"; reviewReason: "caps"; unparsedCapFields: CapField[] } {
   const fields = new Set<CapField>(p.unparsedCapFields);
-
-  if (p.promoType === "profit_boost" && p.maxStake === null) {
-    fields.add("maxStake");
-  }
+  fields.delete("maxStake");
 
   if (fields.size > 0) {
     return { status: "pending_review", reviewReason: "caps", unparsedCapFields: [...fields] };

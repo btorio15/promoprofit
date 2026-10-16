@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { and, asc, eq, gt, isNull, ne, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
 import { promoVisibilityCondition } from "./promos";
@@ -230,8 +230,8 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
 
   const unparsedCapFieldsResult = CapFieldArraySchema.safeParse(row.unparsedCapFields);
   const storedUnparsedCapFields = unparsedCapFieldsResult.success ? unparsedCapFieldsResult.data : [];
-  // CR-04: a caps-review card must always ask for every field the row still
-  // needs (e.g. a boost's missing max stake), even if the stored list is empty.
+  // CR-04: a caps-review card asks for every field the row still needs per
+  // statusAfterMatch (never max stake since quick-261016-kyb).
   const unparsedCapFields =
     row.reviewReason === "caps"
       ? statusAfterMatch({
@@ -456,8 +456,6 @@ export async function applyCapEntry(args: {
         eq(promos.id, promoId),
         eq(promos.status, "pending_review"),
         eq(promos.reviewReason, "caps"),
-        // CR-04: never activate a profit boost without a max stake.
-        maxStake === null ? ne(promos.promoType, "profit_boost") : undefined,
       ),
     )
     .returning({ id: promos.id });
@@ -475,11 +473,8 @@ export async function applyCapEntry(args: {
  * bestGuess (a classify card never pins a market), and records BOTH
  * correctedByUserId and capEnteredByUserId as the acting member (CR-03: a
  * later scrape must never overwrite either the scope OR the caps this
- * member just entered). Defense in depth for CR-04: refuses (returns false,
- * no write) when `next.status` is "active" for a profit_boost with no
- * maxStake -- the caller (classify-promo.ts) must never reach this with
- * that combination, but this is the same belt-and-braces guard
- * applyCapEntry's WHERE clause applies.
+ * member just entered). quick-261016-kyb: a profit_boost may go active with
+ * no maxStake -- it is ranked at the member's book cap or the $25 default.
  */
 export async function applyClassification(args: {
   promoId: number;
@@ -511,10 +506,6 @@ export async function applyClassification(args: {
     next,
     now,
   } = args;
-
-  if (next.status === "active" && promoType === "profit_boost" && maxStake === null) {
-    return false;
-  }
 
   const db = getDb();
 

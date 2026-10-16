@@ -63,9 +63,8 @@ export async function enterPromoCaps(input: unknown): Promise<PromoReviewRespons
   };
 
   // CR-04: the fields a member must supply are every field the row still
-  // needs per D-18 (statusAfterMatch), not just the stored unparsedCapFields
-  // -- a boost with no max stake always needs one, even if the stored list
-  // is empty.
+  // needs per D-18 (statusAfterMatch). quick-261016-kyb: max stake is never
+  // required (a boost with none is ranked at the book cap or $25 default).
   const required = new Set<CapField>(
     statusAfterMatch({
       promoType: row.promoType,
@@ -92,18 +91,12 @@ export async function enterPromoCaps(input: unknown): Promise<PromoReviewRespons
     };
   }
 
-  const normalizedMaxStake = required.has("maxStake")
-    ? new Decimal(maxStake!).toFixed(2)
-    : row.maxStake;
+  // A max stake the member typed is kept even though it is never required.
+  const normalizedMaxStake = maxStake !== undefined ? new Decimal(maxStake).toFixed(2) : row.maxStake;
   const normalizedMaxWinnings = required.has("maxWinnings")
     ? new Decimal(maxWinnings!).toFixed(2)
     : row.maxWinnings;
   const normalizedMinOdds = required.has("minOdds") ? minOddsAmerican! : row.minOddsAmerican;
-
-  // Defense in depth (CR-04): a profit boost is never activated without a max stake.
-  if (row.promoType === "profit_boost" && normalizedMaxStake === null) {
-    return { status: "invalid", fieldErrors: { maxStake: [REQUIRED_FIELD_MESSAGES.maxStake] } };
-  }
 
   const ok = await applyCapEntry({
     promoId,

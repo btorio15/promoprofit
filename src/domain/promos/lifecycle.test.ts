@@ -16,7 +16,7 @@ describe("statusAfterMatch", () => {
     ).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
   });
 
-  it("boost with maxStake null goes to pending_review/caps with maxStake", () => {
+  it("quick-261016-kyb: boost with maxStake null goes active (ranked at the book cap / $25 default)", () => {
     expect(
       statusAfterMatch({
         promoType: "profit_boost",
@@ -24,7 +24,16 @@ describe("statusAfterMatch", () => {
         bonusAmount: null,
         unparsedCapFields: [],
       }),
-    ).toEqual({ status: "pending_review", reviewReason: "caps", unparsedCapFields: ["maxStake"] });
+    ).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
+  });
+
+  it("quick-261016-kyb: an unparsed maxStake never holds a boost back, other unparsed fields still do", () => {
+    expect(
+      statusAfterMatch({ promoType: "profit_boost", maxStake: null, bonusAmount: null, unparsedCapFields: ["maxStake"] }),
+    ).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
+    expect(
+      statusAfterMatch({ promoType: "profit_boost", maxStake: null, bonusAmount: null, unparsedCapFields: ["maxStake", "minOdds"] }),
+    ).toEqual({ status: "pending_review", reviewReason: "caps", unparsedCapFields: ["minOdds"] });
   });
 
   it("boost with a parsed maxStake but an unparsed minOdds goes to pending_review/caps with minOdds", () => {
@@ -149,17 +158,17 @@ describe("decideScrapedWrite", () => {
     });
   });
 
-  it("new + matched, boost with maxStake null -> write pending_review/caps [maxStake], autoMatched true, scope set", () => {
+  it("new + matched, boost with maxStake null -> write active (quick-261016-kyb), autoMatched true, scope set", () => {
     const decision = decideScrapedWrite(null, baseParsed({ maxStake: null }), MATCHED_RESULT, NOW);
     expect(decision).toEqual({
       kind: "write",
-      status: "pending_review",
-      reviewReason: "caps",
+      status: "active",
+      reviewReason: null,
       autoMatched: true,
       scope: MATCHED_SCOPE,
       pinned: null,
       bestGuess: null,
-      unparsedCapFields: ["maxStake"],
+      unparsedCapFields: [],
       capsFrom: "parsed",
     });
   });
@@ -210,14 +219,14 @@ describe("decideScrapedWrite", () => {
     });
   });
 
-  it("CR-01: existing active boost re-scraped with maxStake now absent -> refresh to pending_review/caps [maxStake]", () => {
+  it("CR-01: existing active boost re-scraped with maxStake now absent -> stays active (quick-261016-kyb)", () => {
     const existing = baseExisting({ status: "active", reviewReason: null });
     const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT, NOW);
     expect(decision).toEqual({
       kind: "refresh",
-      status: "pending_review",
-      reviewReason: "caps",
-      unparsedCapFields: ["maxStake"],
+      status: "active",
+      reviewReason: null,
+      unparsedCapFields: [],
     });
   });
 
@@ -226,13 +235,13 @@ describe("decideScrapedWrite", () => {
     expect(decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT, NOW)).toEqual({ kind: "touch" });
   });
 
-  it("CR-04: existing pending_review/caps boost still missing maxStake -> refresh keeps [maxStake] (never an empty field list)", () => {
+  it("quick-261016-kyb: a pending_review/caps boost held only for maxStake is released to active on the next scrape", () => {
     const existing = baseExisting({ status: "pending_review", reviewReason: "caps", maxStake: null, unparsedCapFields: ["maxStake"] });
-    expect(decideScrapedWrite(existing, baseParsed({ maxStake: null, unparsedCapFields: [] }), MATCHED_RESULT, NOW)).toEqual({
+    expect(decideScrapedWrite(existing, baseParsed({ maxStake: null, unparsedCapFields: ["maxStake"] }), MATCHED_RESULT, NOW)).toEqual({
       kind: "refresh",
-      status: "pending_review",
-      reviewReason: "caps",
-      unparsedCapFields: ["maxStake"],
+      status: "active",
+      reviewReason: null,
+      unparsedCapFields: [],
     });
   });
 
@@ -419,9 +428,9 @@ describe("decideScrapedWrite", () => {
     });
   });
 
-  it("CR-03: existing expired without member caps, re-matched with maxStake absent -> pending_review/caps from the fresh parse", () => {
+  it("CR-03: existing expired without member caps, re-matched with minOdds unparsed -> pending_review/caps from the fresh parse", () => {
     const existing = baseExisting({ status: "expired", reviewReason: null, maxStake: "25.00" });
-    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null }), MATCHED_RESULT, NOW);
+    const decision = decideScrapedWrite(existing, baseParsed({ maxStake: null, unparsedCapFields: ["minOdds"] }), MATCHED_RESULT, NOW);
     expect(decision).toMatchObject({ kind: "write", status: "pending_review", reviewReason: "caps", capsFrom: "parsed" });
   });
 

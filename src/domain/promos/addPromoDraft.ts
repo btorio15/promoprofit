@@ -6,7 +6,6 @@ import {
   MSG_BOOST_REQUIRED,
   MSG_EXPIRY_PASSED,
   MSG_GAME_INVALID,
-  MSG_MAX_STAKE,
   MSG_PICK_BOOK,
   MSG_PICK_EXACT_BET,
   fieldErrorsFromIssues,
@@ -345,7 +344,6 @@ export function boostPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult 
   }
 
   const maxStake = draft.maxStake.trim();
-  if (maxStake === "") errors.maxStake = [MSG_MAX_STAKE];
 
   const scopeInput = scopeInputFromDraft(draft.scope);
   if (scopeInput === null) errors.scope = [MSG_GAME_INVALID];
@@ -371,7 +369,7 @@ export function boostPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult 
     bookKey: draft.bookKey,
     boost,
     scope: scopeInput.kind === "event" ? { ...scopeInput, pinned: pin } : scopeInput,
-    maxStake,
+    ...(maxStake !== "" ? { maxStake } : {}),
     ...(winningsText !== "" ? { maxWinnings: { amount: winningsText, kind: draft.maxWinningsKind } } : {}),
     ...(minOdds !== undefined ? { minOddsAmerican: minOdds } : {}),
     ...(draft.boostExpiresEtDate

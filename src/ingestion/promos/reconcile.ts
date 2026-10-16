@@ -343,10 +343,10 @@ function reconcileSkip(
     }
   }
 
+  // quick-261016-kyb: a boost with no max stake is ranked at the member's
+  // book cap or the $25 default, so maxStake is never flagged as missing.
   const unparsed = new Set<CapField>(overlaid.unparsedCapFields);
-  if (overlaid.promoType === "profit_boost" && overlaid.maxStake === null) {
-    unparsed.add("maxStake");
-  }
+  unparsed.delete("maxStake");
   overlaid.unparsedCapFields = [...unparsed];
 
   const teamsOk = reading.teams.length === 0 || reading.teams.length === 2;

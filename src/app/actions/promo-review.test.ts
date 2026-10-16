@@ -325,7 +325,7 @@ describe("confirmPromoMatch server action (PROMO-04, D-10, D-12, T-03-07-01..04)
     expect(args.scope).toEqual(row.bestGuess);
   });
 
-  it("routes a boost with maxStake null to cap review instead of active (D-18)", async () => {
+  it("quick-261016-kyb: a boost with maxStake null goes active (ranked at the book cap / $25 default)", async () => {
     const row = matchQueueRow({ maxStake: null });
     mockGetPendingPromo.mockResolvedValue(row);
     mockGetCachedEvents.mockResolvedValue({ events: [futureEvent()], fetchedAt: new Date() });
@@ -334,11 +334,7 @@ describe("confirmPromoMatch server action (PROMO-04, D-10, D-12, T-03-07-01..04)
     await confirmPromoMatch({ promoId: 5 });
 
     const args = mockApplyConfirmedMatch.mock.calls[0][0];
-    expect(args.next).toEqual({
-      status: "pending_review",
-      reviewReason: "caps",
-      unparsedCapFields: ["maxStake"],
-    });
+    expect(args.next).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
   });
 
   it("returns stale when there is no best guess to confirm", async () => {
@@ -883,14 +879,15 @@ describe("enterPromoCaps server action (D-18, T-03-09-01/03)", () => {
     expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
   });
 
-  it("CR-04: requires a max stake for a boost with none, even when the stored unparsedCapFields is empty", async () => {
-    const row = capsQueueRow({ unparsedCapFields: [], maxStake: null });
+  it("quick-261016-kyb: a boost held only for max stake activates with none entered", async () => {
+    const row = capsQueueRow({ unparsedCapFields: ["maxStake"], maxStake: null });
     mockGetPendingPromo.mockResolvedValue(row);
+    mockApplyCapEntry.mockResolvedValue(true);
 
     const result = await enterPromoCaps({ promoId: 8 });
 
-    expect(result).toEqual({ status: "invalid", fieldErrors: { maxStake: ["Enter the max stake."] } });
-    expect(mockApplyCapEntry).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyCapEntry).toHaveBeenCalledWith(expect.objectContaining({ maxStake: null }));
   });
 
   it("CR-04: an empty stored field list still accepts and normalizes the boost's missing max stake", async () => {
@@ -1241,7 +1238,7 @@ describe("classifyPromo server action (quick-260928-it1, CR-04, T-it1-01..03)", 
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 
-  it("CR-04: profit boost with NO max stake routes to pending_review/caps, never active", async () => {
+  it("quick-261016-kyb: profit boost with NO max stake goes active", async () => {
     mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
     mockGetCachedEvents.mockResolvedValue({ events: [futureEvent()], fetchedAt: new Date() });
     mockApplyClassification.mockResolvedValue(true);
@@ -1255,11 +1252,7 @@ describe("classifyPromo server action (quick-260928-it1, CR-04, T-it1-01..03)", 
 
     expect(result).toEqual({ status: "ok" });
     const args = mockApplyClassification.mock.calls[0][0];
-    expect(args.next).toEqual({
-      status: "pending_review",
-      reviewReason: "caps",
-      unparsedCapFields: ["maxStake"],
-    });
+    expect(args.next).toEqual({ status: "active", reviewReason: null, unparsedCapFields: [] });
   });
 
   it("refuses maxWinnings when the row's maxWinningsKind is unknown", async () => {

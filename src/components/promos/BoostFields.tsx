@@ -188,7 +188,7 @@ export function BoostFields({ draft, onDraftChange, options, fieldErrors, disabl
       {oddsMode ? pinSelect(true) : null}
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="add-max-stake">Max stake</Label>
+        <Label htmlFor="add-max-stake">Max stake (optional)</Label>
         <div className="relative">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-muted-foreground">
             $
@@ -206,7 +206,7 @@ export function BoostFields({ draft, onDraftChange, options, fieldErrors, disabl
             aria-describedby={stakeError ? "add-max-stake-error" : undefined}
           />
         </div>
-        <p className="text-sm text-muted-foreground">Every boost needs a max stake so the math never guesses.</p>
+        <p className="text-sm text-muted-foreground">Leave blank to use your max bet for this book ($25 unless you change it in Settings).</p>
         <FieldError id="add-max-stake-error" message={stakeError} />
       </div>
 
