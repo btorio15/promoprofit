@@ -342,6 +342,24 @@ describe("decideScrapedWrite", () => {
     });
   });
 
+  it("games scope: human scope is over only once the LAST listed game has started", () => {
+    const gamesScope: ScopeGuess = {
+      kind: "games",
+      sportKey: "americanfootball_nfl",
+      games: [
+        { eventId: "g1", homeTeam: "Buffalo Bills", awayTeam: "Kansas City Chiefs", commenceTime: "2026-09-27T17:00:00Z" },
+        { eventId: "g2", homeTeam: "Dallas Cowboys", awayTeam: "Philadelphia Eagles", commenceTime: "2026-09-28T00:20:00Z" },
+      ],
+    };
+    const existing = baseExisting({ status: "expired", reviewReason: null, humanScope: gamesScope });
+    // After the first game but before the last: scope still live, so it is not sent back to review.
+    const between = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT, new Date("2026-09-27T20:00:00Z"));
+    expect(between).toMatchObject({ kind: "write", scope: gamesScope });
+    // After the last game: over.
+    const after = decideScrapedWrite(existing, baseParsed(), UNMATCHED_RESULT, new Date("2026-09-28T01:00:00Z"));
+    expect(after).toMatchObject({ kind: "write", status: "pending_review", scope: null });
+  });
+
   it("WR-02: existing expired with a human sport_window scope whose window closed -> pending_review/match", () => {
     const closedWindow: ScopeGuess = {
       kind: "sport_window",

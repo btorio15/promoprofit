@@ -7,7 +7,7 @@ import { getPendingPromo, applyConfirmedMatch } from "@/db/promoReview";
 import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { SPORT_KEYS } from "@/config/sports";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
-import type { ScopeGuess } from "@/domain/promos/scope";
+import { gamesWindow, type ScopeGuess } from "@/domain/promos/scope";
 
 export type PromoReviewResponse =
   | { status: "ok" }
@@ -80,7 +80,8 @@ export async function confirmPromoMatch(input: unknown): Promise<PromoReviewResp
     };
   } else {
     const guess = row.bestGuess;
-    if (!SPORT_KEYS.includes(guess.sportKey) || new Date(guess.windowEnd).getTime() <= now.getTime()) {
+    const windowEnd = guess.kind === "games" ? gamesWindow(guess.games).windowEnd : guess.windowEnd;
+    if (!SPORT_KEYS.includes(guess.sportKey) || new Date(windowEnd).getTime() <= now.getTime()) {
       return { status: "stale", message: "That promo window has ended. Dismiss this promo instead." };
     }
     scope = guess;

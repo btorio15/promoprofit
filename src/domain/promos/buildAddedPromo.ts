@@ -4,7 +4,7 @@ import { getSportLabel } from "@/config/sports";
 import type { AddPromoInput } from "./addedPromoInput";
 import { etDayBounds, parseEtDateTime } from "./etTime";
 import { promoTitle } from "./promoRowDto";
-import type { ScopeGuess } from "./scope";
+import { gamesWindow, type ScopeGuess } from "./scope";
 import { ScrapedPromoSchema, type ScrapedPromo } from "./scraped";
 import { PROMO_MARKET_TYPES, type PromoMarketType, type PromoSide } from "./types";
 
@@ -44,6 +44,21 @@ function scopeColumns(scope: ScopeGuess | { kind: "any" }) {
       awayTeam: null,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
+    };
+  }
+  if (scope.kind === "games") {
+    const w = gamesWindow(scope.games);
+    return {
+      scopeKind: "games" as const,
+      sportKey: scope.sportKey,
+      eventId: null,
+      eventCommenceTime: null,
+      homeTeam: null,
+      awayTeam: null,
+      windowStart: new Date(w.windowStart),
+      windowEnd: new Date(w.windowEnd),
+      scopeGames: scope.games,
     };
   }
   if (scope.kind === "event") {
@@ -56,6 +71,7 @@ function scopeColumns(scope: ScopeGuess | { kind: "any" }) {
       awayTeam: scope.awayTeam,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
     };
   }
   return {
@@ -67,6 +83,7 @@ function scopeColumns(scope: ScopeGuess | { kind: "any" }) {
     awayTeam: null,
     windowStart: new Date(scope.windowStart),
     windowEnd: new Date(scope.windowEnd),
+    scopeGames: null,
   };
 }
 
@@ -127,6 +144,13 @@ export function buildAddedPromoRow(args: {
   } else if (scope.kind === "event") {
     scopeText = `${scope.awayTeam} @ ${scope.homeTeam}`;
     teamsText = [scope.awayTeam, scope.homeTeam];
+    sportKeyHint = scope.sportKey;
+  } else if (scope.kind === "games") {
+    scopeText = scope.games.map((g) => `${g.awayTeam} @ ${g.homeTeam}`).join(", ");
+    teamsText = [];
+    const w = gamesWindow(scope.games);
+    windowStart = w.windowStart;
+    windowEnd = w.windowEnd;
     sportKeyHint = scope.sportKey;
   } else {
     scopeText = `Any ${getSportLabel(scope.sportKey)} game`;

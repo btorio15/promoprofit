@@ -18,6 +18,8 @@ export type DuplicateCandidate = {
   scope:
     | { kind: "event"; eventId: string; sportKey: string }
     | { kind: "sport_window"; sportKey: string; windowStart: string; windowEnd: string }
+    // windowStart/windowEnd are the earliest/latest listed game kickoffs.
+    | { kind: "games"; sportKey: string; eventIds: string[]; windowStart: string; windowEnd: string }
     | { kind: "any" };
 };
 
@@ -65,6 +67,7 @@ function scopesOverlap(
   if (d.kind === "any" || c.kind === "any") return true;
   if (d.kind === "event") {
     if (c.kind === "event") return d.eventId === c.eventId;
+    if (c.kind === "games") return c.sportKey === d.sportKey && c.eventIds.includes(d.eventId);
     if (c.sportKey !== d.sportKey) return false;
     return d.commenceMs >= Date.parse(c.windowStart) && d.commenceMs <= Date.parse(c.windowEnd);
   }
@@ -76,6 +79,18 @@ function scopesOverlap(
     return ms >= d.startMs && ms <= d.endMs;
   }
   if (c.sportKey !== d.sportKey) return false;
+  if (c.kind === "games") {
+    // Any listed game kicking off inside the draft window (earliest and latest are listed games).
+    const inRange = (iso: string) => Date.parse(iso) >= d.startMs && Date.parse(iso) <= d.endMs;
+    return (
+      inRange(c.windowStart) ||
+      inRange(c.windowEnd) ||
+      c.eventIds.some((id) => {
+        const ev = events.find((e) => e.eventId === id);
+        return ev !== undefined && inRange(ev.commenceTime);
+      })
+    );
+  }
   return d.startMs <= Date.parse(c.windowEnd) && Date.parse(c.windowStart) <= d.endMs;
 }
 

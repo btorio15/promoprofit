@@ -4,7 +4,7 @@ import { getDb } from "./client";
 import { promos } from "./schema";
 import { promoVisibilityCondition } from "./promos";
 import { ScrapedPromoFieldsSchema, ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
-import { ScopeGuessSchema, type ScopeGuess } from "@/domain/promos/scope";
+import { ScopeGuessSchema, gamesWindow, type ScopeGuess } from "@/domain/promos/scope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import {
   CAP_FIELDS,
@@ -63,6 +63,7 @@ interface PendingPromoRow {
   eventCommenceTime: Date | null;
   windowStart: Date | null;
   windowEnd: Date | null;
+  scopeGames: unknown;
   maxStake: string | null;
   maxWinnings: string | null;
   maxWinningsKind: string | null;
@@ -87,6 +88,7 @@ const SELECT_COLUMNS = {
   eventCommenceTime: promos.eventCommenceTime,
   windowStart: promos.windowStart,
   windowEnd: promos.windowEnd,
+  scopeGames: promos.scopeGames,
   maxStake: promos.maxStake,
   maxWinnings: promos.maxWinnings,
   maxWinningsKind: promos.maxWinningsKind,
@@ -120,6 +122,11 @@ function scopeGuessFromColumns(row: PendingPromoRow): ScopeGuess | null {
     };
   }
 
+  if (row.scopeKind === "games") {
+    const parsed = ScopeGuessSchema.safeParse({ kind: "games", sportKey: row.sportKey, games: row.scopeGames });
+    return parsed.success ? parsed.data : null;
+  }
+
   return null;
 }
 
@@ -141,6 +148,21 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
       awayTeam: null,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
+    };
+  }
+  if (scope.kind === "games") {
+    const w = gamesWindow(scope.games);
+    return {
+      scopeKind: "games" as const,
+      sportKey: scope.sportKey,
+      eventId: null,
+      eventCommenceTime: null,
+      homeTeam: null,
+      awayTeam: null,
+      windowStart: new Date(w.windowStart),
+      windowEnd: new Date(w.windowEnd),
+      scopeGames: scope.games,
     };
   }
   return scope.kind === "event"
@@ -153,6 +175,7 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
         awayTeam: scope.awayTeam,
         windowStart: null,
         windowEnd: null,
+        scopeGames: null,
       }
     : {
         scopeKind: "sport_window" as const,
@@ -163,6 +186,7 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
         awayTeam: null,
         windowStart: new Date(scope.windowStart),
         windowEnd: new Date(scope.windowEnd),
+        scopeGames: null,
       };
 }
 
@@ -541,6 +565,7 @@ interface ActivePromoScopeRow {
   eventCommenceTime: Date | null;
   windowStart: Date | null;
   windowEnd: Date | null;
+  scopeGames: unknown;
 }
 
 /**
@@ -573,6 +598,8 @@ function activeScopeGuessFromRow(row: ActivePromoScopeRow): ScopeGuess | null {
       windowStart: row.windowStart.toISOString(),
       windowEnd: row.windowEnd.toISOString(),
     };
+  } else if (row.scopeKind === "games") {
+    candidate = { kind: "games", sportKey: row.sportKey, games: row.scopeGames };
   } else {
     return null;
   }
@@ -615,6 +642,7 @@ export async function getActivePromoForFlag(
       eventCommenceTime: promos.eventCommenceTime,
       windowStart: promos.windowStart,
       windowEnd: promos.windowEnd,
+      scopeGames: promos.scopeGames,
     })
     .from(promos)
     .where(activePromoForFlagWhere(id, viewerUserId))
@@ -678,6 +706,7 @@ export async function applyFlag(args: {
       awayTeam: null,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
       marketType: null,
       line: null,
       side: null,

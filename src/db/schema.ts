@@ -188,7 +188,11 @@ export const refreshLock = pgTable("refresh_lock", {
  * event_commence_time/home_team/away_team (the single named game);
  * scope_kind "sport_window" uses sport_key/window_start/window_end instead,
  * with event_id null (any event of that sport whose commence_time falls in
- * the window). market_type/line/side are now the OPTIONAL pinned selection
+ * the window). scope_kind "games" (migration 0017) uses sport_key +
+ * scope_games (array of {eventId, homeTeam, awayTeam, commenceTime}) +
+ * window_start/window_end = earliest/latest listed commence time (so expiry
+ * and lifecycle keep working off window_end); event_id/event_commence_time/
+ * home_team/away_team stay null. market_type/line/side are now the OPTIONAL pinned selection
  * (D-02) -- null means the app itself picks the best market/side inside the
  * promo's scope (src/domain/promos/selection.ts,
  * src/domain/promos/rankPromoHedges.ts), the same way the bonus-bet finder
@@ -222,6 +226,7 @@ export const promos = pgTable(
     scopeKind: text("scope_kind"),
     windowStart: timestamp("window_start", { withTimezone: true }),
     windowEnd: timestamp("window_end", { withTimezone: true }),
+    scopeGames: jsonb("scope_games"),
     bestGuess: jsonb("best_guess"),
     parsed: jsonb("parsed").notNull(),
     boostPercent: numeric("boost_percent", { precision: 7, scale: 2 }),

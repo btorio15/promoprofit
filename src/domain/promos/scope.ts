@@ -11,13 +11,15 @@ import { SPORT_KEYS } from "@/config/sports";
  * DB or the clock.
  */
 
-export const PROMO_SCOPE_KINDS = ["event", "sport_window", "any"] as const;
+export const PROMO_SCOPE_KINDS = ["event", "sport_window", "games", "any"] as const;
 export type PromoScopeKind = (typeof PROMO_SCOPE_KINDS)[number];
 
 /** Resolved scope with Date objects, ready for eventInScope/enumeration. */
 export type PromoScope =
   | { kind: "event"; eventId: string; sportKey: string }
   | { kind: "sport_window"; sportKey: string; windowStart: Date; windowEnd: Date }
+  // An exact list of 2+ games in one league: eligible ONLY on these event ids.
+  | { kind: "games"; sportKey: string; eventIds: string[]; windowStart: Date; windowEnd: Date }
   // Unrestricted bonus bet (D-07): usable on any upcoming game.
   | { kind: "any" };
 
@@ -26,7 +28,15 @@ export type PromoScope =
  * validated by ScopeGuessSchema (D-10 anti-pattern guard: this is a
  * presentational candidate only, never auto-activated).
  */
+export type ScopeGame = { eventId: string; homeTeam: string; awayTeam: string; commenceTime: string };
+
+/**
+ * "games" has deliberately no windowStart/windowEnd: code that reads
+ * scope.windowEnd for non-event scopes then fails typecheck instead of
+ * silently treating a few-games promo as league-wide. Use gamesWindow().
+ */
 export type ScopeGuess =
+  | { kind: "games"; sportKey: string; games: ScopeGame[] }
   | { kind: "event"; eventId: string; sportKey: string; homeTeam: string; awayTeam: string; commenceTime: string }
   | { kind: "sport_window"; sportKey: string; windowStart: string; windowEnd: string };
 
@@ -60,6 +70,39 @@ const SportWindowScopeGuessSchema = z
     }
   });
 
+const ScopeGameSchema = z
+  .strictObject({
+    eventId: z.string().min(1).max(100),
+    homeTeam: z.string().min(1),
+    awayTeam: z.string().min(1),
+    commenceTime: z.iso.datetime({ offset: true }),
+  })
+  .refine((v) => v.homeTeam !== v.awayTeam, {
+    message: "homeTeam and awayTeam must differ",
+  });
+
+const GamesScopeGuessSchema = z
+  .strictObject({
+    kind: z.literal("games"),
+    sportKey: z.enum(SPORT_KEYS as [string, ...string[]]),
+    games: z.array(ScopeGameSchema).min(2).max(12),
+  })
+  .refine((v) => new Set(v.games.map((g) => g.eventId)).size === v.games.length, {
+    message: "game eventIds must be unique",
+    path: ["games"],
+  });
+
+/** Earliest and latest commence time (ISO) across the listed games. */
+export function gamesWindow(games: ScopeGame[]): { windowStart: string; windowEnd: string } {
+  let min = games[0].commenceTime;
+  let max = games[0].commenceTime;
+  for (const g of games) {
+    if (new Date(g.commenceTime).getTime() < new Date(min).getTime()) min = g.commenceTime;
+    if (new Date(g.commenceTime).getTime() > new Date(max).getTime()) max = g.commenceTime;
+  }
+  return { windowStart: min, windowEnd: max };
+}
+
 /**
  * Discriminated union over ScopeGuess (D-10): strict objects (no extra
  * keys), sportKey must be a configured sport, ISO datetimes, and
@@ -68,12 +111,23 @@ const SportWindowScopeGuessSchema = z
 export const ScopeGuessSchema: z.ZodType<ScopeGuess> = z.discriminatedUnion("kind", [
   EventScopeGuessSchema,
   SportWindowScopeGuessSchema,
+  GamesScopeGuessSchema,
 ]) as unknown as z.ZodType<ScopeGuess>;
 
 /** Converts a validated jsonb-safe ScopeGuess into a PromoScope with real Dates. */
 export function scopeFromGuess(g: ScopeGuess): PromoScope {
   if (g.kind === "event") {
     return { kind: "event", eventId: g.eventId, sportKey: g.sportKey };
+  }
+  if (g.kind === "games") {
+    const w = gamesWindow(g.games);
+    return {
+      kind: "games",
+      sportKey: g.sportKey,
+      eventIds: g.games.map((x) => x.eventId),
+      windowStart: new Date(w.windowStart),
+      windowEnd: new Date(w.windowEnd),
+    };
   }
   return {
     kind: "sport_window",
@@ -96,6 +150,9 @@ export function eventInScope(
   if (scope.kind === "any") return true;
   if (scope.kind === "event") {
     return ev.id === scope.eventId;
+  }
+  if (scope.kind === "games") {
+    return ev.sport_key === scope.sportKey && scope.eventIds.includes(ev.id);
   }
 
   if (ev.sport_key !== scope.sportKey) return false;

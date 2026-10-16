@@ -11,7 +11,7 @@ import type { RankablePromo } from "./rankPromoHedges";
 
 /**
  * D-01: the configured sports the promos cover, in SPORTS config order.
- * An event-scoped promo needs its event's sport, a sport-window promo its
+ * An event-scoped promo needs its event's sport, a sport-window or games promo its
  * sport; an unrestricted ("any") bonus bet can convert on any game, so it
  * needs every sport -- unless it is pinned to a known event, in which case
  * only that event's sport. A promo with no eligible market types
@@ -26,7 +26,7 @@ export function promoRefreshSportKeys(
   for (const promo of promos) {
     if (promo.eligibleMarketTypes.length === 0) continue;
     const scope = promo.scope;
-    if (scope.kind === "event" || scope.kind === "sport_window") {
+    if (scope.kind === "event" || scope.kind === "sport_window" || scope.kind === "games") {
       wanted.add(scope.sportKey);
     } else if (promo.pinned) {
       const sport = opts.sportOfEvent?.(promo.pinned.eventId);

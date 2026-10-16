@@ -161,6 +161,44 @@ describe("rankPromoHedges", () => {
     expect(opportunity.result.boost.guaranteedProfit.toFixed(2)).toBe("3.33");
   });
 
+  it("games scope: never ranks a third game of the same league even when it is the most profitable", () => {
+    const mk = (id: string, h: number, a: number, hours: number) =>
+      moneylineEvent({
+        id,
+        homeTeam: `H ${id}`,
+        awayTeam: `A ${id}`,
+        commenceTime: plusHours(hours),
+        quotes: [
+          { bookKey: "draftkings", homePrice: h, awayPrice: -h - 50 },
+          { bookKey: "fanduel", homePrice: a, awayPrice: -a - 50 },
+        ],
+      });
+    const events = [mk("g-a", 200, 190, 6), mk("g-b", 210, 200, 20), mk("g-c", 900, 880, 12)];
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      scope: {
+        kind: "games",
+        sportKey: "americanfootball_nfl",
+        eventIds: ["g-a", "g-b"],
+        windowStart: new Date(plusHours(6)),
+        windowEnd: new Date(plusHours(20)),
+      },
+      bookKey: "draftkings",
+      boostPercent: "50",
+      maxStake: "25",
+    };
+    const results = rankPromoHedges([promo], {
+      moneylineEvents: events,
+      extendedEvents: [],
+      hedgeBookKeys: new Set(["fanduel"]),
+      precision: "cents" as const,
+      now: NOW,
+    });
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.every((r) => r.selection.eventId !== "g-c")).toBe(true);
+    expect(results.every((r) => ["g-a", "g-b"].includes(r.selection.eventId))).toBe(true);
+  });
+
   it("unpinned boost: picks the argmax-profit candidate across a sport_window scope with two events", () => {
     const eventA = moneylineEvent({
       id: "nfl-a",

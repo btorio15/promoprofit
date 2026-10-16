@@ -13,13 +13,13 @@
  * them, and translating the decision into SQL. It never applies its own
  * status/scope rules inline.
  */
-import { and, eq, inArray, isNull, notInArray, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, notInArray, sql, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "@/db/client";
 import { promos, scrapeRuns } from "@/db/schema";
 import { decideClassifyWrite, decideScrapedWrite, type ExistingPromoState } from "@/domain/promos/lifecycle";
 import type { MatchResult } from "@/domain/promos/matcher";
-import type { ScopeGuess } from "@/domain/promos/scope";
+import { ScopeGuessSchema, gamesWindow, type ScopeGuess } from "@/domain/promos/scope";
 import type { ScrapedPromo } from "@/domain/promos/scraped";
 import type { CapField, PromoMarketType, PromoSelection, PromoSide, PromoStatus, PromoType, ReviewReason } from "@/domain/promos/types";
 import { commitSignupOffers, type CommitSignupOffersOutcome } from "./signupStore";
@@ -117,7 +117,7 @@ function structuredCapColumns(parsed: ScrapedPromo) {
   };
 }
 
-/** scope_kind/event_id/sport_key/event_commence_time/home_team/away_team/window_start/window_end from a ScopeGuess (null clears all). */
+/** scope_kind/event_id/sport_key/event_commence_time/home_team/away_team/window_start/window_end/scope_games from a ScopeGuess (null clears all). */
 function scopeColumnsFrom(scope: ScopeGuess | null) {
   if (scope === null) {
     return {
@@ -129,6 +129,21 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
       awayTeam: null,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
+    };
+  }
+  if (scope.kind === "games") {
+    const w = gamesWindow(scope.games);
+    return {
+      scopeKind: "games" as const,
+      sportKey: scope.sportKey,
+      eventId: null,
+      eventCommenceTime: null,
+      homeTeam: null,
+      awayTeam: null,
+      windowStart: new Date(w.windowStart),
+      windowEnd: new Date(w.windowEnd),
+      scopeGames: scope.games,
     };
   }
   if (scope.kind === "event") {
@@ -141,6 +156,7 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
       awayTeam: scope.awayTeam,
       windowStart: null,
       windowEnd: null,
+      scopeGames: null,
     };
   }
   return {
@@ -152,6 +168,7 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
     awayTeam: null,
     windowStart: new Date(scope.windowStart),
     windowEnd: new Date(scope.windowEnd),
+    scopeGames: null,
   };
 }
 
@@ -174,6 +191,7 @@ interface ExistingPromoRow {
   awayTeam: string | null;
   windowStart: Date | null;
   windowEnd: Date | null;
+  scopeGames: unknown;
   marketType: string | null;
   line: number | null;
   side: string | null;
@@ -209,6 +227,11 @@ function humanScopeFrom(row: ExistingPromoRow): ScopeGuess | null {
       windowStart: row.windowStart.toISOString(),
       windowEnd: row.windowEnd.toISOString(),
     };
+  }
+  if (row.scopeKind === "games") {
+    // Invalid/missing list -> null (never widened to league-wide).
+    const parsed = ScopeGuessSchema.safeParse({ kind: "games", sportKey: row.sportKey, games: row.scopeGames });
+    return parsed.success ? parsed.data : null;
   }
   return null;
 }
@@ -247,6 +270,9 @@ function unchangedSinceRead(row: ExistingPromoRow): SQL {
     eqOrNull(promos.capEnteredByUserId, row.capEnteredByUserId),
     eqOrNull(promos.dismissedByUserId, row.dismissedByUserId),
     eqOrNull(promos.flaggedByUserId, row.flaggedByUserId),
+    row.scopeGames === null || row.scopeGames === undefined
+      ? isNull(promos.scopeGames)
+      : sql`${promos.scopeGames} is not distinct from ${JSON.stringify(row.scopeGames)}::jsonb`,
   )!;
 }
 
@@ -314,6 +340,7 @@ async function buildUpsertStatements(
       awayTeam: promos.awayTeam,
       windowStart: promos.windowStart,
       windowEnd: promos.windowEnd,
+      scopeGames: promos.scopeGames,
       marketType: promos.marketType,
       line: promos.line,
       side: promos.side,

@@ -1,5 +1,5 @@
 import type { ScrapedPromo } from "./scraped";
-import type { ScopeGuess } from "./scope";
+import { gamesWindow, type ScopeGuess } from "./scope";
 import { getSportLabel } from "@/config/sports";
 import { etDayLabel } from "./etTime";
 import { formatAmerican, formatKickoff, formatUsd } from "@/lib/format";
@@ -93,6 +93,16 @@ function sportWindowLabel(sportKey: string, windowStart: string, windowEnd: stri
 export function scopeGuessLabel(guess: ScopeGuess): string {
   if (guess.kind === "event") {
     return `${guess.awayTeam} @ ${guess.homeTeam}, ${formatKickoff(guess.commenceTime)}`;
+  }
+  if (guess.kind === "games") {
+    if (guess.games.length <= 3) {
+      return guess.games.map((g) => `${g.awayTeam} @ ${g.homeTeam}`).join(" or ");
+    }
+    const { windowStart, windowEnd } = gamesWindow(guess.games);
+    return sportWindowLabel(guess.sportKey, windowStart, windowEnd).replace(
+      /^any (.+) game,/,
+      `any of ${guess.games.length} $1 games,`,
+    );
   }
   return sportWindowLabel(guess.sportKey, guess.windowStart, guess.windowEnd);
 }

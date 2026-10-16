@@ -1,5 +1,5 @@
 import type { CapField, PromoSelection, PromoStatus, PromoType, ReviewReason } from "./types";
-import type { ScopeGuess } from "./scope";
+import { gamesWindow, type ScopeGuess } from "./scope";
 import type { MatchResult } from "./matcher";
 import type { ScrapedPromo } from "./scraped";
 
@@ -125,9 +125,14 @@ function capSourceFor(existing: ExistingPromoState, parsed: ScrapedPromo): CapSo
   };
 }
 
-/** True when an event scope's game has started, or a sport_window scope's window has closed. */
+/** True when an event scope's game has started, or a sport_window scope's window has closed, or the last listed game of a games scope has started. */
 function isScopeOver(scope: ScopeGuess, now: Date): boolean {
-  const end = scope.kind === "event" ? scope.commenceTime : scope.windowEnd;
+  const end =
+    scope.kind === "event"
+      ? scope.commenceTime
+      : scope.kind === "games"
+        ? gamesWindow(scope.games).windowEnd
+        : scope.windowEnd;
   return new Date(end).getTime() <= now.getTime();
 }
 

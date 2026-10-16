@@ -14,7 +14,7 @@ import {
   type PromoType,
   type WinningsCapKind,
 } from "@/domain/promos/types";
-import type { PromoScope } from "@/domain/promos/scope";
+import { ScopeGuessSchema, scopeFromGuess, type PromoScope } from "@/domain/promos/scope";
 import type { RankablePromo } from "@/domain/promos/rankPromoHedges";
 import { getSportLabel } from "@/config/sports";
 import { etDayLabel } from "@/domain/promos/etTime";
@@ -129,6 +129,27 @@ function sportWindowScopeLabel(sportKey: string, windowStart: Date, windowEnd: D
   return `Any ${sportLabel} game · ${ET_MONTH_DAY_FORMATTER.format(windowStart)}–${ET_DAY_NUMBER_FORMATTER.format(windowEnd)}`;
 }
 
+/**
+ * "KC Chiefs @ BUF Bills, PHI Eagles @ DAL Cowboys" for up to 3 games, else
+ * "4 NFL games · Sun, Sep 27" (or a day range when the games span days).
+ */
+function gamesScopeLabel(
+  sportKey: string,
+  games: { homeTeam: string; awayTeam: string }[],
+  windowStart: Date,
+  windowEnd: Date,
+): string {
+  if (games.length <= 3) return games.map((g) => `${g.awayTeam} @ ${g.homeTeam}`).join(", ");
+  const sportLabel = getSportLabel(sportKey);
+  const startKey = ET_DAY_KEY_FORMATTER.format(windowStart);
+  const endKey = ET_DAY_KEY_FORMATTER.format(windowEnd);
+  const days =
+    startKey === endKey
+      ? etDayLabel(windowStart.toISOString())
+      : `${ET_MONTH_DAY_FORMATTER.format(windowStart)}–${ET_DAY_NUMBER_FORMATTER.format(windowEnd)}`;
+  return `${games.length} ${sportLabel} games · ${days}`;
+}
+
 interface ActivePromoRow {
   id: number;
   bookKey: string;
@@ -140,6 +161,7 @@ interface ActivePromoRow {
   awayTeam: string | null;
   windowStart: Date | null;
   windowEnd: Date | null;
+  scopeGames: unknown;
   marketType: string | null;
   line: number | null;
   side: string | null;
@@ -190,6 +212,16 @@ export function mapActivePromoRow(row: ActivePromoRow, viewerUserId?: number): A
     }
     scope = { kind: "sport_window", sportKey: row.sportKey, windowStart: row.windowStart, windowEnd: row.windowEnd };
     scopeLabel = sportWindowScopeLabel(row.sportKey, row.windowStart, row.windowEnd);
+  } else if (row.scopeKind === "games") {
+    // Never widen: anything malformed drops the promo instead of falling back
+    // to league-wide.
+    const guess = ScopeGuessSchema.safeParse({ kind: "games", sportKey: row.sportKey, games: row.scopeGames });
+    if (!guess.success || guess.data.kind !== "games" || !row.windowStart || !row.windowEnd) {
+      console.warn(`getActivePromos: dropping promo ${row.id}, invalid games scope`);
+      return null;
+    }
+    scope = scopeFromGuess(guess.data);
+    scopeLabel = gamesScopeLabel(guess.data.sportKey, guess.data.games, row.windowStart, row.windowEnd);
   } else if (row.scopeKind === "any") {
     scope = { kind: "any" };
     scopeLabel = "Any game";
@@ -283,6 +315,7 @@ export function activePromoWhere(now: Date, viewerUserId?: number): SQL {
     or(
       and(eq(promos.scopeKind, "event"), sql`${promos.eventId} is not null`, gt(promos.eventCommenceTime, now)),
       and(eq(promos.scopeKind, "sport_window"), gt(promos.windowEnd, now)),
+      and(eq(promos.scopeKind, "games"), gt(promos.windowEnd, now)),
       and(eq(promos.scopeKind, "any"), sql`${promos.expiresAt} is not null`, gt(promos.expiresAt, now)),
     ),
     promoVisibilityCondition(viewerUserId),
@@ -320,6 +353,7 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
       awayTeam: promos.awayTeam,
       windowStart: promos.windowStart,
       windowEnd: promos.windowEnd,
+      scopeGames: promos.scopeGames,
       marketType: promos.marketType,
       line: promos.line,
       side: promos.side,

@@ -22,6 +22,24 @@ function promo(over: Partial<RankablePromo> & { id?: number } = {}): RankablePro
   };
 }
 
+describe("promoRefreshSportKeys games scope", () => {
+  it("a games-scoped promo needs only its own sport", () => {
+    expect(
+      promoRefreshSportKeys([
+        promo({
+          scope: {
+            kind: "games",
+            sportKey: "icehockey_nhl",
+            eventIds: ["a", "b"],
+            windowStart: new Date("2026-10-04T00:00:00Z"),
+            windowEnd: new Date("2026-10-05T00:00:00Z"),
+          },
+        }),
+      ]),
+    ).toEqual(["icehockey_nhl"]);
+  });
+});
+
 describe("promoRefreshSportKeys (D-01)", () => {
   it("event scope -> its sport; sport_window -> its sport", () => {
     expect(

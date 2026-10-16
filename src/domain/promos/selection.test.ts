@@ -347,6 +347,26 @@ describe("enumerateScopeSelections", () => {
     expect(results.length).toBeGreaterThan(0);
   });
 
+  it("games scope: only the listed events are enumerated, never a third game", () => {
+    const a = fullEvent({ id: "g-a", commence_time: plusHours(6) });
+    const b = fullEvent({ id: "g-b", commence_time: plusHours(20) });
+    const c = fullEvent({ id: "g-c", commence_time: plusHours(12) });
+    const scope: PromoScope = {
+      kind: "games",
+      sportKey: "americanfootball_nfl",
+      eventIds: ["g-a", "g-b"],
+      windowStart: new Date(plusHours(6)),
+      windowEnd: new Date(plusHours(20)),
+    };
+    const results = enumerateScopeSelections(
+      { moneyline: [a, b, c], extended: [a, b, c] },
+      scope,
+      { now: NOW, eligibleMarketTypes: ["moneyline"] },
+    );
+    const ids = new Set(results.map((r) => r.eventId));
+    expect(ids).toEqual(new Set(["g-a", "g-b"]));
+  });
+
   it("events with commence <= now are excluded", () => {
     const pastEvent = fullEvent({ id: "past-event", commence_time: new Date(NOW.getTime() - 1000).toISOString() });
     const scope: PromoScope = { kind: "event", eventId: pastEvent.id, sportKey: pastEvent.sport_key };
