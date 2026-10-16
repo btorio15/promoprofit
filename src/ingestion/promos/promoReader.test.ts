@@ -15,6 +15,7 @@ function validReading(overrides: Partial<PromoReading> = {}): PromoReading {
     minOddsAmerican: -200,
     sport: "icehockey_nhl",
     teams: [],
+    games: [],
     singleGame: false,
     liveOnly: false,
     parlayOrSgpOnly: false,

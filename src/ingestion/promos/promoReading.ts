@@ -18,7 +18,7 @@ import { SKIP_REASONS } from "@/domain/promos/scraped";
  * instructions change in a way that could change the model's output shape.
  */
 export const PROMO_READER_MODEL = "claude-haiku-4-5";
-export const PROMO_READER_PROMPT_VERSION = "2026-09-28.1";
+export const PROMO_READER_PROMPT_VERSION = "2026-10-16.1";
 
 /** SPORT_KEYS is a readonly string[] (built from SPORTS.map), not a literal
  * tuple -- cast once here so z.enum (which requires a non-empty tuple of
@@ -43,6 +43,7 @@ export const PromoReadingSchema = z.strictObject({
   minOddsAmerican: z.number().int().nullable(),
   sport: z.enum(SPORT_KEY_TUPLE).nullable(),
   teams: z.array(z.string()),
+  games: z.array(z.strictObject({ teamA: z.string(), teamB: z.string() })),
   singleGame: z.boolean(),
   liveOnly: z.boolean(),
   parlayOrSgpOnly: z.boolean(),
@@ -94,6 +95,8 @@ Other fields:
 - Set liveOnly, parlayOrSgpOnly, propOnly, and newCustomerOnly to true only when the promo is restricted to exactly that bet type or audience; otherwise false.
 - Set singleGame to true only when the promo names one specific game.
 - Fill teams only when the promo names exactly one game, as the two team names appear in the text; otherwise an empty array.
+- Fill games only when the promo is limited to two or more specific named games: one entry per game with the two team names exactly as written; otherwise an empty array. When games is filled, teams must be empty and singleGame false.
+- A promo limited to specific named games is never sport-wide: do not treat it as covering every game in the sport.
 - Set eventDateText to the date phrase exactly as written (e.g. "9/29/2026"), or null when no date is stated.
 - Set confidence to "high" only when you are certain of the classification and every extracted number's evidence is airtight; "medium" when reasonably sure; "low" when guessing.
 

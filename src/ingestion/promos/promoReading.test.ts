@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   PROMO_READER_MODEL,
   PROMO_READER_PROMPT_VERSION,
+  PROMO_READER_SYSTEM_PROMPT,
   PromoReadingSchema,
   readerText,
   readingCacheKey,
@@ -19,6 +20,7 @@ function validReading(overrides: Partial<PromoReading> = {}): PromoReading {
     minOddsAmerican: -200,
     sport: "icehockey_nhl",
     teams: [],
+    games: [],
     singleGame: false,
     liveOnly: false,
     parlayOrSgpOnly: false,
@@ -41,6 +43,28 @@ describe("PromoReadingSchema", () => {
   it("accepts a full valid reading", () => {
     const result = PromoReadingSchema.safeParse(validReading());
     expect(result.success).toBe(true);
+  });
+
+  it("accepts games [] and a list of games, rejects a reading missing games", () => {
+    expect(PromoReadingSchema.safeParse(validReading({ games: [] })).success).toBe(true);
+    expect(
+      PromoReadingSchema.safeParse(
+        validReading({
+          games: [
+            { teamA: "Jets", teamB: "Bills" },
+            { teamA: "Chiefs", teamB: "Raiders" },
+          ],
+        }),
+      ).success,
+    ).toBe(true);
+    const { games: _games, ...withoutGames } = validReading();
+    void _games;
+    expect(PromoReadingSchema.safeParse(withoutGames).success).toBe(false);
+  });
+
+  it("prompt version was bumped and the system prompt explains games", () => {
+    expect(PROMO_READER_PROMPT_VERSION).not.toBe("2026-09-28.1");
+    expect(PROMO_READER_SYSTEM_PROMPT).toContain("games");
   });
 
   it("rejects an unknown key (strict/closed object)", () => {

@@ -137,6 +137,13 @@ function validatedTeamsText(partial: Partial<ScrapedPromo> | null): string[] {
   return value.length === 0 || value.length === 2 ? value : [];
 }
 
+/** A games list from the partial, only when it is 2-12 valid pairs; otherwise undefined (omitted from the draft). */
+function validatedGamesText(partial: Partial<ScrapedPromo> | null): [string, string][] | undefined {
+  const value = validatedField(partial, "gamesText");
+  if (!Array.isArray(value)) return undefined;
+  return value.length >= 2 && value.length <= 12 ? value : undefined;
+}
+
 function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
 }
@@ -183,6 +190,9 @@ export function buildClassifyDraft(
 
   const bonusAmount = partialBonusAmount ?? (promoType === "bonus_bet" ? bonusAmountFromText : null);
 
+  // A games list and a single-game pair are mutually exclusive on a promo.
+  const gamesText = validatedGamesText(partial);
+
   const draft: ScrapedPromo = {
     bookKey,
     externalId: skip.externalId,
@@ -192,7 +202,8 @@ export function buildClassifyDraft(
     sourceUrl: evidence?.sourceUrl ?? fallbackSourceUrl,
     sportKeyHint: validatedSportKeyHint(partial),
     scopeText: validatedField(partial, "scopeText") ?? title,
-    teamsText: validatedTeamsText(partial),
+    teamsText: gamesText ? [] : validatedTeamsText(partial),
+    ...(gamesText ? { gamesText } : {}),
     windowStart: validatedField(partial, "windowStart"),
     windowEnd: validatedField(partial, "windowEnd"),
     expiresAt: evidence?.expiresAt ?? null,
