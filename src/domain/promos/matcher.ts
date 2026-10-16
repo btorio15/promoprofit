@@ -1,6 +1,6 @@
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { SPORT_KEYS } from "@/config/sports";
-import type { ScopeGuess } from "./scope";
+import { ScopeGuessSchema, type ScopeGuess } from "./scope";
 import type { ScrapedPromo } from "./scraped";
 import type { PromoMarketType, PromoSelection, PromoSide } from "./types";
 import { normalizeTeamText, resolveTeam } from "./aliases";
@@ -19,6 +19,11 @@ import { resolveSelection } from "./selection";
  * "tuning" means growing the alias table and hardening window logic
  * (Plan 08 Task 3), never loosening this rule or adding fuzzy matching.
  * Pure, zero-I/O: "now" is always supplied by the caller.
+ *
+ * Games branch (promos limited to a few named games): every listed game must
+ * resolve to exactly one cached event, all in one league. A list that fails
+ * ANY check is unmatched with a null guess so it lands in Needs a look and
+ * can never be saved league-wide. The branch runs BEFORE the sport-wide one.
  */
 
 export interface MatchSignals {
@@ -295,12 +300,100 @@ function matchGameNamed(
   return { status: "unmatched", signals, guess, unresolvedTeamTexts: [] };
 }
 
+const MAX_LISTED_GAMES = 12;
+
+const NO_SIGNALS: MatchSignals = { sportMatch: false, windowMatch: false, teamMatch: false, marketMatch: false };
+
+function matchGamesNamed(
+  parsed: ScrapedPromo,
+  events: { moneyline: OddsEvent[]; extended: OddsEvent[] },
+  now: Date,
+  windowDaysMs: number,
+): MatchResult {
+  const listed = parsed.gamesText ?? [];
+  const pool = buildPool(events, now, windowDaysMs, parsed.sportKeyHint);
+  const knownTeams = knownTeamsFromPool(pool);
+  const windowInfo = computeWindowValidity(parsed.windowStart, parsed.windowEnd, now, windowDaysMs);
+
+  const fail = (unresolvedTeamTexts: string[]): MatchResult => ({
+    status: "unmatched",
+    signals: { ...NO_SIGNALS, marketMatch: parsed.pinned === null },
+    guess: null,
+    unresolvedTeamTexts,
+  });
+
+  // A pinned selection belongs to one game; it cannot apply to a list.
+  if (parsed.pinned !== null || listed.length > MAX_LISTED_GAMES) {
+    return fail(listed.map(([a, b]) => `${a} @ ${b}`));
+  }
+  const windowBad = windowInfo.given && !windowInfo.valid;
+
+  const unresolved: string[] = [];
+  const found = new Map<string, OddsEvent>();
+  for (const [textA, textB] of listed) {
+    const { resolvedA, resolvedB } = narrowByOpponent(
+      resolveTeam(textA, knownTeams, parsed.sportKeyHint),
+      resolveTeam(textB, knownTeams, parsed.sportKeyHint),
+      pool,
+      windowInfo,
+    );
+    let hit: OddsEvent | null = null;
+    if (resolvedA.length === 1 && resolvedB.length === 1) {
+      const matching = pool.filter((e) => {
+        if (!eventMatchesTeamPair(e, resolvedA[0], resolvedB[0])) return false;
+        if (windowInfo.given && windowInfo.valid) {
+          const c = new Date(e.commence_time).getTime();
+          return c >= windowInfo.start!.getTime() && c <= windowInfo.end!.getTime();
+        }
+        return true;
+      });
+      if (matching.length === 1) hit = matching[0];
+    }
+    if (hit === null) unresolved.push(`${textA} @ ${textB}`);
+    else found.set(hit.id, hit);
+  }
+
+  if (windowBad || unresolved.length > 0) return fail(unresolved);
+
+  const distinct = [...found.values()];
+  if (new Set(distinct.map((e) => e.sport_key)).size > 1 || distinct.length > MAX_LISTED_GAMES) {
+    return fail([]);
+  }
+
+  const allTrue: MatchSignals = { sportMatch: true, windowMatch: true, teamMatch: true, marketMatch: true };
+
+  if (distinct.length === 1) {
+    return { status: "matched", scope: eventScopeGuessOf(distinct[0]), pinned: null, signals: allTrue };
+  }
+
+  const sorted = [...distinct].sort(
+    (a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime(),
+  );
+  const scope = {
+    kind: "games" as const,
+    sportKey: sorted[0].sport_key,
+    games: sorted.map((e) => ({
+      eventId: e.id,
+      homeTeam: e.home_team,
+      awayTeam: e.away_team,
+      commenceTime: e.commence_time,
+    })),
+  };
+  if (!ScopeGuessSchema.safeParse(scope).success) return fail([]);
+  return { status: "matched", scope, pinned: null, signals: allTrue };
+}
+
 export function matchPromo(
   parsed: ScrapedPromo,
   events: { moneyline: OddsEvent[]; extended: OddsEvent[] },
   opts: { now: Date; windowDays?: number },
 ): MatchResult {
   const windowDaysMs = (opts.windowDays ?? DEFAULT_WINDOW_DAYS) * DAY_MS;
+
+  // Must run before the sport-wide branch: a games promo never becomes league-wide.
+  if (parsed.gamesText && parsed.gamesText.length > 0) {
+    return matchGamesNamed(parsed, events, opts.now, windowDaysMs);
+  }
 
   if (parsed.teamsText.length === 0) {
     return matchSportWide(parsed, opts.now, windowDaysMs);

@@ -97,6 +97,28 @@ describe("ScrapedPromoSchema", () => {
     expectInvalid({ ...gameNamedBoost, teamsText: ["LA Rams", "DEN Broncos", "SF 49ers"] });
   });
 
+  describe("gamesText (promo limited to a few games)", () => {
+    const pair = (n: number): [string, string] => [`Away ${n}`, `Home ${n}`];
+    const games = (n: number) => Array.from({ length: n }, (_, i) => pair(i));
+
+    it("accepts 2 pairs with empty teamsText and no pinned", () => {
+      expectValid({ ...sportWideBoost, gamesText: games(2) });
+    });
+    it("rejects 1 pair and 13 pairs", () => {
+      expectInvalid({ ...sportWideBoost, gamesText: games(1) });
+      expectInvalid({ ...sportWideBoost, gamesText: games(13) });
+    });
+    it("rejects gamesText with non-empty teamsText", () => {
+      expectInvalid({ ...gameNamedBoost, gamesText: games(2) });
+    });
+    it("rejects gamesText with a pinned selection", () => {
+      expectInvalid({ ...pinnedBoost, teamsText: [], gamesText: games(2) });
+    });
+    it("still accepts a promo with gamesText omitted", () => {
+      expectValid(sportWideBoost);
+    });
+  });
+
   it("rejects an empty eligibleMarketTypes array", () => {
     expectInvalid({ ...sportWideBoost, eligibleMarketTypes: [] });
   });
