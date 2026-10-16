@@ -120,6 +120,13 @@
       "when": 1792041672547,
       "tag": "0016_worthless_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792133886043,
+      "tag": "0017_giant_jack_power",
+      "breakpoints": true
     }
   ]
 }

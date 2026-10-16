@@ -35,6 +35,11 @@ describe("activePromoWhere visibility (D-01)", () => {
     expect(q.params).toContain(7);
   });
 
+  it("includes the games scope branch gated on window_end", () => {
+    const q = compile(undefined);
+    expect(q.params).toContain("games");
+  });
+
   it("includes the unrestricted 'any' scope branch gated on expires_at", () => {
     const q = compile(undefined);
     expect(q.params).toContain("any");
@@ -61,6 +66,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     awayTeam: null,
     windowStart: null,
     windowEnd: null,
+    scopeGames: null,
     marketType: null,
     line: null,
     side: null,
@@ -130,5 +136,43 @@ describe("mapActivePromoRow", () => {
     expect(mapActivePromoRow(makeRow({ addedByUserId: null }), 7)?.scraped).toBe(true);
     expect(mapActivePromoRow(makeRow({ addedByUserId: 7 }), 7)?.scraped).toBe(false);
     expect(mapActivePromoRow(makeRow({ addedByUserId: 9 }), undefined)?.scraped).toBe(false);
+  });
+});
+
+const GAME_A = { eventId: "A", homeTeam: "BUF Bills", awayTeam: "KC Chiefs", commenceTime: "2026-10-04T17:00:00.000Z" };
+const GAME_B = { eventId: "B", homeTeam: "DAL Cowboys", awayTeam: "PHI Eagles", commenceTime: "2026-10-05T00:20:00.000Z" };
+
+function gamesRow(games: unknown, overrides: Record<string, unknown> = {}) {
+  return makeRow({
+    scopeKind: "games",
+    sportKey: "americanfootball_nfl",
+    windowStart: new Date(GAME_A.commenceTime),
+    windowEnd: new Date(GAME_B.commenceTime),
+    scopeGames: games,
+    ...overrides,
+  });
+}
+
+describe("mapActivePromoRow games scope", () => {
+  it("maps a 2-game row to a games scope with a label naming the games", () => {
+    const mapped = mapActivePromoRow(gamesRow([GAME_A, GAME_B]));
+    expect(mapped?.scope).toMatchObject({ kind: "games", sportKey: "americanfootball_nfl", eventIds: ["A", "B"] });
+    expect(mapped?.scopeLabel).toBe("KC Chiefs @ BUF Bills, PHI Eagles @ DAL Cowboys");
+  });
+
+  it("labels 4+ games by count and day", () => {
+    const games = [GAME_A, GAME_B, { ...GAME_A, eventId: "C" }, { ...GAME_A, eventId: "D" }];
+    const mapped = mapActivePromoRow(gamesRow(games));
+    expect(mapped?.scopeLabel).toMatch(/^4 NFL games · /);
+  });
+
+  it("drops (never widens) null, malformed, single-game and wrong-sport rows", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(mapActivePromoRow(gamesRow(null))).toBeNull();
+    expect(mapActivePromoRow(gamesRow([{ eventId: "A" }, GAME_B]))).toBeNull();
+    expect(mapActivePromoRow(gamesRow([GAME_A]))).toBeNull();
+    expect(mapActivePromoRow(gamesRow([GAME_A, GAME_B], { sportKey: "hockey_nhl" }))).toBeNull();
+    expect(mapActivePromoRow(gamesRow([GAME_A, GAME_B], { windowEnd: null }))).toBeNull();
+    warn.mockRestore();
   });
 });

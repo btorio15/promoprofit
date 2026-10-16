@@ -1,0 +1,1 @@
+ALTER TABLE "promos" ADD COLUMN "scope_games" jsonb;
