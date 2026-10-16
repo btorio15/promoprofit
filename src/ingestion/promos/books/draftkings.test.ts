@@ -398,7 +398,7 @@ describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668)
       "1126077": "sgp",
       "1126078": "futures",
       "1127118": "prop",
-      "1127122": "not_a_promo",
+      "1127122": "no_sweat", // quick-261016-k8a: "No Sweat" category (racing bet-back)
       "1127668": "prop",
       "1127861": "not_a_promo",
     });

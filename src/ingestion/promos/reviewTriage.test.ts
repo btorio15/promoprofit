@@ -26,7 +26,7 @@ describe("CLEAR_SKIP_REASONS / REVIEW_SKIP_REASONS", () => {
     const clear = [...CLEAR_SKIP_REASONS].sort();
     const review = [...REVIEW_SKIP_REASONS].sort();
     expect(clear).toEqual(
-      ["new_customer", "deposit", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
+      ["new_customer", "deposit", "no_sweat", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
     );
     expect(review).toEqual(["unrecognized", "unsupported_sport", "schema_invalid"].sort());
 

@@ -16,6 +16,12 @@ const NEW_CUSTOMER_CATEGORY_RE = /^new customers?$/i;
 const NEW_CUSTOMER_TEXT_RE = /\bnew (?:customers?|users?)\b|\bfirst[- ]bet\b|\bsign[- ]up\b/i;
 const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 
+// quick-261016-k8a: a no-sweat bet refunds a losing stake as a Bonus Bet
+// (DraftKings "NFL London No Sweat"). It is bet insurance, not a bonus bet
+// the user holds, so it is a clear skip -- never a not_a_promo the reader
+// could rescue as a bonus_bet. DK also files these under a "No Sweat" category.
+const NO_SWEAT_RE = /\bno[- ]sweat\b/i;
+
 // The negative lookahead on refer-a-friend excludes DraftKings' generic
 // promotion-abuse boilerplate ("...or any bonuses, the refer-a-friend
 // program, or any other offers...") that appears verbatim in nearly every
@@ -119,6 +125,7 @@ export function classifyExclusion(input: {
   if (category && NEW_CUSTOMER_CATEGORY_RE.test(category.trim())) return "new_customer";
   if (NEW_CUSTOMER_TEXT_RE.test(combined)) return "new_customer";
   if (DEPOSIT_RE.test(combined)) return "deposit";
+  if (NO_SWEAT_RE.test(combined) || (category && NO_SWEAT_RE.test(category))) return "no_sweat";
 
   if (NOT_A_PROMO_RE.test(combined)) return "not_a_promo";
 

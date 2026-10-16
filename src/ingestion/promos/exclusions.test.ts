@@ -187,4 +187,15 @@ describe("classifyExclusion — D-15 skip reasons", () => {
     expect(classifyExclusion({ title: "Boost: Chiefs to win the Super Bowl", text: "Any Wager" })).toBe("futures");
     expect(classifyExclusion({ title: "NHL Boost", text: "Valid for all NHL Futures" })).toBe("futures");
   });
+  // quick-261016-k8a: real DraftKings promo 94 text (stake refunded as a Bonus Bet).
+  it("classifies a no-sweat bet as no_sweat, from text or the No Sweat category", () => {
+    expect(
+      classifyExclusion({
+        title: "NFL London No Sweat",
+        text: "MAX REWARD: $10\n2. Opt-In and receive a No Sweat Token for the London HOU Texans vs JAX Jaguars game on 10/18\n5. If your qualifying bet loses, receive your stake back in the form of a Bonus Bet",
+      }),
+    ).toBe("no_sweat");
+    expect(classifyExclusion({ title: "Bet Back", text: "Get a Bonus Bet if your bet loses", category: "No Sweat" })).toBe("no_sweat");
+    expect(classify("50% Profit Boost", "Bet $25 on any NFL game. No-sweat? Boosted winnings paid in cash.")).toBe("no_sweat");
+  });
 });

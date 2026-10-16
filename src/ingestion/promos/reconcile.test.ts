@@ -219,6 +219,13 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome.skip.reason).toBe("futures");
   });
 
+  it("(g2) quick-261016-k8a: a no_sweat skip stays skipped even when the reader says bonus_bet usable", () => {
+    const skip = { ...findSkip("1126078"), reason: "no_sweat" as const, title: "NFL London No Sweat" };
+    const reading = guardedReading({ kind: "bonus_bet", bonusAmount: "10.00", confidence: "high" });
+    const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome).toEqual({ kind: "skip", skip, via: "clear_reason_kept" });
+  });
+
   it("(k) a not_a_promo skip plus a high-confidence usable reading with no amount gives skip(rescue_without_amount), reviewSuppressed set", () => {
     const skip: SkippedEntry = {
       reason: "not_a_promo",

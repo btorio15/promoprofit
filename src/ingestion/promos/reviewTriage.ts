@@ -41,6 +41,7 @@ import { classifyExclusion } from "./exclusions";
 export const CLEAR_SKIP_REASONS: ReadonlySet<SkipReason> = new Set([
   "new_customer",
   "deposit",
+  "no_sweat",
   "parlay",
   "sgp",
   "futures",

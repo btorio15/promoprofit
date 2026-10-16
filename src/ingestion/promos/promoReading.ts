@@ -18,7 +18,7 @@ import { SKIP_REASONS } from "@/domain/promos/scraped";
  * instructions change in a way that could change the model's output shape.
  */
 export const PROMO_READER_MODEL = "claude-haiku-4-5";
-export const PROMO_READER_PROMPT_VERSION = "2026-10-16.1";
+export const PROMO_READER_PROMPT_VERSION = "2026-10-16.2";
 
 /** SPORT_KEYS is a readonly string[] (built from SPORTS.map), not a literal
  * tuple -- cast once here so z.enum (which requires a non-empty tuple of
@@ -78,7 +78,7 @@ Supported sports (sport field values): ${SPORT_LIST_TEXT}. Use null when the pro
 Skip reasons (skipReason field values, use only one when kind is "not_usable"): ${SKIP_REASON_LIST_TEXT}.
 
 Classification rules:
-- Use "not_usable" for casino games, deposit match offers, new-customer/welcome offers, refer-a-friend, giveaways, pick'em contests, futures/outright bets, and any marketing copy with no concrete offer. Choose the closest skipReason from the list above.
+- Use "not_usable" for casino games, deposit match offers, no-sweat offers (a losing bet refunded as a bonus bet), new-customer/welcome offers, refer-a-friend, giveaways, pick'em contests, futures/outright bets, and any marketing copy with no concrete offer. Choose the closest skipReason from the list above.
 - Use "profit_boost" for an offer that boosts winnings by a stated percent.
 - Use "bonus_bet" for a stated-dollar bonus bet, free bet, or token the user already holds or will receive.
 

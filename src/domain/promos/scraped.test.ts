@@ -197,6 +197,7 @@ describe("SKIP_REASONS", () => {
       "prop",
       "new_customer",
       "deposit",
+      "no_sweat",
       "not_a_promo",
       "unsupported_sport",
       "not_half_point",
