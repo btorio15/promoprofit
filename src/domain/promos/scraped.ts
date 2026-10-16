@@ -56,8 +56,14 @@ export interface ScrapedPromo {
   sportKeyHint: string | null;
   /** As shown: "LA Rams vs. DEN Broncos" / "all NFL games on 9/27/2026". */
   scopeText: string;
-  /** [] = sport-wide; exactly 2 = one named game (order as shown, home/away unknown). */
+  /** [] = sport-wide unless gamesText is set; exactly 2 = one named game (order as shown, home/away unknown). */
   teamsText: string[];
+  /**
+   * 2-12 named games in one league, each [teamA, teamB] as shown; when set,
+   * teamsText is [] and pinned is null. Optional so rows/candidates built
+   * before this field existed still validate.
+   */
+  gamesText?: [string, string][];
   /** ISO; the event-start window the promo covers. */
   windowStart: string | null;
   windowEnd: string | null;
@@ -209,6 +215,7 @@ export const ScrapedPromoFieldsSchema = z.strictObject({
   sportKeyHint: z.string().nullable(),
   scopeText: z.string().max(200),
   teamsText: z.array(z.string().min(1)),
+  gamesText: z.array(z.tuple([z.string().min(1), z.string().min(1)])).optional(),
   windowStart: IsoDateTimeSchema.nullable(),
   windowEnd: IsoDateTimeSchema.nullable(),
   expiresAt: IsoDateTimeSchema.nullable(),
@@ -235,6 +242,30 @@ export const ScrapedPromoSchema = ScrapedPromoFieldsSchema
         path: ["teamsText"],
         message: "teamsText must be empty (sport-wide) or exactly 2 (one named game)",
       });
+    }
+
+    if (promo.gamesText !== undefined) {
+      if (promo.gamesText.length < 2 || promo.gamesText.length > 12) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["gamesText"],
+          message: "gamesText must list 2 to 12 games",
+        });
+      }
+      if (promo.teamsText.length !== 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["gamesText"],
+          message: "teamsText must be empty when gamesText is set",
+        });
+      }
+      if (promo.pinned !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["gamesText"],
+          message: "a pinned selection cannot apply to a list of games",
+        });
+      }
     }
 
     if (new Set(promo.eligibleMarketTypes).size !== promo.eligibleMarketTypes.length) {

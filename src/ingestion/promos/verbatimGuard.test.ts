@@ -18,6 +18,7 @@ function baseReading(overrides: ReadingOverrides = {}): PromoReading {
     minOddsAmerican: null,
     sport: null,
     teams: [],
+    games: [],
     singleGame: false,
     liveOnly: false,
     parlayOrSgpOnly: false,

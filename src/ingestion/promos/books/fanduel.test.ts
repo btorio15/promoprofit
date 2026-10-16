@@ -404,3 +404,57 @@ describe("fanduelScraper -- '<team> @ <team> College Football Game on <date>' sc
     expect(promo.windowStart).not.toBeNull();
   });
 });
+
+describe("fanduelScraper -- multi-game promos (A @ B or C @ D)", () => {
+  function parseName(name: string) {
+    const list = JSON.stringify({
+      promoPlacements: [
+        {
+          placementId: "SBK_PROMOHUB",
+          promotions: [
+            {
+              promoCode: "LOMULTI1018",
+              title: "NFL Profit Boost",
+              name,
+              tags: ["nfl", "american-football"],
+              combinedEndDate: "2026-10-19T04:00:00.000Z",
+            },
+          ],
+        },
+      ],
+    });
+    return fanduelScraper.parse(
+      { listBody: list, detailBodies: {} },
+      { now: new Date("2026-10-16T12:00:00Z"), sourceUrl: "https://api.sportsbook.fanduel.com/promos/api/promotions" },
+    );
+  }
+
+  it("'for the A @ B or C @ D NFL Games on <date>' gives 2 pairs and empty teamsText", () => {
+    const promo = parseName(
+      "Get a 50% Profit Boost Token to use on ANY wager for the Jets @ Bills or Chiefs @ Raiders NFL Games on October 18th!",
+    ).candidates[0];
+    expect(promo.gamesText).toEqual([
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+    ]);
+    expect(promo.teamsText).toEqual([]);
+    expect(promo.windowStart).not.toBeNull();
+  });
+
+  it("'for any A @ B, C @ D and E @ F Games on <date>, <year>' gives 3 pairs", () => {
+    const promo = parseName(
+      "Get a 50% Profit Boost Token to use on ANY wager for any Jets @ Bills, Chiefs @ Raiders and Eagles @ Bears Games on October 18th, 2026!",
+    ).candidates[0];
+    expect(promo.gamesText).toHaveLength(3);
+    expect(promo.teamsText).toEqual([]);
+  });
+
+  it("unsplittable several-game text becomes an unrecognized skip with evidence, never a league-wide candidate", () => {
+    const result = parseName(
+      "Get a 50% Profit Boost Token for NFL Jets @ Bills or tonight's Chiefs @ Raiders matchup!",
+    );
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("unrecognized");
+    expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
+  });
+});

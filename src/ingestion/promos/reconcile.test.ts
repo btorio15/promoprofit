@@ -42,6 +42,7 @@ function guardedReading(overrides: Partial<GuardedReading> = {}): GuardedReading
     minOddsAmerican: null,
     sport: null,
     teams: [],
+    games: [],
     singleGame: false,
     liveOnly: false,
     parlayOrSgpOnly: false,
@@ -70,6 +71,7 @@ function fullReading(overrides: ReadingOverrides = {}): PromoReading {
     minOddsAmerican: null,
     sport: null,
     teams: [],
+    games: [],
     singleGame: false,
     liveOnly: false,
     parlayOrSgpOnly: false,
@@ -376,6 +378,7 @@ describe("reconcileEntry reader-teams override (FanDuel Steelers @ Browns)", () 
       minOddsAmerican: -200,
       sport: "americanfootball_nfl",
       teams: ["Pittsburgh Steelers", "Cleveland Browns"],
+      games: [],
       singleGame: true,
       eventDateText: "October 1st, 2026",
       ...o,
@@ -412,5 +415,123 @@ describe("reconcileEntry reader-teams override (FanDuel Steelers @ Browns)", () 
     const out = reconcileEntry("fanduel", { kind: "candidate", candidate: candidate(["Steelers", "Browns"]) }, reading(), "u");
     if (out.kind !== "candidate") throw new Error("expected candidate");
     expect(out.candidate.teamsText).toEqual(["Steelers", "Browns"]);
+  });
+});
+
+describe("reconcileEntry multi-game never widens", () => {
+  const TWO_GAMES_RAW =
+    "NFL 50% Profit Boost\nProfit Boost: 50% on Jets @ Bills or Chiefs @ Raiders on 10/18/2026. Total bet odds must be -200 or longer.";
+  const url = "https://api.draftkings.com/en/api/promotions/v3/promotions/query";
+  const games = [
+    { teamA: "Jets", teamB: "Bills" },
+    { teamA: "Chiefs", teamB: "Raiders" },
+  ];
+
+  function wideCandidate(rawText: string, extra: Partial<ScrapedPromo> = {}): ScrapedPromo {
+    return {
+      bookKey: "draftkings",
+      externalId: "mg-1",
+      promoType: "profit_boost",
+      title: "NFL 50% Profit Boost",
+      rawText,
+      sourceUrl: url,
+      sportKeyHint: "americanfootball_nfl",
+      scopeText: "NFL",
+      teamsText: [],
+      windowStart: "2026-10-18T04:00:00.000Z",
+      windowEnd: "2026-10-19T03:59:59.999Z",
+      expiresAt: "2026-10-19T03:00:00.000Z",
+      eligibleMarketTypes: ["moneyline", "spread", "total"],
+      pinned: null,
+      boostPercent: "50.00",
+      boostedOddsAmerican: null,
+      baseOddsAmerican: null,
+      bonusAmount: null,
+      maxStake: null,
+      maxWinnings: null,
+      winningsCapKind: "boost_extra",
+      minOddsAmerican: -200,
+      unparsedCapFields: ["maxStake"],
+      claimRequired: "opt_in",
+      finePrintNote: null,
+      ...extra,
+    };
+  }
+
+  function skipEntry(rawText: string): SkippedEntry {
+    return {
+      reason: "unrecognized",
+      externalId: "mg-1",
+      title: "NFL 50% Profit Boost",
+      evidence: { rawText, sourceUrl: url, expiresAt: "2026-10-19T03:00:00.000Z", partial: null },
+    };
+  }
+
+  const highReading = (o: Partial<GuardedReading> = {}) =>
+    guardedReading({
+      boostPercent: "50.00",
+      minOddsAmerican: -200,
+      sport: "americanfootball_nfl",
+      ...o,
+    });
+
+  it("rescues a skip as a games candidate, never as sport-wide", () => {
+    const out = reconcileEntry("draftkings", { kind: "skip", skip: skipEntry(TWO_GAMES_RAW) }, highReading({ games }), url);
+    expect(out.kind).toBe("candidate");
+    if (out.kind !== "candidate") throw new Error("unreachable");
+    expect(out.via).toBe("rescued");
+    expect(out.candidate.gamesText).toEqual([
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+    ]);
+    expect(out.candidate.teamsText).toEqual([]);
+  });
+
+  it("does not rescue a multi-game skip as sport-wide when the reader missed the list", () => {
+    const out = reconcileEntry("draftkings", { kind: "skip", skip: skipEntry(TWO_GAMES_RAW) }, highReading({ games: [] }), url);
+    expect(out.kind).toBe("review");
+    if (out.kind !== "review") throw new Error("unreachable");
+    expect(out.why).toBe("rescue_needs_review");
+  });
+
+  it("does not rescue when the reader's games are not in the text (hallucinated)", () => {
+    const fake = [
+      { teamA: "Packers", teamB: "Lions" },
+      { teamA: "Chiefs", teamB: "Raiders" },
+    ];
+    const out = reconcileEntry("draftkings", { kind: "skip", skip: skipEntry(TWO_GAMES_RAW) }, highReading({ games: fake }), url);
+    expect(out.kind).toBe("review");
+  });
+
+  it("narrows a sport-wide candidate to the reader's verified games", () => {
+    const out = reconcileEntry("draftkings", { kind: "candidate", candidate: wideCandidate(TWO_GAMES_RAW) }, highReading({ games }), url);
+    expect(out.kind).toBe("candidate");
+    if (out.kind !== "candidate") throw new Error("unreachable");
+    expect(out.via).toBe("merged");
+    expect(out.candidate.gamesText).toHaveLength(2);
+    expect(out.candidate.teamsText).toEqual([]);
+  });
+
+  it("demotes a sport-wide candidate to review when the text names several games but the reader gave no list", () => {
+    const out = reconcileEntry("draftkings", { kind: "candidate", candidate: wideCandidate(TWO_GAMES_RAW) }, highReading({ games: [] }), url);
+    expect(out.kind).toBe("review");
+    if (out.kind !== "review") throw new Error("unreachable");
+    expect(out.why).toBe("multi_game_scope");
+  });
+
+  it("keeps an existing gamesText unchanged and ignores reader teams", () => {
+    const candidate = wideCandidate(TWO_GAMES_RAW, {
+      gamesText: [
+        ["Jets", "Bills"],
+        ["Chiefs", "Raiders"],
+      ],
+    });
+    for (const r of [highReading({ games: [] }), highReading({ teams: ["Jets", "Bills"] })]) {
+      const out = reconcileEntry("draftkings", { kind: "candidate", candidate }, r, url);
+      expect(out.kind).toBe("candidate");
+      if (out.kind !== "candidate") throw new Error("unreachable");
+      expect(out.candidate.gamesText).toEqual(candidate.gamesText);
+      expect(out.candidate.teamsText).toEqual([]);
+    }
   });
 });

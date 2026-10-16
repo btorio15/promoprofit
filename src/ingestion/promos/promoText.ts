@@ -1,5 +1,6 @@
 /**
- * Shared team-pair helper for all three parsers. Recon's scope text uses
+ * Shared team-pair helpers for all three parsers (one game: splitTeams; a
+ * list of games: splitGames). Recon's scope text uses
  * one of a handful of separators between the two team names; this never
  * guesses at team aliasing/matching (Plan 08's job) -- it only splits the
  * raw text into two trimmed strings, or returns null when the scope text
@@ -42,4 +43,57 @@ export function splitTeams(scopeText: string): [string, string] | null {
   }
 
   return null;
+}
+
+/** Most games one promo may list (matches ScopeGuessSchema / ScrapedPromoSchema). */
+const MAX_LISTED_GAMES = 12;
+
+/** Longest real team name in words (e.g. "Texas Christian Horned Frogs"). */
+const MAX_TEAM_NAME_WORDS = 4;
+
+/** A lowercase list connector inside a "team name" means a sentence fragment. */
+const LIST_WORD_IN_NAME_RE = /\b(?:or|and)\b/;
+
+/** Separators between games in a list; comma forms first so ", and" is one cut. */
+const GAME_LIST_SEPARATOR_RE = /,\s+and\s+|,\s+or\s+|,\s+|\s+and\s+|\s+or\s+|\s+&\s+/i;
+
+/** Trailing "[NFL] game(s) [on <date>]" a book appends after the list. */
+const TRAILING_GAMES_RE =
+  /\s+(?:(?:college\s+football|college\s+basketball|ncaaf|ncaab|cfb|nfl|mlb|nhl|nba|wnba|football|baseball|hockey|basketball)\s+)?games?(?:\s+on\s+[^\n]{1,60})?$/i;
+
+/**
+ * Splits "A @ B or C @ D" / "A @ B, C @ D and E @ F" (optionally prefixed
+ * "the" and suffixed "NFL games on 10/18/2026") into team pairs. Fails closed:
+ * null unless there are at least 2 pieces and EVERY piece is a plausible pair.
+ * A single game stays with splitTeams. Does not dedupe (the matcher does).
+ */
+export function splitGames(scopeText: string): [string, string][] | null {
+  let text = scopeText.trim().replace(/^the\s+/i, "");
+  text = text.replace(TRAILING_GAMES_RE, "").trim();
+  if (text.length === 0 || text.length > 400) return null;
+
+  const pieces = text.split(GAME_LIST_SEPARATOR_RE).map((piece) => piece.trim());
+  if (pieces.length < 2 || pieces.length > MAX_LISTED_GAMES) return null;
+
+  const pairs: [string, string][] = [];
+  for (const piece of pieces) {
+    const pair = splitTeams(piece);
+    if (pair === null) return null;
+    // Fail closed on sentence fragments posing as team names.
+    if (pair.some((name) => name.split(/\s+/).length > MAX_TEAM_NAME_WORDS || LIST_WORD_IN_NAME_RE.test(name))) {
+      return null;
+    }
+    pairs.push(pair);
+  }
+  return pairs;
+}
+
+/**
+ * True when the text contains 2+ team-pair delimiters (" @ ", " vs. ", " vs ").
+ * Deliberately NOT " at " ("at 8:20 PM"). Used to stop a promo that names
+ * several games from ever being saved league-wide.
+ */
+export function mentionsSeveralGames(text: string): boolean {
+  const matches = text.match(/ @ | vs\. | vs /gi);
+  return matches !== null && matches.length >= 2;
 }

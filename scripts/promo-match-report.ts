@@ -59,6 +59,7 @@ async function main() {
     console.log(`--- ${row.bookKey} #${row.id}: ${parsed.title}`);
     console.log(`  scopeText: ${JSON.stringify(parsed.scopeText)}`);
     console.log(`  teamsText: ${JSON.stringify(parsed.teamsText)}`);
+    console.log(`  gamesText: ${JSON.stringify(parsed.gamesText ?? null)}`);
     console.log(`  sportKeyHint: ${parsed.sportKeyHint ?? "null"}`);
     console.log(`  window: ${parsed.windowStart ?? "null"} .. ${parsed.windowEnd ?? "null"}`);
     console.log(`  pinned: ${parsed.pinned ? JSON.stringify(parsed.pinned) : "null"}`);

@@ -21,7 +21,7 @@ import {
   parseMaxWinnings,
   parseMinOdds,
 } from "@/ingestion/promos/finePrint";
-import { splitTeams } from "@/ingestion/promos/promoText";
+import { mentionsSeveralGames, splitGames, splitTeams } from "@/ingestion/promos/promoText";
 import { sportFromText, type SportHint } from "@/ingestion/promos/sportHints";
 
 /** This book's winnings-cap semantics (per-book recon, 03-RECON.md) -- known independently of whether a cap amount parses (WR-01). */
@@ -245,6 +245,13 @@ function scopeFromTitle(title: string): string {
   return title.replace(TITLE_SCOPE_STRIP_RE, "").replace(TITLE_SCOPE_TRAIL_RE, "").trim();
 }
 
+/** Teams for a scope phrase: a games list when it splits cleanly, else the single pair (existing behavior). */
+function teamsFromScope(scopeText: string): { teamsText: string[]; gamesText?: [string, string][] } {
+  const games = splitGames(scopeText);
+  if (games) return { teamsText: [], gamesText: games };
+  return { teamsText: splitTeams(scopeText) ?? [] };
+}
+
 type BuildResult =
   | { status: "candidate"; promo: ScrapedPromo }
   | { status: "skip"; reason: SkipReason; evidence?: SkipEvidence };
@@ -262,7 +269,7 @@ function buildFromListFallback(card: ListCard, slug: string, titleSportHint: Spo
     sourceUrl: detailUrlFor(slug),
     sportKeyHint: titleSportHint.kind === "supported" ? titleSportHint.sportKey : null,
     scopeText,
-    teamsText: splitTeams(scopeText) ?? [],
+    ...teamsFromScope(scopeText),
     windowStart: null,
     windowEnd: null,
     expiresAt: null,
@@ -352,7 +359,7 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
     sourceUrl,
     sportKeyHint,
     scopeText,
-    teamsText: splitTeams(scopeText) ?? [],
+    ...teamsFromScope(scopeText),
     windowStart,
     windowEnd,
     expiresAt: windowEnd,
@@ -425,6 +432,23 @@ function ballybetParse(
 
     if (built.status === "skip") {
       skipped.push({ reason: built.reason, externalId: card.slug, title: card.title, evidence: built.evidence ?? listEvidence });
+      continue;
+    }
+
+    // Never-widen guard: a promo naming several games that we could not
+    // parse into a games list must go to a human ("Needs a look"), never
+    // become a league-wide candidate.
+    if (
+      built.promo.gamesText === undefined &&
+      built.promo.teamsText.length === 0 &&
+      mentionsSeveralGames(`${built.promo.title}\n${built.promo.rawText}`)
+    ) {
+      skipped.push({
+        reason: "unrecognized",
+        externalId: card.slug,
+        title: card.title,
+        evidence: { rawText: truncate(built.promo.rawText, RAW_TEXT_MAX_CHARS), sourceUrl: built.promo.sourceUrl, expiresAt: built.promo.expiresAt, partial: built.promo },
+      });
       continue;
     }
 

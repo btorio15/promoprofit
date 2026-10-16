@@ -471,6 +471,83 @@ describe("matchPromo", () => {
     });
   });
 
+  describe("games list (promo limited to a few named games)", () => {
+    const ev = (id: string, home: string, away: string, commence: string, sport = NFL) =>
+      baseEvent({ id, sport_key: sport, home_team: home, away_team: away, commence_time: commence });
+    const jetsBills = ev("e1", "Buffalo Bills", "New York Jets", "2026-09-27T17:00:00-04:00");
+    const chiefsRaiders = ev("e2", "Las Vegas Raiders", "Kansas City Chiefs", "2026-09-27T13:00:00-04:00");
+    const eaglesBears = ev("e3", "Chicago Bears", "Philadelphia Eagles", "2026-09-27T20:00:00-04:00");
+    const games = (...pairs: [string, string][]) =>
+      baseParsed({
+        sportKeyHint: NFL,
+        gamesText: pairs,
+        windowStart: "2026-09-27T00:00:00-04:00",
+        windowEnd: "2026-09-27T23:59:00-04:00",
+      });
+
+    it("matches 2 listed games in one league to a games scope ordered by commence time", () => {
+      const parsed = games(["New York Jets", "Buffalo Bills"], ["Kansas City Chiefs", "Las Vegas Raiders"]);
+      const result = matchPromo(parsed, { moneyline: [jetsBills, chiefsRaiders], extended: [] }, { now: NOW });
+      expect(result.status).toBe("matched");
+      if (result.status !== "matched") throw new Error("unreachable");
+      expect(result.scope).toEqual({
+        kind: "games",
+        sportKey: NFL,
+        games: [
+          { eventId: "e2", homeTeam: "Las Vegas Raiders", awayTeam: "Kansas City Chiefs", commenceTime: "2026-09-27T13:00:00-04:00" },
+          { eventId: "e1", homeTeam: "Buffalo Bills", awayTeam: "New York Jets", commenceTime: "2026-09-27T17:00:00-04:00" },
+        ],
+      });
+      expect(result.signals).toEqual({ sportMatch: true, windowMatch: true, teamMatch: true, marketMatch: true });
+    });
+
+    it("is unmatched with a null guess (never sport_window) when one listed game is unknown", () => {
+      const parsed = games(
+        ["New York Jets", "Buffalo Bills"],
+        ["Kansas City Chiefs", "Las Vegas Raiders"],
+        ["Philadelphia Eagles", "Chicago Bears"],
+      );
+      const result = matchPromo(parsed, { moneyline: [jetsBills, chiefsRaiders], extended: [] }, { now: NOW });
+      expect(result.status).toBe("unmatched");
+      if (result.status !== "unmatched") throw new Error("unreachable");
+      expect(result.guess).toBeNull();
+      expect(result.unresolvedTeamTexts).toEqual(["Philadelphia Eagles @ Chicago Bears"]);
+    });
+
+    it("is unmatched when the games span two leagues", () => {
+      const mlb = ev("m1", "Boston Red Sox", "New York Yankees", "2026-09-27T13:00:00-04:00", MLB);
+      const parsed = { ...games(["New York Jets", "Buffalo Bills"], ["New York Yankees", "Boston Red Sox"]), sportKeyHint: null };
+      const result = matchPromo(parsed, { moneyline: [jetsBills, mlb], extended: [] }, { now: NOW });
+      expect(result.status).toBe("unmatched");
+      if (result.status !== "unmatched") throw new Error("unreachable");
+      expect(result.guess).toBeNull();
+    });
+
+    it("is unmatched when one listed game falls outside the parsed window", () => {
+      const late = ev("e4", "Chicago Bears", "Philadelphia Eagles", "2026-09-28T20:00:00-04:00");
+      const parsed = games(["New York Jets", "Buffalo Bills"], ["Philadelphia Eagles", "Chicago Bears"]);
+      const result = matchPromo(parsed, { moneyline: [jetsBills, late], extended: [] }, { now: NOW });
+      expect(result.status).toBe("unmatched");
+    });
+
+    it("collapses two entries for the same event into a normal single-game scope", () => {
+      const parsed = games(["New York Jets", "Buffalo Bills"], ["Buffalo Bills", "New York Jets"]);
+      const result = matchPromo(parsed, { moneyline: [jetsBills, eaglesBears], extended: [] }, { now: NOW });
+      expect(result.status).toBe("matched");
+      if (result.status !== "matched") throw new Error("unreachable");
+      expect(result.scope).toMatchObject({ kind: "event", eventId: "e1" });
+    });
+
+    it("is unmatched for a pinned selection with a games list", () => {
+      const parsed = {
+        ...games(["New York Jets", "Buffalo Bills"], ["Kansas City Chiefs", "Las Vegas Raiders"]),
+        pinned: { selectionText: "Buffalo Bills", marketType: "moneyline" as const, line: null },
+      };
+      const result = matchPromo(parsed, { moneyline: [jetsBills, chiefsRaiders], extended: [] }, { now: NOW });
+      expect(result.status).toBe("unmatched");
+    });
+  });
+
   it("invariant: status is 'matched' if and only if every signal is true, across every fixture above", () => {
     expect(allResults.length).toBeGreaterThan(0);
     for (const result of allResults) {

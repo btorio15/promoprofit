@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitTeams } from "./promoText";
+import { mentionsSeveralGames, splitGames, splitTeams } from "./promoText";
 import { sportFromTags, sportFromText } from "./sportHints";
 
 describe("splitTeams", () => {
@@ -116,5 +116,60 @@ describe("sportHints — sportFromTags", () => {
 
   it("returns unknown for the ambiguous american-football tag alone", () => {
     expect(sportFromTags(["american-football"])).toEqual({ kind: "unknown" });
+  });
+});
+
+describe("splitGames", () => {
+  it("splits two games joined by 'or'", () => {
+    expect(splitGames("Jets @ Bills or Chiefs @ Raiders")).toEqual([
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+    ]);
+  });
+
+  it("splits three games with comma, ', and', ', or' and ' & '", () => {
+    const expected = [
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+      ["Eagles", "Bears"],
+    ];
+    expect(splitGames("Jets @ Bills, Chiefs @ Raiders and Eagles @ Bears")).toEqual(expected);
+    expect(splitGames("Jets @ Bills, Chiefs @ Raiders, and Eagles @ Bears")).toEqual(expected);
+    expect(splitGames("Jets @ Bills, Chiefs @ Raiders, or Eagles @ Bears")).toEqual(expected);
+    expect(splitGames("Jets @ Bills, Chiefs @ Raiders & Eagles @ Bears")).toEqual(expected);
+  });
+
+  it("accepts any splitTeams delimiter per piece", () => {
+    expect(splitGames("Jets vs. Bills or Chiefs vs Raiders")).toHaveLength(2);
+  });
+
+  it("strips a leading 'the' and a trailing '[SPORT] games [on <date>]'", () => {
+    const expected = [
+      ["Jets", "Bills"],
+      ["Chiefs", "Raiders"],
+    ];
+    expect(splitGames("the Jets @ Bills or Chiefs @ Raiders NFL games on 10/18/2026")).toEqual(expected);
+    expect(splitGames("Jets @ Bills or Chiefs @ Raiders Games on October 18th")).toEqual(expected);
+  });
+
+  it("returns null for a single game or no game list", () => {
+    expect(splitGames("Jets @ Bills")).toBeNull();
+    expect(splitGames("NFL games on 10/18/2026")).toBeNull();
+  });
+
+  it("fails closed when any piece is not a plausible pair", () => {
+    expect(splitGames("Jets @ Bills or tonight's big game")).toBeNull();
+    expect(splitGames("Jets @ Bills or tonight's late Chiefs @ Raiders prime-time matchup of the week")).toBeNull();
+  });
+});
+
+describe("mentionsSeveralGames", () => {
+  it("is true when two matchups are named", () => {
+    expect(mentionsSeveralGames("Jets @ Bills or Chiefs @ Raiders")).toBe(true);
+  });
+
+  it("is false for one game, or a time written with 'at'", () => {
+    expect(mentionsSeveralGames("Jets @ Bills game on 10/18 at 8:20 PM ET")).toBe(false);
+    expect(mentionsSeveralGames("for all NFL games on 10/18/2026")).toBe(false);
   });
 });

@@ -3,7 +3,7 @@ import { slateWindow } from "@/domain/promos/etTime";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
 import { ScrapedPromoSchema, type ScrapedPromo, type SkippedEntry } from "@/domain/promos/scraped";
 import type { CapField, PromoType } from "@/domain/promos/types";
-import { isPlausibleTeamName } from "./promoText";
+import { isPlausibleTeamName, mentionsSeveralGames } from "./promoText";
 import { buildClassifyDraft, CLEAR_SKIP_REASONS, REVIEW_SKIP_REASONS } from "./reviewTriage";
 import type { GuardedReading } from "./verbatimGuard";
 
@@ -20,7 +20,7 @@ export type ReconcileOutcome =
   | {
       kind: "review";
       skip: SkippedEntry;
-      why: "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review";
+      why: ReviewWhy;
     }
   | {
       kind: "skip";
@@ -69,10 +69,15 @@ function fmtParserEntry(entry: ReconcileEntry): string {
 }
 
 function fmtReader(reading: GuardedReading): string {
-  return `${reading.kind}, boost ${reading.boostPercent ?? "null"}%, bonus $${reading.bonusAmount ?? "null"}, max stake $${reading.maxStake ?? "null"}, max winnings $${reading.maxWinnings ?? "null"}, min odds ${reading.minOddsAmerican ?? "null"}, sport ${reading.sport ?? "null"}, teams ${reading.teams.length > 0 ? reading.teams.join("/") : "none"}, event ${reading.eventDateText ?? "null"}`;
+  return `${reading.kind}, boost ${reading.boostPercent ?? "null"}%, bonus $${reading.bonusAmount ?? "null"}, max stake $${reading.maxStake ?? "null"}, max winnings $${reading.maxWinnings ?? "null"}, min odds ${reading.minOddsAmerican ?? "null"}, sport ${reading.sport ?? "null"}, teams ${reading.teams.length > 0 ? reading.teams.join("/") : "none"}, games ${reading.games.length > 0 ? reading.games.map((g) => `${g.teamA}/${g.teamB}`).join("; ") : "none"}, event ${reading.eventDateText ?? "null"}`;
 }
 
-type ReviewWhy = "disagreement" | "guard_drop" | "reader_not_usable" | "rescue_needs_review";
+export type ReviewWhy =
+  | "disagreement"
+  | "guard_drop"
+  | "reader_not_usable"
+  | "rescue_needs_review"
+  | "multi_game_scope";
 
 function buildSummaryLine(why: ReviewWhy, entry: ReconcileEntry, reading: GuardedReading): string {
   const dropped = reading.droppedFields.length > 0 ? reading.droppedFields.join(", ") : "none";
@@ -112,6 +117,23 @@ function buildReviewSkip(
 function includesVerbatim(haystack: string, needle: string): boolean {
   const n = needle.trim().toLowerCase();
   return n.length > 0 && haystack.toLowerCase().includes(n);
+}
+
+/**
+ * The reader's list of games as [teamA, teamB] pairs, only when it names 2-12
+ * games and every team name is plausible and appears verbatim in the promo
+ * text (a hallucinated game must never become a scope); otherwise null.
+ */
+function readerGames(reading: GuardedReading, rawText: string): [string, string][] | null {
+  if (reading.games.length < 2 || reading.games.length > 12) return null;
+  const pairs: [string, string][] = [];
+  for (const game of reading.games) {
+    const { teamA, teamB } = game;
+    if (!isPlausibleTeamName(teamA) || !isPlausibleTeamName(teamB)) return null;
+    if (!includesVerbatim(rawText, teamA) || !includesVerbatim(rawText, teamB)) return null;
+    pairs.push([teamA.trim(), teamB.trim()]);
+  }
+  return pairs;
 }
 
 /**
@@ -189,7 +211,38 @@ function reconcileCandidate(
   }
 
   const merged: ScrapedPromo = { ...candidate, unparsedCapFields: [...candidate.unparsedCapFields] };
-  const teamsOverridden = applyReaderTeams(merged, reading);
+  const demoteMultiGame = (): ReconcileOutcome => ({
+    kind: "review",
+    skip: buildReviewSkip(
+      entry,
+      reading,
+      "multi_game_scope",
+      { partial: candidate, dedupeKey: promoDedupeKey(candidate) },
+      fallbackSourceUrl,
+    ),
+    why: "multi_game_scope",
+  });
+
+  // A candidate with a games list is never widened or replaced by the
+  // reader's teams/sport. A sport-wide candidate can only be narrowed to the
+  // reader's verified games list, and is demoted to review when the text (or
+  // the reader) says several games but no clean list is available.
+  let teamsOverridden = false;
+  if (candidate.gamesText === undefined) {
+    if (candidate.teamsText.length === 0) {
+      const games = reading.confidence === "high" ? readerGames(reading, candidate.rawText) : null;
+      if (games !== null) {
+        merged.gamesText = games;
+        teamsOverridden = true;
+      } else if (mentionsSeveralGames(candidate.rawText) || reading.games.length > 0) {
+        return demoteMultiGame();
+      } else {
+        teamsOverridden = applyReaderTeams(merged, reading);
+      }
+    } else {
+      teamsOverridden = applyReaderTeams(merged, reading);
+    }
+  }
   const unparsed = new Set<CapField>(candidate.unparsedCapFields);
   let filled = false;
 
@@ -219,6 +272,7 @@ function reconcileCandidate(
     if (validated.success) {
       return { kind: "candidate", candidate: validated.data, via: "merged" };
     }
+    if (merged.gamesText !== undefined && candidate.gamesText === undefined) return demoteMultiGame();
   }
 
   return { kind: "candidate", candidate, via: "agree" };
@@ -276,8 +330,17 @@ function reconcileSkip(
     overlaid.maxWinnings = reading.maxWinnings !== null ? { amount: reading.maxWinnings, kind: draft.winningsCapKind } : draft.maxWinnings;
   }
   overlaid.sportKeyHint = reading.sport;
-  if (reading.teams.length === 0 || reading.teams.length === 2) {
-    overlaid.teamsText = reading.teams;
+  if (draft.gamesText !== undefined) {
+    // The parser already built a games list: keep it, never replace it.
+    overlaid.teamsText = [];
+  } else {
+    const games = readerGames(reading, draft.rawText);
+    if (games !== null) {
+      overlaid.gamesText = games;
+      overlaid.teamsText = [];
+    } else if (reading.teams.length === 0 || reading.teams.length === 2) {
+      overlaid.teamsText = reading.teams;
+    }
   }
 
   const unparsed = new Set<CapField>(overlaid.unparsedCapFields);
@@ -287,9 +350,21 @@ function reconcileSkip(
   overlaid.unparsedCapFields = [...unparsed];
 
   const teamsOk = reading.teams.length === 0 || reading.teams.length === 2;
-  const sportOrTeams = reading.sport !== null || reading.teams.length === 2;
+  const sportOrTeams = reading.sport !== null || reading.teams.length === 2 || overlaid.gamesText !== undefined;
 
-  if (reading.confidence === "high" && reading.droppedFields.length === 0 && teamsOk && sportOrTeams) {
+  // Fix for the live league-wide mis-scope bug: a rescue that would end up
+  // sport-wide (no teams, no games list) is never allowed when the text names
+  // several games or the reader reported games -- it needs a human.
+  const wouldBeSportWide = overlaid.teamsText.length === 0 && overlaid.gamesText === undefined;
+  const multiGameBlock = wouldBeSportWide && (mentionsSeveralGames(draft.rawText) || reading.games.length > 0);
+
+  if (
+    reading.confidence === "high" &&
+    reading.droppedFields.length === 0 &&
+    teamsOk &&
+    sportOrTeams &&
+    !multiGameBlock
+  ) {
     const validated = ScrapedPromoSchema.safeParse(overlaid);
     if (validated.success) {
       return { kind: "candidate", candidate: validated.data, via: "rescued" };
