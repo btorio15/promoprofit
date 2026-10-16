@@ -4,6 +4,8 @@ import {
   MSG_EXPIRY_TOO_FAR,
   MSG_GAME_GONE,
   MSG_GAME_INVALID,
+  MSG_GAMES_GONE,
+  MSG_GAMES_INVALID,
   MSG_PICK_BOOK,
   MSG_PIN_GONE,
   type AddPromoInput,
@@ -15,7 +17,7 @@ import {
   type AddedPin,
   type AddedPromoInsert,
 } from "@/domain/promos/buildAddedPromo";
-import { resolveMemberScope } from "@/domain/promos/memberScope";
+import { memberScopeInputFrom, resolveMemberScope } from "@/domain/promos/memberScope";
 import { resolveSelection } from "@/domain/promos/selection";
 import type { PromoSelection } from "@/domain/promos/types";
 import type { ScopeGuess } from "@/domain/promos/scope";
@@ -79,22 +81,24 @@ export async function prepareAddedPromoValues(args: {
       getCachedExtendedEvents(),
     ]);
     const scopeResult = resolveMemberScope(
-      data.scope.kind === "event"
-        ? { kind: "event", eventId: data.scope.eventId }
-        : {
-            kind: "sport_day",
-            sportKey: data.scope.sportKey,
-            etDate: data.scope.etDate,
-            ...(data.scope.etEndDate !== undefined ? { etEndDate: data.scope.etEndDate } : {}),
-          },
+      memberScopeInputFrom(data.scope),
       { moneyline, extended },
       now,
     );
     if (scopeResult.status === "stale") {
-      return { ok: false, response: { status: "stale", message: MSG_GAME_GONE } };
+      return {
+        ok: false,
+        response: { status: "stale", message: data.scope.kind === "games" ? MSG_GAMES_GONE : MSG_GAME_GONE },
+      };
     }
     if (scopeResult.status === "invalid") {
-      return { ok: false, response: { status: "invalid", fieldErrors: { scope: [MSG_GAME_INVALID] } } };
+      return {
+        ok: false,
+        response: {
+          status: "invalid",
+          fieldErrors: { scope: [data.scope.kind === "games" ? MSG_GAMES_INVALID : MSG_GAME_INVALID] },
+        },
+      };
     }
     scope = scopeResult.scope;
 

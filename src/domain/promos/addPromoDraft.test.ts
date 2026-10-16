@@ -31,6 +31,7 @@ const baseEdit: AddedPromoEditValues = {
   minOddsAmerican: null,
   scopeKind: "any",
   eventId: null,
+  eventIds: null,
   sportKey: null,
   windowStart: null,
   windowEnd: null,
@@ -65,7 +66,7 @@ describe("draftFromEditValues", () => {
       expiresAt: null,
     });
     expect(d.promoType).toBe("profit_boost");
-    expect(d.scope).toEqual({ ...EMPTY_SCOPE_DRAFT, mode: "game", eventId: "evt-1" });
+    expect(d.scope).toEqual({ ...EMPTY_SCOPE_DRAFT, mode: "game", eventIds: ["evt-1"] });
     expect(d.boostMode).toBe("odds");
     expect(d.boostedOdds).toBe("+250");
     expect(d.pinValue).toBe("moneyline|ml|home");
@@ -190,7 +191,7 @@ describe("bonusPayloadFromDraft", () => {
     expect(none.payload.scope).toBeNull();
     const game = bonusPayloadFromDraft({
       ...complete,
-      scope: { ...complete.scope, mode: "game", eventId: "evt1" },
+      scope: { ...complete.scope, mode: "game", eventIds: ["evt1"] },
     });
     if (!("payload" in game)) throw new Error("expected payload");
     expect(game.payload.scope).toEqual({ kind: "event", eventId: "evt1" });
@@ -211,12 +212,12 @@ describe("bonusPayloadFromDraft", () => {
 
 const dayScope = {
   mode: "league" as const,
-  eventId: null,
+  eventIds: [] as string[],
   sportKey: "americanfootball_nfl",
   fromEtDate: "2026-10-11",
   throughEtDate: null,
 };
-const gameScope = { ...EMPTY_BONUS_DRAFT.scope, mode: "game" as const, eventId: "evt-1" };
+const gameScope = { ...EMPTY_BONUS_DRAFT.scope, mode: "game" as const, eventIds: ["evt-1"] };
 
 const completeBoost: AddPromoDraft = {
   ...EMPTY_BONUS_DRAFT,
@@ -306,5 +307,37 @@ describe("boostPayloadFromDraft", () => {
     const r = payloadFromDraft({ ...completeBoost, maxWinnings: "100", maxWinningsKind: "boost_extra" });
     if (!("payload" in r)) throw new Error("expected payload");
     expect(AddPromoInputSchema.safeParse(r.payload).success).toBe(true);
+  });
+});
+
+describe("multi-game drafts (quick-261016-1se)", () => {
+  const threeGames = { ...EMPTY_BONUS_DRAFT.scope, mode: "game" as const, eventIds: ["a", "b", "c"] };
+
+  it("prefills an edit of a games promo with its picked games", () => {
+    const d = draftFromEditValues({ ...baseEdit, scopeKind: "games", eventIds: ["a", "b"], sportKey: "americanfootball_nfl" });
+    expect(d.scope).toEqual({ ...EMPTY_SCOPE_DRAFT, mode: "game", eventIds: ["a", "b"] });
+  });
+
+  it("a bonus bet over 3 picks sends a games scope", () => {
+    const r = bonusPayloadFromDraft({ ...complete, scope: threeGames });
+    if (!("payload" in r)) throw new Error("expected payload");
+    expect(r.payload.scope).toEqual({ kind: "games", eventIds: ["a", "b", "c"] });
+  });
+
+  it("a percent boost over 3 picks sends a games scope with no pin", () => {
+    const r = payloadFromDraft({ ...completeBoost, scope: threeGames, pinValue: "spread|-3.5|home" });
+    if (!("payload" in r) || r.payload.promoType !== "profit_boost") throw new Error("expected boost payload");
+    expect(r.payload.scope).toEqual({ kind: "games", eventIds: ["a", "b", "c"] });
+  });
+
+  it("odds mode with 2 picks asks for the exact bet", () => {
+    const errors = errorsOf({
+      ...completeBoost,
+      boostMode: "odds",
+      boostedOdds: "+250",
+      scope: { ...threeGames, eventIds: ["a", "b"] },
+      pinValue: "moneyline|ml|home",
+    });
+    expect(errors.pinned).toEqual(["Pick the exact bet this price is for."]);
   });
 });

@@ -1383,3 +1383,83 @@ describe("classifyPromo server action (quick-260928-it1, CR-04, T-it1-01..03)", 
     expect(result).toEqual({ status: "conflict", message: "Someone else already handled this promo." });
   });
 });
+
+describe("games scope in correctPromoMatch and classifyPromo (quick-261016-1se)", () => {
+  const nflGames = () => [
+    futureEvent({ id: "g1", home_team: "Chiefs", away_team: "Raiders" }),
+    futureEvent({ id: "g2", home_team: "Bears", away_team: "Lions", commence_time: plusHours(8) }),
+  ];
+
+  it("correctPromoMatch: logged-out redirects before any read", async () => {
+    mockRequireUser.mockRejectedValueOnce(new Error("NEXT_REDIRECT"));
+    await expect(correctPromoMatch({ promoId: 5, scope: { kind: "games", eventIds: ["g1", "g2"] } })).rejects.toThrow(
+      "NEXT_REDIRECT",
+    );
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("correctPromoMatch: writes a games scope built from cached events", async () => {
+    mockGetPendingPromo.mockResolvedValue(matchQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: nflGames(), fetchedAt: new Date() });
+    mockApplyCorrectedMatch.mockResolvedValue(true);
+
+    const result = await correctPromoMatch({ promoId: 5, scope: { kind: "games", eventIds: ["g2", "g1"] } });
+
+    expect(result).toEqual({ status: "ok" });
+    const args = mockApplyCorrectedMatch.mock.calls[0][0];
+    expect(args.pinned).toBeNull();
+    expect(args.scope.kind).toBe("games");
+    expect(args.scope.games.map((g: { eventId: string }) => g.eventId)).toEqual(["g1", "g2"]);
+  });
+
+  it("correctPromoMatch: mixed leagues -> invalid and no write", async () => {
+    mockGetPendingPromo.mockResolvedValue(matchQueueRow());
+    mockGetCachedEvents.mockResolvedValue({
+      events: [nflGames()[0], futureEvent({ id: "g2", sport_key: "basketball_nba", home_team: "A", away_team: "B" })],
+      fetchedAt: new Date(),
+    });
+    const result = await correctPromoMatch({ promoId: 5, scope: { kind: "games", eventIds: ["g1", "g2"] } });
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockApplyCorrectedMatch).not.toHaveBeenCalled();
+  });
+
+  it("correctPromoMatch: rejects 1 and 13 ids at the schema, before any read", async () => {
+    const thirteen = Array.from({ length: 13 }, (_, i) => `g${i}`);
+    expect(await correctPromoMatch({ promoId: 5, scope: { kind: "games", eventIds: ["g1"] } })).toEqual({ status: "invalid" });
+    expect(await correctPromoMatch({ promoId: 5, scope: { kind: "games", eventIds: thirteen } })).toEqual({ status: "invalid" });
+    expect(mockGetPendingPromo).not.toHaveBeenCalled();
+  });
+
+  it("classifyPromo: passes a games ScopeGuess to applyClassification", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({ events: nflGames(), fetchedAt: new Date() });
+    mockApplyClassification.mockResolvedValue(true);
+
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "profit_boost",
+      boostPercent: "50",
+      maxStake: "25.00",
+      scope: { kind: "games", eventIds: ["g1", "g2"] },
+    });
+
+    expect(result).toEqual({ status: "ok" });
+    expect(mockApplyClassification.mock.calls[0][0].scope.kind).toBe("games");
+  });
+
+  it("classifyPromo: mixed leagues -> invalid and no write", async () => {
+    mockGetPendingPromo.mockResolvedValue(classifyQueueRow());
+    mockGetCachedEvents.mockResolvedValue({
+      events: [nflGames()[0], futureEvent({ id: "g2", sport_key: "basketball_nba", home_team: "A", away_team: "B" })],
+      fetchedAt: new Date(),
+    });
+    const result = await classifyPromo({
+      promoId: 12,
+      promoType: "bonus_bet",
+      bonusAmount: "25",
+      scope: { kind: "games", eventIds: ["g1", "g2"] },
+    });
+    expect(result).toEqual({ status: "invalid" });
+    expect(mockApplyClassification).not.toHaveBeenCalled();
+  });
+});

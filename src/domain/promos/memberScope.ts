@@ -1,7 +1,8 @@
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { etDayBounds } from "./etTime";
 import { DEFAULT_WINDOW_DAYS } from "./correctionOptions";
-import type { ScopeGuess } from "./scope";
+import { ScopeGuessSchema, type ScopeGame, type ScopeGuess } from "./scope";
+import { MAX_PICKED_GAMES } from "./reviewInput";
 
 /**
  * quick-260928-it1: pure(ish) scope resolution shared by correctPromoMatch
@@ -17,7 +18,28 @@ import type { ScopeGuess } from "./scope";
 
 export type MemberScopeInput =
   | { kind: "event"; eventId: string }
+  | { kind: "games"; eventIds: string[] }
   | { kind: "sport_day"; sportKey: string; etDate: string; etEndDate?: string };
+
+/** Maps any action-level scope input (pin stripped, optional etEndDate) to a MemberScopeInput. */
+export function memberScopeInputFrom(
+  scope:
+    | { kind: "event"; eventId: string }
+    | { kind: "games"; eventIds: string[] }
+    | { kind: "sport_day"; sportKey: string; etDate: string; etEndDate?: string },
+): MemberScopeInput {
+  if (scope.kind === "event") return { kind: "event", eventId: scope.eventId };
+  if (scope.kind === "games") return { kind: "games", eventIds: scope.eventIds };
+  return {
+    kind: "sport_day",
+    sportKey: scope.sportKey,
+    etDate: scope.etDate,
+    ...(scope.etEndDate !== undefined ? { etEndDate: scope.etEndDate } : {}),
+  };
+}
+
+export const MSG_GAMES_STALE =
+  "One of those games has started or is no longer in the cached odds. Remove it and try again.";
 
 export type MemberScopeResult =
   | { status: "ok"; scope: ScopeGuess; event: OddsEvent | null }
@@ -59,6 +81,39 @@ export function resolveMemberScope(
       },
       event,
     };
+  }
+
+  if (input.kind === "games") {
+    const ids = input.eventIds;
+    if (ids.length < 2 || ids.length > MAX_PICKED_GAMES || new Set(ids).size !== ids.length) {
+      return { status: "invalid" };
+    }
+    const all = [...events.moneyline, ...events.extended];
+    const found: OddsEvent[] = [];
+    for (const id of ids) {
+      const ev = all.find((e) => e.id === id);
+      if (!ev || new Date(ev.commence_time).getTime() <= now.getTime()) {
+        return { status: "stale", message: MSG_GAMES_STALE };
+      }
+      found.push(ev);
+    }
+    if (new Set(found.map((e) => e.sport_key)).size !== 1) {
+      return { status: "invalid" };
+    }
+    found.sort(
+      (a, b) =>
+        new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    const games: ScopeGame[] = found.map((e) => ({
+      eventId: e.id,
+      homeTeam: e.home_team,
+      awayTeam: e.away_team,
+      commenceTime: e.commence_time,
+    }));
+    const parsed = ScopeGuessSchema.safeParse({ kind: "games", sportKey: found[0].sport_key, games });
+    if (!parsed.success) return { status: "invalid" };
+    return { status: "ok", scope: parsed.data, event: null };
   }
 
   const endEtDate = input.etEndDate ?? input.etDate;

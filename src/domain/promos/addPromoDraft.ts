@@ -194,7 +194,9 @@ export function draftFromEditValues(values: AddedPromoEditValues): AddPromoDraft
 
   let scope: ScopeDraft = EMPTY_SCOPE_DRAFT;
   if (values.scopeKind === "event" && values.eventId) {
-    scope = { ...EMPTY_SCOPE_DRAFT, mode: "game", eventId: values.eventId };
+    scope = { ...EMPTY_SCOPE_DRAFT, mode: "game", eventIds: [values.eventId] };
+  } else if (values.scopeKind === "games" && values.eventIds && values.eventIds.length > 0) {
+    scope = { ...EMPTY_SCOPE_DRAFT, mode: "game", eventIds: [...values.eventIds] };
   } else if (values.scopeKind === "sport_window" && values.sportKey && values.windowStart && values.windowEnd) {
     scope = {
       ...EMPTY_SCOPE_DRAFT,

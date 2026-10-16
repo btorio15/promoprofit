@@ -158,3 +158,36 @@ describe("AddPromoInputSchema (profit boost)", () => {
     expect(AddPromoInputSchema.safeParse({ ...validBoost, userId: 1 }).success).toBe(false);
   });
 });
+
+describe("games scope input", () => {
+  const games = (eventIds: string[]) => ({ kind: "games", eventIds });
+  it("accepts 2-12 unique ids on a bonus bet", () => {
+    expect(AddPromoInputSchema.safeParse({ ...valid, scope: games(["a", "b"]) }).success).toBe(true);
+    const twelve = Array.from({ length: 12 }, (_, i) => `g${i}`);
+    expect(AddPromoInputSchema.safeParse({ ...valid, scope: games(twelve) }).success).toBe(true);
+  });
+
+  it("rejects 1 id, 13 ids, duplicates, empty strings and extra keys", () => {
+    const thirteen = Array.from({ length: 13 }, (_, i) => `g${i}`);
+    for (const scope of [
+      games(["a"]),
+      games(thirteen),
+      games(["a", "a"]),
+      games(["a", ""]),
+      { ...games(["a", "b"]), pinned: null },
+    ]) {
+      expect(AddPromoInputSchema.safeParse({ ...valid, scope }).success).toBe(false);
+    }
+  });
+
+  it("accepts a percent boost over games but not an odds boost", () => {
+    expect(AddPromoInputSchema.safeParse({ ...validBoost, scope: games(["a", "b"]) }).success).toBe(true);
+    expect(
+      messagesFor({
+        ...validBoost,
+        boost: { mode: "odds", boostedOddsAmerican: 250 },
+        scope: games(["a", "b"]),
+      }),
+    ).toContain("Pick the exact bet this price is for.");
+  });
+});

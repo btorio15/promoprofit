@@ -16,6 +16,7 @@ import {
   EMPTY_SCOPE_DRAFT,
   prefillScopeDraft,
   scopeInputFromDraft,
+  singlePickedEventId,
   type ScopeDraft,
 } from "@/domain/promos/scopeDraft";
 import { ScopePicker } from "./ScopePicker";
@@ -90,11 +91,12 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
     });
   }
 
-  const isGameMode = draft.mode === "game";
-  const selectedEvent =
-    isGameMode && draft.eventId
-      ? correctionOptions.events.find((e) => e.eventId === draft.eventId)
-      : undefined;
+  // A market/side pin only makes sense for a single game; 2+ games get none.
+  const isGameMode = draft.mode === "game" && draft.eventIds.length <= 1;
+  const pickedEventId = singlePickedEventId(draft);
+  const selectedEvent = pickedEventId
+    ? correctionOptions.events.find((e) => e.eventId === pickedEventId)
+    : undefined;
   const scopeInput = scopeInputFromDraft(draft);
 
   function toggleCorrect() {
@@ -266,7 +268,7 @@ export function QueueItemCard({ item, correctionOptions, onChanged }: QueueItemC
             idPrefix={`correct-${item.promoId}`}
             draft={draft}
             onDraftChange={(next) => {
-              if (next.eventId !== draft.eventId) setMarketValue("best");
+              if (singlePickedEventId(next) !== singlePickedEventId(draft)) setMarketValue("best");
               setDraft(next);
             }}
             options={correctionOptions}
