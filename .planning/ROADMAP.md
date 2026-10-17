@@ -90,7 +90,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-05-PLAN.md — Totals card component on the Dashboard, Opportunities heading, ProfitSummary removed with guards
+- [x] 07-05-PLAN.md — Totals card component on the Dashboard, Opportunities heading, ProfitSummary removed with guards
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -104,7 +104,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
-| 7. Dashboard | v1.1 | 4/6 | In Progress|  |
+| 7. Dashboard | v1.1 | 5/6 | In Progress|  |
 
 ## Backlog
 
