@@ -80,6 +80,21 @@ describe("buildGraphView", () => {
   });
 });
 
+describe("sinceLabel", () => {
+  const days = [day("2026-10-13", "5.00", "1.00"), day("2026-10-14", "6.00", "2.00")];
+  const empty = [day("2026-10-13", "0.00", "0.00")];
+  it("all range chart and empty", () => {
+    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "all").sinceLabel).toBe("since Oct 13");
+    expect(buildGraphView(ready(empty, "2026-10-14", "2026-10-13"), "all").sinceLabel).toBe("since Oct 13");
+  });
+  it("7d/30d, not-ready and error are null", () => {
+    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "7d").sinceLabel).toBeNull();
+    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "30d").sinceLabel).toBeNull();
+    expect(buildGraphView({ status: "not-ready" }, "all").sinceLabel).toBeNull();
+    expect(buildGraphView({ status: "error" }, "all").sinceLabel).toBeNull();
+  });
+});
+
 describe("formatters", () => {
   it("formats dates in UTC", () => {
     expect(formatTickDate("2026-10-03")).toBe("Oct 3");
