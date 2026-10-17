@@ -105,6 +105,9 @@ export function ProfitGraph({ series, loading }: { series: ProfitSeriesDTO | nul
             Extracted <span className="num font-semibold text-primary">{formatUsd(view.headline.extracted)}</span> of{" "}
             <span className="num font-semibold text-muted-foreground">{formatUsd(view.headline.available)}</span>{" "}
             available
+            {view.sinceLabel !== null ? (
+              <span className="text-sm text-muted-foreground"> {view.sinceLabel}</span>
+            ) : null}
           </p>
           {hideButton}
         </div>

@@ -18,11 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
-import { ProfitSummary } from "@/components/promos/ProfitSummary";
 import { PromoRow } from "@/components/promos/PromoRow";
 import { ArbRow } from "@/components/arb/ArbRow";
 import { formatUsd } from "@/lib/format";
 import { describeOddsAge, STALE_AFTER_MINUTES } from "@/components/finder/oddsAge";
+import { DashboardTotals } from "./DashboardTotals";
 import { OpportunitySection } from "./OpportunitySection";
 import { PairCard } from "./PairCard";
 import { ProfitGraph } from "./ProfitGraph";
@@ -80,7 +80,7 @@ function WholeScreenEmpty({ variant }: { variant: OpportunitiesEmptyVariant }) {
 }
 
 /**
- * Opportunities tab (D-01..D-04, D-13..D-17): the landing screen. Fetches
+ * Dashboard tab (Phase 7, formerly Opportunities) (D-01..D-04, D-13..D-17): the landing screen. Fetches
  * every source's full own-book list once; the Profit/ROI switch re-picks the
  * top 5 on the client without a refetch. Precision follows the Arbitrage
  * tab's persisted setting, same as PromosScreen.
@@ -153,9 +153,11 @@ export function OpportunitiesScreen({
   return (
     <div className="flex flex-col gap-8">
       <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Opportunities</h1>
-        <p className="text-sm text-muted-foreground">The best money available right now at your books.</p>
+        <h1 className="text-xl font-semibold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">Your profit so far, and the best money available right now at your books.</p>
       </header>
+
+      <DashboardTotals loading={showSkeleton} dashboard={ok ? ok.dashboard : null} />
 
       <ProfitGraph
         loading={showSkeleton}
@@ -175,13 +177,7 @@ export function OpportunitiesScreen({
         </p>
       ) : null}
 
-      {ok ? (
-        <ProfitSummary
-          totalProfit={ok.totals.totalProfit}
-          totalExtracted={ok.totals.totalExtracted}
-          availableProfit={ok.totals.availableProfit}
-        />
-      ) : null}
+      <h2 className="text-xl font-semibold">Opportunities</h2>
 
       <SortSwitch value={sort} onChange={setSortStored} />
 
