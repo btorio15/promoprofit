@@ -1,7 +1,7 @@
 import type { PromoRowDTO } from "@/domain/promos/dto";
 import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
-import type { AvailableProfit } from "@/domain/promos/profitTotals";
+import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
 import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
 
 /** D-13: the Opportunities sort switch. */
@@ -33,12 +33,6 @@ export const OPPORTUNITIES_ARB_TOTAL_STAKE = "100.00";
 
 export type OpportunitiesEmptyVariant = "no-odds" | "no-books" | "none-scraped" | "nothing-profitable";
 
-export interface OpportunitiesTotals {
-  totalProfit: string;
-  totalExtracted: string;
-  availableProfit: AvailableProfit;
-}
-
 export type OpportunitiesResponse =
   | { status: "invalid" }
   | {
@@ -46,7 +40,8 @@ export type OpportunitiesResponse =
       emptyVariant: OpportunitiesEmptyVariant | null;
       oddsFetchedAt: string | null;
       extendedOddsFetchedAt: string | null;
-      totals: OpportunitiesTotals;
+      /** Phase 7 STATS-08/09: the member's all-time and 7/30-day totals and counts (server-computed, decimal strings). */
+      dashboard: DashboardTotalsDTO;
       /** Phase 6 STATS-01: the member's own all-time daily gains; the client slices per range, no refetch. */
       profitSeries: ProfitSeriesDTO;
       sources: OpportunitySourceDTO[];
