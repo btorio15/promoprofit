@@ -17,10 +17,10 @@
 
 ### Dashboard
 
-- [ ] **STATS-07**: The Opportunities tab is renamed Dashboard in the main navigation; graph, totals and counts sit above the full ranked feed (no separate Stats page)
-- [ ] **STATS-08**: Dashboard shows headline totals: total profit extracted, total profit available, last 7 days, last 30 days
-- [ ] **STATS-09**: Dashboard shows simple counts: promos completed, average profit per completed promo, best single promo
-- [ ] **STATS-10**: Promos tab no longer shows the profit summary — those numbers live on the Dashboard
+- [x] **STATS-07**: The Opportunities tab is renamed Dashboard in the main navigation; graph, totals and counts sit above the full ranked feed (no separate Stats page)
+- [x] **STATS-08**: Dashboard shows headline totals: total profit extracted, total profit available, last 7 days, last 30 days
+- [x] **STATS-09**: Dashboard shows simple counts: promos completed, average profit per completed promo, best single promo
+- [x] **STATS-10**: Promos tab no longer shows the profit summary — those numbers live on the Dashboard
 
 ## Future Requirements
 
@@ -53,10 +53,10 @@
 | STATS-04 | Phase 6 | Complete |
 | STATS-05 | Phase 6 | Complete |
 | STATS-06 | Phase 6 | Complete |
-| STATS-07 | Phase 7 | Pending |
-| STATS-08 | Phase 7 | Pending |
-| STATS-09 | Phase 7 | Pending |
-| STATS-10 | Phase 7 | Pending |
+| STATS-07 | Phase 7 | Complete |
+| STATS-08 | Phase 7 | Complete |
+| STATS-09 | Phase 7 | Complete |
+| STATS-10 | Phase 7 | Complete |
 
 ---
 *Requirements defined: 2026-10-03*

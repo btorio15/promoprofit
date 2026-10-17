@@ -1,8 +1,8 @@
 ---
 phase: 07-dashboard
 verified: 2026-10-17T21:05:00Z
-status: human_needed
-score: 4/5 roadmap success criteria verified in code (SC5 needs the owner's phone check)
+status: passed
+score: 5/5 roadmap success criteria verified (SC5 by Playwright phone check 2026-10-17, after gap plan 07-07)
 overrides_applied: 0
 human_verification:
   - test: "Open the live Dashboard at 360px width (phone or browser devtools). Check the totals card, then hide the graph, then show it again."
@@ -122,3 +122,12 @@ No code gaps. Every roadmap criterion that can be checked in code holds: the tab
 
 _Verified: 2026-10-17_
 _Verifier: Claude (gsd-verifier)_
+
+## Re-verification (2026-10-17, after 07-07)
+
+Playwright at 360x780 against the deployed site, owner session:
+- First pass found two failures: tab bar 418px wide (page scrolled sideways, Tools cut off) and the "Opportunities" heading at 888px with the graph hidden.
+- Gap plan 07-07 fixed both plus review WR-01/WR-02. Recheck: page width 360, tab bar scrolls on its own, totals card 223px, heading bottom at 770px with the graph hidden, graph shown about one scroll down, "since Oct 13" on clamped 7d/30d ranges and in the aria label.
+- Steps 2-6 and 8 of the owner check passed on the first pass (heading, totals, counts, graph label on All, hide graph keeps totals, Statistics loads, Promos has no summary).
+
+Status: passed.
