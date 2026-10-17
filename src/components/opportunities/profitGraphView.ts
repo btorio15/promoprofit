@@ -34,6 +34,8 @@ export interface GraphView {
   points: ChartPoint[];
   headline: { extracted: string; available: string };
   ariaLabel: string;
+  /** Muted headline suffix for the All time range, e.g. 'since Oct 13' (Phase 7 D-06). null otherwise. */
+  sinceLabel: string | null;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -76,6 +78,7 @@ export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): Grap
       points: [],
       headline: zero,
       ariaLabel: "Profit graph",
+      sinceLabel: null,
     };
   }
   if (series.status === "error") {
@@ -86,6 +89,7 @@ export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): Grap
       points: [],
       headline: zero,
       ariaLabel: "Profit graph",
+      sinceLabel: null,
     };
   }
 
@@ -99,6 +103,7 @@ export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): Grap
     extractedY: Number(p.extractedTotal),
   }));
   const ariaLabel = ariaFor(headline.extracted, headline.available, range);
+  const sinceLabel = range === "all" ? "since " + formatTickDate(series.graphStartDay) : null;
 
   if (!hasAnyGain(real)) {
     return {
@@ -111,7 +116,8 @@ export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): Grap
       points,
       headline,
       ariaLabel,
+      sinceLabel,
     };
   }
-  return { state: "chart", points, headline, ariaLabel };
+  return { state: "chart", points, headline, ariaLabel, sinceLabel };
 }
