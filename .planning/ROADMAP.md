@@ -85,8 +85,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-03-PLAN.md — getOpportunities returns the dashboard totals; drop the group-wide available read
-- [ ] 07-04-PLAN.md — Totals card copy view model + graph "since <day>" suffix
+- [x] 07-03-PLAN.md — getOpportunities returns the dashboard totals; drop the group-wide available read
+- [x] 07-04-PLAN.md — Totals card copy view model + graph "since <day>" suffix
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -104,7 +104,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
-| 7. Dashboard | v1.1 | 2/6 | In Progress|  |
+| 7. Dashboard | v1.1 | 4/6 | In Progress|  |
 
 ## Backlog
 
