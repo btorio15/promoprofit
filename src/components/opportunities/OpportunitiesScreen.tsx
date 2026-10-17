@@ -170,14 +170,16 @@ export function OpportunitiesScreen({
         }
       />
 
+      {/* The stale-odds warning is about the feed, so it sits under the feed
+          heading; keeps the heading on a phone's first screen (07-07). */}
+      <h2 className="text-xl font-semibold">Opportunities</h2>
+
       {stale ? (
         <p className="flex items-center gap-2 text-sm text-warning">
           <TriangleAlert className="size-4" aria-hidden="true" />
           Odds are more than {STALE_AFTER_MINUTES / 60} hours old, so these numbers may have moved.
         </p>
       ) : null}
-
-      <h2 className="text-xl font-semibold">Opportunities</h2>
 
       <SortSwitch value={sort} onChange={setSortStored} />
 

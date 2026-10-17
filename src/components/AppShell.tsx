@@ -60,7 +60,7 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
         <Tabs
           value={activeTab}
           onValueChange={(value) => setActiveTab(value as ActiveTab)}
-          className="gap-8"
+          className="gap-6 sm:gap-8"
         >
           {/* On a phone the five tabs are wider than the screen: scroll the bar
               itself so the page never scrolls sideways. pb keeps the active

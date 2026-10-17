@@ -4,7 +4,7 @@ import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildTotalsView } from "./dashboardTotalsView";
 
-const SHELL = "flex flex-col gap-3 rounded-lg border border-border bg-secondary p-4";
+const SHELL = "flex flex-col gap-3 rounded-lg border border-border bg-secondary p-3 sm:p-4";
 
 const VALUE_CLASS = {
   extracted: "num text-lg font-semibold text-primary",
