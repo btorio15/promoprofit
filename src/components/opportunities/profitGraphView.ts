@@ -64,8 +64,9 @@ export function tooltipGainLine(point: Pick<SeriesPoint, "availableGain" | "extr
   return `That day: ${formatGain(point.availableGain)} available, ${formatGain(point.extractedGain)} extracted`;
 }
 
-function ariaFor(extracted: string, available: string, range: GraphRange): string {
-  return `Extracted ${formatUsd(extracted)} of ${formatUsd(available)} available, ${GRAPH_RANGE_LABELS[range]}`;
+function ariaFor(extracted: string, available: string, range: GraphRange, sinceLabel: string | null): string {
+  const since = sinceLabel !== null ? ` ${sinceLabel}` : "";
+  return `Extracted ${formatUsd(extracted)} of ${formatUsd(available)} available${since}, ${GRAPH_RANGE_LABELS[range]}`;
 }
 
 export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): GraphView {
@@ -102,8 +103,10 @@ export function buildGraphView(series: ProfitSeriesDTO, range: GraphRange): Grap
     availableY: Number(p.availableTotal),
     extractedY: Number(p.extractedTotal),
   }));
-  const ariaLabel = ariaFor(headline.extracted, headline.available, range);
-  const sinceLabel = range === "all" ? "since " + formatTickDate(series.graphStartDay) : null;
+  // Any range that starts on the graph start day (All, or 7d/30d clamped to it)
+  // says so, so the headline never silently disagrees with the totals card.
+  const sinceLabel = start === series.graphStartDay ? "since " + formatTickDate(series.graphStartDay) : null;
+  const ariaLabel = ariaFor(headline.extracted, headline.available, range, sinceLabel);
 
   if (!hasAnyGain(real)) {
     return {

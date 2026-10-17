@@ -63,7 +63,7 @@ describe("buildGraphView", () => {
     expect(v.points[0].date).toBe("2026-09-30");
     expect(v.headline).toEqual({ extracted: "123.45", available: "210.10" });
     expect(v.points[2].availableY).toBe(210.1);
-    expect(v.ariaLabel).toBe("Extracted $123.45 of $210.10 available, Last 30 days");
+    expect(v.ariaLabel).toBe("Extracted $123.45 of $210.10 available since Oct 1, Last 30 days");
   });
 
   it("range switch restarts totals at zero", () => {
@@ -87,9 +87,14 @@ describe("sinceLabel", () => {
     expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "all").sinceLabel).toBe("since Oct 13");
     expect(buildGraphView(ready(empty, "2026-10-14", "2026-10-13"), "all").sinceLabel).toBe("since Oct 13");
   });
-  it("7d/30d, not-ready and error are null", () => {
-    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "7d").sinceLabel).toBeNull();
-    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "30d").sinceLabel).toBeNull();
+  it("7d/30d clamped to the start day say so, in the aria label too", () => {
+    const week = buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "7d");
+    expect(week.sinceLabel).toBe("since Oct 13");
+    expect(week.ariaLabel).toBe("Extracted $3.00 of $11.00 available since Oct 13, Last 7 days");
+    expect(buildGraphView(ready(days, "2026-10-14", "2026-10-13"), "30d").sinceLabel).toBe("since Oct 13");
+  });
+  it("unclamped 7d, not-ready and error are null", () => {
+    expect(buildGraphView(ready(days, "2026-10-25", "2026-10-13"), "7d").sinceLabel).toBeNull();
     expect(buildGraphView({ status: "not-ready" }, "all").sinceLabel).toBeNull();
     expect(buildGraphView({ status: "error" }, "all").sinceLabel).toBeNull();
   });
