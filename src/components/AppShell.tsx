@@ -64,9 +64,14 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
         >
           {/* On a phone the five tabs are wider than the screen: scroll the bar
               itself so the page never scrolls sideways. pb keeps the active
-              underline (bottom -5px) inside the scroll box. */}
-          <div className="-mx-4 overflow-x-auto px-4 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabsList variant="line" aria-label="Select a tab" className="mt-2">
+              underline (bottom -5px) inside the scroll box; h-auto lets the
+              list grow to the 44px triggers instead of clipping them. */}
+          <div className="-mx-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList
+              variant="line"
+              aria-label="Select a tab"
+              className="mt-2 group-data-horizontal/tabs:h-auto"
+            >
               <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
                 Dashboard
               </TabsTrigger>
