@@ -183,7 +183,8 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     const result = await getOpportunities({ precision: "whole" });
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.emptyVariant).toBe("no-odds");
-    expect(result.totals.totalProfit).toBe("0.00");
+    expect(result.dashboard.extracted.allTime).toBe("0.00");
+    expect(result.dashboard.counts.promosDone).toBe(0);
   });
 
   it("includes an own-book promo with its ranking fields mapped from the row DTO", async () => {
@@ -199,14 +200,14 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(item.pct).toBe(item.data.ratePct);
     expect(item.pctLabel).toBe(item.data.rateLabel);
     expect(item.commenceTime).toBe(item.data.commenceTime);
-    expect(result.totals.totalProfit).toBe(item.data.guaranteedProfit);
+    expect(result.dashboard).toBeDefined();
   });
 
-  it("passes the session user id to getActivePromos and getProfitObservationsSince (T-5-visibility)", async () => {
+  it("passes the session user id to getActivePromos and skips the group-wide available read (D-01)", async () => {
     mockGetActivePromos.mockResolvedValue([]);
     await getOpportunities({ precision: "cents" });
     expect(mockGetActivePromos).toHaveBeenCalledWith(expect.any(Date), 1);
-    expect(mockGetProfitObservationsSince).toHaveBeenCalledWith(expect.any(String), 1);
+    expect(mockGetProfitObservationsSince).not.toHaveBeenCalled();
   });
 
   it("D-16: a promo at a non-member book is absent", async () => {
@@ -240,7 +241,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(mockGetHedgeBookKeys).toHaveBeenCalledWith(new Set(["draftkings"]));
   });
 
-  it("a done promo is absent and excluded from the total", async () => {
+  it("a done promo is absent from the feed", async () => {
     mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1 })]);
     mockGetPromoCompletions.mockResolvedValue([
       { promoId: 1, snapshot: null, profitExtracted: "0.00", completedAt: new Date(NOW_ISO) },
@@ -248,21 +249,80 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     const result = await getOpportunities({ precision: "cents" });
     if (result.status !== "ok") throw new Error("unreachable");
     expect(result.sources.every((s) => s.items.length === 0)).toBe(true);
-    expect(result.totals.totalProfit).toBe("0.00");
+    expect(result.dashboard.counts.promosDone).toBe(1);
   });
 
-  it("excludes the viewer's Done promos from availableProfit.today only (quick-260930-fge)", async () => {
+  it("dashboard.available is the sum of the member's own series days", async () => {
     const today = denverDate(new Date());
+    mockGetMemberProfitHistory.mockResolvedValue({
+      status: "ready",
+      graphStartDay: today,
+      rows: [
+        { promoId: 1, denverDate: today, profit: "12.34" },
+        { promoId: 2, denverDate: today, profit: "5.00" },
+      ],
+    });
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok" || result.profitSeries.status !== "ready") throw new Error("unreachable");
+    const expected = result.profitSeries.days.reduce((s, d) => s + Number(d.available), 0).toFixed(2);
+    expect(result.dashboard.available).not.toBeNull();
+    expect(result.dashboard.available?.allTime).toBe(expected);
+    expect(result.dashboard.available?.sinceDay).toBe(today);
+    expect(mockGetProfitObservationsSince).not.toHaveBeenCalled();
+  });
+
+  it("dashboard.extracted includes completions dated before the graph start day (D-18)", async () => {
+    const old = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000);
     mockGetPromoCompletions.mockResolvedValue([
-      { promoId: 1, snapshot: null, profitExtracted: "0.00", completedAt: new Date(NOW_ISO) },
-    ]);
-    mockGetProfitObservationsSince.mockResolvedValue([
-      { promoId: 1, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "12.34" },
-      { promoId: 2, bookKey: "draftkings", denverDate: today, maxGuaranteedProfit: "5.00" },
+      { promoId: 7, snapshot: null, profitExtracted: "10.00", completedAt: old },
+      { promoId: 8, snapshot: null, profitExtracted: "2.50", completedAt: new Date(NOW_ISO) },
     ]);
     const result = await getOpportunities({ precision: "cents" });
     if (result.status !== "ok") throw new Error("unreachable");
-    expect(result.totals.availableProfit).toEqual({ today: "5.00", week: "17.34", month: "17.34" });
+    expect(result.dashboard.extracted.allTime).toBe("12.50");
+    expect(result.dashboard.extracted.last7).toBe("2.50");
+    expect(result.dashboard.counts.promosDone).toBe(2);
+  });
+
+  it("counts a pair once: the pair_member marker row is not a promo done (D-10)", async () => {
+    mockGetPromoCompletions.mockResolvedValue([
+      { promoId: 1, snapshot: null, profitExtracted: "9.00", completedAt: new Date(NOW_ISO) },
+      {
+        promoId: 2,
+        snapshot: { version: 1, kind: "pair_member", pairedWithPromoId: 1 },
+        profitExtracted: "0.00",
+        completedAt: new Date(NOW_ISO),
+      },
+    ]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.dashboard.counts.promosDone).toBe(1);
+    expect(result.dashboard.extracted.allTime).toBe("9.00");
+  });
+
+  it("dashboard.available is null when the member series is not-ready, extracted still populated", async () => {
+    mockGetMemberProfitHistory.mockResolvedValue({ status: "not-ready" });
+    mockGetPromoCompletions.mockResolvedValue([
+      { promoId: 1, snapshot: null, profitExtracted: "4.00", completedAt: new Date(NOW_ISO) },
+    ]);
+    const result = await getOpportunities({ precision: "cents" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.dashboard.available).toBeNull();
+    expect(result.dashboard.extracted.allTime).toBe("4.00");
+  });
+
+  it("carries dashboard in every empty-variant branch", async () => {
+    const none = await getOpportunities({ precision: "whole" });
+    if (none.status !== "ok") throw new Error("unreachable");
+    expect(none.emptyVariant).toBe("none-scraped");
+    expect(none.dashboard).toBeDefined();
+
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: new Date(NOW_ISO) });
+    const nothing = await getOpportunities({ precision: "whole" });
+    if (nothing.status !== "ok") throw new Error("unreachable");
+    expect(nothing.emptyVariant).toBe("nothing-profitable");
+    expect(nothing.dashboard).toBeDefined();
   });
 
   it("'nothing-profitable' when the member has every usable book and no odds match", async () => {
@@ -318,7 +378,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
       mockGetCachedEvents.mockResolvedValue({ events: [PAIR_EVENT], fetchedAt: new Date(NOW_ISO) });
     });
 
-    it("returns a pair, keeps both promos in the promos source, and counts the pair once in the total", async () => {
+    it("returns a pair, keeps both promos in the promos source, and carries the dashboard", async () => {
       mockGetActivePromos.mockResolvedValue(twoBoosts());
       const result = await getOpportunities({ precision: "cents" });
       if (result.status !== "ok") throw new Error("unreachable");
@@ -335,8 +395,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
       if (promos?.id !== "promos") throw new Error("unreachable");
       expect(promos.items.map((i) => i.data.promoId).sort()).toEqual([1, 2]);
 
-      // D-12: the total is the pair's profit alone, not the pair plus the two singles.
-      expect(result.totals.totalProfit).toBe(item.data.guaranteedProfit);
+      expect(result.dashboard).toBeDefined();
     });
 
     it("is deterministic across calls", async () => {
@@ -454,7 +513,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
 
   it("spends 0 API credits: never references the odds-fetch client", () => {
     const src = readFileSync(join(__dirname, "get-opportunities.ts"), "utf8");
-    for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports"]) {
+    for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports", "loadAvailableProfit"]) {
       expect(src).not.toContain(banned);
     }
   });
