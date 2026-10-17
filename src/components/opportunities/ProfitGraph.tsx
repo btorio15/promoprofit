@@ -53,7 +53,7 @@ export function ProfitGraph({ series, loading }: { series: ProfitSeriesDTO | nul
 
   if (hidden) {
     return (
-      <section aria-label="Profit graph" className={SHELL}>
+      <section aria-label="Profit graph" className={cn(SHELL, "py-2")}>
         <div className="flex min-h-11 items-center">
           <span className="text-sm font-semibold">Profit graph</span>
           <Button

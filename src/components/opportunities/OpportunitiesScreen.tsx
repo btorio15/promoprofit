@@ -151,7 +151,7 @@ export function OpportunitiesScreen({
     oldestFetch !== null && staleCheckedAt !== null && describeOddsAge(new Date(oldestFetch), staleCheckedAt).stale;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 sm:gap-8">
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold">Dashboard</h1>
         <p className="text-sm text-muted-foreground">Your profit so far, and the best money available right now at your books.</p>

@@ -4,7 +4,7 @@ import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildTotalsView } from "./dashboardTotalsView";
 
-const SHELL = "flex flex-col gap-4 rounded-lg border border-border bg-secondary p-4";
+const SHELL = "flex flex-col gap-3 rounded-lg border border-border bg-secondary p-4";
 
 const VALUE_CLASS = {
   extracted: "num text-lg font-semibold text-primary",
@@ -27,12 +27,12 @@ export function DashboardTotals({
   if (loading) {
     return (
       <section aria-label="Your totals" aria-busy="true" className={SHELL}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 sm:gap-x-8">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 sm:gap-x-8">
           {[0, 1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-border pt-3">
           <Skeleton className="h-5 w-3/4" />
         </div>
       </section>
@@ -45,16 +45,16 @@ export function DashboardTotals({
 
   return (
     <section aria-label="Your totals" className={SHELL}>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 sm:gap-x-8">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4 sm:gap-x-8">
         {view.cells.map((cell) => (
           <div key={cell.label} className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm text-muted-foreground">{cell.label}</span>
+            <span className="text-xs text-muted-foreground sm:text-sm">{cell.label}</span>
             <span className={VALUE_CLASS[cell.tone]}>{cell.value}</span>
             {cell.caption !== null ? <span className="text-xs text-muted-foreground">{cell.caption}</span> : null}
           </div>
         ))}
       </div>
-      <p className="flex flex-wrap gap-x-1 gap-y-2 border-t border-border pt-4 text-sm text-muted-foreground">
+      <p className="flex flex-wrap gap-x-1 gap-y-1 border-t border-border pt-3 text-sm text-muted-foreground">
         {counts.empty ? (
           counts.text
         ) : (

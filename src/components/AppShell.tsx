@@ -62,33 +62,38 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
           onValueChange={(value) => setActiveTab(value as ActiveTab)}
           className="gap-8"
         >
-          <TabsList variant="line" aria-label="Select a tab" className="mt-2">
-            <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap">
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="stats" className="min-h-11 whitespace-nowrap">
-              Statistics
-            </TabsTrigger>
-            <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap">
-              Arbitrage
-            </TabsTrigger>
-            <TabsTrigger
-              value="promos"
-              className="min-h-11 whitespace-nowrap"
-              aria-label={countLabel("Promos", reviewCount)}
-            >
-              Promos
-              {reviewCount > 0 ? (
-                <>
-                  {" "}
-                  <span className="num">({reviewCount})</span>
-                </>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="tools" className="min-h-11 whitespace-nowrap">
-              Tools
-            </TabsTrigger>
-          </TabsList>
+          {/* On a phone the five tabs are wider than the screen: scroll the bar
+              itself so the page never scrolls sideways. pb keeps the active
+              underline (bottom -5px) inside the scroll box. */}
+          <div className="-mx-4 overflow-x-auto px-4 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList variant="line" aria-label="Select a tab" className="mt-2">
+              <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="stats" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+                Statistics
+              </TabsTrigger>
+              <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+                Arbitrage
+              </TabsTrigger>
+              <TabsTrigger
+                value="promos"
+                className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm"
+                aria-label={countLabel("Promos", reviewCount)}
+              >
+                Promos
+                {reviewCount > 0 ? (
+                  <>
+                    {" "}
+                    <span className="num">({reviewCount})</span>
+                  </>
+                ) : null}
+              </TabsTrigger>
+              <TabsTrigger value="tools" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+                Tools
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="opportunities" keepMounted>
             <OpportunitiesScreen
