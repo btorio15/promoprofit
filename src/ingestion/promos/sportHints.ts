@@ -39,7 +39,7 @@ const SUPPORTED_TEXT_PATTERNS: ReadonlyArray<[RegExp, string]> = [
   [/\bnfl\b/i, "americanfootball_nfl"],
   [/\bnba\b/i, "basketball_nba"],
   [/\bmlb\b/i, "baseball_mlb"],
-  [/\b(?:nhl|hockey)\b/i, "icehockey_nhl"],
+  [/\b(?:nhl|hockey|stanley cup)\b/i, "icehockey_nhl"],
 ];
 
 export function sportFromText(text: string): SportHint {
@@ -98,6 +98,25 @@ export function sportFromTags(tags: readonly string[]): SportHint {
  * is fine because the matcher (src/domain/promos/matcher.ts) resolves
  * teamsText against cached events independently of this hint.
  */
+/**
+ * "Team A @ Team B" at the start of a promo title: the two team names, or null.
+ * The second name stops before a percent, a boost/SGP keyword, or the end.
+ */
+const MATCHUP_TITLE = /^(.+?)\s+@\s+(.+?)(?=\s+\d|\s+(?:SGP|Boost|Profit|Odds|Parlay|Same|Game|Bonus|Promo|Get|Bet)\b|$)/i;
+
+/**
+ * Sport for a promo whose game was not matched to the odds cache: from its
+ * text (sport names, Stanley Cup), then from the two team names in a
+ * "Team A @ Team B" title. Anything else stays unknown.
+ */
+export function sportFromPromoText(title: string, rawText: string): SportHint {
+  const fromText = sportFromText(`${title}\n${rawText}`);
+  if (fromText.kind !== "unknown") return fromText;
+  const matchup = MATCHUP_TITLE.exec(title.trim());
+  if (matchup) return sportFromTeamPair(matchup[1], matchup[2]);
+  return { kind: "unknown" };
+}
+
 export function sportFromTeamPair(teamA: string, teamB: string): SportHint {
   const qualifying: string[] = [];
   for (const sportKey of Object.keys(TEAM_ALIASES)) {
