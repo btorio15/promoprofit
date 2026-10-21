@@ -10,6 +10,11 @@ import Decimal from "decimal.js";
  * - Extracted: the profit members recorded when they marked a promo done
  *   (the completions), counted on the day it was marked done.
  *
+ * A promo is observed once per day it is live, so a 3-day promo has 3 rows.
+ * Within the window each promo counts ONCE, at its best profit, placed on the
+ * day it showed that profit (quick-261021-gy4). Without this a $5 boost live
+ * for three days read as $15 available.
+ *
  * Days with no observations between the first and last recorded day are
  * counted as zero-profit days, so the average per day is over every calendar
  * day in the span, not just the days that happened to have a row.
@@ -66,7 +71,7 @@ export interface DailyPoint {
   bySport: Record<string, string>;
   /** One entry per promo record that day, largest first. Drives the segmented bars. */
   segments: DaySegment[];
-  /** True for a day in the span with no observations. */
+  /** True for a day in the span with no observations (a day can be observed but hold no promo's best). */
   zero: boolean;
 }
 
@@ -159,6 +164,22 @@ function groupTotals(rows: HistoryRow[], completions: CompletionRow[], keyOf: (i
     .sort((a, b) => Number(b.total) - Number(a.total));
 }
 
+/** One row per promo: its best profit, on the earliest day it showed it. */
+export function bestRowPerPromo(rows: HistoryRow[]): HistoryRow[] {
+  const best = new Map<number, HistoryRow>();
+  for (const row of rows) {
+    const current = best.get(row.promoId);
+    if (
+      !current ||
+      new Decimal(row.profit).greaterThan(current.profit) ||
+      (new Decimal(row.profit).equals(current.profit) && row.denverDate < current.denverDate)
+    ) {
+      best.set(row.promoId, row);
+    }
+  }
+  return [...best.values()];
+}
+
 /**
  * Totals for the given window (inclusive Denver days). With a window, the
  * span is every calendar day in it, so zero-profit days count too. Without
@@ -172,7 +193,8 @@ export function dailyHistoryStats(
   allCompletions: CompletionRow[] = [],
 ): DailyHistoryStats {
   const inWindow = (date: string) => !window || (date >= window.start && date <= window.end);
-  const rows = allRows.filter((row) => inWindow(row.denverDate));
+  const windowRows = allRows.filter((row) => inWindow(row.denverDate));
+  const rows = bestRowPerPromo(windowRows);
   const completions = allCompletions.filter((completion) => inWindow(completion.denverDate));
   const doneIds = new Set(allCompletions.map((completion) => completion.promoId));
 
@@ -194,7 +216,9 @@ export function dailyHistoryStats(
     byDay.set(row.denverDate, day);
   }
 
-  const dates = [...byDay.keys()].sort();
+  // The all-time span runs over every observed day, not only the best days.
+  const observedDays = new Set(windowRows.map((row) => row.denverDate));
+  const dates = [...observedDays].sort();
   const span = window
     ? calendarDays(window.start, window.end)
     : dates.length === 0
@@ -213,12 +237,12 @@ export function dailyHistoryStats(
       segments: (day?.segments ?? [])
         .slice()
         .sort((a, b) => Number(b.profit) - Number(a.profit)),
-      zero: day === undefined,
+      zero: !observedDays.has(date),
     };
   });
 
   const dayCount = span.length;
-  const activeDayCount = byDay.size;
+  const activeDayCount = span.filter((date) => observedDays.has(date)).length;
 
   let bonusNum = new Decimal(0);
   let bonusDen = new Decimal(0);

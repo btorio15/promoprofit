@@ -181,3 +181,37 @@ describe("dailyHistoryStats", () => {
     expect(dailyHistoryStats(rows).grandTotal).toBe("1.00");
   });
 });
+
+describe("dailyHistoryStats counts each promo once (quick-261021-gy4)", () => {
+  it("a promo seen on three days counts once at its best, on its best day", () => {
+    const rows: HistoryRow[] = [
+      { promoId: 900, denverDate: "2026-10-01", profit: "4.00", sportKey: "basketball_nba", bookKey: "draftkings", promoType: "profit_boost", bonusAmount: null, maxStake: "25.00" },
+      { promoId: 900, denverDate: "2026-10-02", profit: "5.00", sportKey: "basketball_nba", bookKey: "draftkings", promoType: "profit_boost", bonusAmount: null, maxStake: "25.00" },
+      { promoId: 900, denverDate: "2026-10-03", profit: "3.00", sportKey: "basketball_nba", bookKey: "draftkings", promoType: "profit_boost", bonusAmount: null, maxStake: "25.00" },
+      { promoId: 901, denverDate: "2026-10-03", profit: "2.00", sportKey: "basketball_nba", bookKey: "fanduel", promoType: "profit_boost", bonusAmount: null, maxStake: "50.00" },
+    ];
+    const stats = dailyHistoryStats(rows);
+    expect(stats.grandTotal).toBe("7.00");
+    expect(stats.promoCount).toBe(2);
+    expect(stats.avgPerPromo).toBe("3.50");
+    expect(stats.dayCount).toBe(3);
+    expect(stats.zeroDayCount).toBe(0);
+    expect(stats.days.map((d) => [d.date, d.total, d.zero])).toEqual([
+      ["2026-10-01", "0.00", false],
+      ["2026-10-02", "5.00", false],
+      ["2026-10-03", "2.00", false],
+    ]);
+    expect(stats.books.find((b) => b.key === "draftkings")).toMatchObject({ total: "5.00", promos: 1 });
+    // 7.00 / 75.00 stake, each promo once
+    expect(stats.boostConversion).toMatchObject({ records: 2, pct: "9.33" });
+  });
+
+  it("ties keep the earliest day", () => {
+    const base = { sportKey: null, bookKey: "draftkings", promoType: "bonus_bet", bonusAmount: null, maxStake: null };
+    const stats = dailyHistoryStats([
+      { ...base, promoId: 910, denverDate: "2026-10-05", profit: "1.00" },
+      { ...base, promoId: 910, denverDate: "2026-10-04", profit: "1.00" },
+    ]);
+    expect(stats.days.find((d) => d.total === "1.00")?.date).toBe("2026-10-04");
+  });
+});
