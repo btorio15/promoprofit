@@ -151,20 +151,21 @@ export function HistorySection({
       <CardHeader>
         <CardTitle>Daily promo profit: {label}</CardTitle>
         <CardDescription>
-          Best profit per promo per day, from {dayLabel(first)} to {dayLabel(last)}. Days with no observations count as
-          zero. Each day is one total, so this section has no time-of-day detail.
+          Each promo counted once, at its best profit, on the day it showed it, from {dayLabel(first)} to{" "}
+          {dayLabel(last)}. Days with no observations count as zero. Each day is one total, so this section has no
+          time-of-day detail.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
           <Figure label="Available profit" value={formatUsd(history.grandTotal)} note="best profit each promo showed" />
-          <Figure label="Extracted profit" value={formatUsd(history.extractedTotal)} note="recorded when marked done" />
+          <Figure label="Extracted profit" value={formatUsd(history.extractedTotal)} note="recorded when marked done, all members" />
           <Figure
             label="Avg profit per day"
             value={formatUsd(history.avgPerDay)}
             note={`over ${history.dayCount} days (${history.zeroDayCount} with no promos)`}
           />
-          <Figure label="Avg profit per promo" value={formatUsd(history.avgPerPromo)} note={`${history.promoCount} records`} />
+          <Figure label="Avg profit per promo" value={formatUsd(history.avgPerPromo)} note={`${history.promoCount} promo${history.promoCount === 1 ? "" : "s"}`} />
           <Figure
             label="Bonus conversion"
             value={pctLabel(history.bonusConversion.pct)}

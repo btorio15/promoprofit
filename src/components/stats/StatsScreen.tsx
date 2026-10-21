@@ -27,6 +27,14 @@ function hourLabel(hour: number): string {
   return `${twelve} ${suffix}`;
 }
 
+/** Statistics is group-wide; say so, so it is not read as the member's own numbers. */
+const SCOPE_NOTE = (
+  <p className="text-sm text-muted-foreground">
+    Group-wide: every member&apos;s promos and Mark done results. Available profit is each promo at its own max stake
+    against every hedge book, so it will not match the Dashboard, which uses your books and your caps.
+  </p>
+);
+
 function formatWhen(iso: string | null): string {
   return iso === null ? "None yet" : `${TIME_FORMATTER.format(new Date(iso))} MT`;
 }
@@ -85,6 +93,7 @@ export function StatsScreen({ active }: { active: boolean }) {
     return (
       <div className="flex flex-col gap-8">
         {picker}
+        {SCOPE_NOTE}
         <Card>
           <CardHeader>
             <CardTitle>No scrape runs in this range</CardTitle>
@@ -112,6 +121,7 @@ export function StatsScreen({ active }: { active: boolean }) {
   return (
     <div className="flex flex-col gap-8">
       {picker}
+      {SCOPE_NOTE}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Summary">
         <Stat label="Scrape runs" value={String(stats.runs)} />
         <Stat label="First run" value={formatWhen(stats.firstRunAt)} small />
@@ -163,7 +173,7 @@ export function StatsScreen({ active }: { active: boolean }) {
 
       <StatsCard
         title="Profit by sport and game day"
-        description="Profit by weekday its game starts (Denver time); strongest day highlighted"
+        description="Profit by weekday its game starts (Denver time); strongest day highlighted. Each promo counts once, at its best. A promo covering several days sits on its first day."
       >
         <div className="flex flex-col gap-3">
           {stats.sportWeekday.rows.length === 0 ? (
