@@ -58,8 +58,6 @@ export interface DaySegment {
   promoId: number;
   sportKey: string;
   profit: string;
-  /** True when a member has marked this promo done. Only done segments get a sport color. */
-  done: boolean;
 }
 
 export interface DailyPoint {
@@ -185,7 +183,6 @@ export function bestRowPerPromo(rows: HistoryRow[]): HistoryRow[] {
  * span is every calendar day in it, so zero-profit days count too. Without
  * one (all time), the span runs from the first recorded day to the last.
  * Completions are filtered to the window by the day they were marked done.
- * Any promo with a completion is "done" for the chart, whenever it was done.
  */
 export function dailyHistoryStats(
   allRows: HistoryRow[],
@@ -196,7 +193,6 @@ export function dailyHistoryStats(
   const windowRows = allRows.filter((row) => inWindow(row.denverDate));
   const rows = bestRowPerPromo(windowRows);
   const completions = allCompletions.filter((completion) => inWindow(completion.denverDate));
-  const doneIds = new Set(allCompletions.map((completion) => completion.promoId));
 
   const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal>; segments: DaySegment[] }>();
   let grand = new Decimal(0);
@@ -212,7 +208,7 @@ export function dailyHistoryStats(
     day.total = day.total.plus(profit);
     const sportKey = row.sportKey ?? UNKNOWN_SPORT;
     day.bySport.set(sportKey, (day.bySport.get(sportKey) ?? new Decimal(0)).plus(profit));
-    day.segments.push({ promoId: row.promoId, sportKey, profit: profit.toFixed(2), done: doneIds.has(row.promoId) });
+    day.segments.push({ promoId: row.promoId, sportKey, profit: profit.toFixed(2) });
     byDay.set(row.denverDate, day);
   }
 

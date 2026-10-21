@@ -142,7 +142,7 @@ describe("dailyHistoryStats", () => {
     expect(pick(stats.days[2].segments)).toEqual([{ sportKey: "icehockey_nhl", profit: "1.00" }]);
   });
 
-  it("marks a segment done only when its promo has a completion, and keeps extracted apart from available", () => {
+  it("keeps extracted apart from available; segments carry no extracted state", () => {
     const doneRow = row({ denverDate: "2026-09-27", profit: "9.00", sportKey: "americanfootball_ncaaf", bookKey: "fanduel" });
     const openRow = row({ denverDate: "2026-09-27", profit: "4.00", sportKey: "basketball_nba", bookKey: "fanduel" });
     const completions: CompletionRow[] = [
@@ -158,8 +158,8 @@ describe("dailyHistoryStats", () => {
 
     const stats = dailyHistoryStats([doneRow, openRow], undefined, completions);
     const segments = stats.days[0].segments;
-    expect(segments.find((s) => s.promoId === doneRow.promoId)?.done).toBe(true);
-    expect(segments.find((s) => s.promoId === openRow.promoId)?.done).toBe(false);
+    expect(segments.map((s) => s.profit)).toEqual(["9.00", "4.00"]);
+    expect(segments.every((s) => !("done" in s))).toBe(true);
     expect(stats.grandTotal).toBe("13.00");
     expect(stats.extractedTotal).toBe("7.50");
     expect(stats.books[0]).toMatchObject({ key: "fanduel", total: "13.00", extracted: "7.50" });

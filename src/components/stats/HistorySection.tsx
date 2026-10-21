@@ -91,7 +91,6 @@ export function HistorySection({
   /** Range name shown in the title, e.g. "7 days" or "All time". */
   label: string;
 }) {
-  const [showNotExtracted, setShowNotExtracted] = useState(true);
   const [hiddenSports, setHiddenSports] = useState<Set<string>>(new Set());
   const toggleSport = (sportKey: string) =>
     setHiddenSports((hidden) => {
@@ -113,10 +112,9 @@ export function HistorySection({
 
   const first = history.days[0].date;
   const last = history.days[history.days.length - 1].date;
-  // A block is shown unless its sport is hidden, or it is not extracted and not-extracted blocks are hidden.
+  // A block is shown unless its sport is hidden.
   // Hidden blocks are dropped before stacking, so the blocks below them move down to fill the gap.
-  const isVisible = (segment: { sportKey: string; done: boolean }) =>
-    !hiddenSports.has(segment.sportKey) && (segment.done || showNotExtracted);
+  const isVisible = (segment: { sportKey: string }) => !hiddenSports.has(segment.sportKey);
   // One stacked segment per visible promo record, so a day's bar shows each bet as a separate block.
   const maxSegments = Math.max(0, ...history.days.map((day) => day.segments.filter(isVisible).length));
   const segmentKeys = Array.from({ length: maxSegments }, (_, index) => `seg${index}`);
@@ -139,7 +137,6 @@ export function HistorySection({
     visible.forEach((segment, index) => {
       row[`seg${index}`] = Number(segment.profit);
       row[`seg${index}Sport`] = segment.sportKey;
-      row[`seg${index}Done`] = segment.done;
     });
     return row;
   });
@@ -187,15 +184,13 @@ export function HistorySection({
 
         <StatsCard
           title="Daily profit by sport"
-          description="One block per promo; white = not extracted. Click a key to show or hide it."
+          description="Profit available on the site: one block per promo, colored by sport. Click a key to show or hide it."
           defaultOpen
         >
           <SportLegend
             sportKeys={sportsInRange}
             hiddenSports={hiddenSports}
             onToggleSport={toggleSport}
-            showNotExtracted={showNotExtracted}
-            onToggleNotExtracted={() => setShowNotExtracted((shown) => !shown)}
           />
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -267,9 +262,6 @@ export function HistorySection({
   );
 }
 
-/** Fill for promo blocks that are available but not marked done. */
-const NOT_DONE_COLOR = "#ffffff";
-
 /** Pixels of background left between stacked promo blocks, so each bet reads as its own block. */
 const SEGMENT_GAP = 2;
 
@@ -289,9 +281,7 @@ function segmentShape(props: SegmentShapeProps) {
   const key = String(props.dataKey);
   const payload = (props.payload ?? {}) as Record<string, unknown>;
   const sport = String(payload[`${key}Sport`] ?? UNKNOWN_SPORT);
-  const done = payload[`${key}Done`] === true;
-  // Blocks not yet extracted are white.
-  const fill = done ? colorFor(sport) : NOT_DONE_COLOR;
+  const fill = colorFor(sport);
   const blockHeight = Math.max(height - SEGMENT_GAP, 1);
   return <rect x={x} y={y + (height - blockHeight) / 2} width={width} height={blockHeight} rx={2} fill={fill} />;
 }
@@ -328,14 +318,10 @@ function SportLegend({
   sportKeys,
   hiddenSports,
   onToggleSport,
-  showNotExtracted,
-  onToggleNotExtracted,
 }: {
   sportKeys: string[];
   hiddenSports: Set<string>;
   onToggleSport: (sportKey: string) => void;
-  showNotExtracted: boolean;
-  onToggleNotExtracted: () => void;
 }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" aria-label="Key">
@@ -355,17 +341,6 @@ function SportLegend({
           </li>
         );
       })}
-      <li>
-        <button
-          type="button"
-          aria-pressed={showNotExtracted}
-          onClick={onToggleNotExtracted}
-          className={`flex min-h-8 items-center gap-1.5 rounded-md px-2 ${showNotExtracted ? "" : "opacity-50"}`}
-        >
-          <span className="inline-block size-2.5 rounded-sm border border-border bg-white" aria-hidden="true" />
-          Not extracted
-        </button>
-      </li>
     </ul>
   );
 }
