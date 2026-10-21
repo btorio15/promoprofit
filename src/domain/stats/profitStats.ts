@@ -32,6 +32,13 @@ export function denverWeekday(instant: Date): Weekday {
   return match;
 }
 
+/**
+ * Sport key stored on snapshots of promos that work on any sport (scope
+ * "any"). profit_snapshots.sport_key is NOT NULL, so they get this marker
+ * instead of being left out (quick-261021-gy4).
+ */
+export const ANY_SPORT_KEY = "any";
+
 export interface SnapshotRow {
   promoId: number;
   capturedAt: Date;

@@ -6,7 +6,7 @@ import { loadGameTimes, recordProfitSnapshots, type NewProfitSnapshot } from "./
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
 import { stripMemberCaps } from "@/domain/promos/yourCap";
 import { denverDate } from "@/domain/promos/profitTotals";
-import { denverHour } from "@/domain/stats/profitStats";
+import { ANY_SPORT_KEY, denverHour } from "@/domain/stats/profitStats";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 
 interface CurrentProfitEntry {
@@ -69,7 +69,8 @@ export async function recordCurrentProfitObservations(
  */
 export async function recordCurrentProfitSnapshots(now: Date): Promise<void> {
   const entries = await computeCurrentProfitEntries(now, {});
-  const withSport = entries.filter((entry): entry is CurrentProfitEntry & { sportKey: string } => entry.sportKey !== null);
+  // Any-sport promos are kept under ANY_SPORT_KEY rather than dropped.
+  const withSport = entries.map((entry) => ({ ...entry, sportKey: entry.sportKey ?? ANY_SPORT_KEY }));
   if (withSport.length === 0) return;
 
   try {

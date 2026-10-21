@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
-import { WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
+import { ANY_SPORT_KEY, WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
 import { HistorySection } from "@/components/stats/HistorySection";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { STATS_RANGES, STATS_RANGE_LABELS, type StatsRange } from "@/domain/stats/statsRange";
@@ -241,7 +241,7 @@ function Stat({ label, value, small = false }: { label: string; value: string; s
 function SportRow({ row }: { row: SportWeekdayRow }) {
   return (
     <TableRow>
-      <TableCell className="font-medium">{getSportLabel(row.sportKey)}</TableCell>
+      <TableCell className="font-medium">{row.sportKey === ANY_SPORT_KEY ? "Any sport" : getSportLabel(row.sportKey)}</TableCell>
       {WEEKDAYS.map((day) => {
         const isBest = row.bestDay === day;
         const value = row.byDay[day];
