@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "./client";
-import { promoCompletions, promoProfitObservations, promos } from "./schema";
+import { promoCompletions, promoProfitObservations, promos, scrapeRuns } from "./schema";
 import type { CompletionRow, HistoryRow } from "@/domain/stats/dailyHistory";
 import type { FunnelPromo } from "@/domain/stats/promoFunnel";
 import { denverDate } from "@/domain/promos/profitTotals";
@@ -86,4 +86,15 @@ export async function loadDonePromoIds(): Promise<Set<number>> {
   const db = getDb();
   const rows = await db.selectDistinct({ promoId: promoCompletions.promoId }).from(promoCompletions);
   return new Set(rows.map((row) => row.promoId));
+}
+
+/**
+ * Start time of every scrape run (one scrape_runs row per book shares the
+ * run's ran_at). Counts runs that found nothing profitable, which leave no
+ * profit_snapshots rows. Read-only.
+ */
+export async function loadScrapeRunTimes(): Promise<Date[]> {
+  const db = getDb();
+  const rows = await db.selectDistinct({ ranAt: scrapeRuns.ranAt }).from(scrapeRuns);
+  return rows.map((row) => row.ranAt);
 }

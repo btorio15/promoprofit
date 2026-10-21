@@ -49,18 +49,43 @@ export interface HourOfDayStat {
   avgProfit: string;
 }
 
+/** A snapshot belongs to the scrape run that started at most this long before it. */
+export const SNAPSHOT_RUN_WINDOW_MS = 30 * 60 * 1000;
+
 /**
- * Average profit available per snapshot run, grouped by the Denver hour the
- * run was captured. Each run's total is the sum of its promo profits; a
- * promo appears once per run, so the sum is "profit available in that run".
+ * Average profit available per run, grouped by the Denver hour of the run.
+ * Each run's total is the sum of its promo profits; a promo appears once per
+ * run, so the sum is "profit available in that run".
+ *
+ * Snapshots are only written when a run finds a profitable promo, so a run
+ * with nothing profitable leaves no rows. Pass the scrape run start times
+ * (scrape_runs.ran_at) to count those runs as $0 (quick-261021-gy4). Only
+ * runs from the first snapshot onward count -- earlier runs predate the
+ * recorder. Without runTimes, each distinct capture time is one run.
  */
-export function timeOfDayStats(rows: SnapshotRow[]): HourOfDayStat[] {
+export function timeOfDayStats(rows: SnapshotRow[], runTimes: Date[] = []): HourOfDayStat[] {
   const runTotals = new Map<number, { hour: number; total: Decimal }>();
+  const firstCapture = rows.reduce<number | null>(
+    (min, row) => (min === null || row.capturedAt.getTime() < min ? row.capturedAt.getTime() : min),
+    null,
+  );
+  const runs = [...new Set(runTimes.map((time) => time.getTime()))]
+    .filter((time) => firstCapture !== null && time >= firstCapture - SNAPSHOT_RUN_WINDOW_MS)
+    .sort((a, b) => a - b);
+  for (const time of runs) runTotals.set(time, { hour: denverHour(new Date(time)), total: new Decimal(0) });
+
   for (const row of rows) {
-    const key = row.capturedAt.getTime();
-    const run = runTotals.get(key) ?? { hour: row.denverHour, total: new Decimal(0) };
+    const captured = row.capturedAt.getTime();
+    // Latest run that started at or before this capture, within the window.
+    let key: number | null = null;
+    for (const time of runs) {
+      if (time <= captured && captured - time <= SNAPSHOT_RUN_WINDOW_MS) key = time;
+      if (time > captured) break;
+    }
+    const runKey = key ?? captured;
+    const run = runTotals.get(runKey) ?? { hour: row.denverHour, total: new Decimal(0) };
     run.total = run.total.plus(row.guaranteedProfit);
-    runTotals.set(key, run);
+    runTotals.set(runKey, run);
   }
 
   const byHour = new Map<number, { runs: number; total: Decimal }>();

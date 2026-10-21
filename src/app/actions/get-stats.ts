@@ -2,7 +2,13 @@
 
 import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
-import { loadCompletionRows, loadDailyProfitHistory, loadDonePromoIds, loadFunnelPromos } from "@/db/profitHistory";
+import {
+  loadCompletionRows,
+  loadDailyProfitHistory,
+  loadDonePromoIds,
+  loadFunnelPromos,
+  loadScrapeRunTimes,
+} from "@/db/profitHistory";
 import {
   sportWeekdayStats,
   timeOfDayStats,
@@ -17,10 +23,10 @@ import { denverDate } from "@/domain/promos/profitTotals";
 export interface StatsDTO {
   /** The range these figures cover. */
   range: StatsRange;
-  /** Scheduled odds runs in the range that recorded at least one snapshot. */
-  snapshotRuns: number;
-  firstCapturedAt: string | null;
-  lastCapturedAt: string | null;
+  /** Scrape runs in the range (from scrape_runs), including ones that found nothing profitable. */
+  runs: number;
+  firstRunAt: string | null;
+  lastRunAt: string | null;
   timeOfDay: HourOfDayStat[];
   sportWeekday: SportWeekdayStats;
   /** Older daily data (promo_profit_observations) in the range. */
@@ -43,8 +49,9 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
   const start = rangeStartDate(selected, today);
   const window = start === null ? undefined : { start, end: today };
 
-  const [allRows, historyRows, completionRows, funnelPromos, doneIds] = await Promise.all([
+  const [allRows, allRunTimes, historyRows, completionRows, funnelPromos, doneIds] = await Promise.all([
     loadProfitSnapshotRows(),
+    loadScrapeRunTimes(),
     loadDailyProfitHistory(),
     loadCompletionRows(),
     loadFunnelPromos(),
@@ -52,20 +59,21 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
   ]);
   const rows = start === null ? allRows : allRows.filter((row) => denverDate(row.capturedAt) >= start);
 
-  const runTimes = new Set(rows.map((row) => row.capturedAt.getTime()));
+  const runTimes = start === null ? allRunTimes : allRunTimes.filter((time) => denverDate(time) >= start);
   let first: number | null = null;
   let last: number | null = null;
   for (const time of runTimes) {
-    if (first === null || time < first) first = time;
-    if (last === null || time > last) last = time;
+    const ms = time.getTime();
+    if (first === null || ms < first) first = ms;
+    if (last === null || ms > last) last = ms;
   }
 
   return {
     range: selected,
-    snapshotRuns: runTimes.size,
-    firstCapturedAt: first === null ? null : new Date(first).toISOString(),
-    lastCapturedAt: last === null ? null : new Date(last).toISOString(),
-    timeOfDay: timeOfDayStats(rows),
+    runs: runTimes.length,
+    firstRunAt: first === null ? null : new Date(first).toISOString(),
+    lastRunAt: last === null ? null : new Date(last).toISOString(),
+    timeOfDay: timeOfDayStats(rows, runTimes),
     sportWeekday: sportWeekdayStats(rows),
     history: dailyHistoryStats(historyRows, window, completionRows),
     funnel: promoFunnel(funnelPromos, doneIds),

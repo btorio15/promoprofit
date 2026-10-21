@@ -81,13 +81,13 @@ export function StatsScreen({ active }: { active: boolean }) {
       </div>
     );
   }
-  if (stats.snapshotRuns === 0) {
+  if (stats.runs === 0) {
     return (
       <div className="flex flex-col gap-8">
         {picker}
         <Card>
           <CardHeader>
-            <CardTitle>No scheduled runs in this range</CardTitle>
+            <CardTitle>No scrape runs in this range</CardTitle>
             <CardDescription>
               Scheduled runs (three times a day) record profit from the first run onward. Older daily data is below.
             </CardDescription>
@@ -113,15 +113,15 @@ export function StatsScreen({ active }: { active: boolean }) {
     <div className="flex flex-col gap-8">
       {picker}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Summary">
-        <Stat label="Scheduled runs" value={String(stats.snapshotRuns)} />
-        <Stat label="First run" value={formatWhen(stats.firstCapturedAt)} small />
-        <Stat label="Latest run" value={formatWhen(stats.lastCapturedAt)} small />
+        <Stat label="Scrape runs" value={String(stats.runs)} />
+        <Stat label="First run" value={formatWhen(stats.firstRunAt)} small />
+        <Stat label="Latest run" value={formatWhen(stats.lastRunAt)} small />
         <Stat label="Most profitable hour" value={bestHour ? hourLabel(bestHour.hour) : "None"} />
       </section>
 
       <StatsCard
         title="Profit by time of day"
-        description="Average profit available per scheduled run, by Denver hour"
+        description="Average profit available per scrape run, by Denver hour. Runs that found nothing profitable count as $0."
       >
         <div className="flex flex-col gap-4">
           <div className="h-64 w-full">

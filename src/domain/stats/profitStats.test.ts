@@ -34,6 +34,23 @@ describe("denverWeekday", () => {
   });
 });
 
+describe("timeOfDayStats with scrape runs (quick-261021-gy4)", () => {
+  it("counts runs with no snapshot as $0 and ignores runs before the first snapshot", () => {
+    const before = at("2026-10-12T15:37:00Z");
+    const run1 = at("2026-10-13T15:37:00Z");
+    const run2 = at("2026-10-14T15:40:00Z");
+    const run3 = at("2026-10-14T22:37:00Z");
+    const rows: SnapshotRow[] = [
+      row({ promoId: 1, capturedAt: at("2026-10-13T15:38:10Z"), denverHour: 9, guaranteedProfit: "12.00" }),
+      row({ promoId: 2, capturedAt: at("2026-10-13T15:38:10Z"), denverHour: 9, guaranteedProfit: "8.00" }),
+    ];
+    expect(timeOfDayStats(rows, [before, run1, run2, run3])).toEqual([
+      { hour: 9, runs: 2, avgProfit: "10.00" },
+      { hour: 16, runs: 1, avgProfit: "0.00" },
+    ]);
+  });
+});
+
 describe("timeOfDayStats", () => {
   it("averages each run's total profit per capture hour", () => {
     const morningRun = at("2026-10-13T15:37:00Z");
