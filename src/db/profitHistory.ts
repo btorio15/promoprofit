@@ -75,6 +75,7 @@ export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
       bookKey: promos.bookKey,
       status: promos.status,
       maxStake: promos.maxStake,
+      expiresAt: promos.expiresAt,
     })
     .from(promos);
   return rows;

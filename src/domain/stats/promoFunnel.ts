@@ -11,6 +11,8 @@ export interface FunnelPromo {
   bookKey: string;
   status: string;
   maxStake: string | null;
+  /** When the promo ends; an "active" promo past this counts as expired. */
+  expiresAt?: Date | null;
 }
 
 export interface FunnelTotals {
@@ -37,7 +39,20 @@ export interface PromoFunnelStats {
   books: BookHealth[];
 }
 
-export function promoFunnel(promos: FunnelPromo[], doneIds: ReadonlySet<number>): PromoFunnelStats {
+/**
+ * The scraper only flips a promo to "expired" on its next run, so a promo
+ * whose end time has passed is treated as expired here (quick-261021-gy4).
+ */
+function effectiveStatus(promo: FunnelPromo, now: Date): string {
+  if (promo.status === "active" && promo.expiresAt && promo.expiresAt.getTime() <= now.getTime()) return "expired";
+  return promo.status;
+}
+
+export function promoFunnel(
+  promos: FunnelPromo[],
+  doneIds: ReadonlySet<number>,
+  now: Date = new Date(),
+): PromoFunnelStats {
   const totals: FunnelTotals = {
     total: promos.length,
     available: 0,
@@ -49,17 +64,18 @@ export function promoFunnel(promos: FunnelPromo[], doneIds: ReadonlySet<number>)
   const books = new Map<string, { promos: number; active: number; removed: number; stakeSum: Decimal; known: number }>();
 
   for (const promo of promos) {
+    const status = effectiveStatus(promo, now);
     const done = doneIds.has(promo.promoId);
     if (done) totals.markedDone += 1;
-    if (promo.status === "active") totals.available += 1;
-    if (promo.status === "expired" && !done) totals.expiredUnused += 1;
-    if (promo.status === "dismissed") totals.dismissed += 1;
-    if (promo.status === "pending_review") totals.pendingReview += 1;
+    if (status === "active") totals.available += 1;
+    if (status === "expired" && !done) totals.expiredUnused += 1;
+    if (status === "dismissed") totals.dismissed += 1;
+    if (status === "pending_review") totals.pendingReview += 1;
 
     const book = books.get(promo.bookKey) ?? { promos: 0, active: 0, removed: 0, stakeSum: new Decimal(0), known: 0 };
     book.promos += 1;
-    if (promo.status === "active") book.active += 1;
-    if (promo.status === "expired" || promo.status === "dismissed") book.removed += 1;
+    if (status === "active") book.active += 1;
+    if (status === "expired" || status === "dismissed") book.removed += 1;
     if (promo.maxStake !== null) {
       book.stakeSum = book.stakeSum.plus(promo.maxStake);
       book.known += 1;

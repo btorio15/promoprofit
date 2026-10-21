@@ -39,4 +39,19 @@ describe("promoFunnel", () => {
     const stats = promoFunnel([{ promoId: 9, bookKey: "ballybet", status: "active", maxStake: null }], new Set());
     expect(stats.books[0]).toMatchObject({ avgMaxStake: null, maxStakeKnown: 0 });
   });
+
+  it("treats an active promo past its end time as expired (quick-261021-gy4)", () => {
+    const now = new Date("2026-10-21T12:00:00Z");
+    const stats = promoFunnel(
+      [
+        { promoId: 20, bookKey: "fanduel", status: "active", maxStake: null, expiresAt: new Date("2026-10-21T06:00:00Z") },
+        { promoId: 21, bookKey: "fanduel", status: "active", maxStake: null, expiresAt: new Date("2026-10-22T06:00:00Z") },
+        { promoId: 22, bookKey: "fanduel", status: "active", maxStake: null, expiresAt: null },
+      ],
+      new Set(),
+      now,
+    );
+    expect(stats.totals).toMatchObject({ available: 2, expiredUnused: 1 });
+    expect(stats.books[0]).toMatchObject({ active: 2, removed: 1 });
+  });
 });
