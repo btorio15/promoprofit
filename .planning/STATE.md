@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 999.1
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-21 - Completed quick task 261021-gy4: Fix Statistics page accuracy
+Last activity: 2026-10-21 - Completed quick task 261021-ht5: block graph shows available only
 
 ## Performance Metrics
 
@@ -199,6 +199,7 @@ Recent decisions affecting current work:
 | 261016-k8a | Skip no-sweat promos: new clear skip reason no_sweat (text or DK "No Sweat" category) the promo reader cannot override; reader prompt lists them as not usable | 2026-10-16 | f9f2a7d | Verified | [261016-k8a-skip-no-sweat-promos](./quick/261016-k8a-skip-no-sweat-promos/) |
 | 261016-kyb | Fix auto cap: boosts with no max stake were held in caps review instead of going live at the book cap / $25 default; review gates removed, add-promo max stake optional | 2026-10-16 | 383c721 | Verified | [261016-kyb-boosts-with-no-max-stake-use-the-25-default](./quick/261016-kyb-boosts-with-no-max-stake-use-the-25-default/) |
 | 261021-gy4 | Fix Statistics accuracy: each promo counted once (available $213.74 -> $139.93), runs from scrape_runs with $0 runs, any-sport snapshots, Available now skips expired, group-wide labels | 2026-10-21 | ad425ac | Verified | [261021-gy4-fix-statistics-page-accuracy](./quick/261021-gy4-fix-statistics-page-accuracy/) |
+| 261021-ht5 | Statistics block graph shows available profit only (no extracted / not-extracted blocks) | 2026-10-21 | 84d599b | Verified | [261021-ht5-block-graph-shows-available-only](./quick/261021-ht5-block-graph-shows-available-only/) |
 
 ## Deferred Items
 
