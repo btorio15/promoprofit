@@ -10,20 +10,19 @@ const promos: FunnelPromo[] = [
 ];
 
 describe("promoFunnel", () => {
-  it("counts available, marked-done, expired-unused, dismissed and pending promos", () => {
-    const stats = promoFunnel(promos, new Set([3]));
+  it("counts available, expired, dismissed and pending promos", () => {
+    const stats = promoFunnel(promos);
     expect(stats.totals).toEqual({
       total: 5,
       available: 1,
-      markedDone: 1,
-      expiredUnused: 1,
+      expired: 2,
       dismissed: 1,
       pendingReview: 1,
     });
   });
 
   it("gives per-book stake limits and removals, biggest book first", () => {
-    const stats = promoFunnel(promos, new Set());
+    const stats = promoFunnel(promos);
     expect(stats.books[0]).toEqual({
       bookKey: "draftkings",
       promos: 3,
@@ -36,7 +35,7 @@ describe("promoFunnel", () => {
   });
 
   it("reports no average when no max stake is known", () => {
-    const stats = promoFunnel([{ promoId: 9, bookKey: "ballybet", status: "active", maxStake: null }], new Set());
+    const stats = promoFunnel([{ promoId: 9, bookKey: "ballybet", status: "active", maxStake: null }], new Date());
     expect(stats.books[0]).toMatchObject({ avgMaxStake: null, maxStakeKnown: 0 });
   });
 
@@ -48,10 +47,9 @@ describe("promoFunnel", () => {
         { promoId: 21, bookKey: "fanduel", status: "active", maxStake: null, expiresAt: new Date("2026-10-22T06:00:00Z") },
         { promoId: 22, bookKey: "fanduel", status: "active", maxStake: null, expiresAt: null },
       ],
-      new Set(),
       now,
     );
-    expect(stats.totals).toMatchObject({ available: 2, expiredUnused: 1 });
+    expect(stats.totals).toMatchObject({ available: 2, expired: 1 });
     expect(stats.books[0]).toMatchObject({ active: 2, removed: 1 });
   });
 });

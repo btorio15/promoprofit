@@ -156,7 +156,6 @@ export function HistorySection({
       <CardContent className="flex flex-col gap-4">
         <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Since Sep 27 summary">
           <Figure label="Available profit" value={formatUsd(history.grandTotal)} note="best profit each promo showed" />
-          <Figure label="Extracted profit" value={formatUsd(history.extractedTotal)} note="recorded when marked done, all members" />
           <Figure
             label="Avg profit per day"
             value={formatUsd(history.avgPerDay)}
@@ -219,17 +218,13 @@ export function HistorySection({
           <GroupTable groups={history.books} nameOf={bookName} />
         </StatsCard>
 
-        <StatsCard title="Promo funnel" description="Available, marked done, expired, and per-book stake limits">
-          <section className="grid grid-cols-2 gap-4 sm:grid-cols-5" aria-label="Promo funnel">
+        <StatsCard title="Promo funnel" description="Available, expired, and per-book stake limits">
+          <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Promo funnel">
             <Figure label="Promos recorded" value={String(funnel.totals.total)} />
             <Figure label="Available now" value={String(funnel.totals.available)} />
-            <Figure label="Marked done" value={String(funnel.totals.markedDone)} />
-            <Figure label="Expired unused" value={String(funnel.totals.expiredUnused)} />
+            <Figure label="Expired" value={String(funnel.totals.expired)} />
             <Figure label="Dismissed / pending" value={`${funnel.totals.dismissed} / ${funnel.totals.pendingReview}`} />
           </section>
-          <p className="text-xs text-muted-foreground">
-            &quot;Marked done&quot; means a member marked the promo done in the app. Claims at the sportsbook are not tracked yet.
-          </p>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -356,7 +351,6 @@ function GroupTable({
 }) {
   const promoCount = groups.reduce((sum, group) => sum + group.promos, 0);
   const grand = groups.reduce((sum, group) => sum.plus(group.total), new Decimal(0));
-  const grandExtracted = groups.reduce((sum, group) => sum.plus(group.extracted), new Decimal(0));
   const averagePerPromo = promoCount === 0 ? "0.00" : grand.dividedBy(promoCount).toDecimalPlaces(2).toFixed(2);
   return (
     <div className="overflow-x-auto">
@@ -367,7 +361,6 @@ function GroupTable({
             <TableHead className="text-right">Promos</TableHead>
             <TableHead className="text-right">Profit per promo</TableHead>
             <TableHead className="text-right">Available profit</TableHead>
-            <TableHead className="text-right">Extracted profit</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -386,7 +379,6 @@ function GroupTable({
               <TableCell className="text-right num">{group.promos}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.avgPerPromo)}</TableCell>
               <TableCell className="text-right num">{formatUsd(group.total)}</TableCell>
-              <TableCell className="text-right num">{formatUsd(group.extracted)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -396,7 +388,6 @@ function GroupTable({
             <TableCell className="text-right num font-semibold">{promoCount}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(averagePerPromo)}</TableCell>
             <TableCell className="text-right num font-semibold">{formatUsd(grand.toFixed(2))}</TableCell>
-            <TableCell className="text-right num font-semibold">{formatUsd(grandExtracted.toFixed(2))}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>

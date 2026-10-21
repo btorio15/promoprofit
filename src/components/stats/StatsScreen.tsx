@@ -30,8 +30,8 @@ function hourLabel(hour: number): string {
 /** Statistics is group-wide; say so, so it is not read as the member's own numbers. */
 const SCOPE_NOTE = (
   <p className="text-sm text-muted-foreground">
-    Group-wide: every member&apos;s promos and Mark done results. Available profit is each promo at its own max stake
-    against every hedge book, so it will not match the Dashboard, which uses your books and your caps.
+    Site-wide profit available: every scraped promo at its own max stake against every hedge book. Nothing here is
+    per member; your own extracted profit is on the Dashboard.
   </p>
 );
 

@@ -2,13 +2,7 @@
 
 import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
-import {
-  loadCompletionRows,
-  loadDailyProfitHistory,
-  loadDonePromoIds,
-  loadFunnelPromos,
-  loadScrapeRunTimes,
-} from "@/db/profitHistory";
+import { loadDailyProfitHistory, loadFunnelPromos, loadScrapeRunTimes } from "@/db/profitHistory";
 import {
   sportWeekdayStats,
   timeOfDayStats,
@@ -31,7 +25,7 @@ export interface StatsDTO {
   sportWeekday: SportWeekdayStats;
   /** Older daily data (promo_profit_observations) in the range. */
   history: DailyHistoryStats;
-  /** Promo availability, marked-done counts, and per-book health (current state, not ranged). */
+  /** Promo availability and per-book health (current state, not ranged). */
   funnel: PromoFunnelStats;
 }
 
@@ -49,13 +43,11 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
   const start = rangeStartDate(selected, today);
   const window = start === null ? undefined : { start, end: today };
 
-  const [allRows, allRunTimes, historyRows, completionRows, funnelPromos, doneIds] = await Promise.all([
+  const [allRows, allRunTimes, historyRows, funnelPromos] = await Promise.all([
     loadProfitSnapshotRows(),
     loadScrapeRunTimes(),
     loadDailyProfitHistory(),
-    loadCompletionRows(),
     loadFunnelPromos(),
-    loadDonePromoIds(),
   ]);
   const rows = start === null ? allRows : allRows.filter((row) => denverDate(row.capturedAt) >= start);
 
@@ -75,7 +67,7 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     lastRunAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows, runTimes),
     sportWeekday: sportWeekdayStats(rows),
-    history: dailyHistoryStats(historyRows, window, completionRows),
-    funnel: promoFunnel(funnelPromos, doneIds),
+    history: dailyHistoryStats(historyRows, window),
+    funnel: promoFunnel(funnelPromos),
   };
 }

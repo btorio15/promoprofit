@@ -1,9 +1,9 @@
 import Decimal from "decimal.js";
 
 /**
- * Promo funnel (available, claimed-as-done, expired unused) and per-book
- * health (stake limits, promos removed). Pure, no I/O. "Claimed at the book"
- * is not stored yet, so the funnel tracks promos marked done in the app.
+ * Promo funnel (available, expired, dismissed, pending) and per-book health
+ * (stake limits, promos removed). Site-wide; nothing about what members
+ * marked done (quick-261021-hwm). Pure, no I/O.
  */
 
 export interface FunnelPromo {
@@ -18,8 +18,7 @@ export interface FunnelPromo {
 export interface FunnelTotals {
   total: number;
   available: number;
-  markedDone: number;
-  expiredUnused: number;
+  expired: number;
   dismissed: number;
   pendingReview: number;
 }
@@ -50,14 +49,12 @@ function effectiveStatus(promo: FunnelPromo, now: Date): string {
 
 export function promoFunnel(
   promos: FunnelPromo[],
-  doneIds: ReadonlySet<number>,
   now: Date = new Date(),
 ): PromoFunnelStats {
   const totals: FunnelTotals = {
     total: promos.length,
     available: 0,
-    markedDone: 0,
-    expiredUnused: 0,
+    expired: 0,
     dismissed: 0,
     pendingReview: 0,
   };
@@ -65,10 +62,8 @@ export function promoFunnel(
 
   for (const promo of promos) {
     const status = effectiveStatus(promo, now);
-    const done = doneIds.has(promo.promoId);
-    if (done) totals.markedDone += 1;
     if (status === "active") totals.available += 1;
-    if (status === "expired" && !done) totals.expiredUnused += 1;
+    if (status === "expired") totals.expired += 1;
     if (status === "dismissed") totals.dismissed += 1;
     if (status === "pending_review") totals.pendingReview += 1;
 

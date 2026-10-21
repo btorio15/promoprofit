@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UNKNOWN_SPORT, dailyHistoryStats, type CompletionRow, type HistoryRow } from "./dailyHistory";
+import { UNKNOWN_SPORT, dailyHistoryStats, type HistoryRow } from "./dailyHistory";
 
 let nextPromoId = 1;
 
@@ -142,38 +142,16 @@ describe("dailyHistoryStats", () => {
     expect(pick(stats.days[2].segments)).toEqual([{ sportKey: "icehockey_nhl", profit: "1.00" }]);
   });
 
-  it("keeps extracted apart from available; segments carry no extracted state", () => {
-    const doneRow = row({ denverDate: "2026-09-27", profit: "9.00", sportKey: "americanfootball_ncaaf", bookKey: "fanduel" });
-    const openRow = row({ denverDate: "2026-09-27", profit: "4.00", sportKey: "basketball_nba", bookKey: "fanduel" });
-    const completions: CompletionRow[] = [
-      {
-        promoId: doneRow.promoId,
-        denverDate: "2026-09-27",
-        sportKey: "americanfootball_ncaaf",
-        promoType: "profit_boost",
-        bookKey: "fanduel",
-        profitExtracted: "7.50",
-      },
-    ];
-
-    const stats = dailyHistoryStats([doneRow, openRow], undefined, completions);
+  it("reports available only: segments and groups carry no extracted state", () => {
+    const a = row({ denverDate: "2026-09-27", profit: "9.00", sportKey: "americanfootball_ncaaf", bookKey: "fanduel" });
+    const b = row({ denverDate: "2026-09-27", profit: "4.00", sportKey: "basketball_nba", bookKey: "fanduel" });
+    const stats = dailyHistoryStats([a, b]);
     const segments = stats.days[0].segments;
     expect(segments.map((s) => s.profit)).toEqual(["9.00", "4.00"]);
     expect(segments.every((s) => !("done" in s))).toBe(true);
     expect(stats.grandTotal).toBe("13.00");
-    expect(stats.extractedTotal).toBe("7.50");
-    expect(stats.books[0]).toMatchObject({ key: "fanduel", total: "13.00", extracted: "7.50" });
-  });
-
-  it("counts extracted profit only in the window, by the day it was marked done", () => {
-    const rows = [row({ denverDate: "2026-10-13", profit: "3.00" })];
-    const completions: CompletionRow[] = [
-      { promoId: 1, denverDate: "2026-09-01", sportKey: null, promoType: "bonus_bet", bookKey: "draftkings", profitExtracted: "100.00" },
-      { promoId: 1, denverDate: "2026-10-13", sportKey: null, promoType: "bonus_bet", bookKey: "draftkings", profitExtracted: "2.00" },
-    ];
-
-    const stats = dailyHistoryStats(rows, { start: "2026-10-08", end: "2026-10-14" }, completions);
-    expect(stats.extractedTotal).toBe("2.00");
+    expect("extractedTotal" in stats).toBe(false);
+    expect(stats.books[0]).toEqual({ key: "fanduel", total: "13.00", promos: 2, avgPerPromo: "6.50", smallSample: true });
   });
 
   it("keeps cents exact (no float drift)", () => {

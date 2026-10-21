@@ -1,9 +1,8 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "./client";
-import { promoCompletions, promoProfitObservations, promos, scrapeRuns } from "./schema";
-import type { CompletionRow, HistoryRow } from "@/domain/stats/dailyHistory";
+import { promoProfitObservations, promos, scrapeRuns } from "./schema";
+import type { HistoryRow } from "@/domain/stats/dailyHistory";
 import type { FunnelPromo } from "@/domain/stats/promoFunnel";
-import { denverDate } from "@/domain/promos/profitTotals";
 
 /**
  * Every daily promo profit observation (the older promo_profit_observations
@@ -38,34 +37,6 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
   }));
 }
 
-/**
- * Every member's "marked done" completion, joined to its promo. The Denver
- * date is the day it was marked done. Read-only.
- */
-export async function loadCompletionRows(): Promise<CompletionRow[]> {
-  const db = getDb();
-  const rows = await db
-    .select({
-      promoId: promoCompletions.promoId,
-      completedAt: promoCompletions.completedAt,
-      profitExtracted: promoCompletions.profitExtracted,
-      sportKey: promos.sportKey,
-      promoType: promos.promoType,
-      bookKey: promos.bookKey,
-    })
-    .from(promoCompletions)
-    .leftJoin(promos, eq(promos.id, promoCompletions.promoId));
-
-  return rows.map((row) => ({
-    promoId: row.promoId,
-    denverDate: denverDate(row.completedAt),
-    profitExtracted: row.profitExtracted,
-    sportKey: row.sportKey,
-    promoType: row.promoType ?? "unknown",
-    bookKey: row.bookKey ?? "unknown",
-  }));
-}
-
 /** Every promo's status, book and max stake, for the funnel and book health. */
 export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
   const db = getDb();
@@ -81,12 +52,6 @@ export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
   return rows;
 }
 
-/** Promo ids a member has marked done (across all members). */
-export async function loadDonePromoIds(): Promise<Set<number>> {
-  const db = getDb();
-  const rows = await db.selectDistinct({ promoId: promoCompletions.promoId }).from(promoCompletions);
-  return new Set(rows.map((row) => row.promoId));
-}
 
 /**
  * Start time of every scrape run (one scrape_runs row per book shares the
