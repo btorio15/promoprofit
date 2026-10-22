@@ -47,12 +47,24 @@
 **Depends on**: Phase 1 (bonus-bet finder and hedge engine), Phase 01.1 (cached odds)
 **Requirements**: NSB-01, NSB-02, NSB-03, NSB-04
 **Success Criteria** (what must be TRUE):
+
   1. Given a no-sweat promo (stake, refund cap, min odds, refund as bonus bet), the app returns the qualifying stake and odds, hedge book and stake, and the profit if the bet wins and if it loses, all rounded to the cent.
   2. The refund is valued at the bonus-bet finder's current best conversion rate for that book and the member's hedge books, using cached odds only (no Odds API credits spent).
   3. If the refund book has no odds available, the result says "can't price" instead of showing a number.
   4. Among all cached games and lines that meet the promo's minimum odds, the app picks the line with the highest estimated profit.
   5. Test runs confirm the rounded stake answers match a brute-force search over whole-dollar and cent stakes.
-**Plans**: TBD
+
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — Exact no-sweat solver (solveNoSweat) with research fixtures and brute-force oracle sweep (NSB-01, NSB-04)
+- [ ] 08-02-PLAN.md — Refund conversion rate from the finder's top-1 over My Books, cached odds only, null = can't price (NSB-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-03-PLAN.md — Candidate search across moneylines/spreads/totals with min-odds filter, sport limit and tie-break (NSB-03)
 
 ### Phase 9: No-Sweat Promos in the Feed
 
@@ -60,11 +72,13 @@
 **Depends on**: Phase 8
 **Requirements**: FEED-01, FEED-02, FEED-03, FEED-04, FEED-05
 **Success Criteria** (what must be TRUE):
+
   1. After a scrape, a DraftKings, FanDuel or Bally Bet no-sweat promo for existing customers appears as a no-sweat promo instead of being skipped; new-customer no-sweat offers appear under Sign-up offers.
   2. A no-sweat bet is never shown as a bonus bet (the 2026-10-08 case is a regression test); when the parser and the AI reader disagree on no-sweat vs bonus bet, the promo goes to review.
   3. No-sweat opportunities are ranked in the Opportunities feed alongside other promos, each marked "est." with the conversion rate used.
   4. Dashboard totals, the profit graph's grey line and the Statistics tab are unchanged by no-sweat estimates and stay guaranteed-only.
   5. When a member marks a no-sweat promo done, they enter or confirm the profit they actually made, and that figure (not the estimate) is recorded.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -74,11 +88,13 @@
 **Depends on**: Phase 8, Phase 9
 **Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04, INTRO-05, INTRO-06, INTRO-07
 **Success Criteria** (what must be TRUE):
+
   1. The Sign-up offers screen lists intro offers at books the member doesn't have, ranked by estimated value, best first.
   2. Each ranked offer shows the exact qualifying bet (game, line, odds, stake at the offer's book) and the hedge (book, line, stake), from cached odds.
   3. "Bet & get bonus bets" offers are valued correctly for win-only vs win-or-lose, with each installment's expiry and each installment valued at the live conversion rate; "No-sweat first bet" offers are valued with the no-sweat solver.
   4. Each offer has a whole-plan view: place the qualifying bet and hedge, then each bonus bet as it arrives, with a link to the bonus-bet finder to convert it.
   5. Offers whose terms can't be read in full are marked "terms incomplete" and ranked lower; offers at books with no odds show the headline only under a "can't price" note, never invented odds.
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -88,11 +104,13 @@
 **Depends on**: Phase 10 (structured intro-offer storage), Phase 3 (promo scraping pipeline)
 **Requirements**: BOOKS-01, BOOKS-02, BOOKS-03, BOOKS-04, BOOKS-05, BOOKS-06
 **Success Criteria** (what must be TRUE):
+
   1. After a scheduled run, Hard Rock Bet promos and its intro offer appear through the same parser, AI reader and review pipeline as the existing books.
   2. After a scheduled run, BetMGM's Colorado intro offer appears in Sign-up offers, read by the AI reader.
   3. BetRivers, theScore Bet, Caesars and Fanatics each get a time-boxed check; a scraper ships only where a public, unprotected source works from GitHub Actions, and none uses stealth, proxies or forged sessions.
   4. A block page or empty result never expires live promos (expiry only after two consecutive empty runs), and a zero-result run is logged as a warning.
   5. Each new scraper is proven by one real run on GitHub Actions before it counts as done.
+
 **Plans**: TBD
 
 ## Progress
