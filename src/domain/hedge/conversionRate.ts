@@ -84,6 +84,13 @@ export function makeConversionRateFor(args: {
 }): ConversionRateFor {
   const cache = new Map<string, ConversionRate | null>();
   return (bookKey, amount, hedgeBookKeys) => {
+    // Reject before the cache: toFixed(2) below would otherwise round
+    // 25.004 onto 25.00's entry and return a result for a different amount.
+    if (amount.lte(0) || amount.decimalPlaces() > 2) {
+      throw new RangeError(
+        `amount must be greater than 0 with at most 2 decimal places, got ${amount.toString()}`,
+      );
+    }
     const hedgeKey = [...hedgeBookKeys].sort().join(",");
     const key = `${bookKey}|${amount.toFixed(2)}|${hedgeKey}`;
     if (cache.has(key)) return cache.get(key)!;

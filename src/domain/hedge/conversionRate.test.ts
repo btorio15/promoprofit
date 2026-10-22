@@ -114,6 +114,16 @@ describe("makeConversionRateFor", () => {
     expect(fn("nonexistent_book", new Decimal(100), allKeys)).toBeNull();
   });
 
+  it("rejects amounts the cache key would round, in either call order", () => {
+    const fn = makeConversionRateFor({ events, now });
+    expect(() => fn("draftkings", new Decimal("25.004"), allKeys)).toThrow(RangeError);
+    const exact = fn("draftkings", new Decimal(25), allKeys);
+    expect(exact!.amount.toFixed(2)).toBe("25.00");
+    expect(() => fn("draftkings", new Decimal("25.004"), allKeys)).toThrow(RangeError);
+    expect(() => fn("draftkings", new Decimal(0), allKeys)).toThrow(RangeError);
+    expect(() => fn("draftkings", new Decimal(-5), allKeys)).toThrow(RangeError);
+  });
+
   it("values at the hedge books passed per call, keyed separately in the cache (D-03)", () => {
     const fn = makeConversionRateFor({ events, now });
     const narrow = new Set([...allKeys].filter((k) => k !== "draftkings"));
