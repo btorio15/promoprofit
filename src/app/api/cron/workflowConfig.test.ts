@@ -14,13 +14,10 @@ describe("scrape-promos workflow config (phase 05.1, D-07)", () => {
   const lines = text.split("\n").filter((l) => !l.trim().startsWith("#"));
   const code = lines.join("\n");
 
-  it("has the 15:37 backup plus the 18:37 and 22:37 promo-only passes (debug dk-mlb-choice-boost-missed)", () => {
+  it("schedules only the 5 PM MST run (00:00 UTC); Vercel Cron fires the 7 AM and 12 PM runs (quick-261022-i3j)", () => {
     const crons = lines.filter((l) => /^\s*-\s*cron:/.test(l));
-    expect(crons).toHaveLength(3);
-    expect(crons[0]).toContain("37 15 * * *");
-    expect(crons[1]).toContain("37 18 * * *");
-    expect(crons[2]).toContain("37 22 * * *");
-    expect(code).not.toContain("7 14,18,23");
+    expect(crons).toHaveLength(1);
+    expect(crons[0]).toContain("0 0 * * *");
   });
 
   it("runs the odds observe on every scheduled run, always forced (three odds snapshots a day)", () => {

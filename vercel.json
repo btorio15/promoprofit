@@ -2,8 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
-      "path": "/api/cron/scrape",
-      "schedule": "17 13 * * *"
+      "path": "/api/cron/scrape?slot=morning",
+      "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/scrape?slot=midday",
+      "schedule": "0 19 * * *"
     }
   ]
 }

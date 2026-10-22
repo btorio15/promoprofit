@@ -1,8 +1,8 @@
 /**
  * CLI entry for the odds refresh + profit-observation recording
  * (quick-260927-n12 owner scope change B). Run as its own step in
- * .github/workflows/scrape-promos.yml on every scheduled run (three times a
- * day) with --force. Without --force (manual runs) the Denver morning-window
+ * .github/workflows/scrape-promos.yml on every standard run (three a day:
+ * two dispatched by Vercel Cron, one on the GitHub schedule) with --force. Without --force (manual runs) the Denver morning-window
  * gate applies and the script skips outside it. Loads .env.local via dotenv (a no-op when the file doesn't
  * exist, e.g. in CI) rather than `tsx --env-file`, mirroring
  * scripts/scrape-promos.ts.

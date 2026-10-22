@@ -3,14 +3,15 @@ import type { NextRequest } from "next/server";
 import { dispatchScrapeWorkflow } from "@/lib/githubDispatch";
 
 /**
- * Morning scrape trigger for Vercel Cron (vercel.json, 13:17 UTC = 7:17 AM
- * MDT). Restored in quick-261022-hzb: GitHub's own schedule was starting the
- * "morning" run hours late (around 1:30 PM MT), so promos posted overnight
- * were missing all morning. Vercel's Hobby cron fires on time.
- *
- * It dispatches the Scrape promos workflow as a promo scrape ONLY
- * (skip_morning_observe): the three GitHub scheduled runs already do the odds
- * refresh, so this trigger adds no Odds API spending (D-17).
+ * Scrape + odds trigger for Vercel Cron (quick-261022-i3j). The day has three
+ * standard runs, each a promo scrape plus one moneyline odds refresh and
+ * profit recording, at 7 AM, 12 PM and 5 PM Mountain Standard Time:
+ *   - 14:00 UTC (?slot=morning) and 19:00 UTC (?slot=midday): Vercel Cron
+ *     (Hobby allows two daily jobs), which fires on time;
+ *   - 00:00 UTC (5 PM): the GitHub Actions schedule in scrape-promos.yml,
+ *     which can start late.
+ * The cron times are fixed in UTC, so during daylight time (Mar-Nov) each run
+ * lands an hour later in Mountain time (8 AM, 1 PM, 6 PM).
  *
  * Authentication: Vercel Cron sends `Authorization: Bearer $CRON_SECRET`. The
  * proxy exempts /api/cron/ from the session-cookie check, so this route
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   const result = await dispatchScrapeWorkflow({
     token,
-    forceMorningObserve: false,
+    forceMorningObserve: true,
     repo: process.env.GH_REPO || undefined,
   });
   if (result.ok) return Response.json({ dispatched: true });

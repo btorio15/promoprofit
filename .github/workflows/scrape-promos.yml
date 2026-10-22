@@ -1,20 +1,20 @@
-# Promo scrape + odds refresh + profit snapshots, three times a day.
+# Promo scrape + odds refresh + profit recording, three standard runs a day
+# (quick-261022-i3j): 7 AM, 12 PM and 5 PM Mountain Standard Time (8 AM,
+# 1 PM, 6 PM during daylight time; cron times are fixed in UTC).
 #
-# Each scheduled run (15:37, 18:37 and 22:37 UTC, about 9:37 AM, 12:37 PM and
-# 4:37 PM MDT) does the same work: scrape promos, then run one moneyline odds
-# refresh and record profit snapshots (which feed the Statistics tab) and each
-# member's own observations (member_profit_observations, which feed the
-# Dashboard). Scheduled runs
-# always pass --force so the Denver morning-window gate never skips them.
+#   - 14:00 and 19:00 UTC: Vercel Cron calls /api/cron/scrape, which
+#     dispatches this workflow with force_morning_observe=true (on time).
+#   - 00:00 UTC: this workflow's own schedule below (GitHub can start
+#     scheduled runs late, by up to a few hours).
+#
+# Every run scrapes promos, then runs one moneyline odds refresh and records
+# profit snapshots (Statistics) and each member's own observations
+# (member_profit_observations, the Dashboard). Scheduled and Vercel-triggered
+# runs always pass --force so the Denver morning-window gate never skips them.
 #
 # Odds cost: each refresh spends about sports x region-groups x 1 credits (see
-# src/ingestion/odds/quota.ts). Three runs a day is well above the 500-credit
-# free-tier budget, so the in-app credit guard will block refreshes once the
-# budget runs low. Lower the schedule or the sport list if that matters.
-#
-# Morning: GitHub often starts the 15:37 run hours late, so Vercel Cron also
-# dispatches this workflow at 13:17 UTC (7:17 AM MDT) via /api/cron/scrape as
-# a promo scrape only (skip_morning_observe=true; no extra odds spend).
+# src/ingestion/odds/quota.ts), three refreshes a day. The in-app credit guard
+# blocks refreshes once the budget runs low.
 #
 # Manual dispatch is still available. force_morning_observe runs the odds step
 # outside the morning window. skip_morning_observe skips the odds step.
@@ -26,9 +26,7 @@ name: Scrape promos
 
 on:
   schedule:
-    - cron: "37 15 * * *"
-    - cron: "37 18 * * *"
-    - cron: "37 22 * * *"
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       force_morning_observe:

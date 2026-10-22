@@ -11,12 +11,12 @@ describe("vercel.json cron config", () => {
 
   const config = JSON.parse(readFileSync(join(REPO_ROOT, "vercel.json"), "utf8"));
 
-  it("declares one daily Vercel cron at 13:17 UTC for an on-time morning promo scrape (quick-261022-hzb)", () => {
-    // GitHub starts its scheduled runs hours late, so the morning promo scrape
-    // comes from Vercel Cron (Hobby: one daily job). The route dispatches a
-    // promo scrape only, so the three GitHub odds refreshes stay the only
-    // Odds API spending.
-    expect(config.crons).toEqual([{ path: "/api/cron/scrape", schedule: "17 13 * * *" }]);
+  it("declares the two on-time Vercel runs: 14:00 and 19:00 UTC (7 AM and 12 PM MST) (quick-261022-i3j)", () => {
+    // Hobby allows two daily cron jobs. The 5 PM run is the GitHub schedule.
+    expect(config.crons).toEqual([
+      { path: "/api/cron/scrape?slot=morning", schedule: "0 14 * * *" },
+      { path: "/api/cron/scrape?slot=midday", schedule: "0 19 * * *" },
+    ]);
     expect(existsSync(join(REPO_ROOT, "src/app/api/cron/scrape/route.ts"))).toBe(true);
   });
 

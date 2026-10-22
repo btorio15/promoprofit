@@ -83,12 +83,12 @@ describe("GET /api/cron/scrape", () => {
     expect(mockDispatch.mock.calls[0][0].repo).toBe("a/b");
   });
 
-  it("dispatches a promo scrape only -- the odds step is skipped, so no extra Odds API spend (quick-261022-hzb)", async () => {
+  it("dispatches a scrape plus a forced odds refresh (quick-261022-i3j: every standard run does both)", async () => {
     mockDispatch.mockResolvedValue({ ok: true });
     const res = await GET(req(`Bearer ${SECRET}`));
     expect(res.status).toBe(200);
     expect(mockDispatch).toHaveBeenCalledTimes(1);
-    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(false);
+    expect(mockDispatch.mock.calls[0][0].forceMorningObserve).toBe(true);
   });
 
   it("does not dispatch when unauthorized", async () => {
