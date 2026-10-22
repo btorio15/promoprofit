@@ -114,10 +114,17 @@ Plans:
 5. Stale comments fixed (AppShell tab names, morning-observe gating, scrape workflow description); full test suite, type check and lint green.
 **Requirements**: STATS-02, STATS-08 (hardening; no new requirements)
 **Depends on:** Phase 7
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 07.1 to break down)
+**Wave 1**
+
+- [ ] 07.1-01-PLAN.md — Failure-safe recording: isolated morning-job recorders, shared member recorder, Dashboard side recording reuses loaded odds (W1, W2)
+- [ ] 07.1-03-PLAN.md — Totals card error state and "Couldn't load" for series errors; AppShell comment (W3, IN-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07.1-02-PLAN.md — Remove dead Promos-tab totals and helpers; Promos tab records the member's own observations (W4); final test/type/lint gate
 
 ### Phase 8: More Sportsbooks
 
