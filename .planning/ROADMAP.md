@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MarginMind v1.0** — Phases 1, 01.1, 2, 3, 4, 5, 05.1 (shipped 2026-10-02) — full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
-- 🚧 **v1.1 Profit Stats** — Phases 6–7 (in progress)
+- 🚧 **v1.1 Profit Stats** — Phases 6, 7, 07.1 (in progress)
 
 ## Phases
 
@@ -26,6 +26,7 @@
 
 - [x] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page (completed 2026-10-13)
 - [x] **Phase 7: Dashboard** - Opportunities tab becomes the Dashboard: headline totals and counts above the profit graph, full feed below; profit summary leaves the Promos tab (completed 2026-10-17)
+- [ ] **Phase 07.1: Profit Stats Cleanup** (INSERTED) - Close v1.1 audit tech debt: resilient recording, Dashboard error states, dead Promos totals removed
 
 ### 📋 Next (milestone to be named)
 
@@ -102,6 +103,22 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 07.1: Profit Stats Cleanup (INSERTED)
+
+**Goal:** Close the v1.1 milestone audit's tech debt (`.planning/v1.1-MILESTONE-AUDIT.md`) so the Dashboard's numbers keep updating and the screen stays usable when something fails, and remove dead code left by Phase 7.
+**Success criteria:**
+1. A failure in the site-wide (Statistics) recorders never stops the scheduled job from recording each member's own observations (W1).
+2. A failure in the Dashboard's side recording never takes down the totals, graph and feed; the Dashboard does not re-read odds it already loaded (W2).
+3. When the Dashboard load fails, the totals card shows an error state instead of disappearing, and a database error is not shown as "Not ready yet" (W3, IN-05).
+4. The Promos tab no longer computes or returns profit totals nothing renders (loadAvailableProfit, totalExtracted, availableProfit, totalProfit and their helpers removed), and promos seen on the Promos tab also reach the member's grey line (W4).
+5. Stale comments fixed (AppShell tab names, morning-observe gating, scrape workflow description); full test suite, type check and lint green.
+**Requirements**: STATS-02, STATS-08 (hardening; no new requirements)
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 07.1 to break down)
+
 ### Phase 8: More Sportsbooks
 
 **Goal:** Promos and intro offers from more Colorado sportsbooks show up in the feed automatically, alongside DraftKings, FanDuel and Bally Bet (today's scrapers). Target books: BetMGM, bet365, Fanatics, plus Caesars, BetRivers, Hard Rock Bet and theScore Bet as feasible. Each book gets a promo scraper in the scheduled job and its intro offers in Sign-up offers; members can select it in My Books.
@@ -120,6 +137,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 7/7 | Complete    | 2026-10-17 |
+| 07.1. Profit Stats Cleanup | v1.1 | 0/0 | Not started | - |
 | 8. More Sportsbooks | next | 0/0 | Not started | - |
 
 ## Backlog

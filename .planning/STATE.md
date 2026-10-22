@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Profit Stats
-status: ready_to_plan
-stopped_at: Phase 7 complete (7/7) — ready to discuss Phase 999.1
-last_updated: 2026-10-17T21:13:19.824Z
-last_activity: 2026-10-16 -- Phase 07 execution started
+status: planning
+stopped_at: Phase 07.1 inserted after v1.1 audit
+last_updated: "2026-10-22T16:35:38.234Z"
+last_activity: "2026-10-21 - Completed quick task 261021-hwm: remove extracted from Statistics"
 progress:
-  total_phases: 3
-  completed_phases: 1
-  total_plans: 13
+  total_phases: 5
+  completed_phases: 2
+  total_plans: 14
   completed_plans: 14
-  percent: 33
+  percent: 40
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-25)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 999.1 — admin page
+**Current focus:** Phase 07.1 — Profit Stats Cleanup
 
 ## Current Position
 
-Phase: 999.1
+Phase: 07.1
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-10-21 - Completed quick task 261021-hwm: remove extracted from Statistics
@@ -88,6 +88,7 @@ Last activity: 2026-10-21 - Completed quick task 261021-hwm: remove extracted fr
 - Phase 05.1 inserted after Phase 5: Deploy to Vercel + once-daily Vercel Cron morning scrape (drop midday/evening runs) + login/invite/books form throw guards — v1.0 audit cleanup (PROMO-03, integration W1); owner chose Vercel deploy 2026-10-01 (URGENT)
 - Phase 7 edited: renamed Stats Page -> Dashboard (owner 2026-10-13): Opportunities tab becomes Dashboard; edited fields: title, goal, success_criteria; STATS-07..10 reworded
 - Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
+- Phase 07.1 inserted after Phase 7: Profit Stats Cleanup: close v1.1 audit tech debt (owner chose option B 2026-10-22)
 
 ### Decisions
 
