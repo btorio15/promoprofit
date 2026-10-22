@@ -2,6 +2,7 @@
 created: 2026-10-22T00:00:00Z
 title: Support no-sweat bets (normal promos and intro offers) with a hedge algorithm
 area: promos
+resolves_phase: 8
 files:
   - src/ingestion/promos/exclusions.ts
   - src/ingestion/promos/reviewTriage.ts
