@@ -8,6 +8,8 @@ import {
   type ConversionRateFor,
 } from "@/domain/hedge/conversionRate";
 import { solveNoSweat } from "@/domain/hedge/noSweat";
+import { americanToDecimal } from "@/domain/hedge/americanOdds";
+import { isTieRiskSport } from "@/config/sports";
 import {
   noSweatScope,
   rankNoSweat,
@@ -344,20 +346,60 @@ describe("rankNoSweat search", () => {
     const r = rankNoSweat(promo, opts({ moneylineEvents: events }));
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
-    const best = r.opportunity.solution.estimatedProfit;
-    for (const [q, h] of [
-      [400, -700],
-      [-600, -300],
-      [150, 130],
-      [-180, 135],
-      [100, 105],
-      [-120, -125],
-      [-120, 105],
-    ]) {
-      if (q < -500) continue;
-      expect(best.gte(solve(q, h).estimatedProfit)).toBe(true);
+
+    // Build the real candidate set from the fixture: for each side, the promo
+    // book's price and the best member price on the opposite side.
+    const priceOf = (ev: OddsEvent, bookKey: string, team: string) =>
+      ev.bookmakers
+        .find((b) => b.key === bookKey)!
+        .markets.find((m) => m.key === "h2h")!
+        .outcomes.find((o) => o.name === team)!.price;
+    const candidates: {
+      eventId: string;
+      side: "home" | "away";
+      q: number;
+      h: number;
+    }[] = [];
+    for (const ev of events) {
+      for (const side of ["home", "away"] as const) {
+        const team = side === "home" ? ev.home_team : ev.away_team;
+        const opp = side === "home" ? ev.away_team : ev.home_team;
+        const q = priceOf(ev, promo.bookKey, team);
+        if (americanToDecimal(q).lt(americanToDecimal(promo.minOddsAmerican!)))
+          continue;
+        const h = ev.bookmakers
+          .filter((b) => HEDGE_BOOKS.has(b.key))
+          .map((b) => priceOf(ev, b.key, opp))
+          .reduce((x, y) =>
+            americanToDecimal(y).gt(americanToDecimal(x)) ? y : x,
+          );
+        candidates.push({ eventId: ev.id, side, q, h });
+      }
     }
-    expect(r.opportunity.selection.eventId).not.toBe("a");
+    // a/away (-600) is below min odds; the rest are real candidates, and
+    // event b's home hedge is DraftKings +135 (not FanDuel +130).
+    expect(candidates.map((c) => [c.eventId, c.side, c.q, c.h])).toEqual([
+      ["a", "home", 400, -700],
+      ["b", "home", 150, 135],
+      ["b", "away", -180, -140],
+      ["c", "home", 100, 105],
+      ["c", "away", -120, -125],
+    ]);
+    expect(r.candidatesEvaluated).toBe(candidates.length);
+
+    const scored = candidates.map((c) => ({
+      ...c,
+      profit: solve(c.q, c.h).estimatedProfit,
+    }));
+    const expected = scored.reduce((x, y) => (y.profit.gt(x.profit) ? y : x));
+    const o = r.opportunity;
+    expect(o.solution.estimatedProfit.equals(expected.profit)).toBe(true);
+    expect(o.selection.eventId).toBe(expected.eventId);
+    expect(o.selection.side).toBe(expected.side);
+    expect(o.qualifying.oddsAmerican).toBe(expected.q);
+    expect(o.hedge.oddsAmerican).toBe(expected.h);
+    // The longest qualifying odds (+400) do not win on estimated profit.
+    expect(o.selection.eventId).not.toBe("a");
   });
 
   it("chooses the higher-odds member hedge book", () => {
@@ -623,19 +665,57 @@ describe("rankNoSweat search", () => {
     expect(r.opportunity.solution.refundValue.equals(member.profit)).toBe(true);
   });
 
-  it("carries tieRisk and sameBook through", () => {
+  it("carries tieRisk through (true for a tie-risk sport, false otherwise)", () => {
+    const quotes = [
+      { bookKey: "hardrockbet", homePrice: 120, awayPrice: -140 },
+      { bookKey: "draftkings", homePrice: -130, awayPrice: 110 },
+    ];
+    expect(isTieRiskSport("americanfootball_nfl")).toBe(true);
+    expect(isTieRiskSport("basketball_nba")).toBe(false);
+    const nfl = rankNoSweat(
+      promo,
+      opts({
+        moneylineEvents: [
+          moneylineEvent({ id: "t", sportKey: "americanfootball_nfl", quotes }),
+        ],
+      }),
+    );
+    expect(nfl.kind).toBe("ok");
+    if (nfl.kind !== "ok") return;
+    expect(nfl.opportunity.tieRisk).toBe(true);
+    expect(nfl.opportunity.sameBook).toBe(false);
+
+    const nba = rankNoSweat(
+      promo,
+      opts({
+        moneylineEvents: [
+          moneylineEvent({ id: "t", sportKey: "basketball_nba", quotes }),
+        ],
+      }),
+    );
+    expect(nba.kind).toBe("ok");
+    if (nba.kind !== "ok") return;
+    expect(nba.opportunity.tieRisk).toBe(false);
+  });
+
+  it("flags sameBook when the promo book is the best member hedge", () => {
     const g = moneylineEvent({
-      id: "t",
+      id: "sb",
       quotes: [
-        { bookKey: "hardrockbet", homePrice: 120, awayPrice: -140 },
-        { bookKey: "draftkings", homePrice: -130, awayPrice: 110 },
+        { bookKey: "hardrockbet", homePrice: 120, awayPrice: 105 },
+        { bookKey: "draftkings", homePrice: -150, awayPrice: -130 },
       ],
     });
-    const r = rankNoSweat(promo, opts({ moneylineEvents: [g] }));
+    const r = rankNoSweat(
+      promo,
+      opts({
+        moneylineEvents: [g],
+        hedgeBookKeys: new Set(["hardrockbet", "draftkings"]),
+      }),
+    );
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
-    expect(r.opportunity.sameBook).toBe(false);
-    expect(typeof r.opportunity.tieRisk).toBe("boolean");
-    expect(r.opportunity.tieRisk).toBe(r.opportunity.selection.tieRisk);
+    expect(r.opportunity.hedge.bookKey).toBe("hardrockbet");
+    expect(r.opportunity.sameBook).toBe(true);
   });
 });
