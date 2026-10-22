@@ -144,7 +144,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 7/7 | Complete    | 2026-10-17 |
-| 07.1. Profit Stats Cleanup | v1.1 | 3/3 | Complete   | 2026-10-22 |
+| 07.1. Profit Stats Cleanup | v1.1 | 3/3 | Complete    | 2026-10-22 |
 | 8. More Sportsbooks | next | 0/0 | Not started | - |
 
 ## Backlog
