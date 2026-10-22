@@ -5,15 +5,16 @@ import { promoVisibilityCondition } from "./promos";
 import type { HistoryRow } from "@/domain/stats/dailyHistory";
 import type { FunnelPromo } from "@/domain/stats/promoFunnel";
 
+type Db = ReturnType<typeof getDb>;
+
 /**
  * Every daily promo profit observation (the older promo_profit_observations
  * table), joined to its promo for sport, type, face value and max stake.
  * Read-only; feeds the Statistics page "Since Sep 27" section. Rows for
  * members' private promos are excluded.
  */
-export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
-  const db = getDb();
-  const rows = await db
+export function buildDailyProfitHistoryQuery(db: Db) {
+  return db
     .select({
       promoId: promoProfitObservations.promoId,
       denverDate: promoProfitObservations.denverDate,
@@ -29,7 +30,10 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
     // Site-wide page: scraped promos only, never a member's private promo
     // (WR-02). No viewer means the group-only visibility rule.
     .where(promoVisibilityCondition());
+}
 
+export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
+  const rows = await buildDailyProfitHistoryQuery(getDb());
   return rows.map((row) => ({
     promoId: row.promoId,
     denverDate: row.denverDate,
@@ -43,9 +47,8 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
 }
 
 /** Every site-wide (scraped) promo's status, book and max stake, for the funnel and book health. */
-export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
-  const db = getDb();
-  const rows = await db
+export function buildFunnelPromosQuery(db: Db) {
+  return db
     .select({
       promoId: promos.id,
       bookKey: promos.bookKey,
@@ -57,7 +60,10 @@ export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
     // Site-wide only: members' private hand-added promos stay out of the
     // funnel and book health, like the rest of Statistics (07.1 review fix).
     .where(promoVisibilityCondition());
-  return rows;
+}
+
+export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
+  return buildFunnelPromosQuery(getDb());
 }
 
 
