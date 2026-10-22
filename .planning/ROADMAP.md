@@ -59,8 +59,8 @@
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Exact no-sweat solver (solveNoSweat) with research fixtures and brute-force oracle sweep (NSB-01, NSB-04)
-- [ ] 08-02-PLAN.md — Refund conversion rate from the finder's top-1 over My Books, cached odds only, null = can't price (NSB-02)
+- [x] 08-01-PLAN.md — Exact no-sweat solver (solveNoSweat) with research fixtures and brute-force oracle sweep (NSB-01, NSB-04)
+- [x] 08-02-PLAN.md — Refund conversion rate from the finder's top-1 over My Books, cached odds only, null = can't price (NSB-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -119,7 +119,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
-| 8. No-Sweat Bet Math | v1.2 | 0/0 | Not started | - |
+| 8. No-Sweat Bet Math | v1.2 | 2/3 | In Progress|  |
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/0 | Not started | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |

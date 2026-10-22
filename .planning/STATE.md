@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: executing
 stopped_at: Phase 8 context gathered
-last_updated: "2026-10-22T20:21:30.689Z"
-last_activity: 2026-10-22 -- Phase 8 planning complete
+last_updated: "2026-10-22T20:22:29.172Z"
+last_activity: 2026-10-22 -- Phase 8 execution started
 progress:
   total_phases: 5
   completed_phases: 0
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** v1.2 Intro Offers & No-Sweat — Phase 8 (No-Sweat Bet Math), ready to plan
+**Current focus:** Phase 8 — No-Sweat Bet Math
 
 ## Current Position
 
-Phase: 8 of 11 (No-Sweat Bet Math) — not started
-Plan: —
-Status: Ready to execute
-Last activity: 2026-10-22 -- Phase 8 planning complete
+Phase: 8 (No-Sweat Bet Math) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 8
+Last activity: 2026-10-22 -- Phase 8 execution started
 
 ## Performance Metrics
 
