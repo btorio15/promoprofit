@@ -360,7 +360,7 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     warnSpy.mockRestore();
   });
 
-  it("regression: a pattern-kept candidate (DK 1125873) with a guard-backed maxStake disagreement still goes to review(disagreement)", async () => {
+  it("regression: a pattern-kept candidate (DK 1125873) with a guard-backed maxStake disagreement at medium confidence still goes to review(disagreement)", async () => {
     const parsed = draftkingsScraper.parse(
       { listBody: readFixture("draftkings-promos-2026-09-28.json"), detailBodies: {} },
       { now: NOW, sourceUrl: draftkingsScraper.listRequest.url },
@@ -376,7 +376,7 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
       maxStake: "25",
       minOddsAmerican: -200,
       sport: "icehockey_nhl",
-      confidence: "high",
+      confidence: "medium",
       evidence: {
         boostPercent: "Profit Boost: 50%",
         maxStake: "MAX $25 WAGER",

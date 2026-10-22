@@ -1085,7 +1085,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
     expect(stats.disagreements).toBe(0);
   });
 
-  it("a disagreeing reader on 1125873's boost demotes it to review, preserving its dedupe key", async () => {
+  it("a medium-confidence disagreeing reader on 1125873's boost demotes it to review, preserving its dedupe key", async () => {
     const realFixtureResult = draftkingsScraper.parse(
       { listBody: loadDkFixtureBody(), detailBodies: {} },
       { now: DK_NOW, sourceUrl: DK_SOURCE_URL },
@@ -1123,7 +1123,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
           propOnly: false,
           newCustomerOnly: false,
           eventDateText: "9/29/2026",
-          confidence: "high",
+          confidence: "medium",
           evidence: {
             boostPercent: "Profit Boost: 50%",
             bonusAmount: null,

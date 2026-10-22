@@ -136,7 +136,7 @@ export interface SkippedEntry {
    * never become a classify review row -- even though its own reason would
    * otherwise be review-worthy (e.g. unrecognized).
    */
-  reviewSuppressed?: "reader_rescue_without_amount";
+  reviewSuppressed?: "reader_rescue_without_amount" | "reader_not_usable";
 }
 
 export interface ParseResult {

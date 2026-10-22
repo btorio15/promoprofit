@@ -16,7 +16,7 @@ import type { GuardedReading } from "./verbatimGuard";
 export type ReconcileEntry = { kind: "candidate"; candidate: ScrapedPromo } | { kind: "skip"; skip: SkippedEntry };
 
 export type ReconcileOutcome =
-  | { kind: "candidate"; candidate: ScrapedPromo; via: "agree" | "merged" | "rescued" | "pattern_only" }
+  | { kind: "candidate"; candidate: ScrapedPromo; via: "agree" | "merged" | "rescued" | "pattern_only" | "reader_preferred" }
   | {
       kind: "review";
       skip: SkippedEntry;
@@ -25,7 +25,7 @@ export type ReconcileOutcome =
   | {
       kind: "skip";
       skip: SkippedEntry;
-      via: "agree_not_usable" | "pattern_only" | "clear_reason_kept" | "rescue_without_amount";
+      via: "agree_not_usable" | "pattern_only" | "clear_reason_kept" | "rescue_without_amount" | "reader_overrides_parser";
     };
 
 const RAW_TEXT_MAX_CHARS = 2000;
@@ -43,6 +43,20 @@ function isUsable(reading: GuardedReading): boolean {
     !reading.propOnly &&
     !reading.newCustomerOnly
   );
+}
+
+/**
+ * quick-261022-hxb (owner: "trust the AI over the parser for now"): the skip
+ * reason for a promo the reader rules out. A restriction flag wins, then the
+ * reader's own reason when it is a clear one, else not_a_promo.
+ */
+function readerSkipReason(reading: GuardedReading): SkippedEntry["reason"] {
+  if (reading.propOnly) return "prop";
+  if (reading.liveOnly) return "live_only";
+  if (reading.parlayOrSgpOnly) return "sgp";
+  if (reading.newCustomerOnly) return "new_customer";
+  if (reading.skipReason !== null && CLEAR_SKIP_REASONS.has(reading.skipReason)) return reading.skipReason;
+  return "not_a_promo";
 }
 
 /** True only when both sides are non-null and differ -- one side unknown is never a disagreement. */
@@ -168,8 +182,13 @@ function applyReaderTeams(merged: ScrapedPromo, reading: GuardedReading): boolea
 /**
  * Rule order (candidate entry): reader unusable -> guard drops -> promoType/
  * money disagreement -> otherwise fill nulls from the reader and try a
- * schema-validated merge. A pattern-kept candidate can only ever be demoted
- * to human review here, never dropped outright (T-kc5-02).
+ * schema-validated merge.
+ *
+ * quick-261022-hxb (owner decision, supersedes T-kc5-02's "never dropped"):
+ * the reader is trusted over the parser when it is high-confidence. A
+ * high-confidence "not usable" skips the candidate (suppressed from review);
+ * a high-confidence disagreement with a clean guard takes the reader's type
+ * and amounts. Medium/low confidence still goes to human review.
  */
 function reconcileCandidate(
   entry: { kind: "candidate"; candidate: ScrapedPromo },
@@ -179,6 +198,19 @@ function reconcileCandidate(
   const candidate = entry.candidate;
 
   if (!isUsable(reading)) {
+    if (reading.confidence === "high") {
+      return {
+        kind: "skip",
+        skip: {
+          reason: readerSkipReason(reading),
+          externalId: candidate.externalId,
+          title: candidate.title,
+          evidence: { rawText: candidate.rawText, sourceUrl: candidate.sourceUrl, expiresAt: candidate.expiresAt, partial: null },
+          reviewSuppressed: "reader_not_usable",
+        },
+        via: "reader_overrides_parser",
+      };
+    }
     return {
       kind: "review",
       skip: buildReviewSkip(entry, reading, "reader_not_usable", { partial: candidate, dedupeKey: promoDedupeKey(candidate) }, fallbackSourceUrl),
@@ -201,6 +233,25 @@ function reconcileCandidate(
     moneyDiffers(candidate.maxStake, reading.maxStake) ||
     moneyDiffers(candidate.maxWinnings?.amount ?? null, reading.maxWinnings) ||
     intDiffers(candidate.minOddsAmerican, reading.minOddsAmerican);
+
+  if (disagrees && reading.confidence === "high") {
+    const preferred: ScrapedPromo = {
+      ...candidate,
+      promoType: reading.kind as PromoType,
+      boostPercent: reading.kind === "profit_boost" ? reading.boostPercent : null,
+      bonusAmount: reading.kind === "bonus_bet" ? reading.bonusAmount : null,
+      maxStake: reading.maxStake ?? candidate.maxStake,
+      minOddsAmerican: reading.minOddsAmerican ?? candidate.minOddsAmerican,
+      maxWinnings:
+        reading.maxWinnings !== null && candidate.winningsCapKind
+          ? { amount: reading.maxWinnings, kind: candidate.winningsCapKind }
+          : candidate.maxWinnings,
+    };
+    const validated = ScrapedPromoSchema.safeParse(preferred);
+    if (validated.success) {
+      return { kind: "candidate", candidate: validated.data, via: "reader_preferred" };
+    }
+  }
 
   if (disagrees) {
     return {

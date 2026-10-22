@@ -98,6 +98,12 @@ export async function applyPromoReader(input: {
         rescuedCandidates.push(outcome.candidate);
         stats.rescues++;
       } else {
+        if (outcome.via === "reader_preferred") {
+          stats.disagreements++;
+          console.warn(
+            `applyPromoReader: reader preferred for ${bookKey} ${externalIdOf(entry) ?? "(no id)"}: parser and reader disagreed; reader's type and amounts used (high confidence)`,
+          );
+        }
         candidates.push(outcome.candidate);
       }
       return;
@@ -124,6 +130,13 @@ export async function applyPromoReader(input: {
 
     // outcome.kind === "skip"
     if (outcome.via === "agree_not_usable") stats.skippedByReader++;
+    if (outcome.via === "reader_overrides_parser") {
+      stats.skippedByReader++;
+      stats.disagreements++;
+      console.warn(
+        `applyPromoReader: reader overrode parser for ${bookKey} ${externalIdOf(entry) ?? "(no id)"}: parser kept it, reader said not usable (${outcome.skip.reason}, high) -- skipped, not sent to review`,
+      );
+    }
     if (outcome.via === "clear_reason_kept") {
       stats.clearSkipOverrides++;
       if (guarded) {

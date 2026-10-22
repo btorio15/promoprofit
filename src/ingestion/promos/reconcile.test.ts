@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { draftkingsScraper } from "./books/draftkings";
 import { reconcileEntry } from "./reconcile";
+import { isReviewWorthySkip } from "./reviewTriage";
 import { guardReading, type GuardedReading } from "./verbatimGuard";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
 import type { ParseResult, ScrapedPromo, SkippedEntry } from "@/domain/promos/scraped";
@@ -105,7 +106,7 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome).toEqual({ kind: "candidate", candidate, via: "agree" });
   });
 
-  it("(b) a simulated parser mistake (maxStake 10.00) vs a guard-backed reader maxStake 25.00 goes to review(disagreement) with both readings visible", () => {
+  it("(b2) quick-261022-hxb: at high confidence the reader's amounts win a disagreement (reader_preferred)", () => {
     const real = findCandidate("1125873");
     const candidate: ScrapedPromo = { ...real, maxStake: "10.00" };
     const reading = guardedReading({
@@ -114,6 +115,26 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
       maxStake: "25.00",
       minOddsAmerican: -200,
       sport: "icehockey_nhl",
+      confidence: "high",
+    });
+    const outcome = reconcileEntry("draftkings", { kind: "candidate", candidate }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("candidate");
+    if (outcome.kind !== "candidate") throw new Error("expected candidate");
+    expect(outcome.via).toBe("reader_preferred");
+    expect(outcome.candidate.maxStake).toBe("25.00");
+    expect(outcome.candidate.boostPercent).toBe("50.00");
+  });
+
+  it("(b) a simulated parser mistake (maxStake 10.00) vs a guard-backed reader maxStake 25.00 at medium confidence goes to review(disagreement) with both readings visible", () => {
+    const real = findCandidate("1125873");
+    const candidate: ScrapedPromo = { ...real, maxStake: "10.00" };
+    const reading = guardedReading({
+      kind: "profit_boost",
+      boostPercent: "50.00",
+      maxStake: "25.00",
+      minOddsAmerican: -200,
+      sport: "icehockey_nhl",
+      confidence: "medium",
     });
     const outcome = reconcileEntry("draftkings", { kind: "candidate", candidate }, reading, SOURCE_URL);
     expect(outcome.kind).toBe("review");
@@ -199,9 +220,31 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome.why).toBe("rescue_needs_review");
   });
 
-  it("(f) the parser keeps 1125873 but the reader says not_usable -- review with the candidate's own dedupe key", () => {
+  it("(f2) quick-261022-hxb: a high-confidence props-only reading skips the kept candidate, suppressed from review", () => {
     const candidate = findCandidate("1125873");
-    const reading = guardedReading({ kind: "not_usable", confidence: "high" });
+    const reading = guardedReading({ kind: "profit_boost", boostPercent: "50.00", propOnly: true, confidence: "high" });
+    const outcome = reconcileEntry("draftkings", { kind: "candidate", candidate }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("skip");
+    if (outcome.kind !== "skip") throw new Error("expected skip");
+    expect(outcome.via).toBe("reader_overrides_parser");
+    expect(outcome.skip.reason).toBe("prop");
+    expect(outcome.skip.reviewSuppressed).toBe("reader_not_usable");
+    expect(isReviewWorthySkip(outcome.skip)).toBe(false);
+  });
+
+  it("(f3) quick-261022-hxb: a high-confidence not_usable with no clear reason still never reaches review", () => {
+    const candidate = findCandidate("1125873");
+    const reading = guardedReading({ kind: "not_usable", skipReason: "unrecognized", confidence: "high" });
+    const outcome = reconcileEntry("draftkings", { kind: "candidate", candidate }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("skip");
+    if (outcome.kind !== "skip") throw new Error("expected skip");
+    expect(outcome.skip.reason).toBe("not_a_promo");
+    expect(isReviewWorthySkip(outcome.skip)).toBe(false);
+  });
+
+  it("(f) the parser keeps 1125873 but a medium-confidence reader says not_usable -- review with the candidate's own dedupe key", () => {
+    const candidate = findCandidate("1125873");
+    const reading = guardedReading({ kind: "not_usable", confidence: "medium" });
     const outcome = reconcileEntry("draftkings", { kind: "candidate", candidate }, reading, SOURCE_URL);
     expect(outcome.kind).toBe("review");
     if (outcome.kind !== "review") throw new Error("expected review");
