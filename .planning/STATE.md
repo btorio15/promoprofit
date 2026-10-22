@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 Phase: 08
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-22
+Last activity: 2026-10-22 - Completed quick task 261022-hn4: v1.1 audit cleanup
 
 ## Performance Metrics
 
@@ -204,6 +204,7 @@ Recent decisions affecting current work:
 | 261021-gy4 | Fix Statistics accuracy: each promo counted once (available $213.74 -> $139.93), runs from scrape_runs with $0 runs, any-sport snapshots, Available now skips expired, group-wide labels | 2026-10-21 | ad425ac | Verified | [261021-gy4-fix-statistics-page-accuracy](./quick/261021-gy4-fix-statistics-page-accuracy/) |
 | 261021-ht5 | Statistics block graph shows available profit only (no extracted / not-extracted blocks) | 2026-10-21 | 84d599b | Verified | [261021-ht5-block-graph-shows-available-only](./quick/261021-ht5-block-graph-shows-available-only/) |
 | 261021-hwm | Remove all extracted / marked-done figures from Statistics (site-wide profit available only) | 2026-10-21 | 3a97379 | Verified | [261021-hwm-remove-extracted-from-statistics](./quick/261021-hwm-remove-extracted-from-statistics/) |
+| 261022-hn4 | v1.1 audit cleanup: edit/delete of own promo clears stale member observations; tests for Statistics private-promo filters; spy/comment tidy | 2026-10-22 | c865962 | Verified | [261022-hn4-v1-1-audit-cleanup](./quick/261022-hn4-v1-1-audit-cleanup/) |
 
 ## Deferred Items
 
