@@ -32,7 +32,17 @@ export interface ConversionRate {
   hedgeBookKey: string;
 }
 
-export type ConversionRateFor = (bookKey: string, amount: Decimal) => ConversionRate | null;
+/**
+ * Values a refund of `amount` at `bookKey`, hedging only at `hedgeBookKeys`.
+ * The hedge books are an argument (not fixed when the function is built) so
+ * the caller passes the same set it hedges the qualifying bet with: the refund
+ * can never be valued at books the member can't use (D-03).
+ */
+export type ConversionRateFor = (
+  bookKey: string,
+  amount: Decimal,
+  hedgeBookKeys: ReadonlySet<string>,
+) => ConversionRate | null;
 
 export function topConversionFor(args: {
   events: OddsEvent[];
@@ -71,13 +81,18 @@ export function topConversionFor(args: {
 export function makeConversionRateFor(args: {
   events: OddsEvent[];
   now: Date;
-  hedgeBookKeys: ReadonlySet<string>;
 }): ConversionRateFor {
   const cache = new Map<string, ConversionRate | null>();
-  return (bookKey, amount) => {
-    const key = `${bookKey}|${amount.toFixed(2)}`;
+  return (bookKey, amount, hedgeBookKeys) => {
+    const hedgeKey = [...hedgeBookKeys].sort().join(",");
+    const key = `${bookKey}|${amount.toFixed(2)}|${hedgeKey}`;
     if (cache.has(key)) return cache.get(key)!;
-    const value = topConversionFor({ ...args, refundBookKey: bookKey, amount });
+    const value = topConversionFor({
+      ...args,
+      refundBookKey: bookKey,
+      amount,
+      hedgeBookKeys,
+    });
     cache.set(key, value);
     return value;
   };

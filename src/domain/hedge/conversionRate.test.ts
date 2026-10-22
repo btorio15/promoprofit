@@ -96,7 +96,7 @@ describe("topConversionFor", () => {
 
 describe("makeConversionRateFor", () => {
   it("matches topConversionFor and memoizes per (book, amount)", () => {
-    const fn = makeConversionRateFor({ events, now, hedgeBookKeys: allKeys });
+    const fn = makeConversionRateFor({ events, now });
     const direct = topConversionFor({
       events,
       now,
@@ -104,11 +104,32 @@ describe("makeConversionRateFor", () => {
       amount: new Decimal(100),
       hedgeBookKeys: allKeys,
     });
-    const a = fn("draftkings", new Decimal(100));
+    const a = fn("draftkings", new Decimal(100), allKeys);
     expect(a).toEqual(direct);
-    expect(fn("draftkings", new Decimal("100.00"))).toBe(a);
-    const b = fn("draftkings", new Decimal(25));
+    expect(fn("draftkings", new Decimal("100.00"), allKeys)).toBe(a);
+    // Same set, different insertion order: same cache entry.
+    expect(fn("draftkings", new Decimal(100), new Set([...allKeys].reverse()))).toBe(a);
+    const b = fn("draftkings", new Decimal(25), allKeys);
     expect(b).not.toBe(a);
-    expect(fn("nonexistent_book", new Decimal(100))).toBeNull();
+    expect(fn("nonexistent_book", new Decimal(100), allKeys)).toBeNull();
+  });
+
+  it("values at the hedge books passed per call, keyed separately in the cache (D-03)", () => {
+    const fn = makeConversionRateFor({ events, now });
+    const narrow = new Set([...allKeys].filter((k) => k !== "draftkings"));
+    const wide = fn("draftkings", new Decimal(100), allKeys);
+    const mine = fn("draftkings", new Decimal(100), narrow);
+    expect(mine).toEqual(
+      topConversionFor({
+        events,
+        now,
+        refundBookKey: "draftkings",
+        amount: new Decimal(100),
+        hedgeBookKeys: narrow,
+      }),
+    );
+    expect(mine).not.toBe(wide);
+    expect(mine!.hedgeBookKey).not.toBe("draftkings");
+    expect(fn("draftkings", new Decimal(100), new Set())).toBeNull();
   });
 });

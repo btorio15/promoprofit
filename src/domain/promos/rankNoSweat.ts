@@ -35,6 +35,10 @@ export interface NoSweatRankOptions {
   moneylineEvents: OddsEvent[];
   extendedEvents: OddsEvent[];
   now: Date;
+  /**
+   * The member's books (D-03). Single source of truth: used both for the
+   * hedge leg and, passed through to conversionRateFor, to value the refund.
+   */
   hedgeBookKeys: ReadonlySet<string>;
   precision: StakePrecision;
   conversionRateFor: ConversionRateFor;
@@ -167,7 +171,11 @@ export function rankNoSweat(
   const stake = promo.refundCap; // D-09
   const refundAmount = Decimal.min(stake, promo.refundCap);
 
-  const conversion = opts.conversionRateFor(promo.bookKey, refundAmount);
+  const conversion = opts.conversionRateFor(
+    promo.bookKey,
+    refundAmount,
+    opts.hedgeBookKeys,
+  );
   if (!conversion) {
     return {
       kind: "cant_price",

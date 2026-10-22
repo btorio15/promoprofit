@@ -233,7 +233,6 @@ describe("rankNoSweat", () => {
       makeConversionRateFor({
         events: [hardRockGame],
         now: NOW,
-        hedgeBookKeys: HEDGE_BOOKS,
       });
     const cases: [string, Partial<NoSweatPromo>, string][] = [
       ["refundCap 0", { refundCap: new Decimal(0) }, "bad_refund_cap"],
@@ -533,7 +532,6 @@ describe("rankNoSweat search", () => {
     const rateFor = makeConversionRateFor({
       events: [g],
       now: NOW,
-      hedgeBookKeys: HEDGE_BOOKS,
     });
     const r = rankNoSweat(
       promo,
@@ -568,13 +566,61 @@ describe("rankNoSweat search", () => {
     const rateFor2 = makeConversionRateFor({
       events: [nonMember],
       now: NOW,
-      hedgeBookKeys: HEDGE_BOOKS,
     });
     const priced = rankNoSweat(
       { ...promo, bookKey: "betmgm" },
       opts({ moneylineEvents: [nonMember], conversionRateFor: rateFor2 }),
     );
     expect(priced.kind).not.toBe("cant_price");
+  });
+
+  it("values the refund with the same hedge books it hedges with (D-03)", () => {
+    const seen: ReadonlySet<string>[] = [];
+    const spy: ConversionRateFor = (bookKey, amount, hedgeBookKeys) => {
+      seen.push(hedgeBookKeys);
+      return fixedRate({ hardrockbet: 3.5 })(bookKey, amount, hedgeBookKeys);
+    };
+    rankNoSweat(
+      promo,
+      opts({ moneylineEvents: [hardRockGame], conversionRateFor: spy }),
+    );
+    expect(seen).toEqual([HEDGE_BOOKS]);
+    expect(seen[0]).toBe(HEDGE_BOOKS);
+
+    // A non-member book (betmgm) with a far better hedge price must not
+    // inflate the refund value: it is only reachable through hedgeBookKeys.
+    const g = moneylineEvent({
+      id: "wide",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: 150, awayPrice: -180 },
+        { bookKey: "draftkings", homePrice: -140, awayPrice: 135 },
+        { bookKey: "betmgm", homePrice: 400, awayPrice: 400 },
+      ],
+    });
+    const rateFor = makeConversionRateFor({ events: [g], now: NOW });
+    const r = rankNoSweat(
+      promo,
+      opts({ moneylineEvents: [g], conversionRateFor: rateFor }),
+    );
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    const member = topConversionFor({
+      events: [g],
+      now: NOW,
+      refundBookKey: "hardrockbet",
+      amount: promo.refundCap,
+      hedgeBookKeys: HEDGE_BOOKS,
+    })!;
+    const everyBook = topConversionFor({
+      events: [g],
+      now: NOW,
+      refundBookKey: "hardrockbet",
+      amount: promo.refundCap,
+      hedgeBookKeys: new Set([...HEDGE_BOOKS, "betmgm"]),
+    })!;
+    expect(everyBook.profit.gt(member.profit)).toBe(true);
+    expect(r.opportunity.conversion.hedgeBookKey).not.toBe("betmgm");
+    expect(r.opportunity.solution.refundValue.equals(member.profit)).toBe(true);
   });
 
   it("carries tieRisk and sameBook through", () => {
