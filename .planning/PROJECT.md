@@ -8,7 +8,7 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Shipped:** v1.0 "MarginMind" on 2026-10-02 — live at https://betmargin.vercel.app (Vercel Hobby, auto-deploy on push to main; repo btorio15/promoprofit). Daily promo scrape via Vercel Cron → GitHub Actions (~7 AM MT) with a GitHub backup. Archive: `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`.
 
-**In progress:** v1.1 Profit Stats — Phase 6 (Profit Graph) complete 2026-10-13 (migration 0012 applied); Phase 7 (Dashboard) complete 2026-10-17. All milestone phases done.
+**In progress:** v1.1 Profit Stats — Phase 6 (Profit Graph) complete 2026-10-13 (migration 0012 applied); Phase 7 (Dashboard) complete 2026-10-17; Phase 07.1 (Profit Stats Cleanup, audit tech debt) complete 2026-10-22. All milestone phases done.
 
 ## Current Milestone: v1.1 Profit Stats
 
@@ -119,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 after Phase 7 (Dashboard)*
+*Last updated: 2026-10-22 after Phase 07.1 (Profit Stats Cleanup)*
