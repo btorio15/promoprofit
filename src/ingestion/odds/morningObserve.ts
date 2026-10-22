@@ -3,11 +3,8 @@ import { runOddsRefresh, type RefreshOutcome } from "./refresh";
 import { recordCurrentProfitObservations, recordCurrentProfitSnapshots } from "@/db/promoObservations";
 import { listUserIds } from "@/db/queries";
 import { loadMemberFeedContext } from "@/db/feedContext";
-import { recordMemberProfitObservations } from "@/db/memberObservations";
+import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
-import { computeMemberFeed } from "@/domain/promos/memberFeed";
-import { buildMemberObservationEntries } from "@/domain/promos/memberObservationEntries";
-import { denverDate } from "@/domain/promos/profitTotals";
 
 /**
  * quick-260927-n12 (owner scope change B): the observation job run
@@ -29,9 +26,9 @@ import { denverDate } from "@/domain/promos/profitTotals";
  * Phase 6 D-18: after the group-level recording, a member pass records each
  * member's own feed into member_profit_observations. It reads cached odds
  * only (no extra credits) and applies each member's own books, private
- * promos and Your cap through the shared feed context, using the same
- * computeMemberFeed + buildMemberObservationEntries path as the
- * Opportunities load. One member failing never stops the others.
+ * promos and Your cap through the shared feed context, then records through
+ * recordMemberFeedObservations, the same helper the Dashboard and the Promos
+ * tab use. One member failing never stops the others.
  */
 export type MorningObserveResult =
   | { status: "skipped"; reason: "not-morning-window" | "missing-api-key" }
@@ -57,18 +54,15 @@ export async function recordAllMembersObservations(
     try {
       const ctx = await loadMemberFeedContext({ userId: id, precision: "whole", now });
       if (ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null) continue;
-      const feed = computeMemberFeed({
+      // THE shared member recording rule (same helper as the Dashboard and
+      // the Promos tab), so the scheduled job can never drift from them (WR-03).
+      const ok = await recordMemberFeedObservations({
+        userId: id,
+        now,
         feedPromos: ctx.feedPromos,
         rankOpts: ctx.rankOpts,
         userBookSet: ctx.userBookSet,
       });
-      const entries = buildMemberObservationEntries({
-        denverDate: denverDate(now),
-        singles: feed.singles,
-        chosenPairs: feed.chosenPairs,
-        userBookSet: ctx.userBookSet,
-      });
-      const ok = await recordMemberProfitObservations(id, entries, now);
       if (ok) {
         recorded++;
       } else {

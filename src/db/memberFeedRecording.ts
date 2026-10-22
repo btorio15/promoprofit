@@ -7,13 +7,15 @@ import type { RankablePromo, RankOptions } from "@/domain/promos/rankPromoHedges
 type WholeFeed<P extends RankablePromo> = ReturnType<typeof computeMemberFeed<P>>;
 
 /**
- * THE member recording rule, shared by the Dashboard (getOpportunities) and
- * the Promos tab (getPromos) so the grey line (STATS-02) gets the same
- * entries from either screen. Always ranks at "whole" precision so the
+ * THE member recording rule, shared by all three callers: the Dashboard
+ * (getOpportunities), the Promos tab (getPromos) and the scheduled job
+ * (recordAllMembersObservations in src/ingestion/odds/morningObserve.ts), so
+ * the grey line (STATS-02) gets the same entries from every path. Always ranks at "whole" precision so the
  * recorded best never depends on the precision the member is viewing
  * (WR-01). Never throws: any failure is logged and returns false.
  *
- * The caller must pass a userId it got from requireUser().
+ * Server actions must pass a userId they got from requireUser(); the
+ * scheduled job passes each id from listUserIds().
  */
 export async function recordMemberFeedObservations<P extends RankablePromo>(args: {
   userId: number;

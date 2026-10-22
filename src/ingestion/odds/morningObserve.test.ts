@@ -31,6 +31,9 @@ vi.mock("@/db/feedContext", () => ({ loadMemberFeedContext: mockLoadCtx }));
 vi.mock("@/db/memberObservations", () => ({ recordMemberProfitObservations: mockRecordMember }));
 vi.mock("@/domain/promos/memberFeed", () => ({ computeMemberFeed: mockComputeFeed }));
 vi.mock("@/domain/promos/memberObservationEntries", () => ({ buildMemberObservationEntries: mockBuildEntries }));
+// The REAL shared helper (@/db/memberFeedRecording) runs on top of these
+// mocks, so these tests prove the job records through the same rule as the
+// Dashboard and the Promos tab (WR-03).
 
 import { runMorningObservation } from "./morningObserve";
 
@@ -169,7 +172,20 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
   });
 
   it("records each member with whole precision, after the group recorder", async () => {
+    mockLoadCtx.mockImplementation(async ({ userId }: { userId: number }) => ({
+      userBookSet: new Set([`book${userId}`]),
+      feedPromos: [],
+      rankOpts: { precision: "cents" },
+      oddsFetchedAt: new Date("2026-07-15T13:00:00Z"),
+      extendedOddsFetchedAt: null,
+    }));
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+
+    // The shared helper forces whole precision on top of the context's rankOpts.
+    expect(mockComputeFeed).toHaveBeenCalledTimes(2);
+    for (const [args] of mockComputeFeed.mock.calls) {
+      expect(args.rankOpts.precision).toBe("whole");
+    }
 
     expect(mockLoadCtx).toHaveBeenCalledWith({ userId: 1, precision: "whole", now: MORNING_INSTANT });
     expect(mockLoadCtx).toHaveBeenCalledWith({ userId: 2, precision: "whole", now: MORNING_INSTANT });
@@ -211,6 +227,15 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     mockRecordMember.mockResolvedValueOnce(false);
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
     expect(result).toMatchObject({ status: "ran", memberObservations: { recorded: 1, failed: 1 } });
+  });
+
+  it("counts a member as failed when the shared helper's write throws (WR-03)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockRecordMember.mockRejectedValueOnce(new Error("write failed"));
+    const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+    expect(result).toMatchObject({ status: "ran", memberObservations: { recorded: 1, failed: 1 } });
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("recordMemberFeedObservations"), expect.any(Error));
+    spy.mockRestore();
   });
 
   it("skips a member whose context has no cached odds", async () => {
