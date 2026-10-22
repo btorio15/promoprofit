@@ -160,27 +160,3 @@ export async function recordProfitObservations(entries: ProfitObservation[], now
       },
     });
 }
-
-/** Every observation on or after `sinceDate` ("YYYY-MM-DD"), for summarizeAvailableProfit. */
-export async function getProfitObservationsSince(sinceDate: string, viewerUserId: number): Promise<ProfitObservation[]> {
-  const db = getDb();
-  const rows = await db
-    .select({
-      promoId: promoProfitObservations.promoId,
-      bookKey: promoProfitObservations.bookKey,
-      denverDate: promoProfitObservations.denverDate,
-      maxGuaranteedProfit: promoProfitObservations.maxGuaranteedProfit,
-    })
-    .from(promoProfitObservations)
-    .innerJoin(promos, eq(promos.id, promoProfitObservations.promoId))
-    .where(and(gte(promoProfitObservations.denverDate, sinceDate), promoVisibilityCondition(viewerUserId)));
-
-  // numeric() comes back as a string from neon-http -- keep it a string
-  // (mirrors src/db/promos.ts's ActivePromo money fields).
-  return rows.map((row) => ({
-    promoId: row.promoId,
-    bookKey: row.bookKey,
-    denverDate: row.denverDate,
-    maxGuaranteedProfit: row.maxGuaranteedProfit,
-  }));
-}

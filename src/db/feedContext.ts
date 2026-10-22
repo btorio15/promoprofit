@@ -7,50 +7,16 @@ import {
   getHedgeBookKeys,
   getUserBookKeys,
 } from "@/db/queries";
-import {
-  getProfitObservationsSince,
-  getPromoCompletions,
-} from "@/db/promoTracking";
+import { getPromoCompletions } from "@/db/promoTracking";
 import { toDoneRows } from "@/domain/promos/doneSnapshot";
 import { getMemberProfitHistory } from "@/db/memberObservations";
 import {
   buildProfitSeriesData,
   type ProfitSeriesDTO,
 } from "@/domain/promos/profitSeries";
-import {
-  denverDate,
-  periodStartDates,
-  summarizeAvailableProfit,
-  type AvailableProfit,
-} from "@/domain/promos/profitTotals";
+import { denverDate } from "@/domain/promos/profitTotals";
 import type { RankOptions } from "@/domain/promos/rankPromoHedges";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
-
-/**
- * quick-260927-n12: the member's own-book today/week/month "profit
- * available" numbers (owner decision 3), from persisted observations --
- * independent of the live feed, so it's computed in EVERY "ok" branch of
- * getPromos/getOpportunities, including every empty-state variant. Reads
- * from the min of the week/month start (ISO date strings compare
- * correctly) so one query covers both periods.
- *
- * quick-260930-fge: `doneIds` is the viewer's own Done promo ids (from
- * getPromoCompletions(viewer)); they are excluded from the today number only.
- */
-export async function loadAvailableProfit(
-  now: Date,
-  ownBookKeys: ReadonlySet<string>,
-  viewerUserId: number,
-  doneIds: ReadonlySet<number>,
-): Promise<AvailableProfit> {
-  const { weekStart, monthStart } = periodStartDates(now);
-  const sinceDate = weekStart < monthStart ? weekStart : monthStart;
-  const observations = await getProfitObservationsSince(
-    sinceDate,
-    viewerUserId,
-  );
-  return summarizeAvailableProfit(observations, ownBookKeys, now, doneIds);
-}
 
 /**
  * Phase 6 (STATS-01..03): the member's own all-time daily gains. Plain module;
