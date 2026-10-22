@@ -2,7 +2,9 @@
 #
 # Each scheduled run (15:37, 18:37 and 22:37 UTC, about 9:37 AM, 12:37 PM and
 # 4:37 PM MDT) does the same work: scrape promos, then run one moneyline odds
-# refresh and record the profit snapshot the Dashboard reads. Scheduled runs
+# refresh and record profit snapshots (which feed the Statistics tab) and each
+# member's own observations (member_profit_observations, which feed the
+# Dashboard). Scheduled runs
 # always pass --force so the Denver morning-window gate never skips them.
 #
 # Odds cost: each refresh spends about sports x region-groups x 1 credits (see
