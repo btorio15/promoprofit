@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Profit Stats
-status: ready_to_plan
-stopped_at: Phase 07.1 complete (3/3) — ready to discuss Phase 08
-last_updated: 2026-10-22T17:45:46.204Z
-last_activity: "2026-10-21 - Completed quick task 261021-hwm: remove extracted from Statistics"
+status: Awaiting next milestone
+stopped_at: Phase 7 UI-SPEC approved
+last_updated: "2026-10-22T18:45:16.894Z"
+last_activity: 2026-10-22 — Milestone v1.1 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 14
+  completed_phases: 3
+  total_plans: 17
   completed_plans: 17
-  percent: 40
+  percent: 60
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-09-25)
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-22 - Completed quick task 261022-hn4: v1.1 audit cleanup
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-22 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -219,6 +219,17 @@ Items acknowledged and deferred at v1.0 milestone close on 2026-10-02:
 | todo | Stats overhaul + profit graph | next milestone |
 | backlog | 999.1 Admin page | next milestone |
 
+Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
+
+| Category | Item | Status |
+|----------|------|--------|
+| debug | cfb-school-name-unmatched | awaiting_human_verify |
+| debug | dk-mlb-choice-boost-missed | awaiting_human_verify |
+| todo | 2026-10-03-two-bet-pair-solver-rounding | pending |
+| todo | 2026-10-22-no-sweat-bets | pending (next milestone candidate) |
+| quick_task | 33 quick tasks (260925-wy0 ... 261022-hn4) | flagged "missing" by audit-open (summary file naming); all complete and Verified in the Quick Tasks table |
+| tech_debt | v1.1 audit rev 2 leftovers (IN-03 Promos double cache read, IN-04 try/catch style, phone fit, stale .next type file) | see .planning/milestones/v1.1-MILESTONE-AUDIT.md |
+
 ## Session Continuity
 
 Last session: 2026-10-14T15:29:34.182Z
@@ -227,4 +238,4 @@ Resume file: .planning/phases/07-dashboard/07-UI-SPEC.md
 
 ## Operator Next Steps
 
-- Plan Phase 6 with /gsd-plan-phase 6
+- Start the next milestone with /gsd-new-milestone

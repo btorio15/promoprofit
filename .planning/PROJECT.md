@@ -8,18 +8,21 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Shipped:** v1.0 "MarginMind" on 2026-10-02 — live at https://betmargin.vercel.app (Vercel Hobby, auto-deploy on push to main; repo btorio15/promoprofit). Daily promo scrape via Vercel Cron → GitHub Actions (~7 AM MT) with a GitHub backup. Archive: `.planning/milestones/v1.0-ROADMAP.md`, `.planning/milestones/v1.0-REQUIREMENTS.md`.
 
-**In progress:** v1.1 Profit Stats — Phase 6 (Profit Graph) complete 2026-10-13 (migration 0012 applied); Phase 7 (Dashboard) complete 2026-10-17; Phase 07.1 (Profit Stats Cleanup, audit tech debt) complete 2026-10-22. All milestone phases done.
+**Shipped:** v1.1 "Profit Stats" on 2026-10-22 (Phases 6, 7, 07.1) — per-member profit graph and Dashboard (totals, counts, graph, feed), site-wide Statistics tab (profit available only, nothing member-specific), hardened profit recording; scheduled scrape + odds refresh + profit recording 3x/day from GitHub Actions. Archive: `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.1-REQUIREMENTS.md`, `.planning/milestones/v1.1-MILESTONE-AUDIT.md`.
 
-## Current Milestone: v1.1 Profit Stats
+## Next Milestone Goals
 
-**Goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured.
+Not yet defined (start with `/gsd:new-milestone`). Queued candidates:
+- **Phase 8: More Sportsbooks** — promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books (on the roadmap)
+- **No-sweat bets** — hedge math for no-sweat promos and intro offers (todo 2026-10-22; profit is an estimate that depends on bonus-bet conversion, unlike the guaranteed numbers elsewhere)
+- Admin page (backlog 999.1)
 
-**Target features:**
-- Two-line cumulative profit graph at the top of Opportunities (home): grey = profit available at the member's books (each promo counted once at its best observed profit), green = profit the member personally extracted (Mark done); 7 days / 30 days / All time picker
-- Opportunities tab becomes the Dashboard: headline totals (total extracted, total available, last 7 days, last 30 days) and simple counts (promos completed, average profit per promo, best single promo) above the graph, full ranked feed below (no separate Stats page)
-- Profit summary moves off the Promos tab to the Dashboard
+<details>
+<summary>v1.1 Profit Stats milestone goal (archived)</summary>
 
-**Key context:** own numbers only (no group totals or leaderboard), no per-book/type/sport breakdowns. Both lines come from data already stored (`promo_profit_observations` since 2026-09-27; `promo_completions`) — no schema change expected. Undo of Mark done deletes the completion, so undone promos leave no green-line history. Admin page stays in backlog (999.1).
+**Goal:** Each member can see how much profit was on offer at their books over time, next to how much they actually captured. Delivered as the profit graph (Phase 6), the Dashboard (Phase 7) and the cleanup from the milestone audit (Phase 07.1). The teammate's separate Statistics tab was kept (D-15) and later made site-wide only.
+
+</details>
 
 ## Core Value
 
@@ -44,6 +47,7 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - ✓ **Group-added promos**: any member can hand-add a bonus bet or profit boost; it is private to that member (visible only to them) and feeds their own Promos, Opportunities and Done — Validated in Phase 5: Group-Added Promos (owner UAT 2/2, security 21/21 closed)
 - ✓ **Profit graph**: cumulative two-line graph at the top of Opportunities — grey = profit available at the member's own books (per-member daily record, migration 0012, starts 2026-10-13, no estimates), green = profit they extracted via Mark done; 7 days / 30 days / All time, touch tooltip to the cent, phone-ready — Validated in Phase 6: Profit Graph (owner iPhone check, verification 6/6)
 - ✓ **Dashboard**: the Opportunities tab is now the Dashboard (tabs Dashboard · Statistics · Arbitrage · Promos · Tools) — totals card (extracted all-time, available since the graph start, last 7 / 30 days as extracted of available), counts (promos done, average, best promo), the profit graph, then the feed; the old profit summary is gone — Validated in Phase 7: Dashboard (verification 5/5, phone fit checked with Playwright at 360px)
+- ✓ **Statistics tab (site-wide)**: scrape runs, profit by time of day and by sport and game day, daily profit available by sport, promo funnel and book health — each promo counted once at its best, every scraped promo at its own max stake, no extracted or member-specific data — Quick tasks 261021-gy4/-ht5/-hwm, hardened in Phase 07.1
 
 ### Active
 
@@ -53,7 +57,7 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - Standalone manual hedge calculator page — dropped from v1; the engine powers the feed and finder instead (v2 candidate)
 - Scheduled/automatic odds refresh — v1 uses a user-triggered refresh button; smart scheduled refresh of games with active promos is v2
 - Saving per-user bonus-bet balances and bet history — bonus-bet finder is enter-and-look, nothing saved
-- Second-chance / "risk-free" bets and deposit-match / sign-up bonuses — bonus bets and boosts first
+- Second-chance / "risk-free" bets and deposit-match / sign-up bonuses — bonus bets and boosts first (no-sweat bets now a next-milestone candidate, todo 2026-10-22)
 - Hedging on exchanges / prediction markets (Prophet X, Novig, Sporttrade, Kalshi) — sportsbooks only
 - Multi-state support — Colorado only
 - Alerts (Discord/Telegram/SMS) — web app only for v1
@@ -119,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 after Phase 07.1 (Profit Stats Cleanup)*
+*Last updated: 2026-10-22 after v1.1 milestone (Profit Stats)*
