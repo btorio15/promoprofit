@@ -1,7 +1,8 @@
 ---
 phase: 9
 slug: no-sweat-promos-in-the-feed
-status: draft
+status: approved
+reviewed_at: 2026-10-22
 shadcn_initialized: true
 preset: base-nova (neutral, lucide) - already initialized, no change
 created: 2026-10-22
@@ -268,7 +269,7 @@ Placement: new `Card className="p-6"` on `/settings` AFTER "Max bet per book", i
 - New `DisagreementCard` variant: promo text block on top (existing quote style), below it a two-column comparison (`grid grid-cols-1 sm:grid-cols-2 gap-3`), each column a `rounded-md border border-border bg-background p-3` with a `text-sm text-muted-foreground` label (`Scraper read` / `Reader read`) and `text-base` value. Differences between the two are not highlighted with color. Buttons row beneath: three equal outline buttons (`grid gap-2 sm:grid-cols-3`), `min-h-11`; `Skip` last and `variant="ghost"`.
 
 ### 7. Settings
-- `SettingsLowProfileForm`: three rows, each `min-h-11` with `Label` on the left and a `Checkbox` (existing ui primitive; the app has no Switch component and none is added). Odds value `Input` beneath toggle 1, `h-11 num`, width `w-28`. One Save button at bottom, `min-h-11`.
+- `SettingsLowProfileForm`: three rows, each `min-h-11` with `Label` on the left and a `Checkbox` (existing ui primitive; the app has no Switch component and none is added). Odds value `Input` beneath toggle 1, `h-11 num`, width `w-28`. One "Save changes" button at bottom, `min-h-11`.
 
 ### 8. Decision: where hand-added no-sweats are edited and deleted (open question resolved)
 Hand-added no-sweats do not appear on the Promos tab, so management lives where the member sees them:
