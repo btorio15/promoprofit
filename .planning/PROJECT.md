@@ -53,10 +53,10 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - ✓ **Profit graph**: cumulative two-line graph at the top of Opportunities — grey = profit available at the member's own books (per-member daily record, migration 0012, starts 2026-10-13, no estimates), green = profit they extracted via Mark done; 7 days / 30 days / All time, touch tooltip to the cent, phone-ready — Validated in Phase 6: Profit Graph (owner iPhone check, verification 6/6)
 - ✓ **Dashboard**: the Opportunities tab is now the Dashboard (tabs Dashboard · Statistics · Arbitrage · Promos · Tools) — totals card (extracted all-time, available since the graph start, last 7 / 30 days as extracted of available), counts (promos done, average, best promo), the profit graph, then the feed; the old profit summary is gone — Validated in Phase 7: Dashboard (verification 5/5, phone fit checked with Playwright at 360px)
 - ✓ **Statistics tab (site-wide)**: scrape runs, profit by time of day and by sport and game day, daily profit available by sport, promo funnel and book health — each promo counted once at its best, every scraped promo at its own max stake, no extracted or member-specific data — Quick tasks 261021-gy4/-ht5/-hwm, hardened in Phase 07.1
+- ✓ **No-sweat bet math**: exact no-sweat hedge (qualifying stake = refund cap, hedge at the member's books, whole-dollar/cent stakes proven against a brute-force oracle), refund valued at the finder's live top-1 conversion rate from cached odds (0 credits, "can't price" when the refund book has no odds), best qualifying line across moneylines/spreads/totals with hard min-odds; estimated profit plus worst case — Validated in Phase 8: No-Sweat Bet Math (domain only; feed/UI in Phase 9)
 
 ### Active
 
-- [ ] No-sweat bet algorithm (exact hedge + refund valued at the live bonus-bet conversion rate, estimated profit)
 - [ ] No-sweat promos ranked in the Opportunities feed
 - [ ] Promo + intro-offer scrapers for more Colorado books (BetMGM, Fanatics, Caesars, BetRivers, Hard Rock Bet, theScore Bet as feasible)
 - [ ] Revamped Sign-up offers screen with ranked intro offers and exact qualifying lines for books the member doesn't have
@@ -133,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 at v1.2 milestone start (Intro Offers & No-Sweat)*
+*Last updated: 2026-10-22 after Phase 8 (No-Sweat Bet Math)*
