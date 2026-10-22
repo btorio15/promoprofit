@@ -1,6 +1,5 @@
 import type { CapField, PromoType, ReviewReason } from "./types";
 import type { CorrectionOptions } from "./correctionOptions";
-import type { AvailableProfit } from "./profitTotals";
 import type { DonePromoDTO } from "./doneSnapshot";
 
 export type { DonePromoDTO } from "./doneSnapshot";
@@ -215,29 +214,9 @@ export type GetPromosResponse =
       /** Correct sub-panel dropdown data (Plan 09, T-03-09-06) -- empty lists unless the queue has at least one match-kind item. */
       correctionOptions: CorrectionOptions;
       /**
-       * quick-260927-n12: exact-cent Decimal sum of guaranteed profit across
-       * `rows` at the member's own books, excluding rows they've marked
-       * done (quick-260929-igk: done promos leave the feed). Fixed 2-dp string, "0.00" when there are no
-       * eligible rows. Always present in every "ok" response, including
-       * every empty-state variant, so the headline never disappears.
-       */
-      totalProfit: string;
-      /**
        * quick-260929-igk: this member's done promos, newest first, rendered
        * only from their saved snapshots (never live odds).
        */
       doneRows: DonePromoDTO[];
-      /**
-       * quick-260929-igk: exact-cent Decimal sum of this member's
-       * profit_extracted. "0.00" when nothing has been marked done.
-       */
-      totalExtracted: string;
-      /**
-       * quick-260927-n12: today/week/month best-guaranteed-profit-seen
-       * totals (owner decision 3), from persisted observations at the
-       * member's own books -- independent of the live feed, so it still
-       * reflects past days even when emptyVariant is set.
-       */
-      availableProfit: AvailableProfit;
     }
   | { status: "invalid" };
