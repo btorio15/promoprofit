@@ -53,7 +53,7 @@ Phone-first: every new card is a single column below `md`; the 6-column desktop 
 
 ## Typography
 
-Only the sizes and weights already used by the app. Exactly 3 sizes, 2 weights.
+Only the sizes and weights already used by the app. Exactly 3 sizes. Weights 400 and 600 are the only ones this phase's new markup sets; 500 appears only as the shared Button/Badge weight in existing, unchanged ui components (400/500/600 total in the app).
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
@@ -85,13 +85,13 @@ Existing tokens only. 60/30/10 unchanged.
 Accent reserved for (unchanged rule, extended for this phase):
 1. Guaranteed-profit figures and the primary CTA, as today.
 2. The recorded REAL profit on a settled no-sweat (Done row, the "Recorded" figure after Bet won / Mark done). This is the only no-sweat number that may be green.
-3. Focus ring, active sport chip, and the "Track" primary button.
+3. Focus ring, active sport chip, and the "Track bet" primary button.
 
 Hard rule (supports FEED-04, D-12): **an estimate is never `text-primary`.** The "est." figure uses `text-foreground`, with the `est.` Badge (`variant="outline"`) next to it. Green means guaranteed or recorded money only. The Refund hedge card in the Tracking strip IS guaranteed (it is a plain bonus-bet conversion), so its profit figure is `text-primary`.
 
 Amber (`text-warning`, with `TriangleAlert size-4`) is used for: account-risk line, specific low-profile warnings, waiting reminder, "can't price" note. Never destructive red for these. "Worst case -$3.10" is plain `text-muted-foreground`, not red (it is information, not an error).
 
-Bet won / Bet lost / Push buttons are all `variant="outline"` (neutral), so the app never nudges the member toward a result. Only "Track" is the filled primary button.
+Bet won / Bet lost / Push buttons are all `variant="outline"` (neutral), so the app never nudges the member toward a result. Only "Track bet" is the filled primary button.
 
 ---
 
@@ -109,11 +109,11 @@ Plain, everyday English. No jargon, no decision IDs. Money to the cent.
 | Secondary line | `at 78% · worst case −$3.10` (full phrase per D-09: "est. +$14.20 at 78% · worst case −$3.10" when read as one line by screen readers via aria-label) |
 | ROI column label | `Est. ROI` (replaces "ROI" label under the % for no-sweat rows; sort caption also reads "Est. ROI" when any no-sweat is in the list) |
 | Row detail summary | "Bet {qualifyingStake} on {selection} {odds} at {book}, hedge {hedgeStake} on {selection} {odds} at {hedgeBook}. If your bet loses you get back a {refundAmount} bonus bet." |
-| Primary CTA | `Track` (replaces Mark done on no-sweat rows) |
-| Track helper (under button when expanded) | "Track pins this to the top so you can finish it after the game." |
+| Primary CTA | `Track bet` (replaces Mark done on no-sweat rows) |
+| Track helper (under button when expanded) | "Track bet pins this to the top so you can finish it after the game." |
 | Account-risk line (D-20, every no-sweat row and Track confirmation) | "You only get one shot at this at each book. Mix in some normal bets and skip very long odds so your account looks like a regular customer." |
 | Added-by-you badge | `Added by you` (existing) |
-| Odds changed on Track | "Odds changed, so the numbers were updated. Check them and tap Track again." |
+| Odds changed on Track | "Odds changed, so the numbers were updated. Check them and tap Track bet again." |
 
 Never write: "guaranteed" on a no-sweat estimate, "free money", "multiple accounts", "VPN", "location".
 
@@ -151,7 +151,7 @@ When filters hide lines and nothing is left: "No line fits your Low-profile sett
 | Push / void helper | "No money changes hands, so this counts as $0.00." (A-09) |
 | Won confirmation line | "Recorded +$21.40" (num, text-primary) |
 | Edit link on card | `I bet different amounts` (opens correction inputs) |
-| Correction inputs (A-09) | Labels: `What you bet`, `Odds you got`, `Hedge amount`, `Hedge odds`. Helper: "Change these if you didn't bet exactly what we showed. We'll work out the profit again." Buttons: `Save` and `Cancel`. Recomputed preview line: "Profit would be +$20.10" before the member confirms |
+| Correction inputs (A-09) | Labels: `What you bet`, `Odds you got`, `Hedge amount`, `Hedge odds`. Helper: "Change these if you didn't bet exactly what we showed. We'll work out the profit again." Buttons: `Recalculate profit` and `Keep original amounts`. Recomputed preview line: "Profit would be +$20.10" before the member confirms |
 | State: awaiting_refund heading | "Your bet lost. Turn your {refundAmount} bonus bet into cash." |
 | Refund card body | Priced like the finder: top 3 conversion options (see Component Inventory) each "{selection} {odds} at {book}, bonus bet {stake}, hedge {hedgeStake} at {hedgeBook} -> +${profit}". Footer: "Lost bet: −{qualifyingStake}. Hedge on the first bet pays back +{hedgeWinnings}." and "All in, this one comes to {total}." |
 | Refund CTA | `Mark done` (reuse MarkUsedButton label; records the real total, D-05) |
@@ -234,7 +234,7 @@ Placement: new `Card className="p-6"` on `/settings` AFTER "Max bet per book", i
 - Est. ROI column: `num text-base` percent, caption "Est. ROI" (`text-sm text-muted-foreground`).
 - The whole row must expose `aria-label` with the full spoken form: "Estimate plus 14 dollars 20 cents at 78 percent, worst case minus 3 dollars 10 cents."
 - Warnings block (collapsed view, under the scope line): up to one risk line. Order: low-profile specific warnings (D-22) first, only when relevant. The generic account-risk line (D-20) lives in the EXPANDED panel and in the Track confirmation, so a collapsed row stays scannable on a phone.
-- Track button: `Button` default (filled primary), `min-h-11`, label `Track`, `CheckCheck` is NOT used (use `Pin`). Placed in the collapsed row where MarkUsedButton sits, plus repeated at the bottom of the expanded panel for thumb reach on phone.
+- Track button: `Button` default (filled primary), `min-h-11`, label `Track bet`, `CheckCheck` is NOT used (use `Pin`). Placed in the collapsed row where MarkUsedButton sits, plus repeated at the bottom of the expanded panel for thumb reach on phone.
 - Expanded panel (`NoSweatDetails`, mirrors `PromoDetails`): step list "1. Bet {stake} on ... 2. Hedge {stake} on ...", "If it wins: +${qualifyingWinnings − hedgeStake}", "If it loses: refund of {refund} bonus bet worth about {convertedRefund} at {rate}%, hedge pays {hedgeWinnings}", worst-case line, `PriceAgeNote` (includes the refund-conversion game age), the account-risk `Alert`-style line, then actions.
 - Hand-added no-sweats: expanded panel footer shows `AddedPromoActions` (Edit, Expire now, Delete). This resolves the open question (see below).
 - Sorting: inline with other promos by estimate (D-08). The existing `SortSwitch` Profit/ROI stays; caption for no-sweat sorts becomes "est." Do not add a third sort option.
@@ -250,7 +250,7 @@ Placement: new `Card className="p-6"` on `/settings` AFTER "Max bet per book", i
 - State area by state:
   - Tracking before kickoff: muted status line only.
   - Tracking after kickoff: "How did it go?" `text-base font-semibold`, then a 2x2 grid on phone (`grid grid-cols-2 gap-2`), 4-up row from `sm`: `Bet won`, `Bet lost`, `Push`, `Game voided`, each `variant="outline" min-h-11`. Under them the `I bet different amounts` text-button opens the correction panel inline.
-  - Correction panel (A-09): inline expand inside the card, 2-column grid on `sm`, 1 column on phone, four `Input`s (`h-11 num text-base`, `inputMode="decimal"` for money, `inputMode="text"` for odds), a live preview line, `Save` (primary) and `Cancel` (ghost). Server recomputes; client numbers are never trusted. Refund = min(actual stake, cap) is shown as "You'd get back {refund}."
+  - Correction panel (A-09): inline expand inside the card, 2-column grid on `sm`, 1 column on phone, four `Input`s (`h-11 num text-base`, `inputMode="decimal"` for money, `inputMode="text"` for odds), a live preview line, `Recalculate profit` (primary) and `Keep original amounts` (ghost). Server recomputes; client numbers are never trusted. Refund = min(actual stake, cap) is shown as "You'd get back {refund}."
   - Bet won: on tap, record from snapshot immediately, card shows "Recorded +$X" for 2 seconds then moves to the Done list. A "Fix amounts" link remains on the Done row for the correction path.
   - Bet lost: card transitions (no page navigation) to `awaiting_refund`: heading line, then the refund conversion block (see below).
   - Awaiting_refund block: up to 3 option rows (`rankRefundOpportunities limit 3`), each a compact row: selection, odds, book, stake, hedge stake and book, profit (`num text-primary` because this IS guaranteed). The top option is expanded by default; others are collapsed in `Collapsible`. A summary line of the all-in total sits below. `Mark done` (filled primary, `min-h-11`) records.
