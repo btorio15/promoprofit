@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 Phase: — (v1.1 shipped; next milestone not started)
 Plan: —
 Status: Milestone v1.1 complete
-Last activity: 2026-10-22 - v1.1 Profit Stats milestone archived and tagged
+Last activity: 2026-10-22 - Completed quick task 261022-hxb: trust AI reader over parser
 
 ## Performance Metrics
 
@@ -205,6 +205,7 @@ Recent decisions affecting current work:
 | 261021-ht5 | Statistics block graph shows available profit only (no extracted / not-extracted blocks) | 2026-10-21 | 84d599b | Verified | [261021-ht5-block-graph-shows-available-only](./quick/261021-ht5-block-graph-shows-available-only/) |
 | 261021-hwm | Remove all extracted / marked-done figures from Statistics (site-wide profit available only) | 2026-10-21 | 3a97379 | Verified | [261021-hwm-remove-extracted-from-statistics](./quick/261021-hwm-remove-extracted-from-statistics/) |
 | 261022-hn4 | v1.1 audit cleanup: edit/delete of own promo clears stale member observations; tests for Statistics private-promo filters; spy/comment tidy | 2026-10-22 | c865962 | Verified | [261022-hn4-v1-1-audit-cleanup](./quick/261022-hn4-v1-1-audit-cleanup/) |
+| 261022-hxb | Trust a high-confidence AI reader over the parser: not-usable skips (no review), disagreements take the reader's amounts; medium/low still review | 2026-10-22 | 49eaaff | Verified | [261022-hxb-trust-ai-reader-over-parser](./quick/261022-hxb-trust-ai-reader-over-parser/) |
 
 ## Deferred Items
 
