@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Profit Stats
 status: Awaiting next milestone
-stopped_at: Phase 7 UI-SPEC approved
+stopped_at: v1.1 milestone complete
 last_updated: "2026-10-22T18:45:16.894Z"
 last_activity: 2026-10-22 — Milestone v1.1 completed and archived
 progress:
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-25)
+See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 08 — more sportsbooks
+**Current focus:** Planning next milestone (Phase 8 More Sportsbooks queued)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: — (v1.1 shipped; next milestone not started)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-22 — Milestone v1.1 completed and archived
+Status: Milestone v1.1 complete
+Last activity: 2026-10-22 - v1.1 Profit Stats milestone archived and tagged
 
 ## Performance Metrics
 
