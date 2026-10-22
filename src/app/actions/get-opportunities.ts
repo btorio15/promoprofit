@@ -5,7 +5,7 @@ import Decimal from "decimal.js";
 import { requireUser } from "@/lib/session";
 import { getHedgeBookKeys } from "@/db/queries";
 import { loadMemberFeedContext, loadProfitSeries } from "@/db/feedContext";
-import { recordMemberProfitObservations } from "@/db/memberObservations";
+import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { toPromoRowDTO } from "@/domain/promos/promoRowDto";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
@@ -13,10 +13,8 @@ import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
 import { rankArbs } from "@/domain/hedge/rankArbs";
 import { SPORT_KEYS } from "@/config/sports";
 import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
-import { denverDate } from "@/domain/promos/profitTotals";
 import { buildDashboardTotals } from "@/domain/promos/dashboardTotals";
 import { computeMemberFeed } from "@/domain/promos/memberFeed";
-import { buildMemberObservationEntries } from "@/domain/promos/memberObservationEntries";
 import { toPairRowDTO, type PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import {
@@ -53,8 +51,23 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   const now = new Date();
   const ctx = await loadMemberFeedContext({ userId: user.userId, precision, now });
 
-  // Same as getPromos: keeps the landing screen's period figures fresh.
-  await recordCurrentProfitObservations(now, { activePromos: ctx.activePromos, precision });
+  // Statistics (group) observations from the odds already loaded above. Never
+  // fails the Dashboard: the recorder swallows its own errors, and this catch
+  // is belt-and-braces.
+  try {
+    await recordCurrentProfitObservations(now, {
+      activePromos: ctx.activePromos,
+      precision,
+      cached: {
+        moneylineEvents: ctx.moneylineEvents,
+        extendedEvents: ctx.extendedEvents,
+        oddsFetchedAt: ctx.oddsFetchedAt,
+        everyUsableHedgeBookKeys: ctx.everyUsableHedgeBookKeys,
+      },
+    });
+  } catch (err) {
+    console.error("getOpportunities: group observations failed", err);
+  }
 
   const oddsFetchedAt = ctx.oddsFetchedAt ? ctx.oddsFetchedAt.toISOString() : null;
   const extendedOddsFetchedAt = ctx.extendedOddsFetchedAt ? ctx.extendedOddsFetchedAt.toISOString() : null;
@@ -66,29 +79,17 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     : null;
   if (feed) {
     // Record BEFORE building the series so today's number is included (D-05, D-07).
-    // Always at "whole" precision (same as the morning job) so the recorded best
-    // does not depend on the precision the member happens to be viewing (WR-01).
-    // Precision only changes rankOpts, so re-rank the already-loaded context
-    // instead of reading the promos and both odds caches a second time.
-    const recordCtx = ctx;
-    const recordFeed =
-      precision === "whole"
-        ? feed
-        : computeMemberFeed({
-            feedPromos: ctx.feedPromos,
-            rankOpts: { ...ctx.rankOpts, precision: "whole" },
-            userBookSet: ctx.userBookSet,
-          });
-    await recordMemberProfitObservations(
-      user.userId,
-      buildMemberObservationEntries({
-        denverDate: denverDate(now),
-        singles: recordFeed.singles,
-        chosenPairs: recordFeed.chosenPairs,
-        userBookSet: recordCtx.userBookSet,
-      }),
+    // Always at "whole" precision (same as the morning job); the shared recorder
+    // reuses the whole-precision feed when that is what the member is viewing and
+    // never throws (WR-01, audit W2).
+    await recordMemberFeedObservations({
+      userId: user.userId,
       now,
-    );
+      feedPromos: ctx.feedPromos,
+      rankOpts: ctx.rankOpts,
+      userBookSet: ctx.userBookSet,
+      wholeFeed: precision === "whole" ? feed : undefined,
+    });
   }
   const profitSeries = await loadProfitSeries({ userId: user.userId, now, completions: ctx.completions });
   const dashboard = buildDashboardTotals({
