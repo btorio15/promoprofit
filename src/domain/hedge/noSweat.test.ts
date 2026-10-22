@@ -2,6 +2,14 @@ import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import { solveNoSweat } from "./noSweat";
 import type { StakePrecision } from "./arbMath";
+import {
+  bruteForceNoSweat,
+  mulberry32,
+  noSweatOutcomesAtCents,
+  pick,
+  randInt,
+  type NoSweatOracleInput,
+} from "./noSweat.oracle";
 
 interface Fixture {
   name: string;
@@ -190,8 +198,80 @@ describe("solveNoSweat", () => {
     ];
     for (const [name, override] of cases) {
       it(`throws RangeError for ${name}`, () => {
-        expect(() => solveNoSweat({ ...base, ...override })).toThrow(RangeError);
+        expect(() => solveNoSweat({ ...base, ...override })).toThrow(
+          RangeError,
+        );
       });
+    }
+  });
+});
+
+function toCents(d: Decimal): number {
+  return d.times(100).toNumber();
+}
+
+describe("solveNoSweat oracle", () => {
+  for (const f of fixtures) {
+    it(`fixture ${f.name} matches brute force`, () => {
+      const stake = new Decimal(f.stake);
+      const r = solveNoSweat({
+        stake,
+        refundCap: stake,
+        refundValue: new Decimal(f.refundValue),
+        qualifyingOddsAmerican: f.qualifyingOddsAmerican,
+        hedgeOddsAmerican: f.hedgeOddsAmerican,
+        precision: f.precision,
+      });
+      const oracle = bruteForceNoSweat({
+        stakeCents: toCents(stake),
+        refundValueCents: toCents(new Decimal(f.refundValue)),
+        qualifyingOddsAmerican: f.qualifyingOddsAmerican,
+        hedgeOddsAmerican: f.hedgeOddsAmerican,
+        precision: f.precision,
+      });
+      expect(r.estimatedProfit.toFixed(2)).toBe(
+        oracle.bestEstimated.toFixed(2),
+      );
+    });
+  }
+
+  it("seeded sweep of 300 random cases agrees with brute force", () => {
+    const rng = mulberry32(0x5eed08);
+    const stakes = [5, 10, 25, 50, 100];
+    const CASES = 300;
+    for (let i = 0; i < CASES; i++) {
+      const precision: StakePrecision = i % 2 === 0 ? "whole" : "cents";
+      const stakeDollars = pick(rng, stakes);
+      const stakeCents = stakeDollars * 100;
+      const qa = pick(rng, [-1, 1]) * randInt(rng, 100, 600);
+      const ha = pick(rng, [-1, 1]) * randInt(rng, 100, 600);
+      const refundValueCents = Math.floor(
+        (randInt(rng, 0, 95) * stakeCents) / 100,
+      );
+      const oin: NoSweatOracleInput = {
+        stakeCents,
+        refundValueCents,
+        qualifyingOddsAmerican: qa,
+        hedgeOddsAmerican: ha,
+        precision,
+      };
+      const r = solveNoSweat({
+        stake: new Decimal(stakeDollars),
+        refundCap: new Decimal(stakeDollars),
+        refundValue: new Decimal(refundValueCents).dividedBy(100),
+        qualifyingOddsAmerican: qa,
+        hedgeOddsAmerican: ha,
+        precision,
+      });
+      const label = JSON.stringify(oin);
+      const best = bruteForceNoSweat(oin);
+      expect(r.estimatedProfit.toFixed(2), label).toBe(
+        best.bestEstimated.toFixed(2),
+      );
+      const at = noSweatOutcomesAtCents(oin, toCents(r.hedgeStake));
+      expect(toCents(r.worstCaseProfit), label).toBe(at.worstCents);
+      expect(toCents(r.profitIfWin), label).toBe(at.winCents);
+      expect(toCents(r.profitIfLose), label).toBe(at.loseCents);
     }
   });
 });

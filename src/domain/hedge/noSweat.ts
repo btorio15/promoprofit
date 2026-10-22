@@ -53,7 +53,9 @@ function assertMoney(name: string, value: Decimal, allowZero: boolean): void {
     );
   }
   if (value.decimalPlaces() > 2) {
-    throw new RangeError(`${name} must have at most 2 decimal places, got ${value.toString()}`);
+    throw new RangeError(
+      `${name} must have at most 2 decimal places, got ${value.toString()}`,
+    );
   }
 }
 
@@ -82,7 +84,10 @@ export function solveNoSweat(input: NoSweatInput): NoSweatSolution {
   const dp = input.precision === "whole" ? 0 : 2;
   const unit = new LocalDecimal(dp === 0 ? 1 : "0.01");
 
-  const bases = [exact.toDecimalPlaces(dp, Decimal.ROUND_DOWN), exact.toDecimalPlaces(dp, Decimal.ROUND_UP)];
+  const bases = [
+    exact.toDecimalPlaces(dp, Decimal.ROUND_DOWN),
+    exact.toDecimalPlaces(dp, Decimal.ROUND_UP),
+  ];
   const raw: Decimal[] = [unit];
   for (const base of bases) {
     for (const k of [-2, -1, 0, 1, 2]) raw.push(base.plus(unit.times(k)));
