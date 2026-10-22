@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: ready_to_plan
-stopped_at: Phase 8 complete (3/3) — ready to discuss Phase 999.1
+stopped_at: Phase 8 complete (3/3) — ready to discuss Phase 9
 last_updated: 2026-10-22T20:37:33.405Z
-last_activity: 2026-10-22 -- Phase 8 execution started
+last_activity: 2026-10-22 -- Phase 8 complete
 progress:
-  total_phases: 5
-  completed_phases: 0
+  total_phases: 4
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 0
+  percent: 25
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 999.1 — admin page
+**Current focus:** Phase 9 — No-Sweat Promos in the Feed
 
 ## Current Position
 
-Phase: 999.1
+Phase: 9 of 11 (No-Sweat Promos in the Feed)
 Plan: Not started
 Status: Ready to plan
 Last activity: 2026-10-22
