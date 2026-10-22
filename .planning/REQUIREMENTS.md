@@ -62,3 +62,27 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| NSB-01 | Phase 8 | Pending |
+| NSB-02 | Phase 8 | Pending |
+| NSB-03 | Phase 8 | Pending |
+| NSB-04 | Phase 8 | Pending |
+| FEED-01 | Phase 9 | Pending |
+| FEED-02 | Phase 9 | Pending |
+| FEED-03 | Phase 9 | Pending |
+| FEED-04 | Phase 9 | Pending |
+| FEED-05 | Phase 9 | Pending |
+| INTRO-01 | Phase 10 | Pending |
+| INTRO-02 | Phase 10 | Pending |
+| INTRO-03 | Phase 10 | Pending |
+| INTRO-04 | Phase 10 | Pending |
+| INTRO-05 | Phase 10 | Pending |
+| INTRO-06 | Phase 10 | Pending |
+| INTRO-07 | Phase 10 | Pending |
+| BOOKS-01 | Phase 11 | Pending |
+| BOOKS-02 | Phase 11 | Pending |
+| BOOKS-03 | Phase 11 | Pending |
+| BOOKS-04 | Phase 11 | Pending |
+| BOOKS-05 | Phase 11 | Pending |
+| BOOKS-06 | Phase 11 | Pending |
+
+**Coverage:** 22/22 v1.2 requirements mapped

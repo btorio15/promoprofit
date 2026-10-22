@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-10-22T19:13:33.567Z"
 last_activity: 2026-10-22
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** v1.2 Intro Offers & No-Sweat — defining requirements
+**Current focus:** v1.2 Intro Offers & No-Sweat — Phase 8 (No-Sweat Bet Math), ready to plan
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 8 of 11 (No-Sweat Bet Math) — not started
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-22 — Milestone v1.2 started
+Status: Roadmap created, ready to plan Phase 8
+Last activity: 2026-10-22 — v1.2 roadmap created (Phases 8–11)
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Last activity: 2026-10-22 — Milestone v1.2 started
 - Phase 05.1 inserted after Phase 5: Deploy to Vercel + once-daily Vercel Cron morning scrape (drop midday/evening runs) + login/invite/books form throw guards — v1.0 audit cleanup (PROMO-03, integration W1); owner chose Vercel deploy 2026-10-01 (URGENT)
 - Phase 7 edited: renamed Stats Page -> Dashboard (owner 2026-10-13): Opportunities tab becomes Dashboard; edited fields: title, goal, success_criteria; STATS-07..10 reworded
 - Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
+- v1.2 roadmap (2026-10-22): placeholder Phase 8 More Sportsbooks absorbed; v1.2 phases 8 No-Sweat Bet Math, 9 No-Sweat Promos in the Feed, 10 Ranked Intro Offers, 11 More Sportsbooks
 - Phase 07.1 inserted after Phase 7: Profit Stats Cleanup: close v1.1 audit tech debt (owner chose option B 2026-10-22)
 
 ### Decisions
@@ -240,4 +241,4 @@ Resume file: .planning/phases/07-dashboard/07-UI-SPEC.md
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Run /gsd-plan-phase 8 (confirm conversion statistic: finder top-1 vs median of top N, at start of Phase 8)
