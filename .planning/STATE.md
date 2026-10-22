@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 Phase: — (v1.1 shipped; next milestone not started)
 Plan: —
 Status: Milestone v1.1 complete
-Last activity: 2026-10-22 - Completed quick task 261022-hxb: trust AI reader over parser
+Last activity: 2026-10-22 - Completed quick task 261022-hzb: restore Vercel morning cron
 
 ## Performance Metrics
 
@@ -206,6 +206,7 @@ Recent decisions affecting current work:
 | 261021-hwm | Remove all extracted / marked-done figures from Statistics (site-wide profit available only) | 2026-10-21 | 3a97379 | Verified | [261021-hwm-remove-extracted-from-statistics](./quick/261021-hwm-remove-extracted-from-statistics/) |
 | 261022-hn4 | v1.1 audit cleanup: edit/delete of own promo clears stale member observations; tests for Statistics private-promo filters; spy/comment tidy | 2026-10-22 | c865962 | Verified | [261022-hn4-v1-1-audit-cleanup](./quick/261022-hn4-v1-1-audit-cleanup/) |
 | 261022-hxb | Trust a high-confidence AI reader over the parser: not-usable skips (no review), disagreements take the reader's amounts; medium/low still review | 2026-10-22 | 49eaaff | Verified | [261022-hxb-trust-ai-reader-over-parser](./quick/261022-hxb-trust-ai-reader-over-parser/) |
+| 261022-hzb | Restore Vercel morning cron (13:17 UTC) as a promo-only scrape trigger; GitHub schedule kept for odds | 2026-10-22 | 8c32467 | Verified | [261022-hzb-restore-vercel-morning-cron](./quick/261022-hzb-restore-vercel-morning-cron/) |
 
 ## Deferred Items
 
