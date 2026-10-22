@@ -139,6 +139,20 @@ describe("recordCurrentProfitObservations (quick-261001-dhn)", () => {
     expect(entries[0].maxGuaranteedProfit).toBe(solve("25", 120, 115).guaranteedProfit.toFixed(2));
   });
 
+  it("never records a member's private promo, only scraped ones (WR-02)", async () => {
+    const privatePromo: ActivePromo = { ...boost, id: 21, scraped: false, addedByYou: true };
+    await recordCurrentProfitObservations(NOW, { activePromos: [boost, privatePromo] });
+    expect(recordProfitObservations).toHaveBeenCalledTimes(1);
+    const [entries] = vi.mocked(recordProfitObservations).mock.calls[0];
+    expect(entries.map((e) => e.promoId)).toEqual([20]);
+  });
+
+  it("records nothing when only private promos are active (WR-02)", async () => {
+    const privatePromo: ActivePromo = { ...boost, id: 21, scraped: false, addedByYou: true };
+    await recordCurrentProfitObservations(NOW, { activePromos: [privatePromo] });
+    expect(recordProfitObservations).not.toHaveBeenCalled();
+  });
+
   it("records nothing when cached.oddsFetchedAt is null", async () => {
     await recordCurrentProfitObservations(NOW, {
       activePromos: [boost],

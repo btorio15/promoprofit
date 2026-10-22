@@ -1,13 +1,15 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "./client";
 import { promoProfitObservations, promos, scrapeRuns } from "./schema";
+import { promoVisibilityCondition } from "./promos";
 import type { HistoryRow } from "@/domain/stats/dailyHistory";
 import type { FunnelPromo } from "@/domain/stats/promoFunnel";
 
 /**
  * Every daily promo profit observation (the older promo_profit_observations
  * table), joined to its promo for sport, type, face value and max stake.
- * Read-only; feeds the Statistics page "Since Sep 27" section.
+ * Read-only; feeds the Statistics page "Since Sep 27" section. Rows for
+ * members' private promos are excluded.
  */
 export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
   const db = getDb();
@@ -23,7 +25,10 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
       maxStake: promos.maxStake,
     })
     .from(promoProfitObservations)
-    .leftJoin(promos, eq(promos.id, promoProfitObservations.promoId));
+    .leftJoin(promos, eq(promos.id, promoProfitObservations.promoId))
+    // Site-wide page: scraped promos only, never a member's private promo
+    // (WR-02). No viewer means the group-only visibility rule.
+    .where(promoVisibilityCondition());
 
   return rows.map((row) => ({
     promoId: row.promoId,

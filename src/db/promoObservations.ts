@@ -47,7 +47,9 @@ interface CurrentProfitEntry {
  * never throws: any failure is caught and logged with console.error, so it
  * can never break the caller (the Dashboard, or the scheduled job).
  *
- * Always ranks at "whole" precision, whoever calls it (WR-01).
+ * Always ranks at "whole" precision, whoever calls it (WR-01), and only
+ * scraped promos: a viewer's private promos in `activePromos` are dropped
+ * (WR-02).
  */
 export async function recordCurrentProfitObservations(
   now: Date,
@@ -112,7 +114,11 @@ async function computeCurrentProfitEntries(
   now: Date,
   opts: { activePromos?: ActivePromo[]; cached?: CachedOddsInput },
 ): Promise<CurrentProfitEntry[]> {
-  const activePromos = opts.activePromos ?? (await getActivePromos(now));
+  // Site-wide Statistics must never contain a member's private promo, so
+  // only scraped (group) promos are ranked, whatever list the caller passed.
+  // This is the same visibility the scheduled job's getActivePromos(now) uses
+  // (WR-02).
+  const activePromos = (opts.activePromos ?? (await getActivePromos(now))).filter((promo) => promo.scraped);
   if (activePromos.length === 0) return [];
 
   let moneylineEvents: OddsEvent[];
