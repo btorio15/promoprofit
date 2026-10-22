@@ -1,271 +1,177 @@
-# Architecture Research
+# Architecture: v1.2 Intro Offers & No-Sweat Integration
 
-**Domain:** Sportsbook promo-conversion / hedge calculator (odds comparison + arbitrage-style math over promos)
-**Researched:** 2026-09-25
-**Confidence:** HIGH (The Odds API mechanics, quota model) / MEDIUM (matching + promo pipeline, synthesized from domain patterns — no single authoritative "matched betting app architecture" reference exists for this niche)
+**Domain:** Sportsbook promo-hedge app (existing Next.js + Drizzle/Neon + GitHub Actions scrapers)
+**Researched:** 2026-10-22 (from reading the codebase; no external sources needed)
+**Overall confidence:** HIGH on integration points (read directly from code); MEDIUM on the per-book scraper feasibility (not re-probed here)
 
-## Standard Architecture
+## Headline Findings
 
-This is not a high-frequency trading system — it's a personal/small-group tool gated by a ~500-credit/month free API quota, so the architecture optimizes for **correctness and quota discipline**, not real-time throughput. The generic "arbitrage platform" literature (OddsJam-style marketing content) describes continuous low-latency pipelines that do NOT apply here — ignore that pattern; it would exhaust the free tier in hours.
+1. **No enum migration is needed for the new promo type.** `promos.promo_type` is a plain `text` column with no CHECK constraint (schema.ts line 211). `"no_sweat"` only has to be added to `PROMO_TYPES` in `src/domain/promos/types.ts` (the Zod enums in scraped.ts derive from it). One small additive migration (0018) is still wanted for a `refund_kind` column and the new `signup_offers` columns.
+2. **Latent bug to fix first:** `evaluateCandidate` in `rankPromoHedges.ts` is `promoType === "profit_boost" ? boost : bonus`. A new type would silently be priced as a bonus bet. Every binary `profit_boost`/`bonus_bet` branch must become an exhaustive switch before `no_sweat` enters the type. Same pattern likely exists in `promoRowDto.ts`, `pairPromos.ts`, `doneSnapshot.ts`, `describe.ts`, `dto.ts`, `lifecycle.ts`, `yourCap.ts`, and the PromoRow/PairCard components (all files that mention `promoType`; grep list in "Touch list" below).
+3. **Estimated profit must never reach the guaranteed-profit consumers.** `computeMemberFeed` singles feed `recordMemberFeedObservations`, `recordCurrentProfitObservations`, `buildDashboardTotals`, the profit graph and Statistics. NSB results must be excluded from all of them (or those must filter on `result.kind`). Safest design: NSB is a separate feed source and a separate result kind, never in `singles`.
+4. **Book config is already done for odds.** `books.ts` already has `betmgm`, `betrivers`, `espnbet` (theScore), `hardrockbet` as `free` tier with Odds API keys; `williamhill_us` (Caesars) and `fanatics` are `paid_only` (no cached odds, not hedge venues, no promo-side quote). So the "books config" work is scrapers + `SCRAPE_TARGET_BOOK_KEYS` + `BOOK_SCRAPERS` + `SIGNUP_PAGE_URLS`, not Odds API keys. Consequence: Caesars/Fanatics NSB and intro offers cannot be priced exactly (no promo-book odds) -- see Pitfall-ish note in section 7.
 
-### System Overview
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         PROMO INGESTION                              │
-│  ┌────────────────┐        ┌──────────────────────┐                  │
-│  │ Per-book        │        │ Manual entry form     │                  │
-│  │ scrapers        │        │ (event picker from    │                  │
-│  │ (best-effort)   │        │  free /events cache)   │                  │
-│  └────────┬────────┘        └──────────┬────────────┘                  │
-│           │  raw candidate              │ trusted, pre-matched        │
-│           ▼                             │                             │
-│  ┌─────────────────────────┐            │                             │
-│  │ Event/Market Matcher     │            │                             │
-│  │ (fuzzy team+date match   │            │                             │
-│  │  + human confirm queue)  │            │                             │
-│  └────────────┬─────────────┘            │                             │
-│               └──────────────┬───────────┘                             │
-└──────────────────────────────┼─────────────────────────────────────────┘
-                                ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                          NORMALIZATION LAYER                          │
-│   Book registry · Sport/Market registry · Canonical odds format       │
-│   (promo records and odds records both map into this shared schema)   │
-└───────────────┬──────────────────────────────────┬────────────────────┘
-                │                                    │
-                ▼                                    ▼
-┌───────────────────────────────┐   ┌────────────────────────────────────┐
-│      PROMO STORE (DB)          │   │        ODDS INGESTION LAYER        │
-│  promos, event_matches,        │   │  The Odds API client + quota       │
-│  book_registry, users,         │   │  tracker + cache (bulk /odds for   │
-│  book_preferences               │   │  main lines, per-event /odds for   │
-└───────────────┬─────────────────┘   │  player props/alt lines)           │
-                │                     └──────────────────┬──────────────────┘
-                │                                         │
-                ▼                                         ▼
-        ┌───────────────────────────────────────────────────────┐
-        │              HEDGE OPTIMIZATION ENGINE                 │
-        │  Pure calc: bonus-bet solver, boost solver.             │
-        │  Input: promo + candidate opposing odds (filtered to    │
-        │  user's selected books). No I/O.                        │
-        └───────────────────────┬───────────────────────────────┘
-                                 ▼
-        ┌───────────────────────────────────────────────────────┐
-        │           OPPORTUNITY RANKING (read-time)               │
-        │  active promos × matched odds × book prefs → sorted     │
-        │  by guaranteed profit. Computed on read, not stored.    │
-        └───────────────────────┬───────────────────────────────┘
-                                 ▼
-        ┌───────────────────────────────────────────────────────┐
-        │      WEB DASHBOARD (auth-gated, small user group)       │
-        │  Opportunities list · Promo entry/review · Book prefs   │
-        └───────────────────────────────────────────────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | Typical Implementation |
-|-----------|----------------|-------------------------|
-| Scrapers | Best-effort discovery of promo candidates from book promo pages | Scheduled job per book, outputs raw/unconfirmed promo rows; expected to break often, treated as a hint source, not source of truth |
-| Manual entry form | Reliable, guaranteed-coverage promo input | Form with dropdowns sourced from cached `/events` (zero-quota), so the user picks a real event instead of typing team names — sidesteps fuzzy matching entirely for this path |
-| Event/Market Matcher | Resolve a promo's fuzzy event reference (scraped text or ambiguous manual text) to a canonical Odds API `event_id` + `market_key` | Team-name alias table + date-window match against cached `/events`; always routes through a human confirmation step before a match is trusted — never auto-publish |
-| Normalization Layer | Shared vocabulary: book registry, sport/market registry, canonical odds format (American) | A set of small lookup tables/enums + conversion functions; both promo and odds ingestion map into this before touching the hedge engine |
-| Odds Ingestion Layer | Fetch and cache odds from The Odds API, on demand, under quota | Two-tier client: cheap bulk per-sport calls for h2h/spreads/totals (covers all events in one call), expensive per-event calls only for player props/alt lines; wraps every call with quota-header tracking |
-| Promo Store / DB | Persist promos, matches, registries, users, book preferences | Relational DB (Postgres/SQLite-class) — this data is small and relational, not a scale concern |
-| Hedge Optimization Engine | Compute exact stakes and guaranteed profit for bonus bets and boosts | Pure functions, no I/O, unit-testable against fixture data independent of live API |
-| Opportunity Ranking | Combine promos + odds + user's book selection into a ranked list | Computed at read time from cached odds, never persisted as a stale derived value |
-| Web Dashboard | Present opportunities, promo entry/review, book preference settings | Standard server-rendered or SPA dashboard behind auth |
-| Auth Layer | Gate access to a small private user list; identify user for book-preference filtering | Lightweight session-based auth, invite-only user table — not a general-purpose multi-tenant auth system |
-
-## Recommended Project Structure
+## Recommended Architecture (delta only)
 
 ```
-src/
-├── ingestion/
-│   ├── odds/                 # The Odds API client, quota tracker, cache
-│   │   ├── client.ts         # thin REST wrapper, reads x-requests-* headers
-│   │   ├── cache.ts          # TTL cache keyed by sport+market+region / event+market
-│   │   └── quota.ts          # monthly credit budget tracker + guardrails
-│   ├── promos/
-│   │   ├── scrapers/         # one module per book, isolated & swappable
-│   │   └── manual/           # manual entry validation + event-picker data source
-│   └── matching/
-│       ├── aliases.ts        # team name alias table (curated, CO books)
-│       └── matcher.ts        # fuzzy match + confirmation-queue logic
-├── domain/
-│   ├── registry/             # books, sports, markets — canonical enums/tables
-│   ├── normalize/             # odds format conversion, promo → canonical mapping
-│   └── hedge/                 # PURE calculation engine, zero I/O
-│       ├── bonusBet.ts
-│       ├── profitBoost.ts
-│       └── hedge.test.ts     # fixture-driven correctness tests (core value)
-├── ranking/
-│   └── opportunities.ts      # combine promos + odds + book prefs, sort by profit
-├── data/
-│   └── db/                   # schema, migrations, repositories
-├── auth/
-│   └── session.ts            # lightweight private-group auth
-└── web/
-    ├── pages/ (or routes/)   # dashboard, promo form, opportunities, settings
-    └── components/
+Scrapers (GH Actions)                       Domain (pure)                         Actions / UI
+---------------------                       -------------                         ------------
+books/{betmgm,betrivers,...}.ts  -->  ScrapedPromo{promoType:"no_sweat"}
+exclusions.ts (no_sweat -> keep) -->  promos table (+refund_kind)  -->  loadMemberFeedContext
+promoReading (kind +"no_sweat")                                        |
+signupOffers.ts (kind/structure) -->  signup_offers (+cols)            v
+                                                          conversionRate.ts (NEW)  <- cached events + member hedge set
+                                                          noSweat.ts (NEW)  <- calculateNoSweatHedge(S, Oa, Oh, v, cap)
+                                                          rankPromoHedges (result kind "nosweat")
+                                                          rankIntroOffers.ts (NEW)
+                                                          get-opportunities (new source "nosweat")
+                                                          get-signup-offers (ranked, per-member)  -> SignupOffersScreen (rewrite)
 ```
 
-### Structure Rationale
+### Component Boundaries
 
-- **`ingestion/` is split into three independent subsystems** (odds, promos, matching) because they fail independently: the odds API can rate-limit, scrapers can break, and matching can be ambiguous — none of these failures should take down the others.
-- **`domain/hedge/` is isolated with zero I/O** because correctness ("Core Value" per PROJECT.md) is the entire point of this app. Keeping the solver pure and fixture-testable means the odds math can be verified without live API calls or a database, and regressions are caught immediately.
-- **`domain/registry/` and `domain/normalize/` sit between ingestion and everything else** — both promo data (from scrapers/manual entry) and odds data (from the API) are messy and inconsistently shaped at the source; normalizing both into one canonical schema before they reach the hedge engine means the engine only ever deals with one clean shape.
-- **`ranking/` is separate from `domain/hedge/`** because ranking is a read-time aggregation concern (sort/filter), while hedging is a calculation concern — keeping them apart avoids the ranking logic accidentally depending on I/O timing.
+| Component | Status | Responsibility | Talks to |
+|-----------|--------|----------------|----------|
+| `src/domain/hedge/noSweat.ts` | NEW | Exact NSB solver (see math below). Returns stakes, win/lose branch nets, estimated profit, floor profit (v=0) | decimal.js, americanOdds |
+| `src/domain/hedge/conversionRate.ts` | NEW | `liveConversionRate({bonusBookKey, hedgeBookKeys, events, now, refAmount, precision})` using existing `extractTwoWayMoneylines` + `rankBonusBetHedges(limit 1)`; returns `{rate: Decimal, source: eventId/legs, fetchedAt} | null` | marketFilter, rankBonusBetHedges |
+| `src/domain/hedge/rankBonusBetHedges.ts` | UNCHANGED | Reused as-is as the rate oracle | -- |
+| `src/domain/promos/types.ts` | MODIFIED | `PROMO_TYPES += "no_sweat"` | everything |
+| `src/domain/promos/rankPromoHedges.ts` | MODIFIED | New `evaluateNoSweatCandidate`; result union gains `{kind:"nosweat"}`; exhaustive switch; sort stays on guaranteed profit for boost/bonus only; `RankOptions` gains `conversionRateFor(bookKey)` (injected, keeps module pure) | noSweat, conversionRate |
+| `src/domain/promos/pairPromos.ts` | MODIFIED (guard) | Must exclude `no_sweat` from pairing in v1.2 (pairing logic assumes both legs are boost/bonus) | -- |
+| `src/domain/promos/memberFeed.ts` | MODIFIED | Return `singles` (guaranteed only), `chosenPairs`, and new `estimated` (NSB list) | rankPromoHedges |
+| `src/domain/opportunities/types.ts` | MODIFIED | `SourceId += "nosweat"`; `RankKey.estimated: boolean`; `pctLabel` unchanged; `SOURCE_ORDER`/`SOURCE_META` entry | UI |
+| `src/app/actions/get-opportunities.ts` | MODIFIED | Build NSB source from `feed.estimated`; do NOT pass to recorders/dashboard | memberFeed |
+| `src/domain/signup/rankIntroOffers.ts` | NEW | Per-member ranking of intro offers at books the member lacks (bet&get and NSB-first-bet) with qualifying line, hedge book, stakes, conversion of bonus | noSweat, bonusBet, conversionRate, marketFilter |
+| `src/ingestion/promos/signupOffers.ts` | MODIFIED | Extract `offerKind`, `qualifyingStake`, `bonusTotal`, `installments`, `refundCap`, `minOdds` deterministically (regex + decimal.js; reader never gives money) | exclusions.mentionsNewCustomer |
+| `src/db/schema.ts` + migration 0018 | MODIFIED | See schema section | -- |
+| `src/ingestion/promos/books/*.ts` x up to 6 | NEW | One `BookScraper` each; register in `books/index.ts`, `SCRAPE_TARGET_BOOK_KEYS`, `SIGNUP_PAGE_URLS` | run.ts unchanged |
+| `src/components/signup/SignupOffersScreen.tsx` | REWRITE | Ranked cards, not book groups | get-signup-offers |
+| `src/components/opportunities/*` | MODIFIED | New NSB section/row with "Estimated" badge, shows rate used | -- |
 
-## Architectural Patterns
+## NSB algorithm (exact)
 
-### Pattern 1: Dropdown-first promo entry (avoid fuzzy matching on the primary path)
+Definitions: stake S at promo book (decimal odds Oa), refund R = min(S, refundCap) delivered as a bonus bet worth v*R (v = live conversion rate, 0..~0.9) or as cash (v = 1, `refund_kind = "cash"`). Hedge H at decimal odds Oh on the opposite side.
 
-**What:** The manual entry form does not let the user free-type an event; it presents a searchable dropdown of upcoming events, populated by a cached, zero-cost call to The Odds API's `/events` endpoint. Choosing from the dropdown means the promo is matched to a canonical `event_id` at entry time — the fuzzy matcher is never invoked.
-**When to use:** Every manual promo entry. This should be the default and expected path.
-**Trade-offs:** Requires the event list to be kept fresh (cheap, since `/sports` and `/events` cost zero quota per The Odds API docs) but eliminates an entire class of "wrong event matched → wrong hedge math" bugs for the majority of promos.
+- Promo bet wins: net = S(Oa - 1) - H
+- Promo bet loses: net = H(Oh - 1) - S + v*R
+- Equal profit: S(Oa-1) - H = H(Oh-1) - S + vR  =>  **H = (S*Oa - v*R) / Oh**; profit = S(Oa-1) - H.
+- Linear in v, so it follows the same pattern as `bonusBet.ts`: compute H exact, test floor/ceil at cents (or dollars), pick the better `min(netWin, netLose)`, apply the same `clean()` 20dp snapping and LocalDecimal precision 40.
+- Return both `estimatedProfit` (with v) and `floorProfit` (the same stakes with v = 0 on the lose branch = what is truly guaranteed). Display estimated as the headline, labelled; floor in small print. This is the cleanest way to keep "estimated vs guaranteed" distinct without a second concept in the ranker.
+- Stake choice: S defaults to the promo's cap (`maxStake`) since profit scales with S for positive-EV lines; for a promo with a refund cap < max bet, S = refundCap (staking more only adds unrefunded risk). Guard `S <= refundCap` unless the promo says otherwise.
+- Minimum odds (`minOddsAmerican`) reuse `passesBaseMinOdds` unchanged.
+- Fixture-test against hand calculations like the existing table-driven tests; add a property test that H equalizes both branches within 1 cent.
 
-**Example:**
-```typescript
-// GET /events is free (0 quota cost) — safe to refresh frequently
-const events = await oddsClient.listEvents(sportKey); // cached, zero-cost
-// form renders events as a typeahead; user selects one → event_id captured directly
-promo.event_id = selectedEvent.id;
-promo.match_confidence = "exact"; // no fuzzy match needed
-```
+## How the live conversion rate is computed per hedge set
 
-### Pattern 2: Two-tier odds fetching (bulk vs per-event) to protect quota
+The finder's rate is `conversionPct` (profit / bonus) of the best row from `rankBonusBetHedges` for (bonusBookKey = refund's book, hedgeBookKeys = the member's hedge books). It depends on three things: the bonus book, the hedge set, and the cached events. So it is **per member, per book, per request** -- not global.
 
-**What:** The Odds API charges `markets × regions` credits per call. The bulk `/sports/{sport}/odds` endpoint returns odds for ALL events in that sport for that cost — so it's the cheap default for main markets (h2h, spreads, totals). The per-event `/sports/{sport}/events/{id}/odds` endpoint is required for player props and alternate lines, but it charges `markets × regions` **per event**, making it far more expensive at any scale.
-**When to use:** Use the bulk endpoint for the "opportunities" board and any promo on a main market. Only call the per-event endpoint when a specific promo's market requires it, and only on-demand (e.g., user opens that promo's detail view), never in a background sweep.
-**Trade-offs:** Player-prop promos cost noticeably more quota per lookup — this should be visible in the quota tracker so the user can decide whether checking a prop-based promo is "worth" the credits.
+- Compute lazily in `loadMemberFeedContext` (it already has `moneylineEvents`, `rankOpts.hedgeBookKeys`, `now`): a memoized `conversionRateFor(bookKey)` closure that calls `extractTwoWayMoneylines(events, {now, windowDays: 7, allowedBookKeys: hedgeSet, sportKeys: all})` once and `rankBonusBetHedges(markets, {bonusBookKey, bonusAmount: refAmount, hedgeBookKeys, limit: 1})` once per distinct NSB promo book (at most ~6 per request; cheap, pure, 0 credits).
+- Reference amount: use the promo's own refund amount R (conversion % varies slightly with cent rounding and floor-of-payout), not a fixed $100.
+- Use the same `precision` as the member's setting so the rate matches what the finder would show.
+- **Decision to flag to the owner:** best single row is optimistic (one lopsided market). Recommend using the finder's top-1 as specified ("the finder's live rate"), but also persisting which game produced it so the card can say "valued at 71% (BOS @ NYK)", and clamp v to [0, 1]. If top-1 is on a game that starts before the NSB game's window, it is still valid since the refund bonus is usable later; but if the cached odds are stale (see `priceAge.ts`), propagate the odds age to the NSB card.
+- If the refund book has no cached quotes (Caesars, Fanatics: paid_only) the rate is `null` and the NSB promo is not ranked in the feed (show in Promos tab as "can't price: no odds at this book"). Do not substitute a fixed 70%; the owner explicitly rejected a fixed %.
+- For intro offers at a book the member lacks, the bonus book is not a user book but is still a quote source, so the same function works as long as the book is API-covered free tier. Hedge set = member's own books.
 
-**Example:**
-```typescript
-// Cheap: covers every event in the sport for 1 call
-const bulk = await oddsClient.getOdds(sportKey, { markets: ["h2h"], regions: ["us"] });
-// cost = markets(1) × regions(1) = 1 credit, for ALL events
+## Database changes (migration 0018, additive and nullable; safe for the live deploy)
 
-// Expensive: only when the promo market isn't in bulk (e.g. player_points)
-const propOdds = await oddsClient.getEventOdds(sportKey, eventId, {
-  markets: ["player_points"], regions: ["us"],
-});
-// cost = markets(1) × regions(1) PER EVENT — call sparingly, cache hard
-```
+`promos`:
+- `refund_kind text null` -- `'bonus_bet' | 'cash'`, only for `promo_type = 'no_sweat'`. Reuse existing columns: `max_stake` = max qualifying stake, `max_winnings`/`bonus_amount` unused, `min_odds_american` reused. Optionally `refund_cap numeric` if the refund cap differs from max stake (many books: "refund up to $X"); recommend adding it, because overloading `max_stake` for both is ambiguous. Store parsed scraper output in existing `parsed jsonb` too.
+- No CHECK/enum change. `dedupe.ts` keys must include the type so a no_sweat and bonus_bet from the same book/event don't collide (verify).
 
-### Pattern 3: Human-confirmed matching for anything not entered via dropdown
+`signup_offers` (currently: title, description, raw_text, `bonus_amount`, source_url, expires_at, status):
+- `offer_kind text null` -- `'bet_get' | 'no_sweat' | 'other'` (null = legacy row; backfill by re-scrape, the table rewrites each run via upsert + expire).
+- `qualifying_stake numeric(10,2) null` -- "Bet $5" / "first bet up to $1,000".
+- `bonus_total numeric(10,2) null` -- keep `bonus_amount` as the headline for back-compat; the new column is what ranking uses (for NSB = refund cap).
+- `installments jsonb null` -- e.g. `{count:5, each:"50.00", daysApart:1}` for FanDuel/DK-style paid-over-time offers (affects how/when to convert and, for the ranker, whether it can be done with one hedge).
+- `min_odds_american int null`, `refund_kind text null`, `requires_win boolean null` (bet&get offers split: pays on bet placed vs. on win; "Bet $5 get $200 if your bet wins" is a different strategy -- classify, rank only the placed-bet variety and mark the rest as informational).
+- Keep the table separate from `promos` (existing design decision; boundary test enforces that domain/promos never imports ingestion).
+- `signupStore.ts` upsert `set` clause and `SignupOfferInput` must carry every new field; `SignupOfferRow` in `domain/promos/signupOffers.ts` gains them.
+- Seed: `books` table already seeded from `COLORADO_BOOKS`; no new rows since all six books exist. Run `scripts/seed.ts` only if displayName/notes change.
 
-**What:** Scraped promo candidates (and any manual entry that falls back to free text) go through the fuzzy matcher (team-name alias table + commence-time window), but the match is written as `status: pending_review` and surfaced in a review queue. It only becomes an active, hedge-calculated promo after a human confirms the matched event.
-**When to use:** Any promo whose event reference did not come from a direct dropdown selection against the API's canonical event list.
-**Trade-offs:** Adds a manual step, but a silent mismatch (e.g., matching "Nuggets vs Lakers" to the wrong night's game, or the wrong Lakers game if there are back-to-backs) directly produces wrong stakes and wrong guaranteed-profit numbers — this is the single highest-value correctness guard in the system given the domain's "correctness must be exact" constraint.
+## Ingestion changes
 
-### Pattern 4: Quota-aware caching, not scheduled polling
+- **exclusions.ts**: `classifyExclusion` currently returns `no_sweat` after the new-customer and deposit checks. Keep new-customer precedence (first-bet NSB is a sign-up offer and flows to `signupOffers.ts`). Change the final no-sweat line so existing-customer no-sweat promos are **kept** (return `null`) and the parser sets `promoType: "no_sweat"`. Keep the `no_sweat` `SkipReason` for no-sweat entries that fail (cap unparseable, parlay-only), routing through `reviewTriage` to the classify queue instead of silently dropping. Update `exclusions.test.ts` (it currently asserts the clear skip).
+- **Per-book parsers**: DK/FanDuel/Bally parsers decide `promoType` per entry; add a `no_sweat` branch there that also extracts refund cap (`maxStake`) and refund kind. New-customer NSB entries still go to skips -> `signupOffers.ts`.
+- **promoReading.ts (reader)**: add `"no_sweat"` to `kind` enum; remove "no-sweat offers" from the `not_usable` list in the prompt and add a rule ("a bet that refunds a losing stake as a Bonus Bet or cash up to a stated maximum -> no_sweat; maxStake = the maximum refunded/qualifying amount, evidence must include the $"). Add `refundKind` field only if needed (or derive deterministically from text: regex "bonus bets?" vs "cash"), preferred -- deterministic so no new guard surface. **Bump `PROMO_READER_PROMPT_VERSION`** (cache key invalidation is intentional). `reconcile.ts` and `verbatimGuard.ts` branch on kind: add `no_sweat` handling (needs maxStake guard-backed; boostPercent/bonusAmount not required). `readerPass.ts`/`reviewTriage.ts` "concrete offer" detection must recognize no-sweat so rescues work.
+- **scrapeTargets.ts**: add keys for each new book as feasibility passes (`betmgm`, `fanatics`, `williamhill_us`, `betrivers`, `hardrockbet`, `espnbet`). Existing recon notes: Caesars 403s; Fanatics app-only; Hard Rock domain not found; BetMGM/theScore login/JS-gated; BetRivers only loyalty store. Contract today is `render:"http"`, `stealth:false`, `sourceFormat:"json"` -- any book needing a browser means widening `BookScraper` and the GH Actions job (installs no browser today). **Treat each book as an independent, time-boxed spike**; ship the ones that work, leave the rest on manual add.
+- **Manual add path** (`addedPromoInput`, `AddPromoForm`, `buildAddedPromo`): needs a `no_sweat` option (cap, refund kind) -- required, since scraping many books will fail and manual entry is the fallback.
+- **signupOffers.ts (ingestion)**: today only extracts `bonusAmount` from the largest "$N bonus" match and excludes referrals. Extend with deterministic extractors for kind (NSB wording: "no sweat", "refunded as bonus bets", "second chance bet"), qualifying stake ("bet $N"), installments, min odds. Money stays regex + decimal.js (T-mgi-03).
 
-**What:** No cron job continuously refreshes odds. Instead, every odds fetch checks a TTL cache first; cache misses trigger a live call, which updates both the cache and a running monthly credit counter (read from the API's own `x-requests-remaining`/`x-requests-used`/`x-requests-last` response headers). If remaining quota drops below a safety threshold, the ingestion layer degrades gracefully (serves stale cached odds with an "as of" timestamp, or blocks per-event calls first since those are the most expensive).
-**When to use:** All odds fetching, always.
-**Trade-offs:** Odds shown may lag a few minutes behind live lines (acceptable for a hedge calculator used to lock in a promo, not for live in-play betting).
+## Ranking and feed (estimated vs guaranteed)
 
-## Data Flow
+- Add result kind `{kind:"nosweat", nsb: NoSweatResult, rateUsed: Decimal}` to `PromoOpportunity.result`. `guaranteedProfitOfOpportunity`/`secondaryRankOf` become exhaustive switches; for `nosweat` they must not be used by the guaranteed sort. Recommended: `rankPromoHedges` ranks only boost/bonus; a new `rankNoSweatPromos` (or a flag param) returns NSB opportunities sorted by estimated profit, so a type error rather than discipline prevents mixing.
+- Feed: new `SourceId "nosweat"` ("No-sweat bets (estimated)") rendered as its own section with an "Estimated" badge and "valued at N% conversion" note, `RankKey.estimated = true`. The user-facing sort switch applies within each source, so no cross-contamination. Do not interleave NSB into "Best promos".
+- Exclude from: `recordCurrentProfitObservations`, `recordMemberFeedObservations`, `buildDashboardTotals`, profit series, Statistics, `findUnprofitablePromos` (or give it a null best profit). Add a unit test asserting a feed with only NSB promos yields zero recorded profit.
+- Mark done: allowed for NSB, but `profit_extracted` is what the member enters/confirms; `doneSnapshot.ts` should store `kind: "nosweat"` and the rate used; verify what `promoTracking` records (if it snapshots computed profit as "extracted" this would count an estimate as realized -- needs checking in the phase).
+- Pairing (`pairPromos.ts`): keep NSB out of pairs in v1.2.
+- `get-promos.ts` (Promos tab): list NSB rows with the same estimated labelling; `UnprofitablePromoRow` handles "can't price".
+- Done/History/Stats components that switch on `promoType` (HistorySection, DonePromoRow, DonePairRow, PromoRow, PairCard) need a case.
 
-### Promo → Opportunity Flow
+## Intro offers ranking (Sign-up offers screen)
 
-```
-[Scraper hint] or [Manual entry, dropdown-matched]
-    ↓
-[Normalize: book, type, value, market, max_stake]
-    ↓
-[If not dropdown-matched: fuzzy Match Engine → pending_review]
-    ↓ (human confirms)
-[Promo record: event_id + market_key resolved, status=active]
-    ↓
-[User opens Opportunities view]
-    ↓
-[Odds Ingestion: cache check → (miss) bulk or per-event fetch from The Odds API]
-    ↓
-[Normalize odds into canonical American-odds shape, tag by book]
-    ↓
-[Filter candidate opposing books to the viewing user's book_preferences]
-    ↓
-[Hedge Engine: bonus-bet or boost solver → stakes + guaranteed profit]
-    ↓
-[Opportunity Ranking: sort all active promos by guaranteed profit]
-    ↓
-[Dashboard renders ranked list; promo detail shows exact stake breakdown]
-```
+New pure `rankIntroOffers({offers, ownedBookKeys, events, now, precision})`, called from `get-signup-offers` (which currently takes no args and returns groups; keep "no arguments, userId from session" discipline T-mgi-01; it will additionally need cached events via `getCachedEvents`, 0 credits).
 
-### Key Data Flows
+- Eligible: offers at books the member **lacks** (ownership via `getUserBookKeys`, as today). Hedge set = the member's own books only (they must hold accounts to hedge); if the member has fewer than one hedgeable book, show "add a book" state.
+- Kinds:
+  - `bet_get` (place $S, receive $B in bonus bets regardless of outcome): net = value of B at the live rate (v*B) minus cost of the qualifying bet. Cost-minimising qualifying line = the market where hedging a stake S at the new book against the member's best opposing price loses least (an arb-style calc: pairs of quotes, `arbMath` / two-way hedge with equal-payout, could reuse `rankArbs` helpers with `totalStake = S` and allow negative result, returning the least-negative line). Then profit = v*B - qualifyingLoss. This "negative arb" is new logic; fixture-test it.
+  - `no_sweat` (first bet NSB): use `calculateNoSweatHedge` with S = qualifying stake/refund cap, choose the best line over all events (same candidate loop as promo ranking, unpinned scope = all sports/moneyline), rate from `conversionRate(newBookKey, memberHedgeSet)`.
+  - Installment offers (`installments`): value each installment at v; exact line applies to the qualifying bet only; show "convert each bonus bet with the finder" and a link/prefill to the Tools finder with book + amount.
+- Output DTO per offer: ranked position, bookName, kind, headline value (estimated), qualifying bet (market/side/odds/stake), hedge (book/odds/stake), expected profit estimated vs floor, "how to convert the bonus bets" text/prefill, odds age, source link. Sort by estimated profit desc; unpriceable offers (no odds at that book: Caesars, Fanatics) go to a "can't price" tail with the headline amount only. Do not emit exact lines for them.
+- Owned books: keep the "Show books I already have" toggle (existing owner decision 3) as a secondary list.
+- Reads cached odds only -- no Odds API client import (T-04-04 pattern).
 
-1. **Promo confirmation is a one-time write, odds are a repeated read:** once `promo.event_id` is resolved and confirmed, that mapping never needs to be recomputed — only the odds for that event/market are re-fetched (cached) each time the opportunity is viewed. This separation is what keeps quota usage low: matching costs zero quota (uses free `/events`), only odds lookups cost quota.
-2. **Book-preference filtering happens after odds normalization, before hedge calculation:** the hedge engine should never see odds from books the viewing user doesn't have — filter early so the "best opposing line" search space is already correct.
-3. **Nothing computed by the Hedge Engine is persisted as the source of truth:** guaranteed-profit numbers are always derived at read time from (promo + cached odds), so a promo's displayed profit updates automatically when the underlying cached odds refresh, without a separate invalidation step.
+## Data flow changes
 
-## Scaling Considerations
+1. Scrape (GH Actions 3x/day, unchanged cadence): new parsers -> `promos` (incl. no_sweat) + `signup_offers` (+ new fields).
+2. Feed request: `loadMemberFeedContext` also builds the memoized `conversionRateFor`. `rankOpts` gains it. Singles/pairs unchanged; NSB list produced alongside.
+3. Sign-up screen request: member books + active signup offers + cached events -> `rankIntroOffers`.
+4. Recorders/dashboard/statistics: unchanged inputs (guaranteed-only singles/pairs).
 
-This app has ~1-20 users by design (PROJECT.md: owner + a few friends, private). Traditional scaling tiers do not apply — the real constraint is API quota, not load.
+## Patterns to Follow
 
-| Scale | Architecture Adjustments |
-|-------|---------------------------|
-| Current (1-20 users, ~500 credits/mo) | On-demand + cached fetching only; quota tracker with hard guardrails; per-event (player prop) calls minimized |
-| If quota becomes the bottleneck | Upgrade The Odds API tier ($/mo) before adding architectural complexity — this is a config change, not a redesign |
-| If promo volume grows a lot (many books/scrapers) | Scrapers already isolated per-book; add more without touching matching/hedge/ranking layers |
+- **Inject, don't import, the rate** into `rankPromoHedges` (`opts.conversionRateFor`) to keep domain modules pure and testable with a stub rate.
+- **Exhaustive switch with `never` check** on promo type/result kind everywhere; it turns "forgot a place" into a compile error.
+- **Additive nullable migrations** only (live production on Vercel + teammate pushes to main; fetch before planning).
+- **Deterministic money extraction, reader for classification only** (existing T-mgi-03 rule).
+- **Per-book scraper = one file + registry line + fixtures + test**, same as ballybet/draftkings/fanduel.
 
-### Scaling Priorities
+## Anti-Patterns to Avoid
 
-1. **First (and really only) bottleneck: Odds API quota.** Every architectural decision above (bulk-over-per-event, dropdown-first matching, TTL caching, on-demand not polling) exists specifically to protect the free tier. This is the one place to keep spending design effort.
-2. **Second, much smaller concern: scraper maintenance burden.** Book promo pages change frequently and scrapers will break; the architecture already treats scrapers as a best-effort hint source feeding the same review queue as ambiguous manual entries, so a broken scraper degrades gracefully rather than corrupting data.
+- Merging NSB into the guaranteed-profit sort or Dashboard totals (breaks the Core Value of "correct to the cent").
+- Hardcoding a 70% conversion fallback (owner rejected; return "can't price").
+- Extending `PROMO_TYPES` without fixing the `profit_boost ? ... : bonus` ternary.
+- Importing ingestion code from domain code (boundary tests exist; signup ranking lives in domain).
+- Treating Caesars/Fanatics as hedge venues or promo-side priced books (paid-only odds).
 
-## Anti-Patterns
+## Touch list (files mentioning promoType, to audit for exhaustiveness)
 
-### Anti-Pattern 1: Scheduled/cron polling of the odds API
+domain/promos: rankPromoHedges, pairPromos, pairSnapshot, doneSnapshot, promoRowDto, dto, describe, dedupe, lifecycle, yourCap, buildAddedPromo, addedPromoInput, addPromoDraft, duplicateHint, altSpreads, leagueWideAltTargets, reviewInput, scraped, types. db: promos, promoCaps, promoReview, promoTracking, profitHistory, memberPromoState, memberPairState, addedPromos, addedPromoPipeline, schema. actions: edit-promo, correct-promo-match, confirm-promo-match, set-promo-cap, enter-promo-caps, classify-promo, get-promos, get-add-promo-options. components: PairCard, AddPromoForm, UnprofitablePromoRow, DonePromoRow, ClassifyQueueCard, QueueItemCard, PromoRow, DonePairRow, HistorySection. ingestion: promoReading, reconcile, reviewTriage, exclusions, store, books/*. stats: domain/stats/dailyHistory.
 
-**What people do:** Set up a cron job to refresh all odds every N minutes "to keep the dashboard fresh," modeled on real-time arbitrage platform marketing content.
-**Why it's wrong:** At `markets × regions` credits per call across multiple sports, a polling loop exhausts a ~500 credit/month free tier in hours to days, leaving nothing for actual on-demand use.
-**Instead:** Fetch odds only when a user action requires them (viewing opportunities, refreshing a specific promo), backed by a TTL cache, with quota tracked via the API's own usage headers.
+## Suggested Build Order
 
-### Anti-Pattern 2: Auto-trusting fuzzy-matched events
+1. **NSB math + conversion-rate oracle** (pure, no I/O): `noSweat.ts`, `conversionRate.ts`, fixtures. Unblocks everything; no schema or UI risk.
+2. **Type system + schema**: add `"no_sweat"` to `PROMO_TYPES`, convert all binary branches to exhaustive switches (compile-driven), migration 0018 (`refund_kind`, `refund_cap`, signup_offers columns). Ship dark (no data yet).
+3. **Ranking + feed**: `evaluateNoSweatCandidate`, `memberFeed` `estimated` list, new `nosweat` source in `get-opportunities` + UI section with Estimated badge, exclusion of NSB from recorders/dashboard (tests). Manual-add path for `no_sweat` here so it is testable end-to-end without scrapers.
+4. **Ingestion for existing books**: exclusions change, reader prompt/version bump, reconcile/guard, DK/FanDuel/Bally no_sweat parsing, reviewTriage routing. (After step 3 so kept NSB promos have somewhere to land.)
+5. **Intro-offer extraction + schema fields**: extend ingestion `signupOffers.ts`/`signupStore.ts` for existing 3 books first (data exists to test against).
+6. **Intro-offer ranker + Sign-up screen rewrite** (depends on 1, 2, 5).
+7. **New-book scrapers**, each an independent time-boxed spike (BetRivers, BetMGM, theScore, Hard Rock, then Caesars/Fanatics which are unpriceable anyway). Last, since each is high-uncertainty and independent; the product is complete without any of them via manual add.
 
-**What people do:** Let a string-similarity match against team names automatically resolve a scraped promo to an event_id and immediately start calculating hedges against it.
-**Why it's wrong:** Team name collisions, doubleheaders, and back-to-back games make silent mismatches likely; a wrong event match produces confidently-wrong stake and profit numbers — the opposite of this app's core value ("correctly, every time").
-**Instead:** Route anything not directly selected from the canonical event list through a human confirmation queue before it's eligible for hedge calculation.
+## Research flags for phases
 
-### Anti-Pattern 3: Coupling the hedge math to the database/API layer
+- Step 7 (scrapers): needs per-book recon spikes; prior recon rated most as blocked (Caesars 403, Fanatics app-only, Hard Rock DNS, BetMGM/theScore login-gated, BetRivers loyalty store only). Likely deeper research per book; accept partial delivery.
+- Step 6 (qualifying-line optimizer for bet&get): new math (least-negative arb), design the objective and test fixtures first; check offer terms (min odds, requires-win) per book.
+- Step 3: verify `promoTracking`/`doneSnapshot` do not store computed estimates as extracted profit.
+- Step 1: owner decision on top-1 vs more conservative rate.
+- Steps 2, 4, 5: standard patterns, low research need.
 
-**What people do:** Write the bonus-bet/boost solver as methods on an ORM model or inline in an API route handler, mixing calculation with fetching/persistence.
-**Why it's wrong:** Makes the highest-stakes logic in the app (the actual money math) hard to unit test in isolation and easy to silently break while refactoring ingestion or UI code.
-**Instead:** Keep the solver as pure functions taking plain data (promo terms + odds list) and returning plain data (stakes + profit), tested against fixture cases independent of any live system.
+## Confidence
 
-### Anti-Pattern 4: Persisting computed profit/opportunity values
-
-**What people do:** Store `guaranteed_profit` on the promo row after computing it once, to avoid recomputation.
-**Why it's wrong:** Odds move; a stored value goes stale the moment the underlying line changes, and nothing forces an update, so the dashboard can show a profit number that's no longer achievable.
-**Instead:** Recompute ranking/profit at read time from the promo plus the current cached odds snapshot (which itself carries a `last_update` timestamp to show the user how fresh the number is).
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|----------------------|-------|
-| The Odds API | REST, API key as query param; `region=us`/`us2` for Colorado-legal books | `/sports` and `/events` are zero-quota — use them freely for matching and event discovery. `/odds` (bulk) costs `markets × regions`. Per-event `/odds` (needed for player props/alt lines) costs `markets × regions` **per event** — the expensive path. Track quota via `x-requests-remaining`, `x-requests-used`, `x-requests-last` response headers after every call. |
-| Book promo pages (scrape targets) | Scheduled scraper per book, best-effort | Expect breakage; treat output as unconfirmed candidates only, never as directly-trusted promo data |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|----------------|-------|
-| Ingestion ↔ Domain/Normalize | Plain data objects (no shared mutable state) | Ingestion modules output raw/candidate records; normalize layer is the only place format conversion happens |
-| Matching Engine ↔ Promo Store | Writes a `pending_review` status until human-confirmed | Never let matcher output flow directly into the hedge engine |
-| Odds Ingestion ↔ Hedge Engine | Odds Ingestion supplies already-normalized, cached odds; Hedge Engine has no knowledge of the API, caching, or quota | Keeps the calculation core testable and swappable if the odds provider ever changes |
-| Auth ↔ Everything else | Session/user id passed down to Ranking layer to apply `book_preferences` filter | Book filtering is the only place user identity affects business logic; everything else can be treated as shared/global data |
-
-## Sources
-
-- [Odds API Documentation V4](https://the-odds-api.com/liveapi/guides/v4/) — event/bookmaker/market structure, quota formula, free `/sports` and `/events` endpoints (HIGH confidence, official docs)
-- [The Odds API Free Tier: 500 Credits Is Not 500 Requests](https://oddspapi.io/blog/the-odds-api-free-tier-limits/) — third-party confirmation of quota-per-request behavior (MEDIUM confidence, cross-checked against official docs)
-- [The Odds API error codes / usage headers](https://the-odds-api.com/liveapi/guides/v4/api-error-codes.html) — `x-requests-remaining`/`x-requests-used`/`x-requests-last` header behavior (HIGH confidence, official docs)
-- General arbitrage-platform architecture write-ups (e.g., Idea Usher blog posts on building OddsJam-style platforms) were reviewed but largely describe real-time/high-frequency exchange architectures aimed at production SaaS scale — **not representative** of this project's quota-constrained, low-user-count context, and were used only to confirm the generic layering concept (ingest → normalize → match → calculate → rank), not any specific technical recommendation (LOW confidence, discounted accordingly).
-
----
-*Architecture research for: Sportsbook promo-conversion / hedge calculator (PromoProfit)*
-*Researched: 2026-09-25*
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Type/DB integration | HIGH | Read schema.ts/types.ts directly; text column, no CHECK |
+| NSB math | HIGH | Derived algebraically; verify with fixtures |
+| Rate-per-hedge-set | HIGH | Reuses existing finder functions |
+| Recorder/dashboard exclusion | MEDIUM | Not every consumer file read (promoTracking, doneSnapshot, stats) -- audit in phase |
+| reconcile/verbatimGuard changes | MEDIUM | Files not read in full |
+| Scraper feasibility | LOW-MEDIUM | Based on stale recon notes in scrapeTargets.ts, not re-probed |
