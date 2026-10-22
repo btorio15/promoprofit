@@ -3,10 +3,11 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: planning
-last_updated: "2026-10-22T19:13:33.567Z"
-last_activity: 2026-10-22
+stopped_at: Phase 8 context gathered
+last_updated: "2026-10-22T20:08:59.717Z"
+last_activity: 2026-10-22 — v1.2 roadmap created (Phases 8–11)
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -235,9 +236,9 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 
 ## Session Continuity
 
-Last session: 2026-10-14T15:29:34.182Z
-Stopped at: Phase 7 UI-SPEC approved
-Resume file: .planning/phases/07-dashboard/07-UI-SPEC.md
+Last session: 2026-10-22T20:08:59.706Z
+Stopped at: Phase 8 context gathered
+Resume file: .planning/phases/08-no-sweat-bet-math/08-CONTEXT.md
 
 ## Operator Next Steps
 
