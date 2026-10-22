@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Profit Stats
-status: Awaiting next milestone
-stopped_at: v1.1 milestone complete
-last_updated: "2026-10-22T18:45:16.894Z"
-last_activity: 2026-10-22 — Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Intro Offers & No-Sweat
+status: planning
+last_updated: "2026-10-22T19:13:33.567Z"
+last_activity: 2026-10-22
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 17
-  completed_plans: 17
-  percent: 60
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Planning next milestone (Phase 8 More Sportsbooks queued)
+**Current focus:** v1.2 Intro Offers & No-Sweat — defining requirements
 
 ## Current Position
 
-Phase: — (v1.1 shipped; next milestone not started)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone v1.1 complete
-Last activity: 2026-10-22 - Completed quick task 261022-i3j: standardize three daily runs
+Status: Defining requirements
+Last activity: 2026-10-22 — Milestone v1.2 started
 
 ## Performance Metrics
 

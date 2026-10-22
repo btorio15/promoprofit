@@ -10,12 +10,17 @@ PromoProfit is a private web app that already knows the current promotions at Co
 
 **Shipped:** v1.1 "Profit Stats" on 2026-10-22 (Phases 6, 7, 07.1) — per-member profit graph and Dashboard (totals, counts, graph, feed), site-wide Statistics tab (profit available only, nothing member-specific), hardened profit recording; scheduled scrape + odds refresh + profit recording 3x/day from GitHub Actions. Archive: `.planning/milestones/v1.1-ROADMAP.md`, `.planning/milestones/v1.1-REQUIREMENTS.md`, `.planning/milestones/v1.1-MILESTONE-AUDIT.md`.
 
-## Next Milestone Goals
+## Current Milestone: v1.2 Intro Offers & No-Sweat
 
-Not yet defined (start with `/gsd:new-milestone`). Queued candidates:
-- **Phase 8: More Sportsbooks** — promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books (on the roadmap)
-- **No-sweat bets** — hedge math for no-sweat promos and intro offers (todo 2026-10-22; profit is an estimate that depends on bonus-bet conversion, unlike the guaranteed numbers elsewhere)
-- Admin page (backlog 999.1)
+**Goal:** Turn intro (sign-up) offers and no-sweat promos into ranked, ready-to-place opportunities with exact lines.
+
+**Target features:**
+- No-sweat bet (NSB) algorithm: exact hedge for a no-sweat bet, with the refund bonus bet valued at the bonus-bet finder's real best conversion rate from current odds; shown as estimated profit (not guaranteed)
+- No-sweat promos in the feed: stop skipping no-sweat promos at the scraped books and rank them in Opportunities, labelled as estimates
+- More books: promo and intro-offer scrapers for BetMGM, Fanatics, Caesars, BetRivers, Hard Rock Bet and theScore Bet as feasible (bet365 skipped: no odds coverage)
+- Revamped Sign-up offers screen: for books the member doesn't have, the best intro offers (bet & get bonus bets, no-sweat first bet) ranked by value, with the optimal qualifying line, hedge book and stakes, and how to convert the bonus bets
+
+**Key context:** owner answers 2026-10-22 — bet365 out (no odds); deposit-match offers stay out of scope; NSB conversion uses the finder's live rate, not a fixed %; the NSB algorithm also powers regular no-sweat promos in the feed. Supersedes the 2026-10-22 no-sweat to-do and absorbs queued Phase 8 (More Sportsbooks). bet365 and other non-API books cannot be hedge books.
 
 <details>
 <summary>v1.1 Profit Stats milestone goal (archived)</summary>
@@ -51,13 +56,18 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 ### Active
 
+- [ ] No-sweat bet algorithm (exact hedge + refund valued at the live bonus-bet conversion rate, estimated profit)
+- [ ] No-sweat promos ranked in the Opportunities feed
+- [ ] Promo + intro-offer scrapers for more Colorado books (BetMGM, Fanatics, Caesars, BetRivers, Hard Rock Bet, theScore Bet as feasible)
+- [ ] Revamped Sign-up offers screen with ranked intro offers and exact qualifying lines for books the member doesn't have
+
 
 ### Out of Scope
 
 - Standalone manual hedge calculator page — dropped from v1; the engine powers the feed and finder instead (v2 candidate)
 - Scheduled/automatic odds refresh — v1 uses a user-triggered refresh button; smart scheduled refresh of games with active promos is v2
 - Saving per-user bonus-bet balances and bet history — bonus-bet finder is enter-and-look, nothing saved
-- Second-chance / "risk-free" bets and deposit-match / sign-up bonuses — bonus bets and boosts first (no-sweat bets now a next-milestone candidate, todo 2026-10-22)
+- Deposit-match bonuses — playthrough rules make value unclear (no-sweat and bet & get intro offers moved into v1.2)
 - Hedging on exchanges / prediction markets (Prophet X, Novig, Sporttrade, Kalshi) — sportsbooks only
 - Multi-state support — Colorado only
 - Alerts (Discord/Telegram/SMS) — web app only for v1
@@ -123,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 after v1.1 milestone (Profit Stats)*
+*Last updated: 2026-10-22 at v1.2 milestone start (Intro Offers & No-Sweat)*
