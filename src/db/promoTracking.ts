@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
 import {
   DonePairSnapshotSchema,
@@ -7,7 +7,6 @@ import {
   type PairMemberSnapshot,
 } from "@/domain/promos/pairSnapshot";
 import { getDb } from "./client";
-import { promoVisibilityCondition } from "./promos";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
 
@@ -159,28 +158,4 @@ export async function recordProfitObservations(entries: ProfitObservation[], now
         lastObservedAt: sql`excluded.last_observed_at`,
       },
     });
-}
-
-/** Every observation on or after `sinceDate` ("YYYY-MM-DD"), for summarizeAvailableProfit. */
-export async function getProfitObservationsSince(sinceDate: string, viewerUserId: number): Promise<ProfitObservation[]> {
-  const db = getDb();
-  const rows = await db
-    .select({
-      promoId: promoProfitObservations.promoId,
-      bookKey: promoProfitObservations.bookKey,
-      denverDate: promoProfitObservations.denverDate,
-      maxGuaranteedProfit: promoProfitObservations.maxGuaranteedProfit,
-    })
-    .from(promoProfitObservations)
-    .innerJoin(promos, eq(promos.id, promoProfitObservations.promoId))
-    .where(and(gte(promoProfitObservations.denverDate, sinceDate), promoVisibilityCondition(viewerUserId)));
-
-  // numeric() comes back as a string from neon-http -- keep it a string
-  // (mirrors src/db/promos.ts's ActivePromo money fields).
-  return rows.map((row) => ({
-    promoId: row.promoId,
-    bookKey: row.bookKey,
-    denverDate: row.denverDate,
-    maxGuaranteedProfit: row.maxGuaranteedProfit,
-  }));
 }

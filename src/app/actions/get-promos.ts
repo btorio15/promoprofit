@@ -16,15 +16,14 @@ import { getActivePromos, getScrapeStatus } from "@/db/promos";
 import { getReviewQueue, type QueueRow } from "@/db/promoReview";
 import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { getPromoCompletions } from "@/db/promoTracking";
-import { loadAvailableProfit } from "@/db/feedContext";
-import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
+import { toDoneRows } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
+import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
 import { listCorrectionOptions, scrapedWindowEtDays } from "@/domain/promos/correctionOptions";
 import { findUnprofitablePromos, rankPromoHedges } from "@/domain/promos/rankPromoHedges";
-import { sumOwnBookProfit } from "@/domain/promos/profitTotals";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
@@ -119,11 +118,10 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   ]);
   const userBookSet = new Set(userBookKeys);
   // quick-260929-igk: done promos leave the feed and render only from their
-  // saved snapshots (never live odds); the extracted total is an exact-cent sum.
+  // saved snapshots (never live odds).
   const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
   const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
-  const totalExtracted = sumProfitExtracted(doneRows);
   const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
   const queue = queueRows.map(toQueueItemDTO);
   // quick-260928-it1: classify items also need correctionOptions (their
@@ -133,15 +131,13 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   );
 
   /**
-   * quick-260927-n12: records today's GROUP-level profit observations
-   * (ranked at every usable hedge book, not this member's own -- see
-   * src/db/promoObservations.ts) from whatever odds are already cached (no
-   * new Odds API call), then loads this member's own-book today/week/month
-   * totals. Both run unconditionally, before any empty-state branch below,
-   * so the period numbers are present in every "ok" response.
+   * quick-260927-n12: records today's GROUP-level (Statistics) profit
+   * observations (ranked at every usable hedge book, not this member's own --
+   * see src/db/promoObservations.ts) from whatever odds are already cached
+   * (no new Odds API call). Runs unconditionally, before any empty-state
+   * branch below.
    */
   await recordCurrentProfitObservations(now, { activePromos, precision: precision as StakePrecision });
-  const availableProfit = await loadAvailableProfit(now, userBookSet, user.userId, doneIds);
 
   if (feedPromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";
@@ -154,10 +150,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       unprofitableRows: [],
       queue,
       correctionOptions,
-      totalProfit: "0.00",
       doneRows,
-      totalExtracted,
-      availableProfit,
     };
   }
 
@@ -198,10 +191,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       unprofitableRows: ownAddedRows,
       queue,
       correctionOptions,
-      totalProfit: "0.00",
       doneRows,
-      totalExtracted,
-      availableProfit,
     };
   }
 
@@ -217,6 +207,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     precision: precision as StakePrecision,
     now,
   };
+
+  // W4 / STATS-02: opening the Promos tab records this member's own
+  // observations with the Dashboard's exact rule (whole precision, pairs
+  // included), so the grey line does not depend on visiting the Dashboard.
+  // Uses the caches loaded above (no Odds API call); never throws.
+  await recordMemberFeedObservations({ userId: user.userId, now, feedPromos, rankOpts, userBookSet });
 
   const opportunities = rankPromoHedges(feedPromos, rankOpts);
   const unprofitable = findUnprofitablePromos(feedPromos, rankOpts);
@@ -256,10 +252,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
         unprofitableRows,
         queue,
         correctionOptions,
-        totalProfit: "0.00",
         doneRows,
-        totalExtracted,
-        availableProfit,
       };
     }
 
@@ -271,22 +264,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
       unprofitableRows: [],
       queue,
       correctionOptions,
-      totalProfit: "0.00",
       doneRows,
-      totalExtracted,
-      availableProfit,
     };
   }
 
   const rows = ownBooksFirst(
     opportunities.map((opportunity) => toPromoRowDTO(opportunity, bookNames, userBookSet, priceAge)),
-  );
-  // quick-260927-n12 (owner decision 1): own-book rows only. Done promos are
-  // already filtered out of the feed (quick-260929-igk); doneIds stays as a
-  // belt-and-braces exclusion.
-  const totalProfit = sumOwnBookProfit(
-    rows.map((row) => ({ promoId: row.promoId, guaranteedProfit: row.guaranteedProfit, hasPromoBook: row.hasPromoBook })),
-    doneIds,
   );
 
   return {
@@ -297,10 +280,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     unprofitableRows,
     queue,
     correctionOptions,
-    totalProfit,
     doneRows,
-    totalExtracted,
-    availableProfit,
   };
 }
 

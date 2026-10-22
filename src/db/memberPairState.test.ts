@@ -26,7 +26,6 @@ vi.mock("@/db/promoObservations", () => ({ recordCurrentProfitObservations: vi.f
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/db/promoTracking", () => ({
   getPromoCompletions: mockGetPromoCompletions,
-  getProfitObservationsSince: vi.fn().mockResolvedValue([]),
 }));
 
 import { computeMemberPairState } from "./memberPairState";

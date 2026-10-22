@@ -14,7 +14,6 @@ const {
   mockGetHedgeBookKeys,
   mockGetUserBookKeys,
   mockGetPromoCompletions,
-  mockGetProfitObservationsSince,
   mockRecordCurrentProfitObservations,
   mockRecordMemberProfitObservations,
   mockGetMemberProfitHistory,
@@ -27,7 +26,6 @@ const {
   mockGetHedgeBookKeys: vi.fn(),
   mockGetUserBookKeys: vi.fn(),
   mockGetPromoCompletions: vi.fn(),
-  mockGetProfitObservationsSince: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
   mockRecordMemberProfitObservations: vi.fn(),
   mockGetMemberProfitHistory: vi.fn(),
@@ -44,7 +42,6 @@ vi.mock("@/db/queries", () => ({
 }));
 vi.mock("@/db/promoTracking", () => ({
   getPromoCompletions: mockGetPromoCompletions,
-  getProfitObservationsSince: mockGetProfitObservationsSince,
 }));
 vi.mock("@/db/promoObservations", () => ({
   recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
@@ -154,7 +151,6 @@ beforeEach(() => {
   memberBooksAreHedgeBooks(["draftkings", "fanduel"]);
   mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
   mockGetPromoCompletions.mockResolvedValue([]);
-  mockGetProfitObservationsSince.mockResolvedValue([]);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
   mockRecordMemberProfitObservations.mockResolvedValue(undefined);
   mockGetMemberProfitHistory.mockResolvedValue({ status: "ready", graphStartDay: null, rows: [] });
@@ -207,7 +203,6 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     mockGetActivePromos.mockResolvedValue([]);
     await getOpportunities({ precision: "cents" });
     expect(mockGetActivePromos).toHaveBeenCalledWith(expect.any(Date), 1);
-    expect(mockGetProfitObservationsSince).not.toHaveBeenCalled();
   });
 
   it("D-16: a promo at a non-member book is absent", async () => {
@@ -268,7 +263,6 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(result.dashboard.available).not.toBeNull();
     expect(result.dashboard.available?.allTime).toBe(expected);
     expect(result.dashboard.available?.sinceDay).toBe(today);
-    expect(mockGetProfitObservationsSince).not.toHaveBeenCalled();
   });
 
   it("dashboard.extracted includes completions dated before the graph start day (D-18)", async () => {
@@ -513,7 +507,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
 
   it("spends 0 API credits: never references the odds-fetch client", () => {
     const src = readFileSync(join(__dirname, "get-opportunities.ts"), "utf8");
-    for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports", "loadAvailableProfit"]) {
+    for (const banned of ["ingestion/odds/client", "fetchSportOdds", "listSports"]) {
       expect(src).not.toContain(banned);
     }
   });
