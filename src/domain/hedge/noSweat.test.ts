@@ -176,6 +176,45 @@ describe("solveNoSweat", () => {
       hedgeOddsAmerican: -110,
     });
     expect(r.refundAmount.toFixed(2)).toBe("25.00");
+    // Hand-calculated: Oh = 21/11, exact H = (50*2 - 18.75)/(21/11) = 42.5595...
+    // H = 42.56: hedge payout floor(81.2509) = 81.25.
+    // win = 50 - 42.56 = 7.44; lose = 81.25 - 42.56 - 50 + 18.75 = 7.44.
+    expect(r.hedgeStake.toFixed(2)).toBe("42.56");
+    expect(r.profitIfWin.toFixed(2)).toBe("7.44");
+    expect(r.profitIfLose.toFixed(2)).toBe("7.44");
+    expect(r.worstCaseProfit.toFixed(2)).toBe("-11.31");
+  });
+
+  it("throws when refundValue exceeds the capped refund amount", () => {
+    // Valued at the full $50 stake instead of the $25 cap: a caller bug.
+    expect(() =>
+      solveNoSweat({
+        stake: new Decimal("50"),
+        refundCap: new Decimal("25"),
+        refundValue: new Decimal("25.01"),
+        qualifyingOddsAmerican: 100,
+        hedgeOddsAmerican: -110,
+      }),
+    ).toThrow(RangeError);
+    expect(() =>
+      solveNoSweat({
+        stake: new Decimal("25"),
+        refundCap: new Decimal("50"),
+        refundValue: new Decimal("25.01"),
+        qualifyingOddsAmerican: 100,
+        hedgeOddsAmerican: -110,
+      }),
+    ).toThrow(RangeError);
+    // Exactly the face amount (a 100% conversion) is allowed.
+    expect(() =>
+      solveNoSweat({
+        stake: new Decimal("50"),
+        refundCap: new Decimal("25"),
+        refundValue: new Decimal("25"),
+        qualifyingOddsAmerican: 100,
+        hedgeOddsAmerican: -110,
+      }),
+    ).not.toThrow();
   });
 
   describe("validation", () => {

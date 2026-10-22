@@ -68,7 +68,16 @@ export function solveNoSweat(input: NoSweatInput): NoSweatSolution {
   assertMoney("refundCap", cap, false);
   assertMoney("refundValue", V, true);
 
-  const refundAmount = Decimal.min(S, cap);
+  const refundAmount = LocalDecimal.min(S, cap);
+  // A bonus bet's cash value can never exceed its face amount, so a value
+  // above min(stake, refundCap) means the caller valued the wrong refund
+  // (e.g. at the full stake instead of the cap) and would overstate the
+  // lose-side profit and the hedge stake.
+  if (V.gt(refundAmount)) {
+    throw new RangeError(
+      `refundValue ${V.toString()} cannot exceed refundAmount ${refundAmount.toString()} (min of stake and refundCap)`,
+    );
+  }
   const Oa = new LocalDecimal(americanToDecimal(input.qualifyingOddsAmerican));
   const Oh = new LocalDecimal(americanToDecimal(input.hedgeOddsAmerican));
 
