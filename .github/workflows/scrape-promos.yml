@@ -12,6 +12,10 @@
 # free-tier budget, so the in-app credit guard will block refreshes once the
 # budget runs low. Lower the schedule or the sport list if that matters.
 #
+# Morning: GitHub often starts the 15:37 run hours late, so Vercel Cron also
+# dispatches this workflow at 13:17 UTC (7:17 AM MDT) via /api/cron/scrape as
+# a promo scrape only (skip_morning_observe=true; no extra odds spend).
+#
 # Manual dispatch is still available. force_morning_observe runs the odds step
 # outside the morning window. skip_morning_observe skips the odds step.
 #
