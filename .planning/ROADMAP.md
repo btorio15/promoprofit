@@ -26,7 +26,7 @@
 
 - [x] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page (completed 2026-10-13)
 - [x] **Phase 7: Dashboard** - Opportunities tab becomes the Dashboard: headline totals and counts above the profit graph, full feed below; profit summary leaves the Promos tab (completed 2026-10-17)
-- [ ] **Phase 07.1: Profit Stats Cleanup** (INSERTED) - Close v1.1 audit tech debt: resilient recording, Dashboard error states, dead Promos totals removed
+- [x] **Phase 07.1: Profit Stats Cleanup** (INSERTED) - Close v1.1 audit tech debt: resilient recording, Dashboard error states, dead Promos totals removed (completed 2026-10-22)
 
 ### 📋 Next (milestone to be named)
 
@@ -114,7 +114,7 @@ Plans:
 5. Stale comments fixed (AppShell tab names, morning-observe gating, scrape workflow description); full test suite, type check and lint green.
 **Requirements**: STATS-02, STATS-08 (hardening; no new requirements)
 **Depends on:** Phase 7
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -124,7 +124,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07.1-02-PLAN.md — Remove dead Promos-tab totals and helpers; Promos tab records the member's own observations (W4); final test/type/lint gate
+- [x] 07.1-02-PLAN.md — Remove dead Promos-tab totals and helpers; Promos tab records the member's own observations (W4); final test/type/lint gate
 
 ### Phase 8: More Sportsbooks
 
@@ -144,7 +144,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 7/7 | Complete    | 2026-10-17 |
-| 07.1. Profit Stats Cleanup | v1.1 | 2/3 | In Progress|  |
+| 07.1. Profit Stats Cleanup | v1.1 | 3/3 | Complete   | 2026-10-22 |
 | 8. More Sportsbooks | next | 0/0 | Not started | - |
 
 ## Backlog
