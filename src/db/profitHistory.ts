@@ -42,7 +42,7 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
   }));
 }
 
-/** Every promo's status, book and max stake, for the funnel and book health. */
+/** Every site-wide (scraped) promo's status, book and max stake, for the funnel and book health. */
 export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
   const db = getDb();
   const rows = await db
@@ -53,7 +53,10 @@ export async function loadFunnelPromos(): Promise<FunnelPromo[]> {
       maxStake: promos.maxStake,
       expiresAt: promos.expiresAt,
     })
-    .from(promos);
+    .from(promos)
+    // Site-wide only: members' private hand-added promos stay out of the
+    // funnel and book health, like the rest of Statistics (07.1 review fix).
+    .where(promoVisibilityCondition());
   return rows;
 }
 
