@@ -1,4 +1,4 @@
-import { configuredOddsKeys } from "./oddsKeys";
+import { configuredOddsKeys, MISSING_KEY_MESSAGE } from "./oddsKeys";
 import { runOddsRefresh, type RefreshOutcome } from "./refresh";
 import { recordCurrentProfitObservations, recordCurrentProfitSnapshots } from "@/db/promoObservations";
 import { listUserIds } from "@/db/queries";
@@ -21,7 +21,8 @@ import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
  * populated. Both branches (refresh succeeded vs. didn't) must still
  * record: a blocked/failed refresh is exactly why the morning job exists in
  * the first place, and skipping observations on a bad refresh would lose
- * the whole day's number.
+ * the whole day's number. The same holds when no Odds API key is configured:
+ * only the refresh is skipped (logged), the recorders still run (WR-04).
  *
  * Phase 6 D-18: after the group-level recording, a member pass records each
  * member's own feed into member_profit_observations. It reads cached odds
@@ -31,7 +32,7 @@ import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
  * tab use. One member failing never stops the others.
  */
 export type MorningObserveResult =
-  | { status: "skipped"; reason: "not-morning-window" | "missing-api-key" }
+  | { status: "skipped"; reason: "not-morning-window" }
   | {
       status: "ran";
       refreshOutcome: RefreshOutcome;
@@ -89,11 +90,18 @@ export async function runMorningObservation(opts: {
     return { status: "skipped", reason: "not-morning-window" };
   }
 
-  if (!hasApiKey) {
-    return { status: "skipped", reason: "missing-api-key" };
+  // WR-04: a missing key skips ONLY the refresh. Every recorder below reads
+  // cached odds and needs no key, so the run still records for everyone.
+  let refreshOutcome: RefreshOutcome;
+  if (hasApiKey) {
+    refreshOutcome = await runOddsRefresh({ confirmed: true, triggeredByUserId: null, now });
+  } else {
+    console.error(
+      "runMorningObservation: no Odds API key configured (ODDS_API_KEY / ODDS_API_KEYS); " +
+        "skipping the odds refresh and recording from cached odds only",
+    );
+    refreshOutcome = { status: "error", message: MISSING_KEY_MESSAGE };
   }
-
-  const refreshOutcome = await runOddsRefresh({ confirmed: true, triggeredByUserId: null, now });
   // Each site-wide recorder is isolated so a failure in either can never
   // skip the member pass below (audit W1).
   try {

@@ -93,12 +93,21 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledTimes(1);
   });
 
-  it("skips (missing-api-key) without calling refresh or recording when ODDS_API_KEY is absent", async () => {
+  it("with no API key, skips only the refresh, logs it, and still runs every recorder (WR-04)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: false });
 
-    expect(result).toEqual({ status: "skipped", reason: "missing-api-key" });
+    expect(result).toEqual({
+      status: "ran",
+      refreshOutcome: { status: "error", message: "ODDS_API_KEY is not set" },
+      memberObservations: { recorded: 2, failed: 0 },
+    });
     expect(mockRunOddsRefresh).not.toHaveBeenCalled();
-    expect(mockRecordCurrentProfitObservations).not.toHaveBeenCalled();
+    expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(MORNING_INSTANT);
+    expect(mockRecordSnapshots).toHaveBeenCalledWith(MORNING_INSTANT);
+    expect(mockRecordMember).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("no Odds API key"));
+    spy.mockRestore();
   });
 
   it("detects the key from ODDS_API_KEYS alone (no ODDS_API_KEY)", async () => {
@@ -110,13 +119,17 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("skips (missing-api-key) when neither ODDS_API_KEY nor ODDS_API_KEYS is set", async () => {
+  it("skips only the refresh when neither ODDS_API_KEY nor ODDS_API_KEYS is set (WR-04)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubEnv("ODDS_API_KEY", "");
     vi.stubEnv("ODDS_API_KEYS", "");
     const result = await runMorningObservation({ now: MORNING_INSTANT });
-    expect(result).toEqual({ status: "skipped", reason: "missing-api-key" });
+    expect(result).toMatchObject({ status: "ran", refreshOutcome: { status: "error" } });
     expect(mockRunOddsRefresh).not.toHaveBeenCalled();
+    expect(mockRecordCurrentProfitObservations).toHaveBeenCalledTimes(1);
+    expect(mockRecordMember).toHaveBeenCalledTimes(2);
     vi.unstubAllEnvs();
+    spy.mockRestore();
   });
 
   it("runs the moneyline-only refresh (confirmed, no triggering user) and records observations on success", async () => {
@@ -166,7 +179,6 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
 
   it("skipped runs do not list users or record members", async () => {
     await runMorningObservation({ now: NOON_INSTANT, hasApiKey: true });
-    await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: false });
     expect(mockListUserIds).not.toHaveBeenCalled();
     expect(mockRecordMember).not.toHaveBeenCalled();
   });
