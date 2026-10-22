@@ -27,7 +27,7 @@ describe("buildExpireOwnStatement", () => {
 });
 
 describe("buildSoftDeleteStatements", () => {
-  const [update, del] = buildSoftDeleteStatements(db, { promoId: 5, userId: 7 });
+  const [update, del, delMember] = buildSoftDeleteStatements(db, { promoId: 5, userId: 7 });
   it("soft-deletes with ownership in WHERE", () => {
     const { sql, params } = update.toSQL();
     expect(sql).toMatch(/^update "promos" set "status" = \$1/);
@@ -42,6 +42,16 @@ describe("buildSoftDeleteStatements", () => {
     expect(sql).toContain('"added_by_user_id" = $');
     expect(params).toEqual(expect.arrayContaining([5, 7]));
     for (const s of [update.toSQL().sql, sql]) expect(s).not.toMatch(/delete from "promos"/);
+  });
+  it("clears the owner's member observations for the promo and pairs it is partner in (quick-261022-hn4)", () => {
+    const { sql, params } = delMember.toSQL();
+    expect(sql).toMatch(/^delete from "member_profit_observations"/);
+    expect(sql).toContain('"member_profit_observations"."user_id" = $');
+    expect(sql).toMatch(/"member_profit_observations"\."promo_id" = \$\d+ or "member_profit_observations"\."partner_promo_id" = \$\d+/);
+    expect(sql).toContain('exists (select "id" from "promos"');
+    expect(sql).toContain('"added_by_user_id" = $');
+    expect(params).toEqual(expect.arrayContaining([5, 7]));
+    expect(params).not.toContain("active");
   });
 });
 
@@ -69,7 +79,7 @@ describe("buildUpdateOwnStatements (WR-01)", () => {
     addedByUserId: 7,
     status: "active",
   } as unknown as AddedPromoInsert;
-  const [update, del] = buildUpdateOwnStatements(db, { promoId: 5, userId: 7, values });
+  const [update, del, delMember] = buildUpdateOwnStatements(db, { promoId: 5, userId: 7, values });
   it("updates in place with owner, active status and locked book/type in WHERE", () => {
     const { sql, params } = update.toSQL();
     expect(sql).toMatch(/^update "promos" set/);
@@ -84,5 +94,12 @@ describe("buildUpdateOwnStatements (WR-01)", () => {
     expect(sql).toContain('"added_by_user_id" = $');
     expect(params).toEqual(expect.arrayContaining([5, 7, "active"]));
     expect(sql).not.toMatch(/delete from "promos"/);
+  });
+  it("clears the owner's stale member observations, only while the promo is active (quick-261022-hn4)", () => {
+    const { sql, params } = delMember.toSQL();
+    expect(sql).toMatch(/^delete from "member_profit_observations"/);
+    expect(sql).toContain('"partner_promo_id" = $');
+    expect(sql).toContain('exists (select "id" from "promos"');
+    expect(params).toEqual(expect.arrayContaining([5, 7, "active"]));
   });
 });

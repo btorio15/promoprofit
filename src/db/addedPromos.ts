@@ -1,6 +1,6 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, exists, inArray, or } from "drizzle-orm";
 import { getDb } from "./client";
-import { promoProfitObservations, promos } from "./schema";
+import { memberProfitObservations, promoProfitObservations, promos } from "./schema";
 import { activePromoWhere } from "./promos";
 import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
 import type { AddedPromoEditValues } from "@/domain/promos/addedPromoInput";
@@ -48,9 +48,35 @@ export function buildExpireOwnStatement(db: Db, { promoId, userId }: OwnPromoArg
 }
 
 /**
+ * Removes the owner's own member_profit_observations rows for this promo,
+ * including pair rows where it is the partner (quick-261022-hn4). The member
+ * recorder only ever raises a day's value (greatest), so after an edit or
+ * delete the old, higher value would otherwise stay in the member's grey line
+ * and Available totals. Scoped to the owner and by an ownership subquery
+ * (T-5-16); onlyActive matches the edit statement's status guard.
+ */
+function buildDeleteOwnMemberObservations(db: Db, { promoId, userId }: OwnPromoArgs, onlyActive: boolean) {
+  const owned = and(
+    eq(promos.id, promoId),
+    eq(promos.addedByUserId, userId),
+    ...(onlyActive ? [eq(promos.status, "active")] : []),
+  );
+  return db
+    .delete(memberProfitObservations)
+    .where(
+      and(
+        eq(memberProfitObservations.userId, userId),
+        or(eq(memberProfitObservations.promoId, promoId), eq(memberProfitObservations.partnerPromoId, promoId)),
+        exists(db.select({ id: promos.id }).from(promos).where(owned)),
+      ),
+    );
+}
+
+/**
  * Soft delete (D-11: never a SQL DELETE on promos, so promo_completions
  * survive) plus A4: the promo's profit observations are removed, scoped by
- * an ownership subquery (T-5-16).
+ * an ownership subquery (T-5-16). Site-wide observations never hold private
+ * promos since 07.1 WR-02; the member's own rows are cleared too.
  */
 export function buildSoftDeleteStatements(db: Db, { promoId, userId }: OwnPromoArgs) {
   const update = db
@@ -76,7 +102,7 @@ export function buildSoftDeleteStatements(db: Db, { promoId, userId }: OwnPromoA
       ),
     ),
   );
-  return [update, deleteObservations] as const;
+  return [update, deleteObservations, buildDeleteOwnMemberObservations(db, { promoId, userId }, false)] as const;
 }
 
 /** True when this member's active promo was expired; false for any other id. */
@@ -142,8 +168,9 @@ export async function getOwnActiveAddedPromo(promoId: number, userId: number): P
  * profit observations are removed in the same batch (WR-01): they were
  * recorded for the pre-edit terms, and recordProfitObservations can only
  * raise a day's value, so a lowered amount would otherwise leave an inflated
- * "available profit". The delete is scoped by an ownership subquery (T-5-16);
- * the next Promos load records the corrected value.
+ * "available profit". The delete is scoped by an ownership subquery (T-5-16).
+ * The member's own observations are cleared too (quick-261022-hn4); the next
+ * Dashboard or Promos load records the corrected value for today.
  */
 export function buildUpdateOwnStatements(db: Db, args: { promoId: number; userId: number; values: AddedPromoInsert }) {
   const { promoId, userId, values } = args;
@@ -180,7 +207,7 @@ export function buildUpdateOwnStatements(db: Db, args: { promoId: number; userId
       ),
     ),
   );
-  return [update, deleteObservations] as const;
+  return [update, deleteObservations, buildDeleteOwnMemberObservations(db, { promoId, userId }, true)] as const;
 }
 
 /** Applies buildUpdateOwnStatements in one batch. False when no row matched. */
