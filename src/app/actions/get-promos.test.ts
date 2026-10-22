@@ -17,6 +17,7 @@ const {
   mockGetUserBookKeys,
   mockGetPromoCompletions,
   mockRecordCurrentProfitObservations,
+  mockRecordMember,
 } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
   mockGetScrapeStatus: vi.fn(),
@@ -29,6 +30,7 @@ const {
   mockGetUserBookKeys: vi.fn(),
   mockGetPromoCompletions: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
+  mockRecordMember: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
@@ -52,6 +54,8 @@ vi.mock("@/db/promoTracking", () => ({
 vi.mock("@/db/promoObservations", () => ({
   recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
 }));
+// Only the DB writer is mocked: the real memberFeedRecording rule runs.
+vi.mock("@/db/memberObservations", () => ({ recordMemberProfitObservations: mockRecordMember }));
 
 import { getPromos } from "./get-promos";
 import { computeMemberPromoState } from "@/db/memberPromoState";
@@ -284,6 +288,8 @@ beforeEach(() => {
   mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel"]);
   mockGetPromoCompletions.mockResolvedValue([]);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
+  mockRecordMember.mockReset();
+  mockRecordMember.mockResolvedValue(true);
 });
 
 describe("getPromos server action (D-01, D-05, D-08, D-16, T-03-15-01..04)", () => {
@@ -1286,5 +1292,81 @@ describe("getPromos profit observation recording (quick-260927-n12)", () => {
       activePromos: [],
       precision: "whole",
     });
+  });
+});
+
+// W4 / STATS-02: the Promos tab records the member's own observations.
+describe("getPromos member observation recording (07.1-02, W4)", () => {
+  const event = moneylineEvent({
+    id: "nfl-w4",
+    homeTeam: "DEN Broncos",
+    awayTeam: "LA Rams",
+    commenceTime: plusHours(6),
+    quotes: [
+      { bookKey: "draftkings", homePrice: -275, awayPrice: 220 },
+      { bookKey: "fanduel", homePrice: -260, awayPrice: 210 },
+    ],
+  });
+
+  it("records the session user's entries for a profitable own-book promo, at whole precision even when viewing cents", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" })]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+
+    await getPromos({ precision: "cents" });
+    const centsEntries = mockRecordMember.mock.calls[0][1];
+    mockRecordMember.mockClear();
+    await getPromos({ precision: "whole" });
+
+    expect(mockRecordMember).toHaveBeenCalledTimes(1);
+    const [userId, entries] = mockRecordMember.mock.calls[0];
+    expect(userId).toBe(1);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ promoId: 1, bookKey: "draftkings" });
+    // Same entries whichever precision is being viewed.
+    expect(centsEntries).toEqual(entries);
+  });
+
+  it("does not record when no odds are cached", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetCachedExtendedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+
+    await getPromos({ precision: "whole" });
+
+    expect(mockRecordMember).not.toHaveBeenCalled();
+  });
+
+  it("does not record when there are no feed promos", async () => {
+    mockGetActivePromos.mockResolvedValue([]);
+
+    await getPromos({ precision: "whole" });
+
+    expect(mockRecordMember).not.toHaveBeenCalled();
+  });
+
+  it("does not record a done promo", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" })]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+    mockGetPromoCompletions.mockResolvedValue([completion({ promoId: 1 })]);
+
+    await getPromos({ precision: "whole" });
+
+    expect(mockRecordMember).not.toHaveBeenCalled();
+  });
+
+  it("still returns ok with the same rows when the member write rejects", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo({ id: 1, bookKey: "draftkings", maxStake: "25.00" })]);
+    mockGetCachedEvents.mockResolvedValue({ events: [event], fetchedAt: new Date(NOW_ISO) });
+
+    const baseline = await getPromos({ precision: "whole" });
+    mockRecordMember.mockRejectedValue(new Error("db down"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await getPromos({ precision: "whole" });
+    errSpy.mockRestore();
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok" || baseline.status !== "ok") throw new Error("unreachable");
+    expect(result.rows).toEqual(baseline.rows);
+    expect(result.rows.length).toBeGreaterThan(0);
   });
 });

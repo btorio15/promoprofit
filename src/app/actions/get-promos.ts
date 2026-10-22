@@ -18,6 +18,7 @@ import { getBonusBooks, getCachedEvents, getCachedExtendedEvents, getHedgeBookKe
 import { getPromoCompletions } from "@/db/promoTracking";
 import { toDoneRows } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
+import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
@@ -206,6 +207,12 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
     precision: precision as StakePrecision,
     now,
   };
+
+  // W4 / STATS-02: opening the Promos tab records this member's own
+  // observations with the Dashboard's exact rule (whole precision, pairs
+  // included), so the grey line does not depend on visiting the Dashboard.
+  // Uses the caches loaded above (no Odds API call); never throws.
+  await recordMemberFeedObservations({ userId: user.userId, now, feedPromos, rankOpts, userBookSet });
 
   const opportunities = rankPromoHedges(feedPromos, rankOpts);
   const unprofitable = findUnprofitablePromos(feedPromos, rankOpts);
