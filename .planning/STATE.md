@@ -92,6 +92,7 @@ Last activity: 2026-10-22
 - Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
 - v1.2 roadmap (2026-10-22): placeholder Phase 8 More Sportsbooks absorbed; v1.2 phases 8 No-Sweat Bet Math, 9 No-Sweat Promos in the Feed, 10 Ranked Intro Offers, 11 More Sportsbooks
 - Phase 07.1 inserted after Phase 7: Profit Stats Cleanup: close v1.1 audit tech debt (owner chose option B 2026-10-22)
+- Phase 12 added (owner 2026-10-22): Add Kalshi and Polymarket as hedge venues (prediction markets alongside regulated sportsbooks)
 
 ### Decisions
 

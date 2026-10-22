@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 MarginMind v1.0** — Phases 1, 01.1, 2, 3, 4, 5, 05.1 (shipped 2026-10-02) — full details: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - ✅ **v1.1 Profit Stats** — Phases 6, 7, 07.1 (shipped 2026-10-22) — full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
-- 🚧 **v1.2 Intro Offers & No-Sweat** — Phases 8–11 (in progress)
+- 🚧 **v1.2 Intro Offers & No-Sweat** — Phases 8–12 (in progress)
 
 ## Phases
 
@@ -38,6 +38,7 @@
 - [ ] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals
 - [ ] **Phase 10: Ranked Intro Offers** - Sign-up offers screen ranks intro offers by estimated value with exact qualifying bet, hedge and whole-plan view
 - [ ] **Phase 11: More Sportsbooks** - Hard Rock Bet and BetMGM scrapers (plus time-boxed checks of the other Colorado books) feed promos and intro offers automatically
+- [ ] **Phase 12: Add Kalshi and Polymarket as hedge venues** - Prediction markets as hedge venues alongside regulated sportsbooks
 
 ## Phase Details
 
@@ -113,6 +114,14 @@ Plans:
 
 **Plans**: TBD
 
+### Phase 12: Add Kalshi and Polymarket as hedge venues
+
+**Goal**: [To be planned]
+**Depends on**: Phase 11
+**Requirements**: TBD
+
+**Plans**: TBD (run /gsd-plan-phase 12 to break down)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -123,6 +132,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/0 | Not started | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 0/0 | Not started | - |
 
 ## Backlog
 
