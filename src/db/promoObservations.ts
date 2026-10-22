@@ -7,7 +7,6 @@ import { rankPromoHedges } from "@/domain/promos/rankPromoHedges";
 import { stripMemberCaps } from "@/domain/promos/yourCap";
 import { denverDate } from "@/domain/promos/profitTotals";
 import { ANY_SPORT_KEY, denverHour } from "@/domain/stats/profitStats";
-import type { StakePrecision } from "@/domain/hedge/arbMath";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
 /** Odds and book list a caller already loaded, so no second cache read is needed. */
@@ -47,10 +46,12 @@ interface CurrentProfitEntry {
  * `cached` input a caller already loaded). The whole call, reads and write,
  * never throws: any failure is caught and logged with console.error, so it
  * can never break the caller (the Dashboard, or the scheduled job).
+ *
+ * Always ranks at "whole" precision, whoever calls it (WR-01).
  */
 export async function recordCurrentProfitObservations(
   now: Date,
-  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision; cached?: CachedOddsInput } = {},
+  opts: { activePromos?: ActivePromo[]; cached?: CachedOddsInput } = {},
 ): Promise<void> {
   try {
     const entries = await computeCurrentProfitEntries(now, opts);
@@ -109,7 +110,7 @@ export async function recordCurrentProfitSnapshots(now: Date): Promise<void> {
  */
 async function computeCurrentProfitEntries(
   now: Date,
-  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision; cached?: CachedOddsInput },
+  opts: { activePromos?: ActivePromo[]; cached?: CachedOddsInput },
 ): Promise<CurrentProfitEntry[]> {
   const activePromos = opts.activePromos ?? (await getActivePromos(now));
   if (activePromos.length === 0) return [];
@@ -139,7 +140,10 @@ async function computeCurrentProfitEntries(
     moneylineEvents,
     extendedEvents,
     hedgeBookKeys: new Set(everyUsableBookKeys),
-    precision: opts.precision ?? "whole",
+    // Group observations always rank at "whole" precision, the same as the
+    // scheduled job, so the number never depends on the viewer's precision
+    // setting (WR-01). There is deliberately no precision option.
+    precision: "whole",
     now,
   });
 

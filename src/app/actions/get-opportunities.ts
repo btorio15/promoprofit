@@ -57,7 +57,6 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   try {
     await recordCurrentProfitObservations(now, {
       activePromos: ctx.activePromos,
-      precision,
       cached: {
         moneylineEvents: ctx.moneylineEvents,
         extendedEvents: ctx.extendedEvents,

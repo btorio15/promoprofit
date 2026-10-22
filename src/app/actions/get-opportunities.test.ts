@@ -588,6 +588,13 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
     expect(mockGetCachedExtendedEvents).toHaveBeenCalledTimes(1);
   });
 
+  it("never passes the viewer's precision to the group recorder (WR-01)", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    await getOpportunities({ precision: "cents" });
+    const opts = mockRecordCurrentProfitObservations.mock.calls[0][1];
+    expect(opts).not.toHaveProperty("precision");
+  });
+
   it("maps a missing table to not-ready and keeps the feed", async () => {
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     mockGetMemberProfitHistory.mockResolvedValue({ status: "not-ready" });

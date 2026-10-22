@@ -1213,8 +1213,7 @@ describe("getPromos done-split (quick-260929-igk)", () => {
     await getPromos({ precision: "cents" });
 
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
-      activePromos: [promoA, promoB],
-      precision: "cents",
+      activePromos: [promoA, promoB]
     });
   });
 
@@ -1271,15 +1270,14 @@ describe("computeMemberPromoState parity with getPromos (quick-260929-igk)", () 
 // quick-260927-n12 owner decision 3 + scope change B: profit-observation
 // recording is unconditional (every "ok" branch).
 describe("getPromos profit observation recording (quick-260927-n12)", () => {
-  it("calls recordCurrentProfitObservations with now, the loaded activePromos, and precision", async () => {
+  it("calls recordCurrentProfitObservations with now and the loaded activePromos, never the viewer's precision (WR-01)", async () => {
     const promo = activeBoostPromo();
     mockGetActivePromos.mockResolvedValue([promo]);
 
     await getPromos({ precision: "cents" });
 
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
-      activePromos: [promo],
-      precision: "cents",
+      activePromos: [promo]
     });
   });
 
@@ -1289,8 +1287,7 @@ describe("getPromos profit observation recording (quick-260927-n12)", () => {
     await getPromos({ precision: "whole" });
 
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(expect.any(Date), {
-      activePromos: [],
-      precision: "whole",
+      activePromos: []
     });
   });
 });

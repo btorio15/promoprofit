@@ -137,7 +137,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
    * (no new Odds API call). Runs unconditionally, before any empty-state
    * branch below.
    */
-  await recordCurrentProfitObservations(now, { activePromos, precision: precision as StakePrecision });
+  await recordCurrentProfitObservations(now, { activePromos });
 
   if (feedPromos.length === 0) {
     const emptyVariant: PromosEmptyVariant = hasAnyOkRun ? "no-active" : "none-scraped";

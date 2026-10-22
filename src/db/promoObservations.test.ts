@@ -70,6 +70,7 @@ const boost: ActivePromo = {
   addedByYou: false,
 };
 
+// Group observations always rank at "whole" precision (WR-01).
 function solve(maxStake: string, baseOdds: number, hedgeOdds: number) {
   return calculateProfitBoostHedge({
     boostedOddsAmerican: null,
@@ -79,7 +80,7 @@ function solve(maxStake: string, baseOdds: number, hedgeOdds: number) {
     maxStake: new Decimal(maxStake),
     winningsCap: null,
     minOddsAmerican: null,
-    precision: "cents",
+    precision: "whole",
   })!;
 }
 
@@ -96,7 +97,7 @@ describe("recordCurrentProfitObservations (quick-261001-dhn)", () => {
     const [capped] = applyMemberCaps([boost], new Map([[20, "20.00"]]), new Map());
     expect(capped.maxStake).toBe("20.00");
 
-    await recordCurrentProfitObservations(NOW, { activePromos: [capped], precision: "cents" });
+    await recordCurrentProfitObservations(NOW, { activePromos: [capped] });
 
     expect(recordProfitObservations).toHaveBeenCalledTimes(1);
     const [entries] = vi.mocked(recordProfitObservations).mock.calls[0];
@@ -128,7 +129,6 @@ describe("recordCurrentProfitObservations (quick-261001-dhn)", () => {
   it("uses pre-loaded cached odds without reading the caches or books", async () => {
     await recordCurrentProfitObservations(NOW, {
       activePromos: [boost],
-      precision: "cents",
       cached: { moneylineEvents: [event], extendedEvents: [], oddsFetchedAt: NOW, everyUsableHedgeBookKeys: ["betmgm"] },
     });
     expect(getCachedEvents).not.toHaveBeenCalled();
