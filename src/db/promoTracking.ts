@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
 import {
   DonePairSnapshotSchema,
@@ -7,7 +7,6 @@ import {
   type PairMemberSnapshot,
 } from "@/domain/promos/pairSnapshot";
 import { getDb } from "./client";
-import { promoVisibilityCondition } from "./promos";
 import { promoCompletions, promoProfitObservations, promos } from "./schema";
 import type { ProfitObservation } from "@/domain/promos/profitTotals";
 
