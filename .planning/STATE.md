@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
-status: ready_to_plan
-stopped_at: Phase 8 complete (3/3) — ready to discuss Phase 9
-last_updated: 2026-10-22T20:37:33.405Z
-last_activity: 2026-10-22 -- Phase 8 complete
+status: planning
+stopped_at: Phase 9 context gathered
+last_updated: "2026-10-22T20:49:30.167Z"
+last_activity: 2026-10-22
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 25
+  percent: 20
 ---
 
 # Project State
@@ -237,9 +237,9 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 
 ## Session Continuity
 
-Last session: 2026-10-22T20:08:59.706Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-no-sweat-bet-math/08-CONTEXT.md
+Last session: 2026-10-22T20:49:30.155Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-no-sweat-promos-in-the-feed/09-CONTEXT.md
 
 ## Operator Next Steps
 
