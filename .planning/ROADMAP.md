@@ -27,6 +27,10 @@
 - [x] **Phase 6: Profit Graph** - Cumulative available-vs-extracted graph with range picker at the top of the Opportunities page (completed 2026-10-13)
 - [x] **Phase 7: Dashboard** - Opportunities tab becomes the Dashboard: headline totals and counts above the profit graph, full feed below; profit summary leaves the Promos tab (completed 2026-10-17)
 
+### 📋 Next (milestone to be named)
+
+- [ ] **Phase 8: More Sportsbooks** - Promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books (Caesars, BetRivers, Hard Rock Bet, theScore Bet)
+
 ## Phase Details
 
 ### Phase 6: Profit Graph
@@ -98,6 +102,17 @@ Plans:
 
 **UI hint**: yes
 
+### Phase 8: More Sportsbooks
+
+**Goal:** Promos and intro offers from more Colorado sportsbooks show up in the feed automatically, alongside DraftKings, FanDuel and Bally Bet (today's scrapers). Target books: BetMGM, bet365, Fanatics, plus Caesars, BetRivers, Hard Rock Bet and theScore Bet as feasible. Each book gets a promo scraper in the scheduled job and its intro offers in Sign-up offers; members can select it in My Books.
+**Notes:** Check per book whether its promo pages can be scraped (bot protection, app-only or logged-in promos). bet365 is not in The Odds API, so bet365 promos can be hedged at other books but bet365 cannot be a hedge book. Group-added promos stay the fallback for books that can't be scraped.
+**Requirements**: TBD
+**Depends on:** Phase 3 (promo scraping pipeline)
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -105,6 +120,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 7/7 | Complete    | 2026-10-17 |
+| 8. More Sportsbooks | next | 0/0 | Not started | - |
 
 ## Backlog
 

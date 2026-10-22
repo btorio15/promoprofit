@@ -87,6 +87,7 @@ Last activity: 2026-10-21 - Completed quick task 261021-hwm: remove extracted fr
 - Phase 01.1 inserted after Phase 1: Arbitrage Tab: moneyline arbs from cached odds (no extra credits) + separate opt-in spreads/totals refresh button; odds-age + account-risk advisory (URGENT)
 - Phase 05.1 inserted after Phase 5: Deploy to Vercel + once-daily Vercel Cron morning scrape (drop midday/evening runs) + login/invite/books form throw guards — v1.0 audit cleanup (PROMO-03, integration W1); owner chose Vercel deploy 2026-10-01 (URGENT)
 - Phase 7 edited: renamed Stats Page -> Dashboard (owner 2026-10-13): Opportunities tab becomes Dashboard; edited fields: title, goal, success_criteria; STATS-07..10 reworded
+- Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
 
 ### Decisions
 
