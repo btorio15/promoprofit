@@ -562,6 +562,38 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
     expect(mockRecordMemberProfitObservations.mock.calls[0][1]).toEqual(wholeEntries);
   });
 
+  it("still returns ok when the group recorder rejects", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockRecordCurrentProfitObservations.mockRejectedValue(new Error("boom"));
+    const result = await getOpportunities({ precision: "whole" });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.profitSeries.status).toBe("ready");
+    expect(result.sources).toHaveLength(3);
+    mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
+  });
+
+  it("still returns ok when member recording fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockRecordMemberProfitObservations.mockRejectedValue(new Error("boom"));
+    const result = await getOpportunities({ precision: "whole" });
+    expect(result.status).toBe("ok");
+    mockRecordMemberProfitObservations.mockResolvedValue(undefined);
+  });
+
+  it("hands the group recorder the already-loaded odds and book list", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    await getOpportunities({ precision: "whole" });
+    const opts = mockRecordCurrentProfitObservations.mock.calls[0][1];
+    expect(opts.cached.moneylineEvents).toEqual([EVENT]);
+    expect(opts.cached.extendedEvents).toEqual([]);
+    expect(opts.cached.everyUsableHedgeBookKeys).toEqual(["draftkings", "fanduel", "betmgm"]);
+    expect(mockGetCachedEvents).toHaveBeenCalledTimes(1);
+    expect(mockGetCachedExtendedEvents).toHaveBeenCalledTimes(1);
+  });
+
   it("maps a missing table to not-ready and keeps the feed", async () => {
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     mockGetMemberProfitHistory.mockResolvedValue({ status: "not-ready" });

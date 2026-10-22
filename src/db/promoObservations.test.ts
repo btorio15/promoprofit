@@ -12,10 +12,13 @@ vi.mock("./queries", () => ({
 }));
 vi.mock("./promoTracking", () => ({ recordProfitObservations: vi.fn() }));
 vi.mock("./promos", () => ({ getActivePromos: vi.fn() }));
+vi.mock("./profitSnapshots", () => ({ loadGameTimes: vi.fn(), recordProfitSnapshots: vi.fn() }));
 
 import { getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys } from "./queries";
 import { recordProfitObservations } from "./promoTracking";
-import { recordCurrentProfitObservations } from "./promoObservations";
+import { getActivePromos } from "./promos";
+import { recordProfitSnapshots } from "./profitSnapshots";
+import { recordCurrentProfitObservations, recordCurrentProfitSnapshots } from "./promoObservations";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
 
@@ -103,5 +106,44 @@ describe("recordCurrentProfitObservations (quick-261001-dhn)", () => {
     const at20 = solve("20", 120, 115).guaranteedProfit.toFixed(2);
     expect(at25).not.toBe(at20);
     expect(entries[0].maxGuaranteedProfit).toBe(at25);
+  });
+
+  it("never rejects when a cache read fails, and records nothing", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(getCachedEvents).mockRejectedValue(new Error("db down"));
+    await expect(recordCurrentProfitObservations(NOW, { activePromos: [boost] })).resolves.toBeUndefined();
+    expect(recordProfitObservations).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("snapshots never reject when getActivePromos fails", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(getActivePromos).mockRejectedValue(new Error("db down"));
+    await expect(recordCurrentProfitSnapshots(NOW)).resolves.toBeUndefined();
+    expect(recordProfitSnapshots).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("uses pre-loaded cached odds without reading the caches or books", async () => {
+    await recordCurrentProfitObservations(NOW, {
+      activePromos: [boost],
+      precision: "cents",
+      cached: { moneylineEvents: [event], extendedEvents: [], oddsFetchedAt: NOW, everyUsableHedgeBookKeys: ["betmgm"] },
+    });
+    expect(getCachedEvents).not.toHaveBeenCalled();
+    expect(getCachedExtendedEvents).not.toHaveBeenCalled();
+    expect(getHedgeBookKeys).not.toHaveBeenCalled();
+    expect(recordProfitObservations).toHaveBeenCalledTimes(1);
+    const [entries] = vi.mocked(recordProfitObservations).mock.calls[0];
+    expect(entries[0].maxGuaranteedProfit).toBe(solve("25", 120, 115).guaranteedProfit.toFixed(2));
+  });
+
+  it("records nothing when cached.oddsFetchedAt is null", async () => {
+    await recordCurrentProfitObservations(NOW, {
+      activePromos: [boost],
+      cached: { moneylineEvents: [event], extendedEvents: [], oddsFetchedAt: null, everyUsableHedgeBookKeys: ["betmgm"] },
+    });
+    expect(recordProfitObservations).not.toHaveBeenCalled();
   });
 });

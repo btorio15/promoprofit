@@ -10,9 +10,10 @@ import { buildMemberObservationEntries } from "@/domain/promos/memberObservation
 import { denverDate } from "@/domain/promos/profitTotals";
 
 /**
- * quick-260927-n12 (owner scope change B): the once-daily morning job run
- * by scripts/morning-odds-observe.ts (itself run as its own
- * scrape-promos.yml workflow step, gated to the 8am Denver run). Runs the
+ * quick-260927-n12 (owner scope change B): the observation job run
+ * by scripts/morning-odds-observe.ts (its own step in scrape-promos.yml,
+ * run on every scheduled run with --force, not only the 8am one). A failure
+ * in a site-wide recorder never skips the member pass. Runs the
  * SAME guarded refresh path as the refreshOdds server action
  * (runOddsRefresh -- keeps the lock, the credit ledger, the low-credit
  * block) with moneyline only (never the 3x-cost spreads/totals extended
@@ -99,9 +100,19 @@ export async function runMorningObservation(opts: {
   }
 
   const refreshOutcome = await runOddsRefresh({ confirmed: true, triggeredByUserId: null, now });
-  await recordCurrentProfitObservations(now);
+  // Each site-wide recorder is isolated so a failure in either can never
+  // skip the member pass below (audit W1).
+  try {
+    await recordCurrentProfitObservations(now);
+  } catch (err) {
+    console.error("runMorningObservation: group observations failed", err);
+  }
   // Stats time series: one snapshot per profitable promo for this run.
-  await recordCurrentProfitSnapshots(now);
+  try {
+    await recordCurrentProfitSnapshots(now);
+  } catch (err) {
+    console.error("runMorningObservation: profit snapshots failed", err);
+  }
 
   const memberObservations = await recordAllMembersObservations(now);
 

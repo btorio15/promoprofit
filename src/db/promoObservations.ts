@@ -8,6 +8,15 @@ import { stripMemberCaps } from "@/domain/promos/yourCap";
 import { denverDate } from "@/domain/promos/profitTotals";
 import { ANY_SPORT_KEY, denverHour } from "@/domain/stats/profitStats";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
+import type { OddsEvent } from "@/domain/odds/schemas";
+
+/** Odds and book list a caller already loaded, so no second cache read is needed. */
+export interface CachedOddsInput {
+  moneylineEvents: OddsEvent[];
+  extendedEvents: OddsEvent[];
+  oddsFetchedAt: Date | null;
+  everyUsableHedgeBookKeys: readonly string[];
+}
 
 interface CurrentProfitEntry {
   promoId: number;
@@ -34,18 +43,19 @@ interface CurrentProfitEntry {
  * itself never imports src/ingestion -- only src/db and src/domain -- so
  * either caller can use it without crossing that boundary.
  *
- * No new Odds API calls: reads whatever is already cached. A write failure
- * must never break the caller (getPromos' feed, or the scheduled job) --
- * the DB write itself is wrapped in try/catch + console.error.
+ * No new Odds API calls: reads whatever is already cached (or uses the
+ * `cached` input a caller already loaded). The whole call, reads and write,
+ * never throws: any failure is caught and logged with console.error, so it
+ * can never break the caller (the Dashboard, or the scheduled job).
  */
 export async function recordCurrentProfitObservations(
   now: Date,
-  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision } = {},
+  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision; cached?: CachedOddsInput } = {},
 ): Promise<void> {
-  const entries = await computeCurrentProfitEntries(now, opts);
-  if (entries.length === 0) return;
-
   try {
+    const entries = await computeCurrentProfitEntries(now, opts);
+    if (entries.length === 0) return;
+
     await recordProfitObservations(
       entries.map((entry) => ({
         promoId: entry.promoId,
@@ -56,7 +66,7 @@ export async function recordCurrentProfitObservations(
       now,
     );
   } catch (err) {
-    console.error("recordCurrentProfitObservations: failed to write observations", err);
+    console.error("recordCurrentProfitObservations: failed to record observations", err);
   }
 }
 
@@ -64,16 +74,16 @@ export async function recordCurrentProfitObservations(
  * Stats time series (see profitSnapshots in schema.ts). Called only from
  * the scheduled odds run, so each scrape-promos.yml run adds one snapshot per
  * profitable promo. Same ranking as recordCurrentProfitObservations, but the
- * row keeps capturedAt, the Denver hour and the game time. A write failure is
- * logged and never breaks the scheduled job.
+ * row keeps capturedAt, the Denver hour and the game time. The whole call
+ * (reads and write) never throws; a failure is logged only.
  */
 export async function recordCurrentProfitSnapshots(now: Date): Promise<void> {
-  const entries = await computeCurrentProfitEntries(now, {});
-  // Any-sport promos are kept under ANY_SPORT_KEY rather than dropped.
-  const withSport = entries.map((entry) => ({ ...entry, sportKey: entry.sportKey ?? ANY_SPORT_KEY }));
-  if (withSport.length === 0) return;
-
   try {
+    const entries = await computeCurrentProfitEntries(now, {});
+    // Any-sport promos are kept under ANY_SPORT_KEY rather than dropped.
+    const withSport = entries.map((entry) => ({ ...entry, sportKey: entry.sportKey ?? ANY_SPORT_KEY }));
+    if (withSport.length === 0) return;
+
     const gameTimes = await loadGameTimes(withSport.map((entry) => entry.promoId));
     const hour = denverHour(now);
     const rows: NewProfitSnapshot[] = withSport.map((entry) => ({
@@ -88,7 +98,7 @@ export async function recordCurrentProfitSnapshots(now: Date): Promise<void> {
     }));
     await recordProfitSnapshots(rows);
   } catch (err) {
-    console.error("recordCurrentProfitSnapshots: failed to write snapshots", err);
+    console.error("recordCurrentProfitSnapshots: failed to record snapshots", err);
   }
 }
 
@@ -99,19 +109,30 @@ export async function recordCurrentProfitSnapshots(now: Date): Promise<void> {
  */
 async function computeCurrentProfitEntries(
   now: Date,
-  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision },
+  opts: { activePromos?: ActivePromo[]; precision?: StakePrecision; cached?: CachedOddsInput },
 ): Promise<CurrentProfitEntry[]> {
   const activePromos = opts.activePromos ?? (await getActivePromos(now));
   if (activePromos.length === 0) return [];
 
-  const [{ events: moneylineEvents, fetchedAt: oddsFetchedAt }, { events: extendedEvents }] = await Promise.all([
-    getCachedEvents(),
-    getCachedExtendedEvents(),
-  ]);
+  let moneylineEvents: OddsEvent[];
+  let extendedEvents: OddsEvent[];
+  let oddsFetchedAt: Date | null;
+  let everyUsableBookKeys: readonly string[];
+  if (opts.cached) {
+    moneylineEvents = opts.cached.moneylineEvents;
+    extendedEvents = opts.cached.extendedEvents;
+    oddsFetchedAt = opts.cached.oddsFetchedAt;
+    everyUsableBookKeys = opts.cached.everyUsableHedgeBookKeys;
+  } else {
+    const [ml, ext] = await Promise.all([getCachedEvents(), getCachedExtendedEvents()]);
+    moneylineEvents = ml.events;
+    extendedEvents = ext.events;
+    oddsFetchedAt = ml.fetchedAt;
+    // No cached odds at all yet -- nothing to rank; skip the book read.
+    everyUsableBookKeys = oddsFetchedAt === null ? [] : await getHedgeBookKeys();
+  }
   // No cached odds at all yet -- nothing to rank, nothing to observe.
   if (oddsFetchedAt === null) return [];
-
-  const everyUsableBookKeys = await getHedgeBookKeys();
   // Group-level observations must never reflect one member's "Your cap":
   // always rank at each promo's own max stake (quick-261001-dhn).
   const opportunities = rankPromoHedges(stripMemberCaps(activePromos), {

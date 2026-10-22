@@ -4,6 +4,7 @@ import type { RefreshOutcome } from "./refresh";
 const {
   mockRunOddsRefresh,
   mockRecordCurrentProfitObservations,
+  mockRecordSnapshots,
   mockListUserIds,
   mockLoadCtx,
   mockRecordMember,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   mockRunOddsRefresh: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
+  mockRecordSnapshots: vi.fn(),
   mockListUserIds: vi.fn(),
   mockLoadCtx: vi.fn(),
   mockRecordMember: vi.fn(),
@@ -22,7 +24,7 @@ const {
 vi.mock("./refresh", () => ({ runOddsRefresh: mockRunOddsRefresh }));
 vi.mock("@/db/promoObservations", () => ({
   recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
-  recordCurrentProfitSnapshots: vi.fn(async () => undefined),
+  recordCurrentProfitSnapshots: mockRecordSnapshots,
 }));
 vi.mock("@/db/queries", () => ({ listUserIds: mockListUserIds }));
 vi.mock("@/db/feedContext", () => ({ loadMemberFeedContext: mockLoadCtx }));
@@ -57,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRunOddsRefresh.mockResolvedValue(OK_OUTCOME);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
+  mockRecordSnapshots.mockResolvedValue(undefined);
   mockListUserIds.mockResolvedValue([1, 2]);
   mockLoadCtx.mockImplementation(async ({ userId }: { userId: number }) => ({
     userBookSet: new Set([`book${userId}`]),
@@ -138,6 +141,24 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
 
     expect(result).toMatchObject({ status: "ran", refreshOutcome: errorOutcome });
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledTimes(1);
+  });
+
+  it("still runs the member pass when the group observation recorder rejects", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockRecordCurrentProfitObservations.mockRejectedValueOnce(new Error("read failed"));
+    const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+    expect(result.status).toBe("ran");
+    expect(mockRecordMember).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+
+  it("still runs the member pass when the snapshot recorder rejects", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockRecordSnapshots.mockRejectedValueOnce(new Error("read failed"));
+    const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+    expect(result.status).toBe("ran");
+    expect(mockRecordMember).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
   });
 
   it("skipped runs do not list users or record members", async () => {

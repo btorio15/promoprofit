@@ -11,7 +11,7 @@ import {
   getProfitObservationsSince,
   getPromoCompletions,
 } from "@/db/promoTracking";
-import { sumProfitExtracted, toDoneRows } from "@/domain/promos/doneSnapshot";
+import { toDoneRows } from "@/domain/promos/doneSnapshot";
 import { getMemberProfitHistory } from "@/db/memberObservations";
 import {
   buildProfitSeriesData,
@@ -133,7 +133,6 @@ export async function loadMemberFeedContext({
   );
   const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
-  const totalExtracted = sumProfitExtracted(doneRows);
   const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
 
@@ -152,8 +151,9 @@ export async function loadMemberFeedContext({
     doneIds,
     feedPromos,
     doneRows,
-    totalExtracted,
     hedgeBookKeys,
+    // Every usable book (equals getHedgeBookKeys() with no argument), for group recording.
+    everyUsableHedgeBookKeys: bonusBooks.map((b) => b.key),
     bookNames,
     moneylineEvents,
     extendedEvents,
