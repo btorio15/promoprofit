@@ -25,8 +25,9 @@ type ActiveTab = "opportunities" | "stats" | "arbitrage" | "promos" | "tools";
 
 /**
  * Page shell (D-09, D-01): one sticky status bar + credit banner shared
- * above the top-level "Opportunities | Arbitrage | Promos | Tools"
- * tabs, so odds age/credits/refresh stay visible regardless of which tab is
+ * above the top-level "Dashboard · Statistics · Arbitrage · Promos · Tools"
+ * tabs (the internal ActiveTab value for the Dashboard is still
+ * "opportunities"), so odds age/credits/refresh stay visible regardless of which tab is
  * open. Owns recomputeKey (bumped after a refresh or a successful
  * spreads/totals search, so the odds-dependent tabs recompute together) and
  * activeTab (default "opportunities", D-01, not URL-synced) and promosVersion

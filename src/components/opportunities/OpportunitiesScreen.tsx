@@ -141,6 +141,7 @@ export function OpportunitiesScreen({
 
   const showSkeleton = isPending && response === null;
   const ok = response?.status === "ok" ? response : null;
+  const loadError = (loadFailed && !isPending) || response?.status === "invalid";
 
   const oldestFetch = ok
     ? [ok.oddsFetchedAt, ok.extendedOddsFetchedAt]
@@ -157,17 +158,16 @@ export function OpportunitiesScreen({
         <p className="text-sm text-muted-foreground">Your profit so far, and the best money available right now at your books.</p>
       </header>
 
-      <DashboardTotals loading={showSkeleton} dashboard={ok ? ok.dashboard : null} />
+      <DashboardTotals
+        loading={showSkeleton}
+        dashboard={ok ? ok.dashboard : null}
+        loadFailed={loadError}
+        seriesStatus={ok ? ok.profitSeries.status : null}
+      />
 
       <ProfitGraph
         loading={showSkeleton}
-        series={
-          ok
-            ? ok.profitSeries
-            : (loadFailed && !isPending) || response?.status === "invalid"
-              ? { status: "error" }
-              : null
-        }
+        series={ok ? ok.profitSeries : loadError ? { status: "error" } : null}
       />
 
       {/* The stale-odds warning is about the feed, so it sits under the feed

@@ -2,7 +2,8 @@
 
 import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buildTotalsView } from "./dashboardTotalsView";
+import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
+import { TOTALS_LOAD_ERROR, buildTotalsView } from "./dashboardTotalsView";
 
 const SHELL = "flex flex-col gap-3 rounded-lg border border-border bg-secondary p-3 sm:p-4";
 
@@ -15,14 +16,18 @@ const VALUE_CLASS = {
 /**
  * Dashboard totals card (Phase 7, D-06..D-08). Thin: renders buildTotalsView.
  * Always visible (not tied to the graph's hide toggle) and also when the feed
- * is empty.
+ * is empty, including an error state when the load fails (07-REVIEW IN-04).
  */
 export function DashboardTotals({
   loading,
   dashboard,
+  loadFailed,
+  seriesStatus,
 }: {
   loading: boolean;
   dashboard: DashboardTotalsDTO | null;
+  loadFailed: boolean;
+  seriesStatus: ProfitSeriesDTO["status"] | null;
 }) {
   if (loading) {
     return (
@@ -38,9 +43,19 @@ export function DashboardTotals({
       </section>
     );
   }
-  if (dashboard === null) return null;
+  if (dashboard === null) {
+    if (!loadFailed) return null;
+    return (
+      <section aria-label="Your totals" className={SHELL}>
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-semibold">{TOTALS_LOAD_ERROR.heading}</span>
+          <span className="text-sm text-muted-foreground">{TOTALS_LOAD_ERROR.body}</span>
+        </div>
+      </section>
+    );
+  }
 
-  const view = buildTotalsView(dashboard);
+  const view = buildTotalsView(dashboard, { seriesStatus: seriesStatus ?? undefined });
   const counts = view.counts;
 
   return (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
-import { buildTotalsView } from "./dashboardTotalsView";
+import { TOTALS_LOAD_ERROR, buildTotalsView } from "./dashboardTotalsView";
 
 function dto(over: Partial<DashboardTotalsDTO> = {}): DashboardTotalsDTO {
   return {
@@ -100,5 +100,29 @@ describe("buildTotalsView", () => {
     );
     expect(v.cells[1].value).toBe("$0.00");
     expect(v.cells[2].caption).toBe("of $0.00 available");
+  });
+});
+
+describe("buildTotalsView series status", () => {
+  it("labels a series error as Couldn't load", () => {
+    const v = buildTotalsView(dto({ available: null }), { seriesStatus: "error" });
+    expect(v.cells[1]).toEqual({ label: "Available", value: "Couldn't load", tone: "muted", caption: null });
+    expect(v.cells[2].caption).toBeNull();
+    expect(v.cells[3].caption).toBeNull();
+  });
+
+  it("keeps Not ready yet for not-ready and no option", () => {
+    expect(buildTotalsView(dto({ available: null }), { seriesStatus: "not-ready" }).cells[1].value).toBe("Not ready yet");
+    expect(buildTotalsView(dto({ available: null })).cells[1].value).toBe("Not ready yet");
+  });
+
+  it("ready series is unchanged", () => {
+    const v = buildTotalsView(dto(), { seriesStatus: "ready" });
+    expect(v.cells[1].label).toBe("Available since Oct 13");
+    expect(v.cells[2].caption).toBe("of $2.56 available");
+  });
+
+  it("exposes load-error copy", () => {
+    expect(TOTALS_LOAD_ERROR).toEqual({ heading: "Couldn't load your totals", body: "Refresh the page to try again." });
   });
 });
