@@ -114,13 +114,13 @@ Plans:
 5. Stale comments fixed (AppShell tab names, morning-observe gating, scrape workflow description); full test suite, type check and lint green.
 **Requirements**: STATS-02, STATS-08 (hardening; no new requirements)
 **Depends on:** Phase 7
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 07.1-01-PLAN.md — Failure-safe recording: isolated morning-job recorders, shared member recorder, Dashboard side recording reuses loaded odds (W1, W2)
-- [ ] 07.1-03-PLAN.md — Totals card error state and "Couldn't load" for series errors; AppShell comment (W3, IN-05)
+- [x] 07.1-01-PLAN.md — Failure-safe recording: isolated morning-job recorders, shared member recorder, Dashboard side recording reuses loaded odds (W1, W2)
+- [x] 07.1-03-PLAN.md — Totals card error state and "Couldn't load" for series errors; AppShell comment (W3, IN-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -144,7 +144,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6. Profit Graph | v1.1 | 7/7 | Complete    | 2026-10-13 |
 | 7. Dashboard | v1.1 | 7/7 | Complete    | 2026-10-17 |
-| 07.1. Profit Stats Cleanup | v1.1 | 0/0 | Not started | - |
+| 07.1. Profit Stats Cleanup | v1.1 | 2/3 | In Progress|  |
 | 8. More Sportsbooks | next | 0/0 | Not started | - |
 
 ## Backlog
