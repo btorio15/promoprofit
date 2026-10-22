@@ -1,9 +1,8 @@
 /**
- * quick-260927-n12: Denver-day bucketing and period-start helpers
- * for the persisted profit observations. No I/O, no imports from
- * src/db or src/ingestion (mirrors src/domain/promos/rankPromoHedges.ts's
- * pure-domain boundary). Every money value is a decimal.js Decimal or a
- * fixed 2-dp string -- CLAUDE.md forbids native float money math.
+ * quick-260927-n12: Denver-day helpers (denverDate, addDays,
+ * periodStartDates) and the ProfitObservation row type. No I/O, no imports
+ * from src/db or src/ingestion (mirrors src/domain/promos/rankPromoHedges.ts's
+ * pure-domain boundary). The money-summing helpers were removed in 07.1-02.
  */
 
 /**

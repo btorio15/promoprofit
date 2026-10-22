@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, onTestFinished } from "vitest";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import type { ActivePromo } from "@/db/promos";
 import { denverDate } from "@/domain/promos/profitTotals";
@@ -557,7 +557,8 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
   });
 
   it("still returns ok when the group recorder rejects", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     mockRecordCurrentProfitObservations.mockRejectedValue(new Error("boom"));
     const result = await getOpportunities({ precision: "whole" });
@@ -569,7 +570,8 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
   });
 
   it("still returns ok when member recording fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
     mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
     mockRecordMemberProfitObservations.mockRejectedValue(new Error("boom"));
     const result = await getOpportunities({ precision: "whole" });
@@ -605,7 +607,8 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
   });
 
   it("maps a history failure to error while the feed still loads", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    onTestFinished(() => errorSpy.mockRestore());
     mockGetMemberProfitHistory.mockRejectedValue(new Error("boom"));
     const result = await getOpportunities({ precision: "whole" });
     expect(result.status).toBe("ok");

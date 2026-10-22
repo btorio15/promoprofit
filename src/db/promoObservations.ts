@@ -36,6 +36,8 @@ interface CurrentProfitEntry {
  * src/app/actions, not src/ingestion/promos) so it's callable from BOTH:
  *   - getPromos (src/app/actions/get-promos.ts), on every Promos-tab load,
  *     capturing manual mid-day refreshes;
+ *   - getOpportunities (src/app/actions/get-opportunities.ts), on every
+ *     Dashboard load, reusing the odds it already loaded;
  *   - the morning scheduled job (src/ingestion/odds/morningObserve.ts ->
  *     scripts/morning-odds-observe.ts), after its own moneyline refresh.
  * src/app must never import src/ingestion (boundary test), and this module
