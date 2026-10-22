@@ -225,6 +225,33 @@ describe("rankNoSweat", () => {
     const r = rankNoSweat(promo, opts({ moneylineEvents: [g] }));
     expect(r).toEqual({ kind: "no_qualifying_line", candidatesEvaluated: 0 });
   });
+
+  describe("invalid promo fields return a typed result instead of throwing", () => {
+    // Real rate function with cached refund-book markets: before validation,
+    // a bad refundCap reached calculateBonusBetHedge and threw RangeError.
+    const realRate = () =>
+      makeConversionRateFor({
+        events: [hardRockGame],
+        now: NOW,
+        hedgeBookKeys: HEDGE_BOOKS,
+      });
+    const cases: [string, Partial<NoSweatPromo>, string][] = [
+      ["refundCap 0", { refundCap: new Decimal(0) }, "bad_refund_cap"],
+      ["refundCap negative", { refundCap: new Decimal(-5) }, "bad_refund_cap"],
+      ["refundCap > 2dp", { refundCap: new Decimal("5.001") }, "bad_refund_cap"],
+      ["minOdds -50", { minOddsAmerican: -50 }, "bad_min_odds"],
+      ["minOdds non-integer", { minOddsAmerican: 150.5 }, "bad_min_odds"],
+    ];
+    for (const [name, override, reason] of cases) {
+      it(name, () => {
+        const r = rankNoSweat(
+          { ...promo, ...override },
+          opts({ moneylineEvents: [hardRockGame], conversionRateFor: realRate() }),
+        );
+        expect(r).toEqual({ kind: "invalid_promo", reason, promoId: promo.id });
+      });
+    }
+  });
 });
 
 function spreadsTotalsEvent(opts: {

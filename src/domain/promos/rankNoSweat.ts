@@ -54,6 +54,11 @@ export interface NoSweatOpportunity {
 export type NoSweatRankResult =
   | { kind: "ok"; opportunity: NoSweatOpportunity; candidatesEvaluated: number }
   | { kind: "cant_price"; reason: "no_refund_book_odds"; refundBookKey: string }
+  | {
+      kind: "invalid_promo";
+      reason: "bad_refund_cap" | "bad_min_odds";
+      promoId: string | number;
+    }
   | { kind: "no_qualifying_line"; candidatesEvaluated: number };
 
 const MARKET_ORDER: Record<PromoMarketType, number> = {
@@ -77,6 +82,29 @@ export function noSweatScope(sportKey: string | null, now: Date): PromoScope {
     windowStart: now,
     windowEnd: new Date(8.64e15),
   };
+}
+
+/**
+ * Promo-level validation, run once before any pricing. A malformed promo row
+ * (e.g. a manual entry with a $0 cap or -50 min odds) would otherwise throw a
+ * RangeError from the conversion-rate function or the min-odds filter and take
+ * down the whole ranking; instead it gets a typed result.
+ */
+function validatePromo(
+  promo: NoSweatPromo,
+): "bad_refund_cap" | "bad_min_odds" | null {
+  if (promo.refundCap.lte(0) || promo.refundCap.decimalPlaces() > 2) {
+    return "bad_refund_cap";
+  }
+  if (promo.minOddsAmerican !== null) {
+    try {
+      americanToDecimal(promo.minOddsAmerican);
+    } catch (err) {
+      if (err instanceof RangeError) return "bad_min_odds";
+      throw err;
+    }
+  }
+  return null;
 }
 
 function meetsMinOdds(
@@ -131,6 +159,11 @@ export function rankNoSweat(
   promo: NoSweatPromo,
   opts: NoSweatRankOptions,
 ): NoSweatRankResult {
+  const invalid = validatePromo(promo);
+  if (invalid) {
+    return { kind: "invalid_promo", reason: invalid, promoId: promo.id };
+  }
+
   const stake = promo.refundCap; // D-09
   const refundAmount = Decimal.min(stake, promo.refundCap);
 
