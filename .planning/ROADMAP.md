@@ -34,7 +34,7 @@
 
 **Milestone Goal:** Turn intro (sign-up) offers and no-sweat promos into ranked, ready-to-place opportunities with exact lines.
 
-- [ ] **Phase 8: No-Sweat Bet Math** - Exact no-sweat hedge solver and the bonus-bet conversion rate that values its refund
+- [x] **Phase 8: No-Sweat Bet Math** - Exact no-sweat hedge solver and the bonus-bet conversion rate that values its refund (completed 2026-10-22)
 - [ ] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals
 - [ ] **Phase 10: Ranked Intro Offers** - Sign-up offers screen ranks intro offers by estimated value with exact qualifying bet, hedge and whole-plan view
 - [ ] **Phase 11: More Sportsbooks** - Hard Rock Bet and BetMGM scrapers (plus time-boxed checks of the other Colorado books) feed promos and intro offers automatically
@@ -64,7 +64,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-03-PLAN.md — Candidate search across moneylines/spreads/totals with min-odds filter, sport limit and tie-break (NSB-03)
+- [x] 08-03-PLAN.md — Candidate search across moneylines/spreads/totals with min-odds filter, sport limit and tie-break (NSB-03)
 
 ### Phase 9: No-Sweat Promos in the Feed
 
@@ -119,7 +119,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
-| 8. No-Sweat Bet Math | v1.2 | 2/3 | In Progress|  |
+| 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete   | 2026-10-22 |
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/0 | Not started | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
