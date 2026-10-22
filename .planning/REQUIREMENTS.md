@@ -9,10 +9,10 @@
 
 ### No-sweat bet math
 
-- [ ] **NSB-01**: For a no-sweat promo (stake, refund cap, min odds, refund paid as a bonus bet), the app computes the exact hedge: qualifying stake and odds, hedge book and stake, and the profit on each outcome, rounded to the cent with decimal.js
-- [ ] **NSB-02**: The refund bonus bet is valued at the bonus-bet finder's current best conversion rate for that book and the member's hedge books (cached odds, no Odds API spend); if the refund book has no odds the offer shows "can't price" instead of a number
-- [ ] **NSB-03**: The app searches every cached game and line that meets the promo's minimum odds and picks the qualifying line with the highest estimated profit
-- [ ] **NSB-04**: Rounded-stake answers are checked in tests against a brute-force search over whole-dollar/cent stakes (test-only, not part of the app)
+- [x] **NSB-01**: For a no-sweat promo (stake, refund cap, min odds, refund paid as a bonus bet), the app computes the exact hedge: qualifying stake and odds, hedge book and stake, and the profit on each outcome, rounded to the cent with decimal.js
+- [x] **NSB-02**: The refund bonus bet is valued at the bonus-bet finder's current best conversion rate for that book and the member's hedge books (cached odds, no Odds API spend); if the refund book has no odds the offer shows "can't price" instead of a number
+- [x] **NSB-03**: The app searches every cached game and line that meets the promo's minimum odds and picks the qualifying line with the highest estimated profit
+- [x] **NSB-04**: Rounded-stake answers are checked in tests against a brute-force search over whole-dollar/cent stakes (test-only, not part of the app)
 
 ### No-sweat promos in the feed
 
@@ -62,10 +62,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| NSB-01 | Phase 8 | Pending |
-| NSB-02 | Phase 8 | Pending |
-| NSB-03 | Phase 8 | Pending |
-| NSB-04 | Phase 8 | Pending |
+| NSB-01 | Phase 8 | Complete |
+| NSB-02 | Phase 8 | Complete |
+| NSB-03 | Phase 8 | Complete |
+| NSB-04 | Phase 8 | Complete |
 | FEED-01 | Phase 9 | Pending |
 | FEED-02 | Phase 9 | Pending |
 | FEED-03 | Phase 9 | Pending |
