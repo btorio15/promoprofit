@@ -79,7 +79,7 @@ Plans:
   4. Dashboard totals, the profit graph's grey line and the Statistics tab are unchanged by no-sweat estimates and stay guaranteed-only.
   5. When a member marks a no-sweat promo done, they enter or confirm the profit they actually made, and that figure (not the estimate) is recorded.
 
-**Plans**: 18 plans
+**Plans**: 20 plans
 
 Plans:
 **Wave 1**
@@ -91,10 +91,11 @@ Plans:
 
 **Wave 2**
 
-- [ ] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline, pair finder guard (FEED-02, FEED-04)
+- [ ] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline (bounded typecheck sweep), pair finder guard (FEED-02, FEED-04)
 - [ ] 09-06-PLAN.md — Low-profile limits in the line search, rankNoSweatFeed, no-sweat row DTOs (FEED-03)
 - [ ] 09-07-PLAN.md — TDD settle math and shared refund-conversion ranker (FEED-05)
 - [ ] 09-08-PLAN.md — AI reader no_sweat kind, prompt bump, reconcile disagreements to review, reader budget (FEED-01, FEED-02)
+- [ ] 09-20-PLAN.md — Refresh promos covers no-sweat sports (FEED-03)
 
 **Wave 3**
 
@@ -102,7 +103,8 @@ Plans:
 - [ ] 09-10-PLAN.md — DraftKings no-sweat candidates (FEED-01, FEED-02)
 - [ ] 09-11-PLAN.md — FanDuel and Bally Bet no-sweat paths (FEED-01)
 - [ ] 09-12-PLAN.md — Opportunities composition: ranked estimates, notes, Tracking cards, leak invariants (FEED-03, FEED-04)
-- [ ] 09-13-PLAN.md — manual no-sweat add/edit/delete and classify-as-no-sweat (FEED-03, FEED-02)
+- [ ] 09-13-PLAN.md — manual no-sweat add/edit (prefill)/expire/delete (FEED-03)
+- [ ] 09-19-PLAN.md — classify-as-no-sweat and review readings (FEED-02)
 
 **Wave 4**
 
@@ -110,11 +112,14 @@ Plans:
 
 **Wave 5**
 
-- [ ] 09-15-PLAN.md — no-sweat row components, Track button, risk advisory (FEED-03)
-- [ ] 09-16-PLAN.md — Tracking strip, tracked card, Done row variant (FEED-05)
+- [ ] 09-15-PLAN.md — no-sweat row components, Track button with risk line, risk advisory (FEED-03)
 - [ ] 09-17-PLAN.md — Settings Low-profile card, No-sweat add form, review disagreement card (FEED-03, FEED-02)
 
 **Wave 6**
+
+- [ ] 09-16-PLAN.md — Tracking strip, tracked card (with risk line), Done row variant (FEED-05)
+
+**Wave 7**
 
 - [ ] 09-18-PLAN.md — Opportunities screen wiring, stored-promo re-check with owner OK, phone check (FEED-01..05)
 **UI hint**: yes
@@ -157,7 +162,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 0/18 | Planned | - |
+| 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 

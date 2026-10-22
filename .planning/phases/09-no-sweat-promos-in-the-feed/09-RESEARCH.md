@@ -417,16 +417,21 @@ export function assertNever(x: never): never {
 | A8 | Scraped mis-typed rows self-heal via expire-unseen on the next successful scrape | Ingestion 11 | If a book's scrape fails or yields zero candidates, rows linger (store refuses to mass-expire); audit script covers it |
 | A9 | Disagreement side-by-side data can be carried as an optional structured `evidence.readings` | Ingestion 8 | Review/classify code only skimmed; may need more UI plumbing |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where can members see/manage hand-added no-sweats outside the feed?**
    - Known: Promos tab (`get-promos.ts`) uses `getActivePromos`, which will now exclude no-sweats; edit/delete/expire live in Promos-tab rows.
    - Unclear: whether Phase 9 should add a minimal "No-sweat promos" list/menu in the Promos tab or put `AddedPromoActions` on the Opportunities no-sweat row.
    - Recommendation: put the added-promo actions on the Opportunities no-sweat row (and on the Tracking card for untrack); defer a Promos-tab section. Ask the UI-SPEC step to decide.
+   - RESOLVED: Edit / Expire now / Delete live on the Opportunities no-sweat row and note rows (plan 09-15), hosted by the Opportunities screen's edit form (plan 09-18); server side and tracked/done guard in plan 09-13.
 2. **Negative-estimate no-sweats (D-11):** Opportunities lists only positive rows today; unprofitable rows live only in the Promos tab. Recommendation: omit non-positive no-sweats from Opportunities and show nothing (count only, for the empty-state logic) unless the UI-SPEC wants a collapsed "Not worth it right now" list.
+   - RESOLVED: estimate <= 0 goes to a greyed "Not worth it right now" note row in the unsliced bottom section, never the ranked list (plans 09-06 notWorthIt, 09-12 noSweatNotes, 09-15/09-18 rendering).
 3. **FanDuel/Bally live shape** (Ingestion 10) is unknown until recon.
+   - RESOLVED: recon plan 09-04 writes a BUILD / FIXTURE PENDING decision per book that gates plans 09-10 (DraftKings) and 09-11 (FanDuel, Bally); 09-18 discloses any "fixture pending" book.
 4. **Owner confirmation of Push/void default** (A1).
+   - RESOLVED (pending owner veto): Push and Game voided record $0.00 by default with a "What you actually made" override (plans 09-07, 09-14, 09-16); the owner may veto at the 09-18 checkpoint.
 5. **Is a stored cash-refund no-sweat ever shown?** Per D-17 no; review only.
+   - RESOLVED: cash refunds are review-only (no_sweat_cash review reason, plans 09-03, 09-08; review card in 09-17/09-19); never priced (D-17).
 
 ## Environment Availability
 
@@ -463,7 +468,7 @@ export function assertNever(x: never): never {
 | FEED-02 | Reader schema accepts `no_sweat` + `refundForm`; prompt version changed; cache key differs from old version | unit | `npx vitest run src/ingestion/promos/promoReading.test.ts src/ingestion/promos/verbatimGuard.test.ts` | extend ✅ |
 | FEED-02 | Reader not called for clear-skip entries; cold-cache run stays under cap | unit | `npx vitest run src/ingestion/promos/readerPass.test.ts` | extend ✅ |
 | FEED-02 | A no-sweat is never priced as a bonus bet: `getActivePromos` SQL excludes it; `GuaranteedPromoType` (typecheck); no_sweat `PromoRowDTO` impossible | unit + typecheck | `npx vitest run src/db/promos.test.ts && npm run typecheck` | extend ✅ |
-| FEED-02 | Backfill/audit script classifies the London text as no_sweat, leaves hand-added rows alone, dry-run writes nothing | unit | `npx vitest run scripts/audit-no-sweat.test.ts` (or `src/db/...`) | ❌ Wave 0 |
+| FEED-02 | Backfill/audit script classifies the London text as no_sweat, leaves hand-added rows alone, dry-run writes nothing | unit | `npx vitest run src/ingestion/promos/noSweatAudit.test.ts` | ❌ Wave 0 |
 | FEED-03 | `rankNoSweatFeed`: sorts by estimate, est<=0 omitted, cant_price in separate unsliced list, Est. ROI = est/(qual+hedge), ties deterministic | table-driven unit | `npx vitest run src/domain/promos/rankNoSweatFeed.test.ts` | ❌ Wave 0 |
 | FEED-03 | Low-profile: odds cap (decimal compare, +300 default), main-lines-only drops alt, natural stakes whole $, best allowed line chosen, `filteredOut` count, warnings when protection off | table-driven unit | `npx vitest run src/domain/promos/rankNoSweat.test.ts` | extend ✅ (22 existing must stay green) |
 | FEED-03 | Opportunities response: no-sweat items in `promos` source flagged `estimated`, "Est. ROI" label, `cantPrice`/`tracking` outside `sources`, empty-state counts no-sweats | integration (mocked db) | `npx vitest run src/app/actions/get-opportunities.test.ts` | extend ✅ (update mocks, Pitfall 8) |
