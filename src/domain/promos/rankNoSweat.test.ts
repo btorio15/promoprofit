@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
-import type { ConversionRate, ConversionRateFor } from "@/domain/hedge/conversionRate";
-import { noSweatScope, rankNoSweat, type NoSweatPromo, type NoSweatRankOptions } from "./rankNoSweat";
+import type {
+  ConversionRate,
+  ConversionRateFor,
+} from "@/domain/hedge/conversionRate";
+import {
+  noSweatScope,
+  rankNoSweat,
+  type NoSweatPromo,
+  type NoSweatRankOptions,
+} from "./rankNoSweat";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
 
@@ -70,7 +78,10 @@ const promo: NoSweatPromo = {
   scope: { kind: "any" },
 };
 
-function opts(over: Partial<NoSweatRankOptions> & Pick<NoSweatRankOptions, "moneylineEvents">): NoSweatRankOptions {
+function opts(
+  over: Partial<NoSweatRankOptions> &
+    Pick<NoSweatRankOptions, "moneylineEvents">,
+): NoSweatRankOptions {
   return {
     extendedEvents: [],
     now: NOW,
@@ -108,7 +119,10 @@ describe("rankNoSweat", () => {
   });
 
   it("Hard Rock worked example, whole precision", () => {
-    const r = rankNoSweat(promo, opts({ moneylineEvents: [hardRockGame], precision: "whole" }));
+    const r = rankNoSweat(
+      promo,
+      opts({ moneylineEvents: [hardRockGame], precision: "whole" }),
+    );
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.opportunity.solution.hedgeStake.toFixed(2)).toBe("1.00");
@@ -117,8 +131,18 @@ describe("rankNoSweat", () => {
   });
 
   it("returns cant_price with no profit figure when the rate is null", () => {
-    const r = rankNoSweat(promo, opts({ moneylineEvents: [hardRockGame], conversionRateFor: fixedRate({}) }));
-    expect(r).toEqual({ kind: "cant_price", reason: "no_refund_book_odds", refundBookKey: "hardrockbet" });
+    const r = rankNoSweat(
+      promo,
+      opts({
+        moneylineEvents: [hardRockGame],
+        conversionRateFor: fixedRate({}),
+      }),
+    );
+    expect(r).toEqual({
+      kind: "cant_price",
+      reason: "no_refund_book_odds",
+      refundBookKey: "hardrockbet",
+    });
     expect("solution" in r).toBe(false);
     expect("opportunity" in r).toBe(false);
   });
@@ -131,7 +155,10 @@ describe("rankNoSweat", () => {
         { bookKey: "draftkings", homePrice: -2000, awayPrice: 1500 },
       ],
     });
-    const r = rankNoSweat(promo, opts({ moneylineEvents: [below, hardRockGame] }));
+    const r = rankNoSweat(
+      promo,
+      opts({ moneylineEvents: [below, hardRockGame] }),
+    );
     expect(r.kind).toBe("ok");
     if (r.kind !== "ok") return;
     expect(r.opportunity.selection.eventId).toBe("g1");
@@ -162,7 +189,10 @@ describe("rankNoSweat", () => {
         { bookKey: "draftkings", homePrice: 300, awayPrice: 300 },
       ],
     });
-    const r = rankNoSweat({ ...promo, minOddsAmerican: null }, opts({ moneylineEvents: [g] }));
+    const r = rankNoSweat(
+      { ...promo, minOddsAmerican: null },
+      opts({ moneylineEvents: [g] }),
+    );
     expect(r.kind).toBe("ok");
   });
 
