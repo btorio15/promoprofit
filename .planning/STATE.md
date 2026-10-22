@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-22)
 Phase: — (v1.1 shipped; next milestone not started)
 Plan: —
 Status: Milestone v1.1 complete
-Last activity: 2026-10-22 - Completed quick task 261022-hzb: restore Vercel morning cron
+Last activity: 2026-10-22 - Completed quick task 261022-i3j: standardize three daily runs
 
 ## Performance Metrics
 
@@ -207,6 +207,7 @@ Recent decisions affecting current work:
 | 261022-hn4 | v1.1 audit cleanup: edit/delete of own promo clears stale member observations; tests for Statistics private-promo filters; spy/comment tidy | 2026-10-22 | c865962 | Verified | [261022-hn4-v1-1-audit-cleanup](./quick/261022-hn4-v1-1-audit-cleanup/) |
 | 261022-hxb | Trust a high-confidence AI reader over the parser: not-usable skips (no review), disagreements take the reader's amounts; medium/low still review | 2026-10-22 | 49eaaff | Verified | [261022-hxb-trust-ai-reader-over-parser](./quick/261022-hxb-trust-ai-reader-over-parser/) |
 | 261022-hzb | Restore Vercel morning cron (13:17 UTC) as a promo-only scrape trigger; GitHub schedule kept for odds | 2026-10-22 | 8c32467 | Verified | [261022-hzb-restore-vercel-morning-cron](./quick/261022-hzb-restore-vercel-morning-cron/) |
+| 261022-i3j | Three standard scrape + odds runs a day: Vercel 14:00/19:00 UTC, GitHub 00:00 UTC (7 AM, 12 PM, 5 PM MST) | 2026-10-22 | 1c66c75 | Verified | [261022-i3j-standardize-three-daily-scrape-and-odds-](./quick/261022-i3j-standardize-three-daily-scrape-and-odds-/) |
 
 ## Deferred Items
 
