@@ -3,6 +3,7 @@
  * All money stays a server decimal string run through formatUsd.
  */
 import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
+import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
 import { formatUsd } from "@/lib/format";
 import { formatTickDate } from "./profitGraphView";
 
@@ -28,7 +29,19 @@ export interface TotalsView {
 
 const SEP = " · ";
 
-export function buildTotalsView(dto: DashboardTotalsDTO): TotalsView {
+/**
+ * Copy for the totals card when the whole Dashboard load failed. Mirrors the
+ * graph's "Couldn't load the graph" card.
+ */
+export const TOTALS_LOAD_ERROR = {
+  heading: "Couldn't load your totals",
+  body: "Refresh the page to try again.",
+} as const;
+
+export function buildTotalsView(
+  dto: DashboardTotalsDTO,
+  opts: { seriesStatus?: ProfitSeriesDTO["status"] } = {},
+): TotalsView {
   const { extracted, available, counts } = dto;
   const caption = (v: string | undefined): string | null => (available && v !== undefined ? `of ${formatUsd(v)} available` : null);
 
@@ -41,7 +54,12 @@ export function buildTotalsView(dto: DashboardTotalsDTO): TotalsView {
           tone: "available",
           caption: null,
         }
-      : { label: "Available", value: "Not ready yet", tone: "muted", caption: null },
+      : {
+          label: "Available",
+          value: opts.seriesStatus === "error" ? "Couldn't load" : "Not ready yet",
+          tone: "muted",
+          caption: null,
+        },
     { label: "Last 7 days", value: formatUsd(extracted.last7), tone: "extracted", caption: caption(available?.last7) },
     { label: "Last 30 days", value: formatUsd(extracted.last30), tone: "extracted", caption: caption(available?.last30) },
   ];
