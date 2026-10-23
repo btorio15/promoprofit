@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: executing
 stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-10-22T23:50:23.603Z"
-last_activity: 2026-10-22 -- Phase 9 planning complete
+last_updated: "2026-10-23T02:02:26.105Z"
+last_activity: 2026-10-23 -- Phase 9 execution started
 progress:
   total_phases: 5
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 9 — No-Sweat Promos in the Feed
+**Current focus:** Phase 9 — no-sweat-promos-in-the-feed
 
 ## Current Position
 
-Phase: 9 of 11 (No-Sweat Promos in the Feed)
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-22 -- Phase 9 planning complete
+Phase: 9 (no-sweat-promos-in-the-feed) — EXECUTING
+Plan: 1 of 20
+Status: Executing Phase 9
+Last activity: 2026-10-23 -- Phase 9 execution started
 
 ## Performance Metrics
 
