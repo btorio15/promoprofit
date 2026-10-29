@@ -1,7 +1,8 @@
 ---
 phase: 12
 slug: add-kalshi-and-polymarket-as-hedge-venues
-status: draft
+status: approved
+reviewed_at: 2026-10-29
 shadcn_initialized: true
 preset: base-nova (neutral, cssVariables)
 created: 2026-10-29
@@ -34,7 +35,7 @@ Existing Tailwind scale; no new values.
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
 | xs | 4px | Gap between badge and leg text |
-| sm | 8px | Gap between stacked badges / note under leg |
+| sm | 8px | Gap between note and leg text above it (badges side by side use `gap-1`, inherited from Tie risk) |
 | md | 16px | Gap between BookPicker rows (`gap-4`), group spacing inside a group |
 | lg | 24px | Gap between "Sportsbooks" and "Prediction markets" groups |
 | xl | 32px | unchanged |
@@ -86,6 +87,9 @@ Leg text format (single line, wraps on mobile):
 `buy {N} {YES|NO} @ {P}¢ (${cost} + ${fee} fee) ≈ {American}`
 
 Example: `buy 42 YES @ 61¢ ($25.62 + $0.42 fee) ≈ −156`
+NO-side example (when buying NO on the promo side is cheaper): `buy 42 NO @ 39¢ ($16.38 + $0.42 fee) ≈ +156`
+
+Hierarchy: the guaranteed profit stays the dominant figure on every card, unchanged. The market leg is secondary text in the hedge slot, the same weight as a sportsbook hedge line. Inside the leg, the contract instruction (`buy N YES @ P¢`) comes first because that's what the member types; the American price is a trailing comparison only.
 
 Rules:
 - Whole-number N; P is whole cents (or one decimal only if the venue quotes it); cost and fee both to the cent; American price uses the true minus sign "−" already used by the app's odds formatter.
@@ -111,7 +115,7 @@ Rules:
 
 ### 4. My Books picker (`BookPicker`, onboarding + Settings)
 
-- `BookPicker` renders two groups from the same component: unlabeled "Sportsbooks" list first (unchanged), then a `Separator` and a group heading `Prediction markets` (`text-sm font-medium`), `gap-6` between groups, rows keep `gap-4`. Group heading for sportsbooks is added only when the market group is present: "Sportsbooks" with the same style.
+- `BookPicker` renders two groups from the same component: the sportsbook list first, then a `Separator` and a group heading `Prediction markets` (`text-sm font-medium`), `gap-6` between groups, rows keep `gap-4`. The sportsbook list gets a "Sportsbooks" heading (same style) only when the market group is shown; with no market group configured it stays unlabeled as today.
 - Rows: same full-width `Label` + `Checkbox`, display name only ("Kalshi", "Polymarket"). Default unchecked in onboarding and for existing members (opt-in).
 - Availability note: appears directly under the ticked row (not a toast, not a dialog), renders when that market is checked, hides when unchecked. Style: `text-xs text-muted-foreground`, indented to align with the label text (checkbox width + `gap-2`). Copy, verbatim: "Regulated by the CFTC, not Colorado's gaming division. Check it's available to you."
 - Group helper line under the heading (always visible, `text-xs text-muted-foreground`): "Optional. Used only to hedge your sportsbook promos."
