@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: planning
-stopped_at: Phase 12 context gathered
-last_updated: "2026-10-26T19:55:06.768Z"
+stopped_at: Phase 12 UI-SPEC approved
+last_updated: "2026-10-29T21:36:46.106Z"
 last_activity: 2026-10-22
 progress:
   total_phases: 6
@@ -238,9 +238,9 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 
 ## Session Continuity
 
-Last session: 2026-10-26T19:55:06.758Z
-Stopped at: Phase 12 context gathered
-Resume file: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-CONTEXT.md
+Last session: 2026-10-29T21:36:46.093Z
+Stopped at: Phase 12 UI-SPEC approved
+Resume file: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-UI-SPEC.md
 
 ## Operator Next Steps
 
