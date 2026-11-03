@@ -14,6 +14,7 @@ import {
 } from "@/domain/promos/scraped";
 import { PROMO_MARKET_TYPES, type CapField, type WinningsCapKind } from "@/domain/promos/types";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
+import { classifyNoSweat } from "@/ingestion/promos/noSweat";
 import {
   extractFinePrintNote,
   htmlToText,
@@ -196,23 +197,40 @@ function extractDetailEntry(detailBody: string): DetailEntry | null {
 const BOOST_BONUS_KEYWORD_RE = /\b(?:boost|bonus)\b/i;
 const PERCENT_OR_DOLLAR_RE = /\d+\s*%|\$\s*\d/;
 
+/** Phase 9 (FEED-01, A-07): no-sweat wording in a card title ("Second Chance
+ * Bet", "No Sweat", "Bet Back"). Mirrors noSweat.ts's title vocabulary -- the
+ * real list card carries no body text to classify, so the title is the signal. */
+const NO_SWEAT_CARD_TITLE_RE = /\bno[- ]sweat\b|\bbet back\b|\bsecond chance\b|\bmoney back\b|\b(?:stake|bet) back\b/i;
+
+function isNoSweatTitle(title: string): boolean {
+  return NO_SWEAT_CARD_TITLE_RE.test(title) || classifyNoSweat({ title, text: "" }).kind !== "none";
+}
+
+function isBoostTitle(title: string): boolean {
+  return BOOST_BONUS_KEYWORD_RE.test(title) && PERCENT_OR_DOLLAR_RE.test(title);
+}
+
 function isQualifyingTitle(title: string): boolean {
   if (classifyExclusion({ title, text: "" }) !== null) return false;
   if (sportFromText(title).kind === "unsupported") return false;
-  if (!BOOST_BONUS_KEYWORD_RE.test(title)) return false;
-  if (!PERCENT_OR_DOLLAR_RE.test(title)) return false;
-  return true;
+  // The no-sweat wording bypasses the boost keyword + %/$ requirement.
+  return isNoSweatTitle(title) || isBoostTitle(title);
 }
 
 function planBallybetDetails(listBody: string): DetailPlan[] {
   const cards = extractListCards(listBody);
   const plans: DetailPlan[] = [];
 
-  for (const card of cards) {
+  // Boosts first, then no-sweats, so the shared cap never starves a boost (T-09-31).
+  const qualifying = cards.filter((card) => card.slug && isQualifyingTitle(card.title));
+  const ordered = [
+    ...qualifying.filter((card) => !isNoSweatTitle(card.title) || isBoostTitle(card.title)),
+    ...qualifying.filter((card) => isNoSweatTitle(card.title) && !isBoostTitle(card.title)),
+  ];
+
+  for (const card of ordered) {
     if (plans.length >= MAX_DETAIL_REQUESTS) break;
     if (!card.slug) continue;
-    if (!isQualifyingTitle(card.title)) continue;
-
     plans.push({ entryKey: card.slug, request: buildRequest(detailUrlFor(card.slug)) });
   }
 
@@ -293,9 +311,66 @@ function buildFromListFallback(card: ListCard, slug: string, titleSportHint: Spo
   return { status: "candidate", promo };
 }
 
+/** Phase 9 (FEED-01): a no-sweat built from its detail page. Cash refunds are
+ * never priced; an unreadable dollar cap goes to review (the reader can rescue
+ * it) -- "up to 100%" of the stake is not a cap the app can price. */
+function buildNoSweatFromDetail(
+  card: ListCard,
+  slug: string,
+  title: string,
+  text: string,
+  sportKeyHint: string | null,
+  evidence: SkipEvidence,
+  earlyClaimMatch: RegExpExecArray | null,
+  windowEnd: string | null,
+): BuildResult {
+  const detection = classifyNoSweat({ title, text });
+  if (detection.kind === "cash_refund") return { status: "skip", reason: "no_sweat_cash", evidence };
+  const cap = detection.kind === "bonus_bet_refund" ? detection.refundCap : null;
+  if (cap === null) return { status: "skip", reason: "unrecognized", evidence };
+
+  const minOddsParse = parseMinOdds(text);
+  const scopeText = earlyClaimMatch ? earlyClaimMatch[1].trim() : scopeFromTitle(card.title);
+  const promo: ScrapedPromo = {
+    bookKey: "ballybet",
+    externalId: slug,
+    promoType: "no_sweat",
+    title,
+    rawText: truncate(text, RAW_TEXT_MAX_CHARS),
+    sourceUrl: detailUrlFor(slug),
+    sportKeyHint,
+    scopeText,
+    ...teamsFromScope(scopeText),
+    windowStart: earlyClaimMatch ? parseEtDateTime(earlyClaimMatch[2].trim()) : null,
+    windowEnd,
+    expiresAt: windowEnd,
+    eligibleMarketTypes: [...PROMO_MARKET_TYPES],
+    pinned: null,
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: cap,
+    maxStake: null,
+    maxWinnings: null,
+    winningsCapKind: null,
+    minOddsAmerican: minOddsParse.status === "parsed" ? minOddsParse.value : null,
+    unparsedCapFields: minOddsParse.status === "unparsed" ? ["minOdds"] : [],
+    claimRequired: "claim_token",
+    finePrintNote: extractFinePrintNote(text),
+  };
+  return { status: "candidate", promo };
+}
+
 function buildFromDetail(card: ListCard, slug: string, detailBody: string): BuildResult {
   const detail = extractDetailEntry(detailBody);
   if (!detail) {
+    if (isNoSweatTitle(card.title) && !isBoostTitle(card.title)) {
+      return {
+        status: "skip",
+        reason: "unrecognized",
+        evidence: { rawText: truncate(htmlToText(card.description), RAW_TEXT_MAX_CHARS), sourceUrl: detailUrlFor(slug), expiresAt: null, partial: null },
+      };
+    }
     return buildFromListFallback(card, slug, sportFromText(card.title));
   }
 
@@ -322,6 +397,10 @@ function buildFromDetail(card: ListCard, slug: string, detailBody: string): Buil
   if (sportHint.kind === "unknown") sportHint = sportFromText(title);
   if (sportHint.kind === "unsupported") return { status: "skip", reason: "unsupported_sport", evidence };
   const sportKeyHint = sportHint.kind === "supported" ? sportHint.sportKey : null;
+
+  if (isNoSweatTitle(`${title}\n${card.title}`) && !isBoostTitle(card.title)) {
+    return buildNoSweatFromDetail(card, slug, title, text, sportKeyHint, evidence, earlyClaimMatch, earlyWindowEnd);
+  }
 
   // "Any Wager" is the only eligible-bet-type wording recon found on any
   // Bally Bet promo (Observed Promos rows 1-3) -- anything else is a market
@@ -407,7 +486,7 @@ function ballybetParse(
       continue;
     }
 
-    if (!BOOST_BONUS_KEYWORD_RE.test(card.title) || !PERCENT_OR_DOLLAR_RE.test(card.title)) {
+    if (!isBoostTitle(card.title) && !isNoSweatTitle(card.title)) {
       skipped.push({ reason: "not_a_promo", externalId: card.slug, title: card.title, evidence: listEvidence });
       continue;
     }
@@ -426,6 +505,12 @@ function ballybetParse(
     }
 
     const detailBody = input.detailBodies[card.slug];
+    // A no-sweat has no list-only fallback: without its detail the refund cap
+    // is unreadable, so it goes to review rather than being priced.
+    if (!detailBody && isNoSweatTitle(card.title) && !isBoostTitle(card.title)) {
+      skipped.push({ reason: "unrecognized", externalId: card.slug, title: card.title, evidence: listEvidence });
+      continue;
+    }
     const built = detailBody
       ? buildFromDetail(card, card.slug, detailBody)
       : buildFromListFallback(card, card.slug, titleSportHint);
