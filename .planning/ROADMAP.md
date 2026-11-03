@@ -35,7 +35,7 @@
 **Milestone Goal:** Turn intro (sign-up) offers and no-sweat promos into ranked, ready-to-place opportunities with exact lines.
 
 - [x] **Phase 8: No-Sweat Bet Math** - Exact no-sweat hedge solver and the bonus-bet conversion rate that values its refund (completed 2026-10-22)
-- [ ] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals
+- [x] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals (completed 2026-11-03)
 - [ ] **Phase 10: Ranked Intro Offers** - Sign-up offers screen ranks intro offers by estimated value with exact qualifying bet, hedge and whole-plan view
 - [ ] **Phase 11: More Sportsbooks** - Hard Rock Bet and BetMGM scrapers (plus time-boxed checks of the other Colorado books) feed promos and intro offers automatically
 
@@ -121,7 +121,7 @@ Plans:
 
 **Wave 7**
 
-- [ ] 09-18-PLAN.md — Opportunities screen wiring, stored-promo re-check with owner OK, phone check (FEED-01..05)
+- [x] 09-18-PLAN.md — Opportunities screen wiring, stored-promo re-check with owner OK, phone check (FEED-01..05)
 **UI hint**: yes
 
 ### Phase 10: Ranked Intro Offers
@@ -164,7 +164,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 19/20 | In Progress|  |
+| 9. No-Sweat Promos in the Feed | v1.2 | 20/20 | Complete    | 2026-11-03 |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 
@@ -174,7 +174,7 @@ Plans:
 
 **Goal:** [Captured for future planning] An owner-only admin page. Candidate scope to confirm with the owner (captured 2026-10-02): create/copy invite links in the app (today: `npm run invite:create` on the laptop), see/manage members (list, disable, password reset — today `scripts/password-reset.ts`), Odds API credit usage history, scrape/cron run status + a manual "scrape now" trigger, and reminders like the GitHub dispatch token expiry (~2026-12-30).
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** 20/20 plans complete
 
 Plans:
 

@@ -16,11 +16,11 @@
 
 ### No-sweat promos in the feed
 
-- [ ] **FEED-01**: DraftKings, FanDuel and Bally Bet no-sweat promos for existing customers are recognised (parser + AI reader with an explicit no-sweat kind) instead of skipped; new-customer no-sweat offers go to Sign-up offers
-- [ ] **FEED-02**: The 2026-10-08 case (a no-sweat bet read as a bonus bet) is a regression test; when the parser and reader disagree about no-sweat vs bonus bet the promo goes to review
-- [ ] **FEED-03**: No-sweat opportunities are ranked inline in the Opportunities feed with the other promos, marked with a small "est." label and the conversion rate used
-- [ ] **FEED-04**: No-sweat estimates never count toward the Dashboard totals, the profit graph's grey line, or the Statistics tab, which stay guaranteed-only
-- [ ] **FEED-05**: Marking a no-sweat promo done records the profit the member actually made (entered or confirmed by the member), not the estimate
+- [x] **FEED-01**: DraftKings, FanDuel and Bally Bet no-sweat promos for existing customers are recognised (parser + AI reader with an explicit no-sweat kind) instead of skipped; new-customer no-sweat offers go to Sign-up offers
+- [x] **FEED-02**: The 2026-10-08 case (a no-sweat bet read as a bonus bet) is a regression test; when the parser and reader disagree about no-sweat vs bonus bet the promo goes to review
+- [x] **FEED-03**: No-sweat opportunities are ranked inline in the Opportunities feed with the other promos, marked with a small "est." label and the conversion rate used
+- [x] **FEED-04**: No-sweat estimates never count toward the Dashboard totals, the profit graph's grey line, or the Statistics tab, which stay guaranteed-only
+- [x] **FEED-05**: Marking a no-sweat promo done records the profit the member actually made (entered or confirmed by the member), not the estimate
 
 ### Intro offers screen
 
@@ -69,11 +69,11 @@
 | NSB-02 | Phase 8 | Complete |
 | NSB-03 | Phase 8 | Complete |
 | NSB-04 | Phase 8 | Complete |
-| FEED-01 | Phase 9 | Pending |
-| FEED-02 | Phase 9 | Pending |
-| FEED-03 | Phase 9 | Pending |
-| FEED-04 | Phase 9 | Pending |
-| FEED-05 | Phase 9 | Pending |
+| FEED-01 | Phase 9 | Complete |
+| FEED-02 | Phase 9 | Complete |
+| FEED-03 | Phase 9 | Complete |
+| FEED-04 | Phase 9 | Complete |
+| FEED-05 | Phase 9 | Complete |
 | INTRO-01 | Phase 10 | Pending |
 | INTRO-02 | Phase 10 | Pending |
 | INTRO-03 | Phase 10 | Pending |
