@@ -977,8 +977,9 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
     expect(readerStats).toBeDefined();
     expect((readerStats as ReaderBookStats).calls).toBe(0);
     expect((readerStats as ReaderBookStats).cacheHits).toBe(0);
-    // 1 candidate + 22 skips (every skip in this fixture carries evidence) == 23 entries read.
-    expect((readerStats as ReaderBookStats).fallbacks).toBe(23);
+    // 1 candidate + 11 non-clear skips == 12 entries read; the other 11 clear skips are passed through unread (A-08).
+    expect((readerStats as ReaderBookStats).fallbacks).toBe(12);
+    expect((readerStats as ReaderBookStats).clearSkipsNotRead).toBe(11);
   });
 
   it("agreeing on 1125873 and not_usable/prop on 1127668 leaves the candidate write unchanged, disagreements 0", async () => {
@@ -1083,7 +1084,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
     expect(writesArg[0].parsed).toEqual(candidate1125873);
 
     const stats = outcomes[0].reader as ReaderBookStats;
-    expect(stats.calls).toBe(2);
+    expect(stats.calls).toBe(1); // 1127668 (prop) is a clear skip, never read (A-08)
     expect(stats.cacheHits).toBe(0);
     expect(stats.disagreements).toBe(0);
   });

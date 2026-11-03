@@ -6,7 +6,7 @@ import { isReviewWorthySkip } from "./reviewTriage";
 import { ballybetScraper } from "./books/ballybet";
 import { draftkingsScraper } from "./books/draftkings";
 import { fanduelScraper } from "./books/fanduel";
-import type { ParseResult, SkippedEntry } from "@/domain/promos/scraped";
+import type { ParseResult, ScrapedPromo, SkippedEntry } from "@/domain/promos/scraped";
 import type { PromoReader, ReaderResult } from "./promoReader";
 import type { PromoReading } from "./promoReading";
 
@@ -142,7 +142,8 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("futures");
     expect(isReviewWorthySkip(result.skipped[0])).toBe(false);
-    expect(stats.clearSkipOverrides).toBe(1);
+    expect(stats.clearSkipOverrides).toBe(0);
+    expect(stats.clearSkipsNotRead).toBe(1);
   });
 
   it("Case 2: Bally's Profit Boost (not_a_promo) -- guard drops the reader's 100% (no 'boost' word near the evidence), rescue suppressed for no amount", async () => {
@@ -215,7 +216,8 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("sgp");
     expect(isReviewWorthySkip(result.skipped[0])).toBe(false);
-    expect(stats.clearSkipOverrides).toBe(1);
+    expect(stats.clearSkipOverrides).toBe(0);
+    expect(stats.clearSkipsNotRead).toBe(1);
   });
 
   it("Case 5: FanDuel ACQB5G50BB921 (new_customer) -- clear reason wins, stays new_customer", async () => {
@@ -241,7 +243,8 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("new_customer");
     expect(isReviewWorthySkip(result.skipped[0])).toBe(false);
-    expect(stats.clearSkipOverrides).toBe(1);
+    expect(stats.clearSkipOverrides).toBe(0);
+    expect(stats.clearSkipsNotRead).toBe(1);
   });
 
   it("Case 6a: synthetic FanDuel 'MLB Early Win Token' as unrecognized -- suppression beats the always-review-worthy default", async () => {
@@ -349,13 +352,14 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     for (const skip of result.skipped) {
       expect(isReviewWorthySkip(skip)).toBe(false);
     }
-    expect(stats.clearSkipOverrides).toBe(3); // Stanley Cup, DK SGP, FanDuel ACQ
+    expect(stats.clearSkipOverrides).toBe(0);
+    expect(stats.clearSkipsNotRead).toBe(3); // Stanley Cup, DK SGP, FanDuel ACQ -- never sent to the reader (A-08)
     expect(stats.rescuesWithoutAmount).toBe(4); // Bally Profit Boost, Bally Odds Boost, Early Win x2
 
     const warnMessages = warnSpy.mock.calls.map((call) => String(call[0]));
     const clearKeptLines = warnMessages.filter((m) => m.includes("clear skip kept"));
     const rescueSkippedLines = warnMessages.filter((m) => m.includes("rescue skipped") && m.includes("no guard-backed amount"));
-    expect(clearKeptLines).toHaveLength(3);
+    expect(clearKeptLines).toHaveLength(0);
     expect(rescueSkippedLines).toHaveLength(4);
 
     warnSpy.mockRestore();
@@ -396,5 +400,37 @@ describe("applyPromoReader -- the 6 noise cases from the 2026-09-28 live run", (
     expect(result.skipped).toHaveLength(1);
     expect(stats.reviewRouted).toBe(1);
     expect(stats.disagreements).toBe(1);
+  });
+});
+
+describe("applyPromoReader -- reader budget (Phase 9, A-08)", () => {
+  it("a cold-cache run with 5 candidates and 70 clear skips makes exactly 5 reader calls", async () => {
+    const parsed = draftkingsScraper.parse(
+      { listBody: readFixture("draftkings-promos-2026-09-28.json"), detailBodies: {} },
+      { now: NOW, sourceUrl: draftkingsScraper.listRequest.url },
+    );
+    const base = parsed.candidates[0];
+    const candidates: ScrapedPromo[] = Array.from({ length: 5 }, (_, i) => ({ ...base, externalId: `cand-${i}`, title: `Cand ${i}` }));
+    const reasons = ["parlay", "new_customer", "deposit", "sgp", "prop", "futures", "live_only"] as const;
+    const clearSkips: SkippedEntry[] = Array.from({ length: 70 }, (_, i) => ({
+      reason: reasons[i % reasons.length],
+      externalId: `clear-${i}`,
+      title: `Clear ${i}`,
+      evidence: { rawText: `clear skip ${i}`, sourceUrl: "https://example.com", expiresAt: null, partial: null },
+    }));
+    const read = vi.fn(async (): Promise<ReaderResult> => ({
+      source: "api",
+      reading: reading({ kind: "not_usable", skipReason: "not_a_promo", confidence: "low" }),
+      usage: { inputTokens: 1, outputTokens: 1 },
+    }));
+    const { parseResult: result, stats } = await applyPromoReader({
+      bookKey: "draftkings",
+      parseResult: { found: 75, candidates, skipped: clearSkips },
+      reader: { read } as unknown as PromoReader,
+      fallbackSourceUrl: "https://example.com",
+    });
+    expect(read).toHaveBeenCalledTimes(5);
+    expect(stats.clearSkipsNotRead).toBe(70);
+    expect(result.skipped.filter((s) => clearSkips.includes(s))).toHaveLength(70);
   });
 });
