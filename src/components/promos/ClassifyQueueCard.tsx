@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import type { CorrectionOptions, QueueItemDTO } from "@/domain/promos/dto";
+import { useEffect, useRef, useState, useTransition } from "react";
+import type { CorrectionOptions, QueueItemDTO, QueueReadingsDTO } from "@/domain/promos/dto";
 import { classifyPromo } from "@/app/actions/classify-promo";
 import type { PromoReviewResponse } from "@/app/actions/confirm-promo-match";
 import { Button } from "@/components/ui/button";
@@ -24,10 +24,48 @@ interface ClassifyQueueCardProps {
   onChanged: () => void;
 }
 
+const DONE_DISPLAY_MS = 2000;
+
+type ReadingSide = QueueReadingsDTO["scraper"] | QueueReadingsDTO["reader"];
+
+function signedOdds(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
+}
+
+/** "No-sweat, $25 refund, -200 or longer" / "Bonus bet, $25". Plain text only. */
+function describeReading(reading: ReadingSide): string {
+  if (!reading.label) return "Couldn't tell";
+  if (reading.label === "Not usable") return "Not usable";
+  const parts: string[] = [reading.label];
+  if (reading.amount) {
+    if (reading.label === "No-sweat") parts.push(`$${reading.amount} refund`);
+    else if (reading.label === "Bonus bet") parts.push(`$${reading.amount}`);
+    else parts.push(reading.amount);
+  }
+  if (reading.minOddsAmerican !== null) parts.push(`${signedOdds(reading.minOddsAmerican)} or longer`);
+  return parts.join(", ");
+}
+
+/** The reading (scraper first) that called this a given type, or null. */
+function readingFor(readings: QueueReadingsDTO | null, label: "No-sweat" | "Bonus bet"): ReadingSide | null {
+  if (!readings) return null;
+  if (readings.scraper.label === label) return readings.scraper;
+  if (readings.reader.label === label) return readings.reader;
+  return null;
+}
+
+type OneTapChoice = "no_sweat" | "bonus_bet" | "skip";
+const DONE_LABELS: Record<OneTapChoice, string> = {
+  no_sweat: "Saved as no-sweat",
+  bonus_bet: "Saved as bonus bet",
+  skip: "Skipped",
+};
+
 const INVALID_MESSAGE = "Something went wrong with that request. Try refreshing the page.";
 
 type BoostFieldKey = "boostPercent" | "maxStake" | "minOdds" | "maxWinnings";
 type BonusFieldKey = "bonusAmount" | "minOdds";
+type NoSweatFieldKey = "refundCap" | "minOdds";
 
 /**
  * "Needs a look" queue card for an uncertain scraped entry (quick-260928-it1,
@@ -43,13 +81,23 @@ type BonusFieldKey = "bonusAmount" | "minOdds";
 export function ClassifyQueueCard({ item, correctionOptions, onChanged }: ClassifyQueueCardProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [dismissOpen, setDismissOpen] = useState(false);
-  const [openPanel, setOpenPanel] = useState<"boost" | "bonus" | null>(null);
+  const [openPanel, setOpenPanel] = useState<"boost" | "bonus" | "nosweat" | null>(null);
   const [draft, setDraft] = useState<ScopeDraft>(EMPTY_SCOPE_DRAFT);
   const [isPending, startTransition] = useTransition();
 
   const [boostValues, setBoostValues] = useState<Partial<Record<BoostFieldKey, string>>>({});
   const [boostErrors, setBoostErrors] = useState<Partial<Record<BoostFieldKey, string | undefined>>>({});
   const [bonusValues, setBonusValues] = useState<Partial<Record<BonusFieldKey, string>>>({});
+  const [noSweatValues, setNoSweatValues] = useState<Partial<Record<NoSweatFieldKey, string>>>({});
+  const [doneMessage, setDoneMessage] = useState<string | null>(null);
+  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (doneTimer.current) clearTimeout(doneTimer.current);
+    },
+    [],
+  );
 
   if (!item.classify) return null;
   // Captured once, non-null, so nested function declarations below don't
@@ -63,6 +111,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
     setBoostValues({});
     setBoostErrors({});
     setBonusValues({});
+    setNoSweatValues({});
   }
 
   /** Prefill league mode from the promo's scraped window (presentational; the server re-validates). */
@@ -104,10 +153,16 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
     });
   }
 
-  function handleOutcome(outcome: PromoReviewResponse) {
+  function handleOutcome(outcome: PromoReviewResponse, choice?: OneTapChoice) {
     if (outcome.status === "ok") {
       setMessage(null);
       resetPanels();
+      if (choice) {
+        // Show the result for 2 seconds, then let the queue drop the card.
+        setDoneMessage(DONE_LABELS[choice]);
+        doneTimer.current = setTimeout(onChanged, DONE_DISPLAY_MS);
+        return;
+      }
       onChanged();
       return;
     }
@@ -120,6 +175,83 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
       return;
     }
     setMessage(outcome.message);
+  }
+
+  /** Scope for a one-tap choice: the promo's scraped window when it has one, else "best game". */
+  function oneTapScope() {
+    const prefill = item.scrapedWindow
+      ? prefillScopeDraft(item.scrapedWindow, correctionOptions.sportDays, new Date())
+      : null;
+    return scopeInputFromDraft(prefill ?? EMPTY_SCOPE_DRAFT);
+  }
+
+  const noSweatReading = readingFor(item.readings, "No-sweat");
+  const bonusReading = readingFor(item.readings, "Bonus bet");
+  // Cash-refund items may have no no-sweat label; the reader's amount is then the refund cap.
+  const noSweatAmount =
+    noSweatReading?.amount ?? (item.cashRefund ? (item.readings?.reader.amount ?? null) : null);
+  const noSweatMinOdds = noSweatReading?.minOddsAmerican ?? item.readings?.reader.minOddsAmerican ?? null;
+  const bonusAmount = bonusReading?.amount ?? classify.suggested.bonusAmount;
+  const bonusMinOdds = bonusReading?.minOddsAmerican ?? classify.suggested.minOdds;
+
+  function openNoSweatPanel(amount: string | null, minOdds: number | null) {
+    if (openPanel !== "nosweat") applyScrapedWindowPrefill();
+    setOpenPanel("nosweat");
+    setNoSweatValues({ refundCap: amount ?? "", minOdds: minOdds !== null ? String(minOdds) : "" });
+  }
+
+  function submitNoSweat(refundCap: string, minOdds: number | null, scope: unknown, choice?: OneTapChoice) {
+    const payload: Record<string, unknown> = {
+      promoId: item.promoId,
+      promoType: "no_sweat",
+      refundCap,
+      scope,
+    };
+    if (minOdds !== null) payload.minOddsAmerican = minOdds;
+    startTransition(async () => {
+      const call = await safeAction(() => classifyPromo(payload), "classifyPromo");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      handleOutcome(call.value, choice);
+    });
+  }
+
+  function chooseNoSweat() {
+    if (!noSweatAmount) {
+      openNoSweatPanel(null, noSweatMinOdds);
+      return;
+    }
+    submitNoSweat(noSweatAmount, noSweatMinOdds, oneTapScope(), "no_sweat");
+  }
+
+  function chooseBonusBet() {
+    if (!bonusAmount) {
+      openBonusPanel();
+      return;
+    }
+    const payload: Record<string, unknown> = {
+      promoId: item.promoId,
+      promoType: "bonus_bet",
+      bonusAmount,
+      scope: oneTapScope(),
+    };
+    if (bonusMinOdds !== null) payload.minOddsAmerican = bonusMinOdds;
+    startTransition(async () => {
+      const call = await safeAction(() => classifyPromo(payload), "classifyPromo");
+      if (!call.ok) {
+        setMessage(ACTION_FAILED_MESSAGE);
+        return;
+      }
+      handleOutcome(call.value, "bonus_bet");
+    });
+  }
+
+  function saveNoSweatPanel() {
+    if (!noSweatValues.refundCap) return;
+    const parsedOdds = noSweatValues.minOdds ? Number.parseInt(noSweatValues.minOdds, 10) : Number.NaN;
+    submitNoSweat(noSweatValues.refundCap, Number.isNaN(parsedOdds) ? null : parsedOdds, scopeInputFromDraft(draft));
   }
 
   function saveBoost() {
@@ -180,9 +312,18 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
         <span className="text-base">
           {item.bookName} — {classify.title}
         </span>
-        <span className="text-sm text-muted-foreground">
-          Needs a look: we couldn&apos;t tell what kind of promo this is.
-        </span>
+        {item.cashRefund ? (
+          <>
+            <span className="text-base font-semibold">This refund may be cash</span>
+            <span className="text-sm text-muted-foreground">We only price refunds paid as a bonus bet.</span>
+          </>
+        ) : item.readings ? (
+          <span className="text-base font-semibold">Scraper and reader disagree</span>
+        ) : (
+          <span className="text-sm text-muted-foreground">
+            Needs a look: we couldn&apos;t tell what kind of promo this is.
+          </span>
+        )}
         <span className="text-sm text-muted-foreground">{classify.excerpt}</span>
         {classify.sourceUrl ? (
           <a
@@ -199,29 +340,107 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
         ) : null}
       </div>
 
+      {item.readings ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1 rounded-md border border-border bg-background p-3">
+            <span className="text-sm text-muted-foreground">Scraper read</span>
+            <span className="text-base">{describeReading(item.readings.scraper)}</span>
+          </div>
+          <div className="flex flex-col gap-1 rounded-md border border-border bg-background p-3">
+            <span className="text-sm text-muted-foreground">Reader read</span>
+            <span className="text-base">{describeReading(item.readings.reader)}</span>
+          </div>
+        </div>
+      ) : null}
+
       {message ? (
         <p role="alert" className="text-sm text-destructive">
           {message}
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="h-10" onClick={openBoostPanel} disabled={isPending}>
-          It&apos;s a profit boost
-        </Button>
-        <Button variant="outline" className="h-10" onClick={openBonusPanel} disabled={isPending}>
-          It&apos;s a bonus bet
-        </Button>
-        <Button
-          variant="outline"
-          className="h-10 text-destructive"
-          aria-label="Dismiss this promo"
-          onClick={() => setDismissOpen(true)}
-          disabled={isPending}
-        >
-          Dismiss
-        </Button>
-      </div>
+      {doneMessage ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {doneMessage}
+        </p>
+      ) : item.cashRefund ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Button variant="outline" className="min-h-11" onClick={chooseNoSweat} disabled={isPending}>
+            It&apos;s a no-sweat (bonus bet refund)
+          </Button>
+          <Button variant="ghost" className="min-h-11" onClick={() => setDismissOpen(true)} disabled={isPending}>
+            Skip
+          </Button>
+        </div>
+      ) : item.readings ? (
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Button variant="outline" className="min-h-11" onClick={chooseNoSweat} disabled={isPending}>
+            It&apos;s a no-sweat
+          </Button>
+          <Button variant="outline" className="min-h-11" onClick={chooseBonusBet} disabled={isPending}>
+            It&apos;s a bonus bet
+          </Button>
+          <Button variant="ghost" className="min-h-11" onClick={() => setDismissOpen(true)} disabled={isPending}>
+            Skip
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="h-10" onClick={openBoostPanel} disabled={isPending}>
+            It&apos;s a profit boost
+          </Button>
+          <Button variant="outline" className="h-10" onClick={openBonusPanel} disabled={isPending}>
+            It&apos;s a bonus bet
+          </Button>
+          <Button
+            variant="outline"
+            className="h-10 text-destructive"
+            aria-label="Dismiss this promo"
+            onClick={() => setDismissOpen(true)}
+            disabled={isPending}
+          >
+            Dismiss
+          </Button>
+        </div>
+      )}
+
+      {openPanel === "nosweat" ? (
+        <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`classify-nosweat-cap-${item.promoId}`}>Most you get back</Label>
+            <Input
+              id={`classify-nosweat-cap-${item.promoId}`}
+              inputMode="decimal"
+              placeholder="$0.00"
+              className="num h-10"
+              value={noSweatValues.refundCap ?? ""}
+              onChange={(e) => setNoSweatValues((prev) => ({ ...prev, refundCap: e.target.value }))}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor={`classify-nosweat-min-odds-${item.promoId}`}>Min odds</Label>
+            <Input
+              id={`classify-nosweat-min-odds-${item.promoId}`}
+              inputMode="numeric"
+              placeholder="-200"
+              className="num h-10"
+              value={noSweatValues.minOdds ?? ""}
+              onChange={(e) => setNoSweatValues((prev) => ({ ...prev, minOdds: e.target.value }))}
+            />
+          </div>
+
+          {scopeControls("classify-scope-nosweat")}
+
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-10" disabled={!noSweatValues.refundCap || isPending} onClick={saveNoSweatPanel}>
+              Save promo
+            </Button>
+            <Button variant="ghost" className="h-10" onClick={resetPanels}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {openPanel === "boost" ? (
         <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border bg-background p-4">
@@ -335,7 +554,7 @@ export function ClassifyQueueCard({ item, correctionOptions, onChanged }: Classi
         onCancel={() => setDismissOpen(false)}
         onOutcome={(outcome) => {
           setDismissOpen(false);
-          handleOutcome(outcome);
+          handleOutcome(outcome, item.readings || item.cashRefund ? "skip" : undefined);
         }}
       />
     </div>

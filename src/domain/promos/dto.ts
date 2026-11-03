@@ -185,6 +185,18 @@ export interface ClassifyQueueItemDTO {
   maxWinningsKindKnown: boolean;
 }
 
+/** Phase 9 (D-15): scraper and reader readings of one promo, shown side by side in the review queue. */
+export interface QueueReadingsDTO {
+  scraper: { label: PromoTypeLabel | null; amount: string | null; minOddsAmerican: number | null };
+  reader: {
+    label: PromoTypeLabel | "Not usable";
+    amount: string | null;
+    minOddsAmerican: number | null;
+    confidence: "high" | "medium" | "low";
+    refundForm: "bonus_bet" | "cash" | "unknown" | null;
+  };
+}
+
 export interface QueueItemDTO {
   promoId: number;
   kind: ReviewReason;
@@ -202,6 +214,10 @@ export interface QueueItemDTO {
    * Presentational -- the server re-validates whatever the member submits.
    */
   scrapedWindow: { sportKey: string; startEtDate: string; endEtDate: string } | null;
+  /** Phase 9 (D-15): null unless the scraper and the promo reader both produced a reading. */
+  readings: QueueReadingsDTO | null;
+  /** Phase 9 (D-17): a refund that may be paid in cash (never priced). */
+  cashRefund: boolean;
 }
 
 export type GetPromosResponse =

@@ -4,7 +4,9 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
 import { SettingsBookCapsForm } from "@/components/settings/SettingsBookCapsForm";
+import { SettingsLowProfileForm } from "@/components/settings/SettingsLowProfileForm";
 import { getMemberBookCaps } from "@/db/bookCaps";
+import { getMemberLowProfile } from "@/db/lowProfile";
 import { getBonusBooks, getUsableUserBooks } from "@/db/queries";
 import { DEFAULT_MAX_STAKE } from "@/domain/promos/yourCap";
 import { formatUsd } from "@/lib/format";
@@ -31,10 +33,11 @@ export default async function SettingsPage() {
   // predicate / and /onboarding/books use), so a stale saved key that no
   // longer renders as a checkbox is never seeded into initialKeys -- Save
   // changes can always succeed.
-  const [books, usableSaved, bookCaps] = await Promise.all([
+  const [books, usableSaved, bookCaps, lowProfile] = await Promise.all([
     getBonusBooks(),
     getUsableUserBooks(user.userId),
     getMemberBookCaps(user.userId),
+    getMemberLowProfile(user.userId),
   ]);
   const initialKeys = usableSaved.map((b) => b.key);
 
@@ -69,6 +72,10 @@ export default async function SettingsPage() {
               cap still applies if it&apos;s lower, and a cap you set on a single promo always wins.
             </p>
             <SettingsBookCapsForm books={usableSaved} caps={Object.fromEntries(bookCaps)} />
+          </Card>
+
+          <Card className="p-6">
+            <SettingsLowProfileForm initial={lowProfile} />
           </Card>
         </div>
       </main>
