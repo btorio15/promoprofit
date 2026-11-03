@@ -1,0 +1,32 @@
+/* Mirrors src/app/globals.css tokens (shadcn neutral + emerald accent). */
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --popover: oklch(1 0 0);
+  --primary: #059669;
+  --secondary: oklch(0.97 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --destructive: #dc2626;
+  --border: oklch(0.922 0 0);
+  --warning: #d97706;
+  --radius: 0.625rem;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --popover: oklch(0.205 0 0);
+    --primary: #10b981;
+    --secondary: oklch(0.269 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --destructive: #ef4444;
+    --border: oklch(1 0 0 / 10%);
+    --warning: #f59e0b;
+  }
+}
