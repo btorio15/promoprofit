@@ -27,6 +27,13 @@ import {
  * never logs in.
  */
 
+/**
+ * WR-02: stamped as the first rawText line of a classify draft built from a
+ * cash-refund no-sweat skip, so the review card can show the cash note even
+ * when the promo reader never ran (the skip reason is not a DB column).
+ */
+export const NO_SWEAT_CASH_MARKER = "[No-sweat refund: cash]";
+
 export const SKIP_REASONS = [
   "parlay",
   "sgp",

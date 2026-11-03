@@ -11,7 +11,7 @@ import { draftkingsScraper } from "./books/draftkings";
 import { ballybetScraper } from "./books/ballybet";
 import { fanduelScraper } from "./books/fanduel";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
-import { ScrapedPromoFieldsSchema } from "@/domain/promos/scraped";
+import { NO_SWEAT_CASH_MARKER, ScrapedPromoFieldsSchema } from "@/domain/promos/scraped";
 import { sportFromTags, sportFromText } from "./sportHints";
 import { SKIP_REASONS, type SkippedEntry } from "@/domain/promos/scraped";
 
@@ -355,7 +355,57 @@ describe("no_sweat in review triage (Phase 9)", () => {
     expect(draft.boostPercent).toBeNull();
   });
 
-  it("never picks no_sweat without a partial type", () => {
+  // WR-02: a reader-less no-sweat skip drafts as no_sweat, never as a guaranteed bonus_bet.
+  it("a no_sweat_cash skip with no reader drafts as no_sweat with the refund cap and the cash marker", () => {
+    const draft = buildClassifyDraft(
+      "ballybet",
+      skip("no_sweat_cash", {
+        title: "Second Chance Bet",
+        evidence: {
+          rawText: "If your bet loses, get your stake back in cash up to $25. Not valid with a $25 bonus bet.",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: null,
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("25.00");
+    expect(draft.boostPercent).toBeNull();
+    expect(draft.rawText.startsWith(`${NO_SWEAT_CASH_MARKER}\n`)).toBe(true);
+  });
+
+  it("an unrecognized bonus-bet-refund no-sweat with no reader drafts as no_sweat, not bonus_bet", () => {
+    const draft = buildClassifyDraft(
+      "fanduel",
+      skip("unrecognized", {
+        title: "NFL No Sweat",
+        evidence: {
+          rawText: "Bet up to $500 on any NFL game. If your bet loses, get a $25 bonus bet.",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: null,
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("25.00");
+    expect(draft.rawText).not.toContain(NO_SWEAT_CASH_MARKER);
+  });
+
+  it("does not add the cash marker when the reader summary line already flags no_sweat_cash", () => {
+    const rawText = "[Promo reader check: no_sweat_cash] parser: x\nIf your bet loses, get your stake back in cash.";
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("no_sweat_cash", { title: "No Sweat", evidence: { rawText, sourceUrl: "x", expiresAt: null, partial: null } }),
+      "x",
+    );
+    expect(draft.rawText).toBe(rawText);
+  });
+
+  it("does not infer no_sweat from a passing 'no sweat' mention without refund wording", () => {
     const draft = buildClassifyDraft(
       "draftkings",
       skip("unrecognized", {

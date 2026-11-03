@@ -3,7 +3,12 @@ import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
 import { promoVisibilityCondition } from "./promos";
-import { ScrapedPromoFieldsSchema, ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
+import {
+  NO_SWEAT_CASH_MARKER,
+  ScrapedPromoFieldsSchema,
+  ScrapedPromoSchema,
+  type ScrapedPromo,
+} from "@/domain/promos/scraped";
 import { ScopeGuessSchema, gamesWindow, type ScopeGuess } from "@/domain/promos/scope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import { promoTypeLabel, type PromoTypeLabel } from "@/domain/promos/promoTypeLabel";
@@ -281,10 +286,14 @@ export function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
       }
     : null;
   // The skip reason is not persisted as a column; reconcile.ts stamps it into the
-  // rawText summary line ("[Promo reader check: no_sweat_cash]") and the reader's refundForm.
+  // rawText summary line ("[Promo reader check: no_sweat_cash]"), the reader's refundForm
+  // carries it, and (WR-02) a reader-less classify draft carries NO_SWEAT_CASH_MARKER.
+  const rawText = parsedResult.data.rawText;
   const cashRefund =
     row.reviewReason === "classify" &&
-    (parsedResult.data.rawText.includes("[Promo reader check: no_sweat_cash]") || rr?.reader.refundForm === "cash");
+    (rawText.includes("[Promo reader check: no_sweat_cash]") ||
+      rawText.includes(NO_SWEAT_CASH_MARKER) ||
+      rr?.reader.refundForm === "cash");
 
   return {
     id: row.id,

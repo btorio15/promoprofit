@@ -7,6 +7,7 @@ vi.mock("@/db/client", () => ({ getDb: vi.fn() }));
 
 import { activePromoForFlagWhere, flagUpdateWhere, mapPendingPromoRow } from "./promoReview";
 import { promos } from "./schema";
+import { NO_SWEAT_CASH_MARKER } from "@/domain/promos/scraped";
 
 const db = drizzle({ client: neon("postgresql://u:p@db.invalid/x"), schema });
 
@@ -109,6 +110,14 @@ describe("mapPendingPromoRow readings and cashRefund (D-15, D-17)", () => {
       row({ parsed: { ...parsed, rawText: "[Promo reader check: no_sweat_cash] x", reviewReadings: r } }) as never,
     );
     expect(item?.readings?.reader.label).toBe("Not usable");
+    expect(item?.cashRefund).toBe(true);
+  });
+
+  it("flags a reader-less no_sweat_cash classify draft from the cash marker (WR-02)", () => {
+    const item = mapPendingPromoRow(
+      row({ promoType: "no_sweat", parsed: { ...parsed, rawText: `${NO_SWEAT_CASH_MARKER}\nstake back in cash` } }) as never,
+    );
+    expect(item?.readings).toBeNull();
     expect(item?.cashRefund).toBe(true);
   });
 
