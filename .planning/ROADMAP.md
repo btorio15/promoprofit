@@ -205,7 +205,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
+- [x] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -222,7 +222,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 11/16 | In Progress|  |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 12/16 | In Progress|  |
 
 ## Backlog
 
