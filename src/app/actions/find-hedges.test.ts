@@ -420,4 +420,65 @@ describe("findHedges (per-user book scoping, D-13..D-20)", () => {
 
     expect(vi.mocked(getCachedEvents).mock.calls.length).toBe(callsBefore);
   });
+
+  describe("market hedges (Phase 12)", () => {
+    function eventsWithKalshi() {
+      return buildFixtureEvents(now).map((e) =>
+        e.id === "nba-nuggets-jazz"
+          ? {
+              ...e,
+              bookmakers: [
+                ...e.bookmakers,
+                {
+                  key: "kalshi",
+                  title: "Kalshi",
+                  markets: [
+                    {
+                      key: "h2h",
+                      outcomes: [
+                        { name: "Utah Jazz", price: 260 },
+                        { name: "Denver Nuggets", price: -245 },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            }
+          : e,
+      );
+    }
+
+    it("returns a Kalshi hedge when the member saved it and it beats the books", async () => {
+      // Jazz +300 bonus -> 300 payout; Kalshi 71c: 300 contracts cost 213 + 4.33 fee = 217.33 -> profit 82.67 > 80 (FanDuel).
+      vi.mocked(getCachedEvents).mockResolvedValueOnce({ events: eventsWithKalshi(), fetchedAt: now });
+      vi.mocked(getUserBookKeys).mockResolvedValueOnce(["draftkings", "fanduel", "betmgm", "kalshi"]);
+
+      const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+      expect(response.status).toBe("ok");
+      if (response.status !== "ok") return;
+      const nba = response.resultsBySport.basketball_nba[0];
+      expect(nba.hedge.bookKey).toBe("kalshi");
+      expect(nba.hedge.bookName).toBe("Kalshi");
+      expect(nba.hedgeMarket).not.toBeNull();
+      expect(nba.hedgeMarket!.contracts).toBeGreaterThan(0);
+      expect(nba.hedgeStake).toBe(nba.hedgeMarket!.outlay);
+      expect(nba.guaranteedProfit).toBe("82.67");
+    });
+
+    it("never shows a market hedge when the member has not ticked one (D-03/D-14)", async () => {
+      vi.mocked(getCachedEvents).mockResolvedValueOnce({ events: eventsWithKalshi(), fetchedAt: now });
+
+      const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+      expect(response.status).toBe("ok");
+      if (response.status !== "ok") return;
+      for (const rows of Object.values(response.resultsBySport)) {
+        for (const row of rows) {
+          expect(row.hedgeMarket).toBeNull();
+          expect(row.hedge.bookKey).not.toBe("kalshi");
+        }
+      }
+    });
+  });
 });

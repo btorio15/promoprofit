@@ -15,6 +15,7 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 import { extractTwoWayMoneylines } from "./marketFilter";
 import { rankBonusBetHedges } from "./rankBonusBetHedges";
 import { SPORT_KEYS } from "@/config/sports";
+import { isMarketVenue } from "@/config/books";
 
 /** Must stay equal to WINDOW_DAYS in src/app/actions/find-hedges.ts. */
 export const CONVERSION_WINDOW_DAYS = 7;
@@ -51,7 +52,9 @@ export function topConversionFor(args: {
   amount: Decimal;
   hedgeBookKeys: ReadonlySet<string>;
 }): ConversionRate | null {
-  const { events, now, refundBookKey, amount, hedgeBookKeys } = args;
+  const { events, now, refundBookKey, amount } = args;
+  // Phase 12 D-01: market hedges for no-sweat are deferred until Phase 9 lands (ROADMAP follow-up)
+  const hedgeBookKeys = new Set([...args.hedgeBookKeys].filter((k) => !isMarketVenue(k)));
   const allowed = new Set([...hedgeBookKeys, refundBookKey]);
   const markets = extractTwoWayMoneylines(events, {
     now,
