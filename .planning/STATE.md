@@ -210,6 +210,7 @@ Recent decisions affecting current work:
 | 261022-hxb | Trust a high-confidence AI reader over the parser: not-usable skips (no review), disagreements take the reader's amounts; medium/low still review | 2026-10-22 | 49eaaff | Verified | [261022-hxb-trust-ai-reader-over-parser](./quick/261022-hxb-trust-ai-reader-over-parser/) |
 | 261022-hzb | Restore Vercel morning cron (13:17 UTC) as a promo-only scrape trigger; GitHub schedule kept for odds | 2026-10-22 | 8c32467 | Verified | [261022-hzb-restore-vercel-morning-cron](./quick/261022-hzb-restore-vercel-morning-cron/) |
 | 261022-i3j | Three standard scrape + odds runs a day: Vercel 14:00/19:00 UTC, GitHub 00:00 UTC (7 AM, 12 PM, 5 PM MST) | 2026-10-22 | 1c66c75 | Verified | [261022-i3j-standardize-three-daily-scrape-and-odds-](./quick/261022-i3j-standardize-three-daily-scrape-and-odds-/) |
+| 261103-lx2 | No-sweat row redesign from sketch 001: win/lose waterfall bars replace the text panel; all notices in one (i) popover with an amber dot for Low-profile warnings; one Track button | 2026-11-03 | 135df33 | Needs Review (owner visual check) | [261103-lx2-no-sweat-row-waterfall-diagram-and-singl](./quick/261103-lx2-no-sweat-row-waterfall-diagram-and-singl/) |
 
 ## Deferred Items
 
