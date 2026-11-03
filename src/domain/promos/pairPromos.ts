@@ -7,6 +7,10 @@ import {
   type BoostLegInput,
   type PairResult,
 } from "@/domain/hedge/pairMath";
+import { isMarketVenue } from "@/config/books";
+import { VENUE_FEES } from "@/config/venues";
+import { toMarketLeg, type MarketFill, type MarketLeg } from "@/domain/market/marketLeg";
+import { solveBoostBoostPairWithMarketTopUp } from "@/domain/market/solvePairMarketTopUp";
 import { decimalToAmericanDisplay, effectiveBoostedDecimal } from "@/domain/hedge/profitBoost";
 import {
   bestHedgeQuote,
@@ -51,6 +55,8 @@ export interface PairCandidate<P extends RankablePromo = RankablePromo> {
    * hedge-book quote for that side. selection is that leg's own selection.
    */
   topUp?: { side: "A" | "B"; selection: ResolvedSelection; bookKey: string; oddsAmerican: number } | null;
+  /** Boost + boost only: the whole-contract market top-up when it won; null for a book or no top-up. */
+  topUpMarket: MarketFill | null;
   separateProfitA: Decimal;
   separateProfitB: Decimal;
   /** pair profit minus the two promos hedged separately. */
@@ -220,6 +226,34 @@ function topUpOf<P extends RankablePromo>(
   };
 }
 
+interface MarketSideQuote {
+  quote: SelectionQuote;
+  leg: MarketLeg;
+}
+
+/** Market-venue quotes on one side the member may use (hedgeBookKeys), as solver legs. */
+function marketQuotesOf(quotes: SelectionQuote[], opts: RankOptions): MarketSideQuote[] {
+  const out: MarketSideQuote[] = [];
+  for (const quote of quotes) {
+    if (!opts.hedgeBookKeys.has(quote.bookKey) || !isMarketVenue(quote.bookKey)) continue;
+    const leg = toMarketLeg(quote);
+    if (leg) out.push({ quote, leg });
+  }
+  return out.sort((x, y) => (x.quote.bookKey < y.quote.bookKey ? -1 : x.quote.bookKey > y.quote.bookKey ? 1 : 0));
+}
+
+/**
+ * Lower bound on a market contract's cost per $1 payout: price plus the
+ * UNROUNDED fee (the real fee only rounds up or to the cent), so it is a valid
+ * optimistic value for pruning.
+ */
+function marketInverse(leg: MarketLeg): Decimal {
+  const p = new LocalDecimal(leg.priceCents).dividedBy(100);
+  const cfg = VENUE_FEES[leg.venueKey];
+  const fee = new LocalDecimal(cfg.coefficient).times(cfg.multiplier).times(p).times(new LocalDecimal(1).minus(p));
+  return p.plus(fee);
+}
+
 /** Better = higher profit, then commence asc, eventId, market, line, side, lower ids. */
 function isBetterCandidate(a: PairCandidate, b: PairCandidate | null): boolean {
   if (!b) return true;
@@ -295,14 +329,26 @@ export function findPairCandidates<P extends RankablePromo>(
             let bound: Decimal;
             let quoteOnA: SelectionQuote | null = null;
             let quoteOnB: SelectionQuote | null = null;
+            let marketsOnA: MarketSideQuote[] = [];
+            let marketsOnB: MarketSideQuote[] = [];
             if (kind === "boost_boost") {
               const boostB = legB.boost!;
               quoteOnA = bestHedgeQuote(legA.selection.promoSideQuotes, opts.hedgeBookKeys);
               quoteOnB = bestHedgeQuote(legB.selection.promoSideQuotes, opts.hedgeBookKeys);
               const invA = one.dividedBy(legA.oddsDecimal);
               const invB = one.dividedBy(legB.oddsDecimal);
-              const invCOnA = quoteOnA ? one.dividedBy(americanToDecimal(quoteOnA.oddsAmerican)) : null;
-              const invCOnB = quoteOnB ? one.dividedBy(americanToDecimal(quoteOnB.oddsAmerican)) : null;
+              marketsOnA = marketQuotesOf(legA.selection.promoSideQuotes, opts);
+              marketsOnB = marketQuotesOf(legB.selection.promoSideQuotes, opts);
+              const bestInv = (book: SelectionQuote | null, markets: MarketSideQuote[]): Decimal | null => {
+                let inv: Decimal | null = book ? one.dividedBy(americanToDecimal(book.oddsAmerican)) : null;
+                for (const m of markets) {
+                  const mi = marketInverse(m.leg);
+                  if (inv === null || mi.lt(inv)) inv = mi;
+                }
+                return inv;
+              };
+              const invCOnA = bestInv(quoteOnA, marketsOnA);
+              const invCOnB = bestInv(quoteOnB, marketsOnB);
               // A top-up on a side can help only when promo + max(other boost, top-up) odds form an arb.
               const helpsOnB = invCOnB !== null && invA.plus(Decimal.min(invB, invCOnB)).lt(1);
               const helpsOnA = invCOnA !== null && invB.plus(Decimal.min(invA, invCOnA)).lt(1);
@@ -316,8 +362,8 @@ export function findPairCandidates<P extends RankablePromo>(
                   new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)),
                 ),
               ];
-              if (quoteOnB) bounds.push(new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)));
-              if (quoteOnA) bounds.push(new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)));
+              if (quoteOnB || marketsOnB.length > 0) bounds.push(new LocalDecimal(boostA.maxStake).times(legA.oddsDecimal.minus(1)));
+              if (quoteOnA || marketsOnA.length > 0) bounds.push(new LocalDecimal(boostB.maxStake).times(legB.oddsDecimal.minus(1)));
               bound = Decimal.max(...bounds);
             } else {
               const winIfBonus = new LocalDecimal(legB.bonus!.bonusAmount).times(legB.oddsDecimal.minus(1));
@@ -326,6 +372,7 @@ export function findPairCandidates<P extends RankablePromo>(
             if (bound.lte(singleSum)) continue;
 
             let result: PairResult | null;
+            let marketWinner: { fill: MarketFill; quote: SelectionQuote; side: "A" | "B" } | null = null;
             try {
               result =
                 kind === "boost_boost"
@@ -339,6 +386,50 @@ export function findPairCandidates<P extends RankablePromo>(
                       opts.precision,
                     )
                   : solveBoostBonusPair(boostA, legB.bonus!, opts.precision);
+
+              // D-02: a market top-up replaces the book top-up / plain pair only when
+              // its after-fee profit is strictly greater.
+              if (kind === "boost_boost" && (marketsOnA.length > 0 || marketsOnB.length > 0)) {
+                const venues = [...new Set([...marketsOnA, ...marketsOnB].map((m) => m.quote.bookKey))].sort();
+                for (const venue of venues) {
+                  const onA = marketsOnA.find((m) => m.quote.bookKey === venue) ?? null;
+                  const onB = marketsOnB.find((m) => m.quote.bookKey === venue) ?? null;
+                  const mr = solveBoostBoostPairWithMarketTopUp({
+                    legA: boostA,
+                    legB: legB.boost!,
+                    marketOnA: onA?.leg ?? null,
+                    marketOnB: onB?.leg ?? null,
+                    precision: opts.precision,
+                  });
+                  if (!mr) continue;
+                  const current: PairResult | null = result;
+                  if (current !== null && !mr.guaranteedProfit.gt(current.guaranteedProfit)) continue;
+                  marketWinner = {
+                    fill: mr.market,
+                    quote: (mr.topUpSide === "A" ? onA : onB)!.quote,
+                    side: mr.topUpSide,
+                  };
+                  result = {
+                    legA: mr.legA,
+                    legB: mr.legB,
+                    totalStaked: mr.totalStaked,
+                    netIfAWins: mr.netIfAWins,
+                    netIfBWins: mr.netIfBWins,
+                    guaranteedProfit: mr.guaranteedProfit,
+                    roiPct: mr.roiPct,
+                    topUp: {
+                      side: mr.topUpSide,
+                      leg: {
+                        stake: mr.market.outlay,
+                        payout: new Decimal(mr.market.contracts),
+                        oddsDecimal: new Decimal(mr.market.contracts).dividedBy(mr.market.outlay),
+                        priceSource: "quote",
+                        capBound: null,
+                      },
+                    },
+                  };
+                }
+              }
             } catch (err) {
               if (err instanceof RangeError) {
                 console.warn(`pairPromos: pair ${pa.id}/${pb.id} raised RangeError: ${err.message}`);
@@ -361,7 +452,15 @@ export function findPairCandidates<P extends RankablePromo>(
               baseOddsAAmerican: legA.baseOddsAmerican,
               baseOddsBAmerican: legB.baseOddsAmerican,
               result,
-              topUp: topUpOf(result, legA, legB, quoteOnA, quoteOnB),
+              topUp: marketWinner
+                ? {
+                    side: marketWinner.side,
+                    selection: marketWinner.side === "A" ? legA.selection : legB.selection,
+                    bookKey: marketWinner.fill.venueKey,
+                    oddsAmerican: marketWinner.quote.oddsAmerican,
+                  }
+                : topUpOf(result, legA, legB, quoteOnA, quoteOnB),
+              topUpMarket: marketWinner ? marketWinner.fill : null,
               separateProfitA: singleA,
               separateProfitB: singleB,
               gain: result.guaranteedProfit.minus(singleSum),
