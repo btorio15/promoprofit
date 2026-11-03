@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
 status: executing
 stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-11-03T06:26:42.509Z"
-last_activity: 2026-11-03 -- Phase 12 planning complete
+last_updated: "2026-11-03T06:27:08.075Z"
+last_activity: 2026-11-03 -- Phase 12 execution started
 progress:
   total_phases: 6
   completed_phases: 1
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 9 — No-Sweat Promos in the Feed
+**Current focus:** Phase 12 — add-kalshi-and-polymarket-as-hedge-venues
 
 ## Current Position
 
-Phase: 9 of 11 (No-Sweat Promos in the Feed)
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-11-03 -- Phase 12 planning complete
+Phase: 12 (add-kalshi-and-polymarket-as-hedge-venues) — EXECUTING
+Plan: 1 of 16
+Status: Executing Phase 12
+Last activity: 2026-11-03 -- Phase 12 execution started
 
 ## Performance Metrics
 
