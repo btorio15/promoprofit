@@ -37,6 +37,15 @@ describe("buildDailyGains available (D-08)", () => {
 
 describe("buildDailyGains extracted (D-10, D-04)", () => {
   const base = { memberRows: [], graphStartDay: "2026-10-04", today: "2026-10-06" };
+  it("a market-hedged completion (hedgeMarket snapshot) adds its stored profitExtracted (MKT-08)", () => {
+    const completion = {
+      completedAt: new Date("2026-10-05T05:30:00Z"),
+      profitExtracted: "28.00",
+      snapshot: { row: { hedgeMarket: { venueKey: "kalshi" as const, venueName: "Kalshi", side: "yes" as const, contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32", americanDisplay: -156, liquidity: { kind: "price_may_move" as const }, settlementNote: "Settles on the official result." } } },
+    };
+    const days = buildDailyGains({ ...base, completions: [completion] });
+    expect(days[0].extracted).toBe("28.00");
+  });
   it("buckets by Denver day (MDT)", () => {
     const days = buildDailyGains({
       ...base,

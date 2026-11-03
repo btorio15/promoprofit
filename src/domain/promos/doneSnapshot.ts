@@ -1,6 +1,7 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
+import { MarketLegDTOSchema } from "@/domain/market/legDto";
 import { PROMO_TYPES, type PromoType } from "./types";
 import { promoTitle } from "./promoRowDto";
 import { DonePairSnapshotSchema, isPairMemberSnapshot, toDonePairDTO, type DonePairDTO } from "./pairSnapshot";
@@ -46,6 +47,7 @@ const SnapshotRowSchema = z.object({
     selectionLabel: z.string(),
     oddsAmerican: z.number(),
   }),
+  hedgeMarket: MarketLegDTOSchema.nullable().optional(),
   promoStake: z.string(),
   hedgeStake: z.string(),
   totalStaked: z.string(),

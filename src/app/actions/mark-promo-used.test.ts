@@ -164,6 +164,26 @@ describe("markPromoUsedAction (mark done; T-igk-01, T-igk-02)", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 
+  it("market-hedged row stores hedgeMarket and profitExtracted equals the row's guaranteed profit", async () => {
+    const marketRow = {
+      ...hedgeRow,
+      hedge: { bookKey: "kalshi", bookName: "Kalshi", selectionLabel: "Home", oddsAmerican: -156 },
+      hedgeMarket: { venueKey: "kalshi" as const, venueName: "Kalshi", side: "yes" as const, contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32", americanDisplay: -156, liquidity: { kind: "price_may_move" as const }, settlementNote: "Settles on the official result." },
+      hedgeStake: "26.32",
+      hedgePayout: "42.00",
+      guaranteedProfit: "28.00",
+    } as PromoRowDTO;
+    mockComputeMemberPromoState.mockResolvedValue({ ...hedgeState, row: marketRow });
+
+    const result = await markPromoUsedAction({ ...validInput, expectedGuaranteedProfit: "28.00" });
+
+    expect(result).toEqual({ status: "ok", profitExtracted: "28.00" });
+    const args = mockMarkPromoDone.mock.calls[0][0];
+    expect(args.profitExtracted).toBe("28.00");
+    expect(args.snapshot.row.hedgeMarket).toMatchObject({ contracts: 42, priceCents: 61, outlay: "26.32" });
+    expect(args.snapshot.row.guaranteedProfit).toBe(args.profitExtracted);
+  });
+
   it("rejects with odds_changed when the displayed profit no longer matches", async () => {
     mockComputeMemberPromoState.mockResolvedValue(hedgeState);
 
