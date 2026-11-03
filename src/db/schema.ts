@@ -451,6 +451,49 @@ export const userBookCaps = pgTable(
 );
 
 /**
+ * Phase 9 (FEED-05): a member's tracked no-sweat promo, kept separate from
+ * promo_completions so totals only ever see settled rows (dated at settle
+ * time). state is 'tracking' or 'awaiting_refund'; snapshot is the versioned
+ * server-built Track snapshot (src/domain/promos/noSweatSnapshot.ts).
+ */
+export const trackedNoSweats = pgTable(
+  "tracked_no_sweats",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    promoId: integer("promo_id")
+      .notNull()
+      .references(() => promos.id, { onDelete: "cascade" }),
+    /** 'tracking' | 'awaiting_refund' */
+    state: text("state").notNull(),
+    trackedAt: timestamp("tracked_at", { withTimezone: true }).notNull(),
+    /** null | 'lost' */
+    outcome: text("outcome"),
+    outcomeAt: timestamp("outcome_at", { withTimezone: true }),
+    correction: jsonb("correction"),
+    snapshot: jsonb("snapshot").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.promoId] })],
+);
+
+/**
+ * Phase 9 (D-21): a member's Low-profile settings (odds cap, main lines only,
+ * whole-dollar stakes). One row per member; no row means the defaults.
+ */
+export const userLowProfileSettings = pgTable("user_low_profile_settings", {
+  userId: integer("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  oddsCapEnabled: boolean("odds_cap_enabled").notNull().default(true),
+  oddsCapAmerican: integer("odds_cap_american").notNull().default(300),
+  mainLinesOnly: boolean("main_lines_only").notNull().default(false),
+  naturalStakes: boolean("natural_stakes").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+
+/**
  * quick-260927-n12 (owner decision 3): the best guaranteed profit observed
  * for a promo on a given America/Denver calendar day, recorded by getPromos
  * on every Promos-tab load (never by the scraper -- see get-promos.ts's
