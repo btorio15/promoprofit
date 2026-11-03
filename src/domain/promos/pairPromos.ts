@@ -243,13 +243,15 @@ function marketQuotesOf(quotes: SelectionQuote[], opts: RankOptions): MarketSide
 }
 
 /**
- * Lower bound on a market contract's cost per $1 payout: price plus the
- * UNROUNDED fee (the real fee only rounds up or to the cent), so it is a valid
- * optimistic value for pruning.
+ * Lower bound on a market contract's cost per $1 payout, an optimistic value
+ * for pruning. A ceil-rounded fee never falls below its unrounded value, so
+ * price plus the unrounded fee is safe there. A half-even fee can round below
+ * it, so those venues count the price alone (same bound as solveMarketHedge).
  */
 function marketInverse(leg: MarketLeg): Decimal {
   const p = new LocalDecimal(leg.priceCents).dividedBy(100);
   const cfg = VENUE_FEES[leg.venueKey];
+  if (cfg.rounding !== "ceil_cent") return p;
   const fee = new LocalDecimal(cfg.coefficient).times(cfg.multiplier).times(p).times(new LocalDecimal(1).minus(p));
   return p.plus(fee);
 }
