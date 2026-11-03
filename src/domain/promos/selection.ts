@@ -35,6 +35,8 @@ export interface ResolvedSelection {
   oppositePoint: number | null;
   promoSideQuotes: SelectionQuote[];
   oppositeSideQuotes: SelectionQuote[];
+  /** True when this spread line exists only as the book's alternate spread (Phase 9, D-23). */
+  fromAlternate?: boolean;
 }
 
 function resolveMoneyline(event: OddsEvent, sel: PromoSelection): ResolvedSelection | null {
@@ -309,6 +311,8 @@ export function enumerateScopeSelections(
   const allIds = new Set<string>([...moneylineById.keys(), ...extendedById.keys()]);
 
   const results: ResolvedSelection[] = [];
+  // Alt-only spread home points, keyed `${eventId}|${Math.round(homePoint*2)}`.
+  const altOnlyKeys = new Set<string>();
 
   for (const eventId of allIds) {
     const descriptor = extendedById.get(eventId) ?? moneylineById.get(eventId);
@@ -343,7 +347,9 @@ export function enumerateScopeSelections(
         for (const p of collectSpreadHomePoints(extEvent)) homePoints.set(Math.round(p * 2), p);
         if (opts.altSpreadBookKey) {
           for (const p of collectAltSpreadHomePoints(extEvent, opts.altSpreadBookKey)) {
-            homePoints.set(Math.round(p * 2), p);
+            const key = Math.round(p * 2);
+            if (!homePoints.has(key)) altOnlyKeys.add(`${eventId}|${key}`);
+            homePoints.set(key, p);
           }
         }
         for (const homePoint of homePoints.values()) {
@@ -367,7 +373,13 @@ export function enumerateScopeSelections(
             : events.extended
           : events.extended;
       const resolved = resolveSelection(sourceEvents, candidate);
-      if (resolved) results.push(resolved);
+      if (resolved) {
+        if (candidate.marketType === "spread" && candidate.line !== null) {
+          const homePoint = candidate.side === "home" ? candidate.line : -candidate.line;
+          if (altOnlyKeys.has(`${eventId}|${Math.round(homePoint * 2)}`)) resolved.fromAlternate = true;
+        }
+        results.push(resolved);
+      }
     }
   }
 

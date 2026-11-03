@@ -70,7 +70,7 @@ export function yourCapFor(promo: PresentablePromo): YourCapDTO | undefined {
   };
 }
 
-function attributionLineFor(promo: PresentablePromo): string | null {
+export function attributionLineFor(promo: Pick<PresentablePromo, "attribution">): string | null {
   if (promo.attribution.length === 0) return null;
   return promo.attribution.map((a) => `${a.verb} ${a.displayName}`).join(" · ");
 }
