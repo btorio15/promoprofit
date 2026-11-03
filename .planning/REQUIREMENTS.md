@@ -41,6 +41,19 @@
 - [ ] **BOOKS-05**: Every new scraper fails soft: a block page or empty result never expires live promos (expire only after two consecutive empty runs), and a zero-result run is logged as a warning
 - [ ] **BOOKS-06**: Each new scraper is proven by one real run on GitHub Actions before it counts as done
 
+### Prediction-market hedge venues (Phase 12)
+
+- [ ] **MKT-01**: Kalshi and Polymarket US are configured as hedge-only venues (venue type on the book config), off by default, in a "Prediction markets" group in My Books (onboarding + Settings) with the CFTC/availability note; a selection still needs at least one sportsbook
+- [ ] **MKT-02**: A refresh adds the venues to the existing `bookmakers=` list at zero extra credits (<= 10 keys = 1 bucket); the credit estimate uses the same list and stays accurate
+- [ ] **MKT-03**: Venue quotes are parsed from Odds API h2h (or Kalshi's public API) into a whole-cent contract price (1..99c), validated with Zod
+- [ ] **MKT-04**: Per-venue taker fee functions in decimal.js match the published schedules (Kalshi `ceil(0.07*C*P*(1-P))` to the cent; Polymarket US `0.0695*C*p*(1-p)` banker's-rounded), with pinned coefficients
+- [ ] **MKT-05**: Whole-contract solvers (bonus bet, profit boost, arbitrage, paired-promo top-up) pick the contract count that maximizes worst-case profit after fees, proven against brute-force oracles
+- [ ] **MKT-06**: The bonus-bet finder, promo hedges, paired promos and Arbitrage tab use a market hedge only when its after-fee profit strictly beats every sportsbook hedge, and only for members who ticked that market; every opportunity keeps one sportsbook leg
+- [ ] **MKT-07**: Market legs show the contract instruction with native and American price ("buy 42 YES @ 61¢ ($25.62 + $0.70 fee) ≈ −156"), a "Settlement differs" badge explaining the case, and "Price may move" or (with Kalshi depth) "Thin market: only N contracts at P¢"
+- [ ] **MKT-08**: Done snapshots store contracts, price, fee and outlay so recorded profit matches; market-hedged profit counts the same in Dashboard totals, the graph lines and Statistics
+- [ ] **MKT-09**: PROJECT.md (Constraints, Out of Scope, Key Decisions) and REQUIREMENTS.md reflect the scope reversal and the venues actually shipped
+- [ ] **MKT-10**: Only venues proven priceable (live Odds API probe on the free key, or Kalshi's public API) and usable from Colorado ship
+
 ## Future Requirements
 
 - Manual entry of intro offers for books that can't be scraped (owner or member)
@@ -48,6 +61,9 @@
 - Floor (0% conversion) and sensitivity range on no-sweat estimates
 - Separate "Estimated" feed section (owner chose inline with an "est." label)
 - Pairing a sign-up offer with a promo at a held book; profit-per-day ranking; FanCash valuation; no-sweat in tandem pairs
+- Market (Kalshi/Polymarket) hedges for no-sweat promos — Phase 12 D-01 follow-up, after Phase 9 lands
+- Low-profile settings apply only to sportsbook legs on market-hedged rows — Phase 12 D-16 follow-up, after Phase 9 lands
+- Walking the order book for blended pricing on large market hedges
 
 ## Out of Scope
 
@@ -57,6 +73,9 @@
 - Authenticated scraping / storing sportsbook credentials
 - Treating no-sweat profit as guaranteed in totals, graph or Statistics
 - Fanatics FanCash valued as bonus bets
+- Market-vs-market arbs (Kalshi vs Polymarket, YES/NO within a venue) — every opportunity keeps one sportsbook leg
+- Other exchanges (Prophet X, Novig, Sporttrade) as hedge venues
+- Promos or intro offers from prediction markets
 
 ## Traceability
 
@@ -84,5 +103,15 @@
 | BOOKS-04 | Phase 11 | Pending |
 | BOOKS-05 | Phase 11 | Pending |
 | BOOKS-06 | Phase 11 | Pending |
+| MKT-01 | Phase 12 | Pending |
+| MKT-02 | Phase 12 | Pending |
+| MKT-03 | Phase 12 | Pending |
+| MKT-04 | Phase 12 | Pending |
+| MKT-05 | Phase 12 | Pending |
+| MKT-06 | Phase 12 | Pending |
+| MKT-07 | Phase 12 | Pending |
+| MKT-08 | Phase 12 | Pending |
+| MKT-09 | Phase 12 | Pending |
+| MKT-10 | Phase 12 | Pending |
 
-**Coverage:** 22/22 v1.2 requirements mapped
+**Coverage:** 32/32 v1.2 requirements mapped

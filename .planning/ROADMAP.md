@@ -38,7 +38,7 @@
 - [ ] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals
 - [ ] **Phase 10: Ranked Intro Offers** - Sign-up offers screen ranks intro offers by estimated value with exact qualifying bet, hedge and whole-plan view
 - [ ] **Phase 11: More Sportsbooks** - Hard Rock Bet and BetMGM scrapers (plus time-boxed checks of the other Colorado books) feed promos and intro offers automatically
-- [ ] **Phase 12: Add Kalshi and Polymarket as hedge venues** - Prediction markets as hedge venues alongside regulated sportsbooks
+- [ ] **Phase 12: Add Kalshi and Polymarket as hedge venues** - Opt-in Kalshi / Polymarket US hedges across the finder, promo hedges, paired promos and Arbitrage tab, whole contracts with exact fees, zero extra credits
 
 ## Phase Details
 
@@ -158,11 +158,62 @@ Plans:
 
 ### Phase 12: Add Kalshi and Polymarket as hedge venues
 
-**Goal**: [To be planned]
-**Depends on**: Phase 11
-**Requirements**: TBD
+**Goal**: Members who opt in can hedge their sportsbook promos and arbs on Kalshi or Polymarket US whenever that is more profitable after fees, with the exact whole-contract buy shown to the cent, at no extra Odds API cost.
+**Depends on**: Phase 1 (bonus-bet finder and hedge engine), Phase 01.1 (Arbitrage tab, cached odds and refresh), Phase 2 (My Books), Phase 4 (promo hedges and paired promos), Phase 8 (latest shipped engine baseline). Does NOT depend on Phase 9, 10 or 11; no plan uses Phase 9 code.
+**Requirements**: MKT-01, MKT-02, MKT-03, MKT-04, MKT-05, MKT-06, MKT-07, MKT-08, MKT-09, MKT-10
+**Success Criteria** (what must be TRUE):
 
-**Plans**: TBD (run /gsd-plan-phase 12 to break down)
+  1. A member can tick Kalshi and/or Polymarket in a "Prediction markets" group in My Books (off by default, CFTC availability note, at least one sportsbook still required); members who don't tick one never see a market hedge.
+  2. A refresh costs the same credits as before (venues fit in the existing bookmaker bucket) and the credit meter estimate is unchanged.
+  3. The bonus-bet finder, promo hedges, paired promos and Arbitrage tab suggest a market hedge exactly when its after-fee profit beats every sportsbook hedge; every opportunity keeps one sportsbook leg.
+  4. A market leg reads like "buy 42 YES @ 61¢ ($25.62 + $0.70 fee) ≈ −156", with a "Settlement differs" badge and either "Price may move" or (from Kalshi depth) "Thin market: only N contracts at P¢"; fees and profit are correct to the cent and proven against brute-force oracles.
+  5. Marking a market-hedged promo or pair done records the same profit the card showed, and it counts in Dashboard totals, the graph and Statistics.
+  6. Only venues proven priceable by the live probe (or Kalshi's public API) and usable from Colorado ship; PROJECT.md records the outcome.
+
+**Deferred follow-ups (wire in after Phase 9 lands):**
+- D-01 no-sweat part: market hedges for no-sweat promos (Phase 8 solver / Phase 9 feed). Phase 12 keeps no-sweat hedging sportsbook-only.
+- D-16: Low-profile settings (Phase 9 D-20..D-23) apply only to sportsbook legs on market-hedged rows.
+
+**Plans**: 16 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 12-01-PLAN.md — Venue-aware book config (kalshi, polymarket_us), refresh list + credit estimate at zero extra cost, member hedge-book scoping, saveBooks needs a sportsbook (MKT-01, MKT-02)
+- [ ] 12-02-PLAN.md — TDD venue fees (Kalshi ceil, Polymarket banker's) + MarketLeg / cents <-> American conversions (MKT-03, MKT-04)
+- [ ] 12-03-PLAN.md — Wave 0 live probe (owner-approved, ~1 credit) of Odds API us_ex venues + Kalshi public API recon; branch A/B/C/D recorded in 12-PROBE.md (MKT-10)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 12-04-PLAN.md — TDD whole-contract solvers for bonus bet, profit boost and arb with brute-force oracle (MKT-05)
+- [ ] 12-05-PLAN.md — TDD boost + boost pair with a market top-up leg, oracle-proven (MKT-05)
+- [ ] 12-06-PLAN.md — MarketLegDTO, leg text, settlement notes and shared MarketLeg component (MKT-07)
+- [ ] 12-07-PLAN.md — My Books "Prediction markets" group with availability note (MKT-01)
+- [ ] 12-08-PLAN.md — Apply probe branch to venue config; finalize PROJECT/REQUIREMENTS (MKT-09, MKT-10)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
+- [ ] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
+- [ ] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 12-12-PLAN.md — Promo row DTO, Done snapshot (Zod only, no migration) and promo row UI (MKT-07, MKT-08)
+- [ ] 12-13-PLAN.md — Paired promos market top-up with fee-aware prune (MKT-06)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 12-15-PLAN.md — Kalshi public API client, game matcher and pure depth/price enrichment (MKT-07, MKT-10)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 12-16-PLAN.md — Kalshi depth in the refresh (Thin market), quote plumbing, owner end-to-end check (MKT-06, MKT-07, MKT-10)
+**UI hint**: yes
 
 ## Progress
 
@@ -174,7 +225,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 0/0 | Not started | - |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 0/16 | Planned | - |
 
 ## Backlog
 
