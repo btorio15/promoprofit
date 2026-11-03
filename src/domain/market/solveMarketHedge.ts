@@ -11,6 +11,8 @@ import {
   type WinningsCap,
 } from "../hedge/profitBoost";
 import type { BonusBetHedgeResult } from "../hedge/bonusBet";
+import type { ArbResult, StakePrecision } from "../hedge/arbMath";
+import { VENUE_FEES } from "@/config/venues";
 import { marketCost, toMarketFill, type MarketFill, type MarketLeg } from "./marketLeg";
 
 export type { MarketFill } from "./marketLeg";
@@ -254,4 +256,113 @@ export function solveProfitBoostMarketHedge(
     capBound,
     market: best.solved.fill,
   };
+}
+
+/**
+ * Arbitrage between one sportsbook leg and one market leg (D-04). The book
+ * stake B (a multiple of the precision unit) and the whole contract count N
+ * are chosen jointly under the cap B + outlay(N) <= totalStake, where the
+ * outlay includes the exact fee (D-11).
+ *
+ *   profit(B, N) = min(floorCents(B x d), N) - B - outlay(N)
+ *
+ * N-major exact scan: for a fixed N the best B is the smallest unit-multiple
+ * whose floored payout reaches N (below it profit is nondecreasing in B,
+ * above it strictly decreasing), so only that B , the unit below it and the
+ * largest stake the cap allows need evaluating. The scan is bounded by totalStake / price, and an O(1)
+ * necessary condition (1/d + p + fee-rate < 1) rejects non-arbs up front
+ * (T-12-13): profit <= N x (1 - 1/d - p/100 - r) because payout(B) - B is at
+ * most N(1 - 1/d) when payout is capped at N.
+ */
+export function solveArbWithMarket(i: {
+  totalStake: Decimal;
+  bookOddsAmerican: number;
+  leg: MarketLeg;
+  precision: StakePrecision;
+}): { result: ArbResult; bookStake: Decimal; market: MarketFill } | null {
+  const totalStake = new LocalDecimal(i.totalStake);
+  if (totalStake.lte(0)) {
+    throw new RangeError(`totalStake must be greater than 0, got ${totalStake.toString()}`);
+  }
+  if (totalStake.decimalPlaces() > 2) {
+    throw new RangeError(
+      `totalStake must have at most 2 decimal places, got ${totalStake.toString()}`,
+    );
+  }
+
+  const d = new LocalDecimal(americanToDecimal(i.bookOddsAmerican));
+  const priceFrac = new LocalDecimal(i.leg.priceCents).dividedBy(100);
+  const invD = new LocalDecimal(1).dividedBy(d);
+
+  // Kalshi's fee is ceil(coef x N x p(1-p)) >= the unrounded rate; Polymarket
+  // US rounds half-even and can round below it, so it contributes 0 here.
+  const fee = VENUE_FEES[i.leg.venueKey];
+  const feeRate =
+    fee.rounding === "ceil_cent"
+      ? new LocalDecimal(fee.coefficient)
+          .times(fee.multiplier)
+          .times(priceFrac)
+          .times(new LocalDecimal(1).minus(priceFrac))
+      : new LocalDecimal(0);
+  if (!invD.plus(priceFrac).plus(feeRate).lt(1)) return null;
+
+  const dp = i.precision === "whole" ? 0 : 2;
+  const unit = dp === 0 ? new LocalDecimal(1) : new LocalDecimal("0.01");
+
+  let best: {
+    n: number;
+    bookStake: Decimal;
+    payoutBook: Decimal;
+    fill: MarketFill;
+    totalLaid: Decimal;
+    profit: Decimal;
+  } | null = null;
+
+  for (let n = 1; ; n++) {
+    if (i.leg.availableContracts !== null && n > i.leg.availableContracts) break;
+    const { outlay } = marketCost(i.leg, n);
+    // The book stake is at least one unit, and outlay is nondecreasing in n.
+    if (outlay.plus(unit).gt(totalStake)) break;
+
+    const bStar = clean(new LocalDecimal(n).dividedBy(d)).toDecimalPlaces(dp, Decimal.ROUND_UP);
+    const first = bStar.lt(unit) ? unit : bStar;
+    // The cap can bind below B*: the largest affordable unit-multiple is
+    // then the best stake (profit is nondecreasing in B up to B*).
+    const bMax = totalStake.minus(outlay).toDecimalPlaces(dp, Decimal.ROUND_DOWN);
+    for (const bookStake of [first, first.minus(unit), bMax]) {
+      if (bookStake.lt(unit)) continue;
+      const totalLaid = bookStake.plus(outlay);
+      if (totalLaid.gt(totalStake)) continue;
+      const payoutBook = floorCents(bookStake.times(d));
+      const profit = Decimal.min(payoutBook, new LocalDecimal(n)).minus(totalLaid);
+      const isBetter =
+        best === null ||
+        profit.gt(best.profit) ||
+        (profit.equals(best.profit) && totalLaid.lt(best.totalLaid)) ||
+        (profit.equals(best.profit) && totalLaid.equals(best.totalLaid) && n < best.n);
+      if (isBetter) {
+        best = { n, bookStake, payoutBook, fill: toMarketFill(i.leg, n), totalLaid, profit };
+      }
+    }
+  }
+
+  if (best === null || best.profit.lte(0)) return null;
+
+  const payoutMarket = new LocalDecimal(best.n);
+  const result: ArbResult = {
+    impliedSum: clean(invD.plus(best.fill.outlay.dividedBy(best.n))),
+    stakeA: best.bookStake,
+    stakeB: best.fill.outlay,
+    totalLaid: best.totalLaid,
+    payoutA: best.payoutBook,
+    payoutB: payoutMarket,
+    netIfAWins: best.payoutBook.minus(best.totalLaid),
+    netIfBWins: payoutMarket.minus(best.totalLaid),
+    guaranteedProfit: best.profit,
+    returnPct: best.profit
+      .dividedBy(best.totalLaid)
+      .times(100)
+      .toDecimalPlaces(2, Decimal.ROUND_DOWN),
+  };
+  return { result, bookStake: best.bookStake, market: best.fill };
 }
