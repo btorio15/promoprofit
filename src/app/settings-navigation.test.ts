@@ -22,6 +22,11 @@ vi.mock("@/components/AccountMenu", () => ({
 }));
 vi.mock("@/db/bookCaps", () => ({ getMemberBookCaps: async () => new Map<string, string>() }));
 vi.mock("@/components/settings/SettingsBookCapsForm", () => ({ SettingsBookCapsForm: () => null }));
+vi.mock("@/db/lowProfile", async () => {
+  const { DEFAULT_LOW_PROFILE } = await import("@/domain/promos/lowProfile");
+  return { getMemberLowProfile: async () => DEFAULT_LOW_PROFILE };
+});
+vi.mock("@/components/settings/SettingsLowProfileForm", () => ({ SettingsLowProfileForm: () => null }));
 vi.mock("@/components/settings/SettingsBooksForm", () => ({
   SettingsBooksForm: () => null,
 }));
