@@ -1,20 +1,15 @@
 "use client";
 
-import { ChevronDown, TriangleAlert } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { NoSweatRowDTO } from "@/domain/promos/noSweatRowDto";
 import { noSweatAriaLabel } from "@/domain/promos/noSweatRowDto";
 import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NoSweatDetails } from "./NoSweatDetails";
+import { NoSweatNoticesPopover } from "./NoSweatNoticesPopover";
 import { TrackButton } from "./TrackButton";
-import {
-  NO_SWEAT_EST_TOOLTIP,
-  estimateSecondaryLine,
-  hiddenLinesNote,
-  warningCopy,
-} from "./noSweatRowView";
+import { estimateSecondaryLine } from "./noSweatRowView";
 
 interface NoSweatRowProps {
   dto: NoSweatRowDTO;
@@ -33,7 +28,6 @@ interface NoSweatRowProps {
  * accent), an "est." badge, and an "Est. ROI" caption (D-08, D-09).
  */
 export function NoSweatRow({ dto, precision, onChanged, addedActions }: NoSweatRowProps) {
-  const hidden = hiddenLinesNote(dto.filteredOut);
   return (
     <Collapsible className="group rounded-lg border border-border bg-secondary">
       <div className="relative">
@@ -49,6 +43,11 @@ export function NoSweatRow({ dto, precision, onChanged, addedActions }: NoSweatR
             <span className="flex flex-wrap items-center gap-2 text-base">
               <Badge variant="outline">No-sweat</Badge>
               <span className="truncate">{dto.title}</span>
+              {dto.warnings.length > 0 ? (
+                <span className="size-2 shrink-0 rounded-full bg-warning" title="Low-profile warning">
+                  <span className="sr-only">Low-profile warning</span>
+                </span>
+              ) : null}
               {dto.addedByYou ? <Badge variant="outline">Added by you</Badge> : null}
             </span>
             <span className="flex flex-wrap items-center gap-2 text-base">
@@ -58,13 +57,6 @@ export function NoSweatRow({ dto, precision, onChanged, addedActions }: NoSweatR
               <Badge variant="outline">{dto.marketBadge}</Badge>
             </span>
             {dto.scopeLabel ? <span className="text-sm text-muted-foreground">Promo: {dto.scopeLabel}</span> : null}
-            {dto.warnings.map((w) => (
-              <span key={w} className="flex items-start gap-1 text-sm text-warning">
-                <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                {warningCopy(w)}
-              </span>
-            ))}
-            {hidden ? <span className="text-sm text-muted-foreground">{hidden}</span> : null}
           </div>
 
           <div className="flex min-w-0 flex-col text-base">
@@ -92,12 +84,8 @@ export function NoSweatRow({ dto, precision, onChanged, addedActions }: NoSweatR
                 {dto.estimatedProfit.startsWith("-") ? "" : "+"}
                 {formatUsd(dto.estimatedProfit)}
               </span>
-              <Tooltip>
-                <TooltipTrigger render={<Badge variant="outline" className="pointer-events-auto cursor-default" />}>
-                  est.
-                </TooltipTrigger>
-                <TooltipContent>{NO_SWEAT_EST_TOOLTIP}</TooltipContent>
-              </Tooltip>
+              <Badge variant="outline">est.</Badge>
+              <NoSweatNoticesPopover warnings={dto.warnings} filteredOut={dto.filteredOut} />
             </span>
             <span className="text-sm text-muted-foreground md:text-right">{estimateSecondaryLine(dto)}</span>
           </span>
@@ -119,7 +107,7 @@ export function NoSweatRow({ dto, precision, onChanged, addedActions }: NoSweatR
         </div>
       </div>
       <CollapsibleContent>
-        <NoSweatDetails dto={dto} precision={precision} onChanged={onChanged} addedActions={addedActions} />
+        <NoSweatDetails dto={dto} onChanged={onChanged} addedActions={addedActions} />
       </CollapsibleContent>
     </Collapsible>
   );
