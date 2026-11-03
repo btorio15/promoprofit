@@ -1,8 +1,13 @@
 import Decimal from "decimal.js";
 import { slateWindow } from "@/domain/promos/etTime";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
-import { ScrapedPromoSchema, type ScrapedPromo, type SkippedEntry } from "@/domain/promos/scraped";
-import type { CapField, PromoType } from "@/domain/promos/types";
+import {
+  ScrapedPromoSchema,
+  type ReviewReadings,
+  type ScrapedPromo,
+  type SkippedEntry,
+} from "@/domain/promos/scraped";
+import { assertNever, type CapField, type PromoType } from "@/domain/promos/types";
 import { isPlausibleTeamName, mentionsSeveralGames } from "./promoText";
 import { buildClassifyDraft, CLEAR_SKIP_REASONS, REVIEW_SKIP_REASONS } from "./reviewTriage";
 import type { GuardedReading } from "./verbatimGuard";
@@ -59,6 +64,48 @@ function readerSkipReason(reading: GuardedReading): SkippedEntry["reason"] {
   return "not_a_promo";
 }
 
+/** Maps a reader kind to the stored promo type; not_usable has none. */
+function readingPromoType(kind: GuardedReading["kind"]): PromoType | null {
+  switch (kind) {
+    case "profit_boost":
+    case "bonus_bet":
+    case "no_sweat":
+      return kind;
+    case "not_usable":
+      return null;
+    default:
+      return assertNever(kind);
+  }
+}
+
+/** The reader's headline amount: a boost percent, or a bonus/refund-cap dollar amount. */
+function readerAmount(reading: GuardedReading): string | null {
+  switch (reading.kind) {
+    case "profit_boost":
+      return reading.boostPercent;
+    case "bonus_bet":
+    case "no_sweat":
+      return reading.bonusAmount;
+    case "not_usable":
+      return null;
+    default:
+      return assertNever(reading.kind);
+  }
+}
+
+/** The pattern parser's headline amount for a candidate. */
+function candidateAmount(candidate: ScrapedPromo): string | null {
+  switch (candidate.promoType) {
+    case "profit_boost":
+      return candidate.boostPercent;
+    case "bonus_bet":
+    case "no_sweat":
+      return candidate.bonusAmount;
+    default:
+      return assertNever(candidate.promoType);
+  }
+}
+
 /** True only when both sides are non-null and differ -- one side unknown is never a disagreement. */
 function moneyDiffers(a: string | null, b: string | null): boolean {
   if (a === null || b === null) return false;
@@ -91,7 +138,8 @@ export type ReviewWhy =
   | "guard_drop"
   | "reader_not_usable"
   | "rescue_needs_review"
-  | "multi_game_scope";
+  | "multi_game_scope"
+  | "no_sweat_cash";
 
 function buildSummaryLine(why: ReviewWhy, entry: ReconcileEntry, reading: GuardedReading): string {
   const dropped = reading.droppedFields.length > 0 ? reading.droppedFields.join(", ") : "none";
@@ -102,7 +150,7 @@ function buildReviewSkip(
   entry: ReconcileEntry,
   reading: GuardedReading,
   why: ReviewWhy,
-  opts: { partial: Partial<ScrapedPromo> | null; dedupeKey?: string },
+  opts: { partial: Partial<ScrapedPromo> | null; dedupeKey?: string; reason?: SkippedEntry["reason"] },
   fallbackSourceUrl: string,
 ): SkippedEntry {
   const summary = buildSummaryLine(why, entry, reading);
@@ -114,15 +162,34 @@ function buildReviewSkip(
     entry.kind === "candidate" ? entry.candidate.sourceUrl : (entry.skip.evidence?.sourceUrl ?? fallbackSourceUrl);
   const expiresAt = entry.kind === "candidate" ? entry.candidate.expiresAt : (entry.skip.evidence?.expiresAt ?? null);
 
+  // Phase 9 (D-15): both readings as structured data for the side-by-side review card.
+  const reviewReadings: ReviewReadings = {
+    scraper:
+      entry.kind === "candidate"
+        ? {
+            promoType: entry.candidate.promoType,
+            amount: candidateAmount(entry.candidate),
+            minOddsAmerican: entry.candidate.minOddsAmerican,
+          }
+        : { promoType: null, amount: null, minOddsAmerican: null },
+    reader: {
+      kind: reading.kind,
+      amount: readerAmount(reading),
+      minOddsAmerican: reading.minOddsAmerican,
+      confidence: reading.confidence,
+      refundForm: reading.refundForm,
+    },
+  };
+
   return {
-    reason: "unrecognized",
+    reason: opts.reason ?? "unrecognized",
     externalId,
     title,
     evidence: {
       rawText,
       sourceUrl,
       expiresAt,
-      partial: opts.partial,
+      partial: { ...(opts.partial ?? {}), reviewReadings },
       ...(opts.dedupeKey !== undefined ? { dedupeKey: opts.dedupeKey } : {}),
     },
   };
@@ -198,7 +265,8 @@ function reconcileCandidate(
   const candidate = entry.candidate;
 
   if (!isUsable(reading)) {
-    if (reading.confidence === "high") {
+    // A no-sweat is never silently dropped by the reader (A-05): review at any confidence.
+    if (reading.confidence === "high" && candidate.promoType !== "no_sweat") {
       return {
         kind: "skip",
         skip: {
@@ -226,21 +294,41 @@ function reconcileCandidate(
     };
   }
 
+  // Phase 9 (A-05, T-09-22): a no-sweat vs anything-else disagreement is
+  // ALWAYS review, whatever the reader's confidence -- placed before the
+  // high-confidence reader-wins branch so a reader can never turn a no-sweat
+  // (stake-back, not guaranteed) into a bonus bet or the reverse.
+  const parserNoSweat = candidate.promoType === "no_sweat";
+  const readerNoSweat = reading.kind === "no_sweat";
+  const noSweatConflict =
+    parserNoSweat !== readerNoSweat ||
+    (parserNoSweat &&
+      readerNoSweat &&
+      (reading.refundForm === "cash" || moneyDiffers(candidate.bonusAmount, reading.bonusAmount)));
+  if (noSweatConflict) {
+    return {
+      kind: "review",
+      skip: buildReviewSkip(entry, reading, "disagreement", { partial: candidate, dedupeKey: promoDedupeKey(candidate) }, fallbackSourceUrl),
+      why: "disagreement",
+    };
+  }
+
   const disagrees =
-    (reading.kind as PromoType) !== candidate.promoType ||
+    readingPromoType(reading.kind) !== candidate.promoType ||
     moneyDiffers(candidate.boostPercent, reading.boostPercent) ||
     moneyDiffers(candidate.bonusAmount, reading.bonusAmount) ||
     moneyDiffers(candidate.maxStake, reading.maxStake) ||
     moneyDiffers(candidate.maxWinnings?.amount ?? null, reading.maxWinnings) ||
     intDiffers(candidate.minOddsAmerican, reading.minOddsAmerican);
 
-  if (disagrees && reading.confidence === "high") {
+  const readerType = readingPromoType(reading.kind);
+  if (disagrees && reading.confidence === "high" && readerType !== null) {
     const preferred: ScrapedPromo = {
       ...candidate,
-      promoType: reading.kind as PromoType,
-      boostPercent: reading.kind === "profit_boost" ? reading.boostPercent : null,
-      bonusAmount: reading.kind === "bonus_bet" ? reading.bonusAmount : null,
-      maxStake: reading.maxStake ?? candidate.maxStake,
+      promoType: readerType,
+      boostPercent: readerType === "profit_boost" ? reading.boostPercent : null,
+      bonusAmount: readerType === "bonus_bet" || readerType === "no_sweat" ? reading.bonusAmount : null,
+      maxStake: readerType === "no_sweat" ? null : (reading.maxStake ?? candidate.maxStake),
       minOddsAmerican: reading.minOddsAmerican ?? candidate.minOddsAmerican,
       maxWinnings:
         reading.maxWinnings !== null && candidate.winningsCapKind
@@ -297,7 +385,7 @@ function reconcileCandidate(
   const unparsed = new Set<CapField>(candidate.unparsedCapFields);
   let filled = false;
 
-  if (merged.maxStake === null && reading.maxStake !== null) {
+  if (merged.maxStake === null && reading.maxStake !== null && !parserNoSweat) {
     merged.maxStake = reading.maxStake;
     unparsed.delete("maxStake");
     filled = true;
@@ -372,10 +460,11 @@ function reconcileSkip(
   const draft = buildClassifyDraft(bookKey, skip, fallbackSourceUrl);
   const overlaid: ScrapedPromo = { ...draft };
 
-  overlaid.promoType = reading.kind as PromoType;
-  overlaid.boostPercent = reading.kind === "profit_boost" ? reading.boostPercent : null;
-  overlaid.bonusAmount = reading.kind === "bonus_bet" ? reading.bonusAmount : null;
-  overlaid.maxStake = reading.maxStake;
+  const readerType = readingPromoType(reading.kind) ?? draft.promoType;
+  overlaid.promoType = readerType;
+  overlaid.boostPercent = readerType === "profit_boost" ? reading.boostPercent : null;
+  overlaid.bonusAmount = readerType === "bonus_bet" || readerType === "no_sweat" ? reading.bonusAmount : null;
+  overlaid.maxStake = readerType === "no_sweat" ? null : reading.maxStake;
   overlaid.minOddsAmerican = reading.minOddsAmerican;
   if (draft.winningsCapKind) {
     overlaid.maxWinnings = reading.maxWinnings !== null ? { amount: reading.maxWinnings, kind: draft.winningsCapKind } : draft.maxWinnings;
@@ -409,12 +498,27 @@ function reconcileSkip(
   const wouldBeSportWide = overlaid.teamsText.length === 0 && overlaid.gamesText === undefined;
   const multiGameBlock = wouldBeSportWide && (mentionsSeveralGames(draft.rawText) || reading.games.length > 0);
 
+  // Phase 9 (D-17): a cash refund -- the parser's own no_sweat_cash skip or
+  // the reader's refundForm "cash" -- is never priced; it goes to review.
+  if (skip.reason === "no_sweat_cash" || (reading.kind === "no_sweat" && reading.refundForm === "cash")) {
+    return {
+      kind: "review",
+      skip: buildReviewSkip(entry, reading, "no_sweat_cash", { partial: overlaid, reason: "no_sweat_cash" }, fallbackSourceUrl),
+      why: "no_sweat_cash",
+    };
+  }
+
+  // A reader-only no-sweat rescue needs a bonus-bet refund form (T-09-24);
+  // unknown/missing refund form goes to review instead.
+  const noSweatRescueOk = reading.kind !== "no_sweat" || reading.refundForm === "bonus_bet";
+
   if (
     reading.confidence === "high" &&
     reading.droppedFields.length === 0 &&
     teamsOk &&
     sportOrTeams &&
-    !multiGameBlock
+    !multiGameBlock &&
+    noSweatRescueOk
   ) {
     const validated = ScrapedPromoSchema.safeParse(overlaid);
     if (validated.success) {
