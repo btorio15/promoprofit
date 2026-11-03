@@ -7,9 +7,10 @@ import { safeAction } from "@/lib/safeAction";
 import { resolveSaveBooksOutcome } from "./saveBooksOutcome";
 import { Button } from "@/components/ui/button";
 import { BookPicker } from "./BookPicker";
+import { hasSportsbook, type BookPickerOption } from "./bookPickerGroups";
 
 export interface OnboardingBooksFormProps {
-  books: { key: string; displayName: string }[];
+  books: BookPickerOption[];
 }
 
 /**
@@ -25,6 +26,8 @@ export function OnboardingBooksForm({ books }: OnboardingBooksFormProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const sportsbookPicked = hasSportsbook(selected, books);
 
   function handleContinue() {
     startTransition(async () => {
@@ -52,11 +55,15 @@ export function OnboardingBooksForm({ books }: OnboardingBooksFormProps) {
         }}
         disabled={isPending}
       />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : selected.size > 0 && !sportsbookPicked ? (
+        <p className="text-sm text-destructive">Select at least one sportsbook.</p>
+      ) : null}
       <Button
         type="button"
         className="h-10 w-full"
-        disabled={selected.size === 0 || isPending}
+        disabled={!sportsbookPicked || isPending}
         onClick={handleContinue}
       >
         Continue

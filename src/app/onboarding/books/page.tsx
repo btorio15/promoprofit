@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { OnboardingBooksForm } from "@/components/settings/OnboardingBooksForm";
-import { getBonusBooks, getUsableUserBooks } from "@/db/queries";
+import { getMyBookOptions, getUsableUserBooks } from "@/db/queries";
 import { requireUser } from "@/lib/session";
 
 // Unauthenticated visitors never reach this page (requireUser redirects to
@@ -26,7 +26,7 @@ export default async function OnboardingBooksPage() {
     redirect("/");
   }
 
-  const books = await getBonusBooks();
+  const books = await getMyBookOptions();
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
