@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mapActivePromoRow } from "@/db/promos";
 import type { AddPromoInput } from "./addedPromoInput";
 import { buildAddedPromoRow, etExpiryInstant, type AddedPromoInsert } from "./buildAddedPromo";
-import { ScrapedPromoSchema } from "./scraped";
+import { ScrapedPromoSchema, type ScrapedPromo } from "./scraped";
 import { PROMO_MARKET_TYPES } from "./types";
 
 const NOW = new Date("2026-10-01T16:00:00.000Z");
@@ -298,5 +298,48 @@ describe("buildAddedPromoRow (profit boost)", () => {
       { marketType: "spread", line: -3.5, side: "away", selectionText: "LA Rams" },
     );
     expect(result.ok && result.values.line).toBe(-3.5);
+  });
+});
+
+describe("buildAddedPromoRow (no-sweat)", () => {
+  const noSweat: AddPromoInput = {
+    promoType: "no_sweat",
+    bookKey: "betmgm",
+    refundCap: "25",
+    expires: { etDate: "2026-10-04", etTime: "23:59" },
+    scope: null,
+  };
+
+  function buildNoSweat(over: Partial<AddPromoInput> = {}) {
+    return buildAddedPromoRow({
+      input: { ...noSweat, ...over } as AddPromoInput,
+      scope: { kind: "any" },
+      bookName: "BetMGM",
+      now: NOW,
+      expiresAt: EXPIRES,
+      userId: 7,
+      dedupeKey: "added:test",
+    });
+  }
+
+  it("stores the refund cap as bonus_amount with all three markets and no boost fields", () => {
+    const result = buildNoSweat();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const v = result.values;
+    expect(v.promoType).toBe("no_sweat");
+    expect(v.bonusAmount).toBe("25.00");
+    expect(v.boostPercent).toBeNull();
+    expect(v.maxStake).toBeNull();
+    expect(v.expiresAt).toEqual(EXPIRES);
+    expect((v.parsed as ScrapedPromo).eligibleMarketTypes).toEqual([...PROMO_MARKET_TYPES]);
+    expect((v.parsed as ScrapedPromo).title).toBe("No-sweat up to $25.00");
+  });
+
+  it("limits the qualifying bet type when a market is given", () => {
+    const result = buildNoSweat({ marketType: "spread" } as Partial<AddPromoInput>);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect((result.values.parsed as ScrapedPromo).eligibleMarketTypes).toEqual(["spread"]);
   });
 });

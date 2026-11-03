@@ -185,3 +185,39 @@ describe("games scope input", () => {
     ).toContain("Pick the exact bet this price is for.");
   });
 });
+
+describe("AddPromoInputSchema (no-sweat)", () => {
+  const base = {
+    promoType: "no_sweat",
+    bookKey: "betmgm",
+    refundCap: "25",
+    expires: { etDate: "2026-10-04", etTime: "23:59" },
+    scope: null,
+  };
+
+  it("accepts whole-dollar and whole-cent caps, optional min odds and market limit", () => {
+    expect(AddPromoInputSchema.safeParse(base).success).toBe(true);
+    expect(AddPromoInputSchema.safeParse({ ...base, refundCap: "25.00" }).success).toBe(true);
+    expect(
+      AddPromoInputSchema.safeParse({ ...base, minOddsAmerican: -200, marketType: "moneyline" }).success,
+    ).toBe(true);
+    for (const marketType of ["spread", "total"]) {
+      expect(AddPromoInputSchema.safeParse({ ...base, marketType }).success).toBe(true);
+    }
+  });
+
+  it.each(["25.005", "0", "-5", "10000.01", "abc", ""])("rejects refund cap %s", (refundCap) => {
+    const r = AddPromoInputSchema.safeParse({ ...base, refundCap });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues[0].message).toBe("Enter a whole-cent amount, like 25 or 25.00.");
+    }
+  });
+
+  it("rejects an extra userId key, a missing expiry and an unknown market", () => {
+    expect(AddPromoInputSchema.safeParse({ ...base, userId: 9 }).success).toBe(false);
+    const { expires: _expires, ...noExpiry } = base;
+    expect(AddPromoInputSchema.safeParse(noExpiry).success).toBe(false);
+    expect(AddPromoInputSchema.safeParse({ ...base, marketType: "prop" }).success).toBe(false);
+  });
+});
