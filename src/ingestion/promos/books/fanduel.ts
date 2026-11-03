@@ -21,6 +21,7 @@ import {
   parseMinOdds,
 } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
+import { classifyNoSweat, parseNoSweatRefundCap } from "@/ingestion/promos/noSweat";
 import { sportFromTags, sportFromText } from "@/ingestion/promos/sportHints";
 import {
   isPlausibleTeamName,
@@ -174,6 +175,9 @@ interface FanduelClassification {
   candidate: boolean;
   reason: SkipReason | null;
   sportKey: string | null;
+  /** Phase 9 (FEED-01, A-07): "no_sweat" when the entry refunds a losing stake
+   * as a bonus bet; it bypasses the boost/bonus token gate below. */
+  kind: "profit_boost" | "no_sweat";
 }
 
 function classifyFanduelEntry(entry: {
@@ -185,16 +189,25 @@ function classifyFanduelEntry(entry: {
   const tags = entry.tags ?? [];
 
   if (tags.some((t) => FANDUEL_ACQ_TAG_RE.test(t)) || FANDUEL_NEW_CUSTOMER_TEXT_RE.test(combined)) {
-    return { candidate: false, reason: "new_customer", sportKey: null };
+    return { candidate: false, reason: "new_customer", sportKey: null, kind: "profit_boost" };
   }
 
   const exclusion = classifyExclusion({ title: entry.title, text: entry.name });
   if (exclusion !== null) {
-    return { candidate: false, reason: exclusion, sportKey: null };
+    return { candidate: false, reason: exclusion, sportKey: null, kind: "profit_boost" };
   }
 
-  if (!BOOST_OR_BONUS_TOKEN_RE.test(combined)) {
-    return { candidate: false, reason: "not_a_promo", sportKey: null };
+  // Phase 9 (FEED-01, A-07): an existing-customer no-sweat names neither a
+  // boost nor a "bonus bet" token in its list text, so it must be detected
+  // before the token gate or it is dropped as not_a_promo.
+  const noSweat = classifyNoSweat({ title: entry.title, text: entry.name });
+  if (noSweat.kind === "cash_refund") {
+    return { candidate: false, reason: "no_sweat_cash", sportKey: null, kind: "no_sweat" };
+  }
+  const isNoSweat = noSweat.kind === "bonus_bet_refund";
+
+  if (!isNoSweat && !BOOST_OR_BONUS_TOKEN_RE.test(combined)) {
+    return { candidate: false, reason: "not_a_promo", sportKey: null, kind: "profit_boost" };
   }
 
   let sport = sportFromTags(tags);
@@ -203,13 +216,13 @@ function classifyFanduelEntry(entry: {
   }
 
   if (sport.kind === "unsupported") {
-    return { candidate: false, reason: "unsupported_sport", sportKey: null };
+    return { candidate: false, reason: "unsupported_sport", sportKey: null, kind: isNoSweat ? "no_sweat" : "profit_boost" };
   }
   if (sport.kind !== "supported") {
-    return { candidate: false, reason: "unrecognized", sportKey: null };
+    return { candidate: false, reason: "unrecognized", sportKey: null, kind: isNoSweat ? "no_sweat" : "profit_boost" };
   }
 
-  return { candidate: true, reason: null, sportKey: sport.sportKey };
+  return { candidate: true, reason: null, sportKey: sport.sportKey, kind: isNoSweat ? "no_sweat" : "profit_boost" };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,8 +442,11 @@ function buildCandidate(params: {
   minOddsAmerican: number | null;
   unparsedCapFields: CapField[];
   finePrintNote: string | null;
+  /** Set for a no-sweat: the refund cap (bonusAmount). Boost fields stay null. */
+  noSweatCap?: string;
 }): ScrapedPromo {
   const {
+    noSweatCap,
     entry,
     title,
     text,
@@ -497,7 +513,7 @@ function buildCandidate(params: {
   return {
     bookKey: "fanduel",
     externalId: entry.promoCode,
-    promoType: "profit_boost",
+    promoType: noSweatCap !== undefined ? "no_sweat" : "profit_boost",
     title,
     rawText: truncate(text, MAX_RAW_TEXT_CHARS),
     sourceUrl,
@@ -510,13 +526,13 @@ function buildCandidate(params: {
     expiresAt,
     eligibleMarketTypes: eligibleMarketTypesFor(text),
     pinned: null,
-    boostPercent,
+    boostPercent: noSweatCap !== undefined ? null : boostPercent,
     boostedOddsAmerican: null,
     baseOddsAmerican: null,
-    bonusAmount: null,
-    maxStake,
-    maxWinnings,
-    winningsCapKind: WINNINGS_CAP_KIND,
+    bonusAmount: noSweatCap ?? null,
+    maxStake: noSweatCap !== undefined ? null : maxStake,
+    maxWinnings: noSweatCap !== undefined ? null : maxWinnings,
+    winningsCapKind: noSweatCap !== undefined ? null : WINNINGS_CAP_KIND,
     minOddsAmerican,
     unparsedCapFields,
     claimRequired: "claim_token",
@@ -586,6 +602,51 @@ function buildCandidateListOnly(entry: FanduelListEntry, sportKey: string, sourc
   });
 }
 
+type NoSweatBuild =
+  | { status: "candidate"; promo: ScrapedPromo }
+  | { status: "skip"; reason: SkipReason; evidence: SkipEvidence };
+
+/** Phase 9 (FEED-01): build a no_sweat candidate from the list entry plus its
+ * detail body when one was fetched. Cash refunds are never priced; an
+ * unreadable refund cap goes to review (the reader can rescue it). */
+function buildNoSweat(
+  entry: FanduelListEntry,
+  detail: FanduelDetailEntry | null,
+  sportKey: string,
+  listSourceUrl: string,
+): NoSweatBuild {
+  const descriptionText = detail ? htmlToText(detail.description ?? "") : "";
+  const title = detail?.title || entry.title;
+  const text = detail ? `${entry.name}\n${detail.title}\n${descriptionText}` : `${entry.title}\n${entry.name}`;
+  const sourceUrl = detail ? fanduelDetailUrl(entry.promoCode) : listSourceUrl;
+  const expiresAt = detail
+    ? (detail.combinedEndDate ?? detail.customerPromotionState?.promoStateExpiryDate ?? entry.combinedEndDate ?? null)
+    : (entry.combinedEndDate ?? null);
+  const evidence: SkipEvidence = { rawText: truncate(text, MAX_RAW_TEXT_CHARS), sourceUrl, expiresAt, partial: null };
+
+  const detection = classifyNoSweat({ title, text });
+  if (detection.kind === "cash_refund") return { status: "skip", reason: "no_sweat_cash", evidence };
+  const cap = detection.kind === "bonus_bet_refund" ? (detection.refundCap ?? parseNoSweatRefundCap(text)) : null;
+  if (cap === null) return { status: "skip", reason: "unrecognized", evidence };
+
+  const minOddsParse = parseMinOdds(text);
+  const promo = buildCandidate({
+    entry,
+    title,
+    text,
+    sourceUrl,
+    sportKey,
+    expiresAt,
+    maxStake: null,
+    maxWinnings: null,
+    minOddsAmerican: minOddsParse.status === "parsed" ? minOddsParse.value : null,
+    unparsedCapFields: minOddsParse.status === "unparsed" ? ["minOdds"] : [],
+    finePrintNote: extractFinePrintNote(detail ? descriptionText : entry.name),
+    noSweatCap: cap,
+  });
+  return { status: "candidate", promo };
+}
+
 function parse(
   input: { listBody: string; detailBodies: Readonly<Record<string, string>> },
   ctx: { now: Date; sourceUrl: string },
@@ -618,6 +679,22 @@ function parse(
 
     const detailBody = input.detailBodies[entry.promoCode];
     let promo: ScrapedPromo;
+
+    if (classification.kind === "no_sweat") {
+      const parsedDetail = detailBody !== undefined ? safeJsonParse(detailBody) : null;
+      const detailResult = parsedDetail !== null ? FanduelDetailResponseSchema.safeParse(parsedDetail) : null;
+      const built = buildNoSweat(
+        entry,
+        detailResult?.success ? detailResult.data[0] : null,
+        classification.sportKey,
+        ctx.sourceUrl,
+      );
+      if (built.status === "skip") {
+        skipped.push({ reason: built.reason, externalId: entry.promoCode, title: entry.title, evidence: built.evidence });
+        continue;
+      }
+      promo = built.promo;
+    } else
 
     if (detailBody !== undefined) {
       const parsedDetail = safeJsonParse(detailBody);

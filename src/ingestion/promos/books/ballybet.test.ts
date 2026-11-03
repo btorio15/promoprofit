@@ -40,10 +40,11 @@ describe("ballybetScraper.listRequest", () => {
 });
 
 describe("ballybetScraper.planDetails", () => {
-  it("plans exactly one detail request for the real fixture: today's Rams-Broncos boost", () => {
+  it("plans the Rams-Broncos boost first, then the Second Chance Bet no-sweat (Phase 9)", () => {
     const plans = ballybetScraper.planDetails(LIST_FIXTURE);
-    expect(plans).toHaveLength(1);
+    expect(plans).toHaveLength(2);
     expect(plans[0].entryKey).toBe(RAMS_BRONCOS_KEY);
+    expect(plans[1].entryKey).toBe("sbk-second-chance-bet-01");
     expect(plans[0].request.method).toBe("GET");
     expect(plans[0].request.url).toBe(
       `https://dx-config-service.eks00.prod.na00.aws.ballys.tech/view/${RAMS_BRONCOS_KEY}`,
@@ -145,7 +146,7 @@ describe("ballybetScraper.parse — real fixture", () => {
     expect(byTitle.get("🌟 Unlock the Ultimate VIP Experience 🌟")).toBe("not_a_promo");
     expect(byTitle.get("Bally's Profit Boost")).toBe("not_a_promo");
     expect(byTitle.get("Bally's Odds Boost")).toBe("not_a_promo");
-    expect(byTitle.get("Second Chance Bet")).toBe("not_a_promo");
+    expect(byTitle.get("Second Chance Bet")).toBe("unrecognized"); // Phase 9: no-sweat, no readable cap -> review
     expect(byTitle.get("Game In Good Hands")).toBe("not_a_promo");
 
     // Not explicitly named in the plan's behavior list, but every one still
@@ -359,5 +360,109 @@ describe("ballybetScraper.parse — multi-game promos", () => {
     expect(result.candidates).toHaveLength(0);
     expect(result.skipped[0].reason).toBe("unrecognized");
     expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
+  });
+});
+
+// Phase 9 (FEED-01, A-07). Recon decision for Bally: BUILD from the live
+// "Second Chance Bet" fixture (no dollar cap -> review). The dollar-cap and
+// cash-refund cases have no live example, so they are SYNTHETIC details.
+describe("ballybetScraper -- no-sweat path (Second Chance Bet)", () => {
+  const SECOND_CHANCE_LIST = readFixture("ballybet-promos-2026-11-03.json");
+  const SECOND_CHANCE_DETAIL = readFixture("ballybet-promo-detail-sbk-second-chance-bet-01.json");
+  const SC_KEY = "sbk-second-chance-bet-01";
+
+  function syntheticNoSweat(descHtml: string, title = "Second Chance Bet") {
+    const list = JSON.stringify({
+      sections: {
+        primaryContent: [
+          {
+            data: [
+              {
+                sys: { id: "syn-sc" },
+                type: "promotion_content_card",
+                title,
+                description: "Available on Select Days.",
+                link: { url: "/promotions/syn-second-chance" },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const detail = JSON.stringify({
+      sections: {
+        primaryContent: [
+          { componentType: "promotion_details", title, description: descHtml, terms: "" },
+        ],
+      },
+    });
+    return ballybetScraper.parse({ listBody: list, detailBodies: { "syn-second-chance": detail } }, CTX);
+  }
+
+  it("plans a detail fetch for the live 'Second Chance Bet' card", () => {
+    const plans = ballybetScraper.planDetails(SECOND_CHANCE_LIST);
+    expect(plans.map((p) => p.entryKey)).toContain(SC_KEY);
+    expect(plans.length).toBeLessThanOrEqual(6);
+  });
+
+  it("live detail ('up to 100%' of stake, no dollar cap) -> unrecognized skip with evidence, no candidate", () => {
+    const result = ballybetScraper.parse(
+      { listBody: SECOND_CHANCE_LIST, detailBodies: { [SC_KEY]: SECOND_CHANCE_DETAIL } },
+      CTX,
+    );
+    const skip = result.skipped.find((s) => s.externalId === SC_KEY);
+    expect(skip?.reason).toBe("unrecognized");
+    expect(skip?.evidence?.rawText).toContain("Second Chance Bet Token");
+    expect(result.candidates.find((c) => c.externalId === SC_KEY)).toBeUndefined();
+  });
+
+  it("list card only (no detail) -> unrecognized skip, never a candidate", () => {
+    const result = ballybetScraper.parse({ listBody: SECOND_CHANCE_LIST, detailBodies: {} }, CTX);
+    const skip = result.skipped.find((s) => s.externalId === SC_KEY);
+    expect(skip?.reason).toBe("unrecognized");
+    expect(result.candidates.find((c) => c.externalId === SC_KEY)).toBeUndefined();
+  });
+
+  it("SYNTHETIC: detail with a bonus-bet refund up to $50 -> no_sweat candidate", () => {
+    const result = syntheticNoSweat(
+      "<p>If your Qualifying Wager loses, receive a Bonus Bet Token up to $50. Minimum odds of -200 or longer.</p>",
+    );
+    expect(result.skipped).toEqual([]);
+    expect(result.candidates).toHaveLength(1);
+    const c = result.candidates[0];
+    expect(c.promoType).toBe("no_sweat");
+    expect(c.bonusAmount).toBe("50.00");
+    expect(c.boostPercent).toBeNull();
+    expect(c.maxStake).toBeNull();
+  });
+
+  it("SYNTHETIC: cash refund wording -> no_sweat_cash skip", () => {
+    const result = syntheticNoSweat("<p>If your Qualifying Wager loses, get your stake back in cash up to $50.</p>");
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("no_sweat_cash");
+  });
+
+  it("a boost title still qualifies and boosts are planned before no-sweats under the 6 cap", () => {
+    const cards = [
+      ...Array.from({ length: 3 }, (_, i) => ({
+        sys: { id: `ns-${i}` },
+        type: "promotion_content_card",
+        title: `No Sweat Bet ${i}`,
+        description: "x",
+        link: { url: `/promotions/ns-${i}` },
+      })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        sys: { id: `b-${i}` },
+        type: "promotion_content_card",
+        title: `${10 + i}% Some Team vs. Other Team Profit Boost`,
+        description: "Any Wager",
+        link: { url: `/promotions/boost-${i}` },
+      })),
+    ];
+    const plans = ballybetScraper.planDetails(
+      JSON.stringify({ sections: { primaryContent: [{ data: cards }] } }),
+    );
+    expect(plans).toHaveLength(6);
+    expect(plans.every((p) => p.entryKey.startsWith("boost-"))).toBe(true);
   });
 });
