@@ -200,8 +200,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-12-PLAN.md — Promo row DTO, Done snapshot (Zod only, no migration) and promo row UI (MKT-07, MKT-08)
-- [ ] 12-13-PLAN.md — Paired promos market top-up with fee-aware prune (MKT-06)
+- [x] 12-12-PLAN.md — Promo row DTO, Done snapshot (Zod only, no migration) and promo row UI (MKT-07, MKT-08)
+- [x] 12-13-PLAN.md — Paired promos market top-up with fee-aware prune (MKT-06)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -222,7 +222,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 9/16 | In Progress|  |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 11/16 | In Progress|  |
 
 ## Backlog
 
