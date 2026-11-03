@@ -179,8 +179,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Venue-aware book config (kalshi, polymarket_us), refresh list + credit estimate at zero extra cost, member hedge-book scoping (group/site-wide lists stay sportsbook-only), saveBooks needs a sportsbook (MKT-01, MKT-02)
-- [ ] 12-02-PLAN.md — TDD venue fees (Kalshi ceil, Polymarket banker's) + MarketLeg / cents <-> American conversions (MKT-03, MKT-04)
+- [x] 12-01-PLAN.md — Venue-aware book config (kalshi, polymarket_us), refresh list + credit estimate at zero extra cost, member hedge-book scoping (group/site-wide lists stay sportsbook-only), saveBooks needs a sportsbook (MKT-01, MKT-02)
+- [x] 12-02-PLAN.md — TDD venue fees (Kalshi ceil, Polymarket banker's) + MarketLeg / cents <-> American conversions (MKT-03, MKT-04)
 - [ ] 12-03-PLAN.md — Wave 0 live probe (owner-approved, ~1 credit) of Odds API us_ex venues + Kalshi public API recon; branch A/B/C/D recorded in 12-PROBE.md (MKT-10)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -222,7 +222,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 0/16 | Planned | - |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 2/16 | In Progress|  |
 
 ## Backlog
 
