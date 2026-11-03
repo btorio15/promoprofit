@@ -5,6 +5,8 @@ import { GUARANTEED_PROMO_TYPES, PROMO_TYPES as PROMO_TYPES_LIST, type Guarantee
 import { promoTypeLabel, type PromoTypeLabel } from "./promoTypeLabel";
 import { promoTitle } from "./promoRowDto";
 import { DonePairSnapshotSchema, isPairMemberSnapshot, toDonePairDTO, type DonePairDTO } from "./pairSnapshot";
+import { NoSweatDoneSnapshotSchema, type NoSweatDoneSnapshot, type RefundConversion } from "./noSweatSnapshot";
+import { formatAmerican, formatUsd } from "@/lib/format";
 
 export type { DonePairDTO } from "./pairSnapshot";
 
@@ -186,13 +188,47 @@ export function buildDoneSnapshot(
   };
 }
 
+export interface DoneNoSweatDTO {
+  outcome: NoSweatDoneSnapshot["outcome"];
+  outcomeLabel: "Won" | "Lost, refund converted" | "Push" | "Voided";
+  qualifyingSummary: string;
+  hedgeSummary: string;
+  refund: RefundConversion | null;
+  profitSource: NoSweatDoneSnapshot["profitSource"];
+}
+
+const OUTCOME_LABELS: Record<NoSweatDoneSnapshot["outcome"], DoneNoSweatDTO["outcomeLabel"]> = {
+  won: "Won",
+  lost: "Lost, refund converted",
+  push: "Push",
+  void: "Voided",
+};
+
+function toDoneNoSweatDTO(snap: NoSweatDoneSnapshot): DoneNoSweatDTO {
+  const t = snap.tracked;
+  const q = snap.correction
+    ? { stake: snap.correction.qualifyingStake, odds: snap.correction.qualifyingOddsAmerican }
+    : { stake: t.qualifying.stake, odds: t.qualifying.oddsAmerican };
+  const h = snap.correction
+    ? { stake: snap.correction.hedgeStake, odds: snap.correction.hedgeOddsAmerican }
+    : { stake: t.hedge.stake, odds: t.hedge.oddsAmerican };
+  return {
+    outcome: snap.outcome,
+    outcomeLabel: OUTCOME_LABELS[snap.outcome],
+    qualifyingSummary: `${formatUsd(q.stake)} on ${t.game.qualifyingSelectionLabel} at ${formatAmerican(q.odds)} (${t.qualifying.bookName})`,
+    hedgeSummary: `${formatUsd(h.stake)} on ${t.game.hedgeSelectionLabel} at ${formatAmerican(h.odds)} (${t.hedge.bookName})`,
+    refund: snap.refund,
+    profitSource: snap.profitSource,
+  };
+}
+
 /** One Done-tab row, built only from the saved snapshot (never live odds). */
 export interface DonePromoDTO {
   rowKey: string;
   promoId: number;
   /** ISO timestamp of when the member marked it done. */
   completedAt: string;
-  kind: "hedge" | "no_hedge" | "legacy" | "pair";
+  kind: "hedge" | "no_hedge" | "legacy" | "pair" | "no_sweat";
   bookName: string;
   promoTypeLabel: PromoTypeLabel;
   title: string;
@@ -203,6 +239,8 @@ export interface DonePromoDTO {
   recordedPrecision: "whole" | "cents" | null;
   /** Set only for kind "pair" (both legs, stakes and the paired profit). */
   pair: DonePairDTO | null;
+  /** Set only for kind "no_sweat" (Phase 9): how it settled, from the Track snapshot. */
+  noSweat: DoneNoSweatDTO | null;
   /** True when the member added the source promo (any source state). */
   addedByYou: boolean;
   /** Source promo state for added promos: "gone" = deleted; null = scraped promo. */
@@ -282,6 +320,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     note,
     recordedPrecision: null,
     pair: null,
+    noSweat: null,
   });
 
   if (c.snapshot === null || c.snapshot === undefined) {
@@ -303,6 +342,27 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
       note: null,
       recordedPrecision: pairParsed.data.precision,
       pair,
+      noSweat: null,
+    };
+  }
+
+  // Phase 9: a settled no-sweat (v2). Tried before the v1 parse so it never reads as v1.
+  const noSweatParsed = NoSweatDoneSnapshotSchema.safeParse(c.snapshot);
+  if (noSweatParsed.success) {
+    const snap = noSweatParsed.data;
+    return {
+      ...base,
+      kind: "no_sweat",
+      bookName: snap.tracked.promo.bookName,
+      promoTypeLabel: "No-sweat",
+      title: snap.tracked.promo.title,
+      scopeLabel: snap.tracked.promo.scopeLabel,
+      profitExtracted: c.profitExtracted,
+      row: null,
+      note: null,
+      recordedPrecision: snap.tracked.precision,
+      pair: null,
+      noSweat: toDoneNoSweatDTO(snap),
     };
   }
 
@@ -324,6 +384,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     note: snap.note,
     recordedPrecision: snap.precision,
     pair: null,
+    noSweat: null,
   };
 }
 
