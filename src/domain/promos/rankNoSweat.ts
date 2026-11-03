@@ -29,6 +29,17 @@ export interface NoSweatPromo {
   refundCap: Decimal;
   minOddsAmerican: number | null;
   scope: PromoScope;
+  /** The promo's market limit (D-14). Defaults to all three markets. */
+  eligibleMarketTypes?: readonly PromoMarketType[];
+  /** Games starting after this are never chosen (A-11). */
+  expiresAt?: Date | null;
+}
+
+/** The member's Low-profile limits as the line search sees them (D-21, D-23). */
+export interface RankLowProfile {
+  maxQualifyingOddsAmerican: number | null;
+  mainLinesOnly: boolean;
+  naturalStakes: boolean;
 }
 
 export interface NoSweatRankOptions {
@@ -42,6 +53,7 @@ export interface NoSweatRankOptions {
   hedgeBookKeys: ReadonlySet<string>;
   precision: StakePrecision;
   conversionRateFor: ConversionRateFor;
+  lowProfile?: RankLowProfile;
 }
 
 export interface NoSweatOpportunity {
@@ -56,14 +68,19 @@ export interface NoSweatOpportunity {
 }
 
 export type NoSweatRankResult =
-  | { kind: "ok"; opportunity: NoSweatOpportunity; candidatesEvaluated: number }
+  | {
+      kind: "ok";
+      opportunity: NoSweatOpportunity;
+      candidatesEvaluated: number;
+      filteredOut: number;
+    }
   | { kind: "cant_price"; reason: "no_refund_book_odds"; refundBookKey: string }
   | {
       kind: "invalid_promo";
       reason: "bad_refund_cap" | "bad_min_odds";
       promoId: string | number;
     }
-  | { kind: "no_qualifying_line"; candidatesEvaluated: number };
+  | { kind: "no_qualifying_line"; candidatesEvaluated: number; filteredOut: number };
 
 const MARKET_ORDER: Record<PromoMarketType, number> = {
   moneyline: 0,
@@ -78,13 +95,17 @@ const SIDE_ORDER: Record<PromoSide, number> = {
 };
 
 /** Sport limit as a PromoScope (D-06): null = every game; else every future game of that sport. */
-export function noSweatScope(sportKey: string | null, now: Date): PromoScope {
+export function noSweatScope(
+  sportKey: string | null,
+  now: Date,
+  expiresAt: Date | null = null,
+): PromoScope {
   if (sportKey === null) return { kind: "any" };
   return {
     kind: "sport_window",
     sportKey,
     windowStart: now,
-    windowEnd: new Date(8.64e15),
+    windowEnd: expiresAt ?? new Date(8.64e15),
   };
 }
 
@@ -189,20 +210,40 @@ export function rankNoSweat(
     promo.scope,
     {
       now: opts.now,
-      eligibleMarketTypes: ["moneyline", "spread", "total"],
+      eligibleMarketTypes: promo.eligibleMarketTypes ?? [
+        "moneyline",
+        "spread",
+        "total",
+      ],
       altSpreadBookKey: promo.bookKey,
     },
   );
 
   let best: Candidate | null = null;
   let candidatesEvaluated = 0;
+  let filteredOut = 0;
+  const lp = opts.lowProfile;
+  const capDecimal =
+    lp && lp.maxQualifyingOddsAmerican !== null
+      ? americanToDecimal(lp.maxQualifyingOddsAmerican)
+      : null;
+  const expiryMs = promo.expiresAt ? promo.expiresAt.getTime() : null;
 
   for (const selection of selections) {
+    if (expiryMs !== null && selection.commenceTime.getTime() > expiryMs) continue;
     const qualifying = selection.promoSideQuotes.find(
       (q) => q.bookKey === promo.bookKey,
     );
     if (!qualifying) continue;
     if (!meetsMinOdds(qualifying, promo.minOddsAmerican)) continue;
+    if (lp?.mainLinesOnly && selection.fromAlternate) {
+      filteredOut++;
+      continue;
+    }
+    if (capDecimal && americanToDecimal(qualifying.oddsAmerican).gt(capDecimal)) {
+      filteredOut++;
+      continue;
+    }
     const hedge = bestHedgeQuote(
       selection.oppositeSideQuotes,
       opts.hedgeBookKeys,
@@ -217,7 +258,7 @@ export function rankNoSweat(
         refundValue: conversion.profit,
         qualifyingOddsAmerican: qualifying.oddsAmerican,
         hedgeOddsAmerican: hedge.oddsAmerican,
-        precision: opts.precision,
+        precision: lp?.naturalStakes ? "whole" : opts.precision,
       });
     } catch (err) {
       if (err instanceof RangeError) {
@@ -234,11 +275,12 @@ export function rankNoSweat(
     if (isBetterNoSweat(candidate, best)) best = candidate;
   }
 
-  if (!best) return { kind: "no_qualifying_line", candidatesEvaluated };
+  if (!best) return { kind: "no_qualifying_line", candidatesEvaluated, filteredOut };
 
   return {
     kind: "ok",
     candidatesEvaluated,
+    filteredOut,
     opportunity: {
       promoId: promo.id,
       selection: best.selection,

@@ -225,7 +225,11 @@ describe("rankNoSweat", () => {
       ],
     });
     const r = rankNoSweat(promo, opts({ moneylineEvents: [g] }));
-    expect(r).toEqual({ kind: "no_qualifying_line", candidatesEvaluated: 0 });
+    expect(r).toEqual({
+      kind: "no_qualifying_line",
+      candidatesEvaluated: 0,
+      filteredOut: 0,
+    });
   });
 
   describe("invalid promo fields return a typed result instead of throwing", () => {
@@ -717,5 +721,206 @@ describe("rankNoSweat search", () => {
     if (r.kind !== "ok") return;
     expect(r.opportunity.hedge.bookKey).toBe("hardrockbet");
     expect(r.opportunity.sameBook).toBe(true);
+  });
+});
+
+describe("rankNoSweat Low-profile limits, market limit and expiry (Phase 9)", () => {
+  const lp = (over: Partial<NonNullable<NoSweatRankOptions["lowProfile"]>> = {}) => ({
+    maxQualifyingOddsAmerican: null,
+    mainLinesOnly: false,
+    naturalStakes: false,
+    ...over,
+  });
+  const cap = { ...promo, minOddsAmerican: null };
+  const longAndShort = [
+    moneylineEvent({
+      id: "long",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: 450, awayPrice: -600 },
+        { bookKey: "draftkings", homePrice: -700, awayPrice: 500 },
+      ],
+    }),
+    moneylineEvent({
+      id: "short",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: 250, awayPrice: -300 },
+        { bookKey: "draftkings", homePrice: -330, awayPrice: 280 },
+      ],
+    }),
+  ];
+
+  it("cap null picks the longest-odds winner; cap 300 skips +450 and counts it", () => {
+    const free = rankNoSweat(
+      cap,
+      opts({ moneylineEvents: longAndShort, lowProfile: lp() }),
+    );
+    const capped = rankNoSweat(
+      cap,
+      opts({
+        moneylineEvents: longAndShort,
+        lowProfile: lp({ maxQualifyingOddsAmerican: 300 }),
+      }),
+    );
+    expect(free.kind).toBe("ok");
+    expect(capped.kind).toBe("ok");
+    if (free.kind !== "ok" || capped.kind !== "ok") return;
+    expect(free.filteredOut).toBe(0);
+    expect(capped.filteredOut).toBeGreaterThan(0);
+    expect(
+      americanToDecimal(capped.opportunity.qualifying.oddsAmerican).lte(
+        americanToDecimal(300),
+      ),
+    ).toBe(true);
+  });
+
+  it("allows -150 under a +300 cap (decimal compare, not raw ints)", () => {
+    const g = moneylineEvent({
+      id: "fav",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: -150, awayPrice: 130 },
+        { bookKey: "draftkings", homePrice: -160, awayPrice: 140 },
+      ],
+    });
+    const r = rankNoSweat(
+      cap,
+      opts({
+        moneylineEvents: [g],
+        lowProfile: lp({ maxQualifyingOddsAmerican: 300 }),
+      }),
+    );
+    expect(r.kind).toBe("ok");
+    if (r.kind === "ok") expect(r.filteredOut).toBe(0);
+  });
+
+  it("every line filtered gives no_qualifying_line with filteredOut > 0", () => {
+    const g = moneylineEvent({
+      id: "all-long",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: 450, awayPrice: 400 },
+        { bookKey: "draftkings", homePrice: 420, awayPrice: 410 },
+      ],
+    });
+    const r = rankNoSweat(
+      cap,
+      opts({
+        moneylineEvents: [g],
+        lowProfile: lp({ maxQualifyingOddsAmerican: 300 }),
+      }),
+    );
+    expect(r.kind).toBe("no_qualifying_line");
+    if (r.kind === "no_qualifying_line") expect(r.filteredOut).toBeGreaterThan(0);
+  });
+
+  it("naturalStakes forces whole-dollar hedge stakes under cents precision", () => {
+    const r = rankNoSweat(
+      promo,
+      opts({
+        moneylineEvents: [hardRockGame],
+        lowProfile: lp({ naturalStakes: true }),
+      }),
+    );
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(r.opportunity.solution.hedgeStake.decimalPlaces()).toBe(0);
+    expect(r.opportunity.solution.hedgeStake.toFixed(2)).toBe("1.00");
+  });
+
+  function altEvent(): OddsEvent {
+    const home = "Home alt";
+    const away = "Away alt";
+    const mk = (book: string, main: [number, number], alt: [number, number]) => ({
+      key: book,
+      title: book,
+      markets: [
+        {
+          key: "spreads",
+          outcomes: [
+            { name: home, price: main[0], point: -3.5 },
+            { name: away, price: main[1], point: 3.5 },
+          ],
+        },
+        {
+          key: "alternate_spreads",
+          outcomes: [
+            { name: home, price: alt[0], point: -9.5 },
+            { name: away, price: alt[1], point: 9.5 },
+          ],
+        },
+      ],
+    });
+    return {
+      id: "alt",
+      sport_key: "americanfootball_nfl",
+      sport_title: "NFL",
+      commence_time: plusHours(24),
+      home_team: home,
+      away_team: away,
+      bookmakers: [
+        mk("hardrockbet", [-110, -110], [250, -300]),
+        mk("draftkings", [-110, -110], [-290, 240]),
+      ],
+    };
+  }
+
+  it("mainLinesOnly skips alternate-only spreads; off allows them with fromAlternate", () => {
+    const onlyAlt = { ...cap, eligibleMarketTypes: ["spread"] as const };
+    const on = rankNoSweat(
+      onlyAlt,
+      opts({
+        moneylineEvents: [],
+        extendedEvents: [altEvent()],
+        lowProfile: lp({ mainLinesOnly: true }),
+      }),
+    );
+    expect(on.kind).toBe("ok");
+    if (on.kind !== "ok") return;
+    expect(on.opportunity.selection.fromAlternate).toBeFalsy();
+    expect(on.filteredOut).toBeGreaterThan(0);
+
+    const off = rankNoSweat(
+      onlyAlt,
+      opts({
+        moneylineEvents: [],
+        extendedEvents: [altEvent()],
+        lowProfile: lp({ mainLinesOnly: false }),
+      }),
+    );
+    expect(off.kind).toBe("ok");
+    if (off.kind !== "ok") return;
+    expect(off.filteredOut).toBe(0);
+    expect(off.opportunity.selection.fromAlternate).toBe(true);
+  });
+
+  it("eligibleMarketTypes [moneyline] never picks a spread or total", () => {
+    const mixed = spreadsTotalsEvent({
+      id: "mix",
+      quotes: [
+        { bookKey: "hardrockbet", spreadHome: 300, spreadAway: 300, over: 300, under: 300 },
+        { bookKey: "draftkings", spreadHome: 300, spreadAway: 300, over: 300, under: 300 },
+      ],
+    });
+    const r = rankNoSweat(
+      { ...cap, eligibleMarketTypes: ["moneyline"] },
+      opts({ moneylineEvents: [hardRockGame], extendedEvents: [mixed] }),
+    );
+    expect(r.kind).toBe("ok");
+    if (r.kind === "ok") expect(r.opportunity.selection.marketType).toBe("moneyline");
+  });
+
+  it("noSweatScope uses expiresAt as windowEnd; null keeps the far future; null sport stays any", () => {
+    const exp = new Date("2026-10-01T00:00:00Z");
+    const s = noSweatScope("americanfootball_nfl", NOW, exp);
+    expect(s.kind === "sport_window" && s.windowEnd).toEqual(exp);
+    const open = noSweatScope("americanfootball_nfl", NOW, null);
+    expect(open.kind === "sport_window" && open.windowEnd).toEqual(new Date(8.64e15));
+    expect(noSweatScope(null, NOW, exp)).toEqual({ kind: "any" });
+  });
+
+  it("never chooses a game that starts after expiresAt, whatever the scope", () => {
+    const r = rankNoSweat(
+      { ...cap, expiresAt: new Date(NOW.getTime() + 12 * 3600 * 1000) },
+      opts({ moneylineEvents: [hardRockGame] }), // starts +24h
+    );
+    expect(r.kind).toBe("no_qualifying_line");
   });
 });
