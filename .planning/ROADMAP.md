@@ -128,7 +128,7 @@ Plans:
 
 **Goal**: Members can open Sign-up offers and see which new-book intro offers are worth the most, with the exact bets to place.
 **Depends on**: Phase 8, Phase 9
-**Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04, INTRO-05, INTRO-06, INTRO-07
+**Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04, INTRO-05, INTRO-06, INTRO-07, INTRO-08, INTRO-09, INTRO-10
 **Success Criteria** (what must be TRUE):
 
   1. The Sign-up offers screen lists intro offers at books the member doesn't have, ranked by estimated value, best first.
@@ -136,6 +136,8 @@ Plans:
   3. "Bet & get bonus bets" offers are valued correctly for win-only vs win-or-lose, with each installment's expiry and each installment valued at the live conversion rate; "No-sweat first bet" offers are valued with the no-sweat solver.
   4. Each offer has a whole-plan view: place the qualifying bet and hedge, then each bonus bet as it arrives, with a link to the bonus-bet finder to convert it.
   5. Offers whose terms can't be read in full are marked "terms incomplete" and ranked lower; offers at books with no odds show the headline only under a "can't price" note, never invented odds.
+  6. The Opportunities page has a separate "Best intro offers" section with the top-ranked intro offers; intro offers never appear in or sort with the promos list (including hand-entered ones), and the full ranked list stays on Sign-up offers.
+  7. Intro-offer profit is not counted in the Dashboard profit graph.
 
 **Plans**: TBD
 **UI hint**: yes
