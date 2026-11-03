@@ -1,7 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRequireUser, mockExpire, mockDelete, mockRevalidatePath, mockGetOwn, mockUpdateOwn, mockPrepare } =
-  vi.hoisted(() => ({
+const {
+  mockRequireUser,
+  mockExpire,
+  mockDelete,
+  mockRevalidatePath,
+  mockGetOwn,
+  mockUpdateOwn,
+  mockPrepare,
+  mockTracked,
+} = vi.hoisted(() => ({
+  mockTracked: vi.fn(),
   mockGetOwn: vi.fn(),
   mockUpdateOwn: vi.fn(),
   mockPrepare: vi.fn(),
@@ -18,6 +27,7 @@ vi.mock("@/db/addedPromos", () => ({
   getOwnActiveAddedPromo: mockGetOwn,
   updateOwnAddedPromo: mockUpdateOwn,
 }));
+vi.mock("@/db/noSweatGuard", () => ({ isNoSweatTrackedOrDone: mockTracked }));
 vi.mock("@/db/addedPromoPipeline", () => ({ prepareAddedPromoValues: mockPrepare }));
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }));
 
@@ -36,6 +46,19 @@ describe.each(cases)("%s", (_name, action, dbFn) => {
     mockExpire.mockReset().mockResolvedValue(true);
     mockDelete.mockReset().mockResolvedValue(true);
     mockRevalidatePath.mockReset();
+    mockTracked.mockReset().mockResolvedValue(false);
+  });
+
+  it("refuses a no-sweat the member is tracking or finished, and writes nothing", async () => {
+    mockTracked.mockResolvedValue(true);
+    const r = await action({ promoId: 5 });
+    expect(r).toEqual({
+      status: "invalid",
+      fieldErrors: { form: ["This one is already being tracked. Stop tracking it first."] },
+    });
+    expect(mockTracked).toHaveBeenCalledWith(7, 5);
+    expect(dbFn).not.toHaveBeenCalled();
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 
   it("rejects before any db work when requireUser rejects", async () => {
@@ -81,6 +104,18 @@ describe("editPromo", () => {
     mockUpdateOwn.mockReset().mockResolvedValue(true);
     mockPrepare.mockReset().mockResolvedValue({ ok: true, values });
     mockRevalidatePath.mockReset();
+    mockTracked.mockReset().mockResolvedValue(false);
+  });
+
+  it("refuses to edit a no-sweat the member is tracking or finished", async () => {
+    mockTracked.mockResolvedValue(true);
+    const r = await editPromo({ promoId: 5, promo });
+    expect(r).toEqual({
+      status: "invalid",
+      fieldErrors: { form: ["This one is already being tracked. Stop tracking it first."] },
+    });
+    expect(mockPrepare).not.toHaveBeenCalled();
+    expect(mockUpdateOwn).not.toHaveBeenCalled();
   });
 
   it("rejects before any db work when requireUser rejects", async () => {

@@ -5,6 +5,8 @@ import { activePromoWhere } from "./promos";
 import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
 import type { AddedPromoEditValues } from "@/domain/promos/addedPromoInput";
 import { ScopeGuessSchema } from "@/domain/promos/scope";
+import { ScrapedPromoSchema } from "@/domain/promos/scraped";
+import { assertNever } from "@/domain/promos/types";
 
 /** Inserts one member-added promo and returns its id (D-09: live immediately, no review queue). */
 export async function insertAddedPromo(values: AddedPromoInsert): Promise<number> {
@@ -138,11 +140,37 @@ export async function getOwnActiveAddedPromo(promoId: number, userId: number): P
     .where(and(eq(promos.id, promoId), eq(promos.addedByUserId, userId), eq(promos.status, "active")))
     .limit(1);
   if (!row) return null;
+  return mapOwnPromoToEditValues(row);
+}
+
+/**
+ * Maps a stored promo row to the edit form's values. A no-sweat's refund cap
+ * is its bonus_amount and its bet-type limit lives only in the parsed payload
+ * (there is no column): one eligible market -> that market, all three -> null.
+ */
+export function mapOwnPromoToEditValues(row: typeof promos.$inferSelect): AddedPromoEditValues {
+  let refundCap: string | null = null;
+  let marketType: string | null = row.marketType;
+  switch (row.promoType) {
+    case "no_sweat": {
+      refundCap = row.bonusAmount;
+      const parsed = ScrapedPromoSchema.safeParse(row.parsed);
+      const eligible = parsed.success ? parsed.data.eligibleMarketTypes : [];
+      marketType = eligible.length === 1 ? eligible[0] : null;
+      break;
+    }
+    case "profit_boost":
+    case "bonus_bet":
+      break;
+    default:
+      return assertNever(row.promoType as never);
+  }
   return {
     promoId: row.id,
     bookKey: row.bookKey,
     promoType: row.promoType,
     bonusAmount: row.bonusAmount,
+    refundCap,
     boostPercent: row.boostPercent,
     boostedOddsAmerican: row.boostedOddsAmerican,
     maxStake: row.maxStake,
@@ -155,7 +183,7 @@ export async function getOwnActiveAddedPromo(promoId: number, userId: number): P
     sportKey: row.sportKey,
     windowStart: row.windowStart ? row.windowStart.toISOString() : null,
     windowEnd: row.windowEnd ? row.windowEnd.toISOString() : null,
-    marketType: row.marketType,
+    marketType,
     line: row.line,
     side: row.side,
     expiresAt: row.expiresAt ? row.expiresAt.toISOString() : null,

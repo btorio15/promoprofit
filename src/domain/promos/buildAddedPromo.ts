@@ -6,7 +6,8 @@ import { etDayBounds, parseEtDateTime } from "./etTime";
 import { promoTitle } from "./promoRowDto";
 import { gamesWindow, type ScopeGuess } from "./scope";
 import { ScrapedPromoSchema, type ScrapedPromo } from "./scraped";
-import { PROMO_MARKET_TYPES, type PromoMarketType, type PromoSide } from "./types";
+import { PROMO_MARKET_TYPES, assertNever, type PromoMarketType, type PromoSide } from "./types";
+import { formatUsd } from "@/lib/format";
 
 /**
  * Phase 5: pure builder from a validated member input + server-resolved scope
@@ -109,7 +110,22 @@ export function buildAddedPromoRow(args: {
   const pinned = input.promoType === "profit_boost" ? (args.pinned ?? null) : null;
 
   const minOddsAmerican = input.minOddsAmerican ?? null;
-  const bonusAmount = input.promoType === "bonus_bet" ? new Decimal(input.bonusAmount).toFixed(2) : null;
+  // A no-sweat's refund cap is stored in bonus_amount (D-19), whole cents.
+  let bonusAmount: string | null = null;
+  let eligibleMarketTypes: PromoMarketType[] = [...PROMO_MARKET_TYPES];
+  switch (input.promoType) {
+    case "bonus_bet":
+      bonusAmount = new Decimal(input.bonusAmount).toFixed(2);
+      break;
+    case "no_sweat":
+      bonusAmount = new Decimal(input.refundCap).toFixed(2);
+      if (input.marketType !== undefined) eligibleMarketTypes = [input.marketType];
+      break;
+    case "profit_boost":
+      break;
+    default:
+      return assertNever(input);
+  }
   let boostPercent: string | null = null;
   let boostedOddsAmerican: number | null = null;
   let maxStake: string | null = null;
@@ -126,12 +142,15 @@ export function buildAddedPromoRow(args: {
     }
   }
 
-  const title = promoTitle({
-    promoType: input.promoType,
-    boostPercent,
-    boostedOddsAmerican,
-    bonusAmount,
-  });
+  const title =
+    input.promoType === "no_sweat"
+      ? `No-sweat up to ${formatUsd(bonusAmount ?? "0.00")}`
+      : promoTitle({
+          promoType: input.promoType,
+          boostPercent,
+          boostedOddsAmerican,
+          bonusAmount,
+        });
 
   let scopeText: string;
   let teamsText: string[];
@@ -173,7 +192,7 @@ export function buildAddedPromoRow(args: {
     windowStart,
     windowEnd,
     expiresAt: expiresAt !== null ? expiresAt.toISOString() : null,
-    eligibleMarketTypes: pinned ? [pinned.marketType] : [...PROMO_MARKET_TYPES],
+    eligibleMarketTypes: pinned ? [pinned.marketType] : eligibleMarketTypes,
     pinned: pinned
       ? { selectionText: pinned.selectionText, marketType: pinned.marketType, line: pinned.line }
       : null,

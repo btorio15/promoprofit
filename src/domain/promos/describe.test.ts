@@ -160,3 +160,16 @@ describe("scopeGuessLabel games scope", () => {
     expect(label).toMatch(/^any of 4 NFL games, .* \(ET\)$/);
   });
 });
+
+describe("describePromo (no-sweat)", () => {
+  it("reads in plain English with the refund cap", () => {
+    const parsed = baseParsed({
+      promoType: "no_sweat",
+      boostPercent: null,
+      maxStake: null,
+      bonusAmount: "25.00",
+      scopeText: "any NBA game",
+    });
+    expect(describePromo(parsed)).toBe("No-sweat up to $25.00 · any NBA game");
+  });
+});
