@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
+import { tieRiskTooltipText } from "@/domain/market/legDto";
 import { AddedPromoActions } from "./AddedPromoActions";
 import { FlagMatchButton } from "./FlagMatchButton";
 import { MarkUsedButton } from "./MarkUsedButton";
@@ -142,7 +144,8 @@ export function PromoRow({ row, precision, onChanged, capEditable, capFieldIdPre
           <div className="flex min-w-0 flex-col text-base">
             <span className="text-sm text-muted-foreground md:hidden">Hedge</span>
             <span className="flex flex-wrap items-center gap-2">
-              {row.hedge.selectionLabel} <span className="num">{formatAmerican(row.hedge.oddsAmerican)}</span>
+              {row.hedge.selectionLabel}{" "}
+              {row.hedgeMarket ? null : <span className="num">{formatAmerican(row.hedge.oddsAmerican)}</span>}
               {row.sameBook ? (
                 <Tooltip>
                   <TooltipTrigger
@@ -165,13 +168,16 @@ export function PromoRow({ row, precision, onChanged, capEditable, capFieldIdPre
                     }
                   />
                   <TooltipContent>
-                    Regular-season NFL games can end in a tie (&lt;1% historically). A tie voids
-                    both legs: profit becomes $0, no cash loss.
+                    {tieRiskTooltipText(Boolean(row.hedgeMarket))}
                   </TooltipContent>
                 </Tooltip>
               ) : null}
             </span>
-            <span className="text-sm text-muted-foreground">{row.hedge.bookName}</span>
+            {row.hedgeMarket ? <MarketLegLine leg={row.hedgeMarket} /> : null}
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">{row.hedge.bookName}</span>
+              {row.hedgeMarket ? <MarketLegBadges leg={row.hedgeMarket} /> : null}
+            </span>
           </div>
 
           <span className="num text-xl font-semibold text-primary md:text-right">
