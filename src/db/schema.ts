@@ -623,3 +623,37 @@ export const profitSnapshots = pgTable(
     index("profit_snapshots_sport_game_idx").on(table.sportKey, table.gameAt),
   ],
 );
+
+/**
+ * One row per usable book per scheduled odds snapshot. Values a fixed $100.00
+ * bonus bet at that book's best conversion using cached odds (0 credits);
+ * hedge books are every usable Colorado book (group-level, not per member).
+ * Nulls mean no profitable conversion at that run. Recorded going forward
+ * only, never backfilled. Read by nothing yet (Phase 10 will value no-sweat
+ * refunds and intro offers from it). Migration 0019 is applied manually with
+ * owner OK.
+ */
+export const bonusConversionSnapshots = pgTable(
+  "bonus_conversion_snapshots",
+  {
+    bookKey: text("book_key")
+      .notNull()
+      .references(() => books.key),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+    denverDate: text("denver_date").notNull(),
+    denverHour: integer("denver_hour").notNull(),
+    referenceAmount: numeric("reference_amount", { precision: 10, scale: 2 }).notNull(),
+    candidateCount: integer("candidate_count").notNull(),
+    topNCount: integer("top_n_count").notNull(),
+    topProfit: numeric("top_profit", { precision: 10, scale: 2 }),
+    topPct: numeric("top_pct", { precision: 6, scale: 2 }),
+    medianTopPct: numeric("median_top_pct", { precision: 7, scale: 3 }),
+    topEventId: text("top_event_id"),
+    topSportKey: text("top_sport_key"),
+    topHedgeBookKey: text("top_hedge_book_key"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.bookKey, table.capturedAt] }),
+    index("bonus_conversion_snapshots_captured_at_idx").on(table.capturedAt),
+  ],
+);

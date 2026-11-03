@@ -134,6 +134,13 @@
       "when": 1793741110526,
       "tag": "0018_small_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793748198905,
+      "tag": "0019_bonus_conversion_snapshots",
+      "breakpoints": true
     }
   ]
 }
