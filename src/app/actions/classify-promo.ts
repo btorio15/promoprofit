@@ -9,7 +9,7 @@ import { getCachedEvents, getCachedExtendedEvents } from "@/db/queries";
 import { memberScopeInputFrom, resolveMemberScope } from "@/domain/promos/memberScope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
 import { ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
-import { PROMO_MARKET_TYPES } from "@/domain/promos/types";
+import { PROMO_MARKET_TYPES, assertNever } from "@/domain/promos/types";
 import type { ScopeGuess } from "@/domain/promos/scope";
 import type { PromoReviewResponse } from "./confirm-promo-match";
 
@@ -66,10 +66,24 @@ export async function classifyPromo(input: unknown): Promise<PromoReviewResponse
     scope = scopeResult.scope;
   }
 
-  const boostPercent = data.promoType === "profit_boost" ? new Decimal(data.boostPercent).toFixed(2) : null;
-  const bonusAmount = data.promoType === "bonus_bet" ? new Decimal(data.bonusAmount).toFixed(2) : null;
-  const maxStake =
-    data.promoType === "profit_boost" && data.maxStake !== undefined ? new Decimal(data.maxStake).toFixed(2) : null;
+  let boostPercent: string | null = null;
+  let bonusAmount: string | null = null;
+  let maxStake: string | null = null;
+  switch (data.promoType) {
+    case "profit_boost":
+      boostPercent = new Decimal(data.boostPercent).toFixed(2);
+      maxStake = data.maxStake !== undefined ? new Decimal(data.maxStake).toFixed(2) : null;
+      break;
+    case "bonus_bet":
+      bonusAmount = new Decimal(data.bonusAmount).toFixed(2);
+      break;
+    case "no_sweat":
+      // D-19: the refund cap is stored as bonus_amount.
+      bonusAmount = new Decimal(data.refundCap).toFixed(2);
+      break;
+    default:
+      return assertNever(data);
+  }
   const minOddsAmerican = data.minOddsAmerican ?? null;
 
   // T-it1-03/D-18: a member can never invent or override which winnings-cap

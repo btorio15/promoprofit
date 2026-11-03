@@ -213,6 +213,8 @@ function matchQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: [],
+    readings: null,
+    cashRefund: false,
     ...overrides,
   };
 }
@@ -240,6 +242,8 @@ function capsQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: ["maxStake", "minOdds"],
+    readings: null,
+    cashRefund: false,
     ...overrides,
   };
 }
@@ -268,6 +272,8 @@ function classifyQueueRow(overrides: Partial<QueueRow> = {}): QueueRow {
     minOddsAmerican: null,
     bonusAmount: null,
     unparsedCapFields: [],
+    readings: null,
+    cashRefund: false,
     ...overrides,
   };
 }
