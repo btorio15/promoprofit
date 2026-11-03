@@ -89,7 +89,7 @@ beforeEach(() => {
   m.markLost.mockResolvedValue(true);
   m.revert.mockResolvedValue(true);
   m.getCompletions.mockResolvedValue([]);
-  m.markDone.mockResolvedValue(undefined);
+  m.markDone.mockResolvedValue(true);
   m.updateCompletion.mockResolvedValue(undefined);
   m.buildSnapshot.mockReturnValue(snap);
   m.rankRefund.mockReturnValue([fakeOpp()]);
@@ -233,6 +233,19 @@ describe("settleNoSweatAction", () => {
     expect((await settleNoSweatAction({ promoId: 101, outcome: "won" })).status).toBe("not_found");
   });
 
+  // WR-05: a racing request inserted first; report what was actually stored.
+  it("on a lost insert race returns the stored profit, not its own", async () => {
+    m.markDone.mockResolvedValue(false);
+    m.getCompletions.mockResolvedValueOnce([]).mockResolvedValueOnce([{ promoId: 101, profitExtracted: "0.00" }]);
+    const res = await settleNoSweatAction({ promoId: 101, outcome: "won" });
+    expect(res).toEqual({ status: "ok", profitExtracted: "0.00", awaitingRefund: false });
+  });
+
+  it("on a lost insert race with no stored completion found is invalid", async () => {
+    m.markDone.mockResolvedValue(false);
+    expect(await settleNoSweatAction({ promoId: 101, outcome: "won" })).toEqual({ status: "invalid" });
+  });
+
   it("scopes every db read to the session user", async () => {
     await settleNoSweatAction({ promoId: 101, outcome: "won" });
     expect(m.getTracked).toHaveBeenCalledWith(USER_ID, 101);
@@ -255,6 +268,13 @@ describe("completeRefundNoSweatAction", () => {
     const arg = m.markDone.mock.calls[0][0];
     expect(arg).toMatchObject({ userId: USER_ID, promoId: 101, profitExtracted: "14.37" });
     expect(arg.snapshot).toMatchObject({ outcome: "lost", refund: { optionKey, profit: "35.00" } });
+  });
+
+  it("on a lost insert race returns the stored refund total (WR-05)", async () => {
+    m.markDone.mockResolvedValue(false);
+    m.getCompletions.mockResolvedValueOnce([]).mockResolvedValueOnce([{ promoId: 101, profitExtracted: "9.37" }]);
+    const res = await completeRefundNoSweatAction({ promoId: 101, optionKey, expectedRefundProfit: "35.00" });
+    expect(res).toEqual({ status: "ok", profitExtracted: "9.37" });
   });
 
   it("odds_changed for an unknown option", async () => {

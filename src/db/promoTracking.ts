@@ -52,6 +52,10 @@ export async function getPromoCompletions(userId: number) {
  * quick-260929-igk: records a member's mark-done with its server-built
  * snapshot. ON CONFLICT DO NOTHING keeps the FIRST snapshot on a double-tap
  * (idempotent); the caller's recompute already proved the promo exists.
+ *
+ * WR-05: resolves true when THIS call inserted the row, false when a
+ * completion already existed (a racing double tap / second tab), so the
+ * caller can report the stored figure instead of its own.
  */
 export async function markPromoDone(args: {
   userId: number;
@@ -59,13 +63,15 @@ export async function markPromoDone(args: {
   now: Date;
   snapshot: DonePromoSnapshot | NoSweatDoneSnapshot;
   profitExtracted: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const { userId, promoId, now, snapshot, profitExtracted } = args;
   const db = getDb();
-  await db
+  const inserted = await db
     .insert(promoCompletions)
     .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
-    .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
+    .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] })
+    .returning({ promoId: promoCompletions.promoId });
+  return inserted.length > 0;
 }
 
 /**

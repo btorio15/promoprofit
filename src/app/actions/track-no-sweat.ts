@@ -122,6 +122,18 @@ async function hasCompletion(memberId: number, promoId: number): Promise<boolean
   return completions.some((c) => c.promoId === promoId);
 }
 
+/**
+ * WR-05: when markPromoDone lost a race (another settle/refund request inserted
+ * first), the figure to report is the one actually stored, not this request's.
+ * null when no completion can be found.
+ */
+async function storedProfit(memberId: number, promoId: number): Promise<string | null> {
+  const completions = await getPromoCompletions(memberId);
+  const stored = completions.find((c) => c.promoId === promoId);
+  if (!stored || stored.profitExtracted === null) return null;
+  return new Decimal(stored.profitExtracted).toFixed(2);
+}
+
 function profitFromOverride(
   outcome: "won" | "push" | "void",
   tracked: TrackedNoSweatSnapshot,
@@ -249,9 +261,13 @@ export async function settleNoSweatAction(input: unknown): Promise<SettleRespons
       settledAt: now.toISOString(),
     };
     // D-06: the completion row is written at settle time, so it counts that day.
-    await markPromoDone({ userId: user.userId, promoId, now, snapshot, profitExtracted: result.profit });
-
+    const inserted = await markPromoDone({ userId: user.userId, promoId, now, snapshot, profitExtracted: result.profit });
     revalidatePath("/");
+    if (!inserted) {
+      const stored = await storedProfit(user.userId, promoId);
+      if (stored === null) return { status: "invalid" };
+      return { status: "ok", profitExtracted: stored, awaitingRefund: false };
+    }
     return { status: "ok", profitExtracted: result.profit, awaitingRefund: false };
   });
 }
@@ -306,9 +322,13 @@ export async function completeRefundNoSweatAction(input: unknown): Promise<Compl
       profitSource: correction ? "corrected" : "computed",
       settledAt: now.toISOString(),
     };
-    await markPromoDone({ userId: user.userId, promoId, now, snapshot: done, profitExtracted: total });
-
+    const inserted = await markPromoDone({ userId: user.userId, promoId, now, snapshot: done, profitExtracted: total });
     revalidatePath("/");
+    if (!inserted) {
+      const stored = await storedProfit(user.userId, promoId);
+      if (stored === null) return { status: "invalid" };
+      return { status: "ok", profitExtracted: stored };
+    }
     return { status: "ok", profitExtracted: total };
   });
 }
