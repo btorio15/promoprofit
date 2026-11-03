@@ -1,4 +1,4 @@
-import { COLORADO_BOOKS } from "@/config/books";
+import { COLORADO_BOOKS, groupHedgeBookKeys } from "@/config/books";
 import { getActivePromos } from "@/db/promos";
 import {
   getBonusBooks,
@@ -118,8 +118,8 @@ export async function loadMemberFeedContext({
     feedPromos,
     doneRows,
     hedgeBookKeys,
-    // Every usable book (equals getHedgeBookKeys() with no argument), for group recording.
-    everyUsableHedgeBookKeys: bonusBooks.map((b) => b.key),
+    // Site-wide / group list (sportsbooks only, same source as getHedgeBookKeys() with no argument): group recording never includes a member's markets (Phase 12, D-03).
+    everyUsableHedgeBookKeys: groupHedgeBookKeys(),
     bookNames,
     moneylineEvents,
     extendedEvents,

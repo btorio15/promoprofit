@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi, onTestFinished } from "vitest";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import type { ActivePromo } from "@/db/promos";
 import { denverDate } from "@/domain/promos/profitTotals";
+import { groupHedgeBookKeys } from "@/config/books";
 
 const {
   mockRequireUser,
@@ -346,6 +347,16 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     expect(result.emptyVariant).toBe("no-books");
   });
 
+  it("never says 'no-books' for a member with every sportsbook and no market", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: new Date(NOW_ISO) });
+    mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel", "betmgm"]);
+    memberBooksAreHedgeBooks(["draftkings", "fanduel", "betmgm"]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("nothing-profitable");
+  });
+
   it("'none-scraped' when there are no active promos", async () => {
     const result = await getOpportunities({ precision: "whole" });
     if (result.status !== "ok") throw new Error("unreachable");
@@ -585,7 +596,7 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
     const opts = mockRecordCurrentProfitObservations.mock.calls[0][1];
     expect(opts.cached.moneylineEvents).toEqual([EVENT]);
     expect(opts.cached.extendedEvents).toEqual([]);
-    expect(opts.cached.everyUsableHedgeBookKeys).toEqual(["draftkings", "fanduel", "betmgm"]);
+    expect(opts.cached.everyUsableHedgeBookKeys).toEqual(groupHedgeBookKeys());
     expect(mockGetCachedEvents).toHaveBeenCalledTimes(1);
     expect(mockGetCachedExtendedEvents).toHaveBeenCalledTimes(1);
   });
