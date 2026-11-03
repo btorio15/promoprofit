@@ -156,7 +156,7 @@ describe("oracle equality (seed 1205)", () => {
         }
       }
       expect(positives).toBeGreaterThan(100);
-    });
+    }, 120_000);
   }
 });
 

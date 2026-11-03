@@ -50,6 +50,7 @@ function legRows(input: BoostLegInput, precision: OraclePrecision, all: boolean)
     for (let c = unitC; c <= maxC; c += unitC) stakes.add(c);
   } else {
     stakes.add(maxC);
+    stakes.add(unitC);
     if (cap) {
       const kinkC = clean(kinkStake(obEff, base, cap)).times(100);
       if (kinkC.lt(maxC)) {
@@ -83,9 +84,43 @@ function profitCents(
 }
 
 /**
+ * Cross-seed rows for one gap: stakes within +/-1 unit of the largest stake
+ * whose payout is <= target (cents). Uses a bisection over lazily computed
+ * integer-cent payouts (payout is nondecreasing in stake).
+ */
+function crossRows(input: BoostLegInput, precision: OraclePrecision, targetC: number): Row[] {
+  const obEff = effectiveBoostedDecimal(input).decimal;
+  const base =
+    input.baseOddsAmerican !== null ? new Decimal(americanToDecimal(input.baseOddsAmerican)) : null;
+  const cap: WinningsCap | null = input.winningsCap
+    ? { kind: input.winningsCap.kind, amount: new Decimal(input.winningsCap.amount) }
+    : null;
+  const unitC = precision === "whole" ? 100 : 1;
+  const maxK = Math.floor(Math.floor(input.maxStake.times(100).toNumber() / unitC));
+  const payoutAtK = (k: number) =>
+    floorCents(promoPayoutRaw(new Decimal(k * unitC).dividedBy(100), obEff, base, cap))
+      .times(100)
+      .toNumber();
+  if (maxK < 1 || payoutAtK(1) > targetC) return [];
+  let lo = 1;
+  let hi = maxK;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (payoutAtK(mid) <= targetC) lo = mid;
+    else hi = mid - 1;
+  }
+  const rows: Row[] = [];
+  for (let k = Math.max(1, lo - 1); k <= Math.min(maxK, lo + 1); k += 1) {
+    rows.push({ stake: k * unitC, payout: payoutAtK(k) });
+  }
+  return rows;
+}
+
+/**
  * Candidate-stake oracle: same promo stake candidates as the solver (max stake,
- * cap kink floor/ceil), N scanned 1..ceil(N0)+10 per side. Returns the best
- * strictly positive profit in cents, or null.
+ * unit, cap kink floor/ceil, plus the N0 >= 1 cross-seeds), N scanned
+ * 1..ceil(N0)+10 per side. Returns the best strictly positive profit in
+ * cents, or null.
  */
 export function oracleMarketTopUp(
   a: BoostLegInput,
@@ -97,8 +132,16 @@ export function oracleMarketTopUp(
   const rowsA = legRows(a, precision, false);
   const rowsB = legRows(b, precision, false);
   let best: number | null = null;
-  for (const ra of rowsA) {
-    for (const rb of rowsB) {
+  const pairs: Array<[Row, Row]> = [];
+  for (const ra of rowsA) for (const rb of rowsB) pairs.push([ra, rb]);
+  for (let gap = 1; gap <= 8; gap += 1) {
+    for (const ra of rowsA) for (const rb of crossRows(b, precision, ra.payout - 100 * gap)) pairs.push([ra, rb]);
+    for (const ra of rowsA) for (const rb of crossRows(b, precision, ra.payout + 100 * gap)) pairs.push([ra, rb]);
+    for (const rb of rowsB) for (const ra of crossRows(a, precision, rb.payout - 100 * gap)) pairs.push([ra, rb]);
+    for (const rb of rowsB) for (const ra of crossRows(a, precision, rb.payout + 100 * gap)) pairs.push([ra, rb]);
+  }
+  {
+    for (const [ra, rb] of pairs) {
       const sides: Array<["A" | "B", OracleMarket | null, number]> = [
         ["B", onB, ra.payout - rb.payout],
         ["A", onA, rb.payout - ra.payout],
@@ -138,6 +181,11 @@ export function gridBruteForceMarketTopUp(
     for (let n = 1; n <= nMax; n += 1) outlays.push(outlayCents(market, n));
     for (const ra of rowsA) {
       for (const rb of rowsB) {
+        // Same domain as the solver: a top-up whose side already pays at least
+        // as much as the other (N0 < 1) is just the plain pair minus a wasted
+        // contract; the plain pair is the caller's separate candidate.
+        const gapC = side === "B" ? ra.payout - rb.payout : rb.payout - ra.payout;
+        if (gapC < 100) continue;
         for (let n = 1; n <= nMax; n += 1) {
           const total = ra.stake + rb.stake + outlays[n];
           const na = ra.payout + (side === "A" ? 100 * n : 0) - total;
