@@ -2,6 +2,18 @@ import { SPORTS } from "@/config/sports";
 import { ALT_SPREAD_EVENT_LIMIT, buildAltSpreadRequests } from "./altSpreads";
 import { isLeagueWideAltSpreadPromo } from "./leagueWideAltTargets";
 import type { RankablePromo } from "./rankPromoHedges";
+import type { PromoScope } from "./scope";
+import type { PromoMarketType } from "./types";
+
+/**
+ * Minimal shape promoRefreshSportKeys reads, shared by guaranteed promos and
+ * no-sweat promos (which carry no pin).
+ */
+export interface RefreshScopePromo {
+  eligibleMarketTypes: readonly PromoMarketType[];
+  scope: PromoScope;
+  pinned?: { eventId: string } | null;
+}
 
 /**
  * quick-261001-jbc: which sports a member's active promos need fresh odds
@@ -18,7 +30,7 @@ import type { RankablePromo } from "./rankPromoHedges";
  * contributes nothing.
  */
 export function promoRefreshSportKeys(
-  promos: readonly RankablePromo[],
+  promos: readonly RefreshScopePromo[],
   opts: { sportOfEvent?: (eventId: string) => string | undefined } = {},
 ): string[] {
   const configured = SPORTS.map((s) => s.key);

@@ -8,7 +8,7 @@ import {
   type AltSpreadEventPicker,
   type PromoRefreshOutcome,
 } from "@/ingestion/odds/refreshExtended";
-import { getActivePromos, type ActivePromo } from "@/db/promos";
+import { getActiveNoSweatPromos, getActivePromos, type ActiveNoSweatPromo, type ActivePromo } from "@/db/promos";
 import { getCachedEvents, getCachedExtendedEvents, getHedgeBookKeys, getUserBookKeys } from "@/db/queries";
 import { getPromoCompletions } from "@/db/promoTracking";
 import { pickLeagueWideAltSpreadEventIds } from "@/domain/promos/leagueWideAltTargets";
@@ -40,22 +40,27 @@ export async function refreshPromos(input: unknown): Promise<PromoRefreshOutcome
   }
 
   let feedPromos: ActivePromo[];
+  let noSweatPromos: ActiveNoSweatPromo[];
   let userBookKeys: string[];
   try {
-    const [activePromos, completions, bookKeys] = await Promise.all([
-      getActivePromos(new Date(), user.userId),
+    const now = new Date();
+    const [activePromos, activeNoSweats, completions, bookKeys] = await Promise.all([
+      getActivePromos(now, user.userId),
+      getActiveNoSweatPromos(now, user.userId),
       getPromoCompletions(user.userId),
       getUserBookKeys(user.userId),
     ]);
     const doneIds = new Set(completions.map((c) => c.promoId));
     // Same set the Promos tab ranks: active minus the member's Done promos.
     feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
+    // FEED-03/D-10: no-sweats only widen the refresh sport list (A-01: never ranked or alt-spread).
+    noSweatPromos = activeNoSweats.filter((p) => !doneIds.has(p.id));
     userBookKeys = bookKeys;
   } catch {
     return { status: "error", message: "Couldn't load your promos to refresh. Try again." };
   }
 
-  if (feedPromos.length === 0) {
+  if (feedPromos.length === 0 && noSweatPromos.length === 0) {
     return { status: "no_promos", message: NO_PROMOS_MESSAGE };
   }
 
@@ -70,7 +75,7 @@ export async function refreshPromos(input: unknown): Promise<PromoRefreshOutcome
     sportByEvent.clear();
   }
 
-  const sportKeys = promoRefreshSportKeys(feedPromos, { sportOfEvent: (id) => sportByEvent.get(id) });
+  const sportKeys = promoRefreshSportKeys([...feedPromos, ...noSweatPromos], { sportOfEvent: (id) => sportByEvent.get(id) });
   const altGameEstimate = estimatePromoAltGames(feedPromos);
 
   let altSpreads: AltSpreadRequests = NO_ALT_SPREAD_REQUESTS;
