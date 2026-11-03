@@ -5,6 +5,7 @@ import type { YourCapDTO } from "./dto";
 import type { PairCandidate } from "./pairPromos";
 import { pricesAsOfFor, type PriceAgeContext } from "./priceAge";
 import { capNoteFor, promoTitle, yourCapFor, type PresentablePromo } from "./promoRowDto";
+import { guaranteedPromoTypeLabel } from "./promoTypeLabel";
 import type { ResolvedSelection } from "./selection";
 
 /**
@@ -82,12 +83,13 @@ function toLegDTO(
   leg: PairLegResult,
   bookNames: Map<string, string>,
 ): PairLegDTO {
-  const isBoost = promo.promoType === "profit_boost";
+  const typeLabel = guaranteedPromoTypeLabel(promo.promoType);
+  const isBoost = typeLabel === "Boost";
   return {
     promoId: promo.id,
     bookKey: promo.bookKey,
     bookName: bookNames.get(promo.bookKey) ?? promo.bookKey,
-    promoTypeLabel: isBoost ? "Boost" : "Bonus bet",
+    promoTypeLabel: typeLabel,
     promoTitle: promoTitle(promo),
     selectionLabel: selectionLabel(selection.marketType, selection.sideSelection, selection.sidePoint),
     oddsAmerican,

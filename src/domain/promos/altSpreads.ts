@@ -1,7 +1,7 @@
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { isHalfPoint } from "@/domain/hedge/spreadsTotalsFilter";
 import type { PromoScope } from "./scope";
-import type { PromoMarketType, PromoSelection, PromoType } from "./types";
+import type { GuaranteedPromoType, PromoMarketType, PromoSelection } from "./types";
 
 /**
  * Alternate-spread helpers for promo games (quick 260930-gam, generalized in
@@ -40,7 +40,7 @@ export interface AltSpreadRequests {
 export const NO_ALT_SPREAD_REQUESTS: AltSpreadRequests = { pins: [], scopedEventIds: [] };
 
 export interface AltSpreadPromoInput {
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   scope: PromoScope;
   pinned: PromoSelection | null;
   eligibleMarketTypes: readonly PromoMarketType[];

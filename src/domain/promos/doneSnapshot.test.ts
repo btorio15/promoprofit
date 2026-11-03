@@ -174,6 +174,22 @@ describe("toDonePromoDTO", () => {
     expect(bare.bookName).toBe("mystery");
   });
 
+  it("legacy no_sweat completion is labelled No-sweat and never titled as a bonus bet", () => {
+    const dto = toDonePromoDTO(
+      { ...completion, snapshot: null, promoType: "no_sweat", promoBonusAmount: "50.00" },
+      names,
+    );
+    expect(dto.promoTypeLabel).toBe("No-sweat");
+    expect(dto.title).toBe("Promo #5");
+  });
+
+  it("v1 snapshot schema rejects a no_sweat promo type", () => {
+    const { snapshot } = buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx);
+    const bad = JSON.parse(JSON.stringify(snapshot));
+    bad.promo.promoType = "no_sweat";
+    expect(DonePromoSnapshotSchema.safeParse(bad).success).toBe(false);
+  });
+
   it("unreadable snapshot is legacy with the column amount", () => {
     const dto = toDonePromoDTO({ ...completion, snapshot: { version: 99 } }, names);
     expect(dto.kind).toBe("legacy");

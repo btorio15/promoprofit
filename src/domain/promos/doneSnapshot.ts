@@ -1,7 +1,8 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
-import { PROMO_TYPES, type PromoType } from "./types";
+import { GUARANTEED_PROMO_TYPES, PROMO_TYPES as PROMO_TYPES_LIST, type GuaranteedPromoType, type PromoType } from "./types";
+import { promoTypeLabel, type PromoTypeLabel } from "./promoTypeLabel";
 import { promoTitle } from "./promoRowDto";
 import { DonePairSnapshotSchema, isPairMemberSnapshot, toDonePairDTO, type DonePairDTO } from "./pairSnapshot";
 
@@ -19,7 +20,7 @@ export type { DonePairDTO } from "./pairSnapshot";
 const SnapshotRowSchema = z.object({
   rowKey: z.string(),
   promoId: z.number(),
-  promoType: z.enum(PROMO_TYPES),
+  promoType: z.enum(GUARANTEED_PROMO_TYPES),
   promoTypeLabel: z.enum(["Boost", "Bonus bet"]),
   sportLabel: z.string(),
   commenceTime: z.string(),
@@ -77,7 +78,7 @@ export const DonePromoSnapshotSchema = z.object({
     id: z.number(),
     bookKey: z.string(),
     bookName: z.string(),
-    promoType: z.enum(PROMO_TYPES),
+    promoType: z.enum(GUARANTEED_PROMO_TYPES),
     promoTypeLabel: z.enum(["Boost", "Bonus bet"]),
     title: z.string(),
     scopeLabel: z.string(),
@@ -99,7 +100,7 @@ export type DonePromoSnapshot = z.infer<typeof DonePromoSnapshotSchema>;
 export interface DonePromoTerms {
   id: number;
   bookKey: string;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   title: string;
   boostPercent: string | null;
   boostedOddsAmerican: number | null;
@@ -193,7 +194,7 @@ export interface DonePromoDTO {
   completedAt: string;
   kind: "hedge" | "no_hedge" | "legacy" | "pair";
   bookName: string;
-  promoTypeLabel: "Boost" | "Bonus bet";
+  promoTypeLabel: PromoTypeLabel;
   title: string;
   scopeLabel: string | null;
   profitExtracted: string;
@@ -233,19 +234,27 @@ function addedState(c: DoneCompletionInput): Pick<DonePromoDTO, "addedByYou" | "
   return { addedByYou: true, addedPromoStatus: status };
 }
 
+function legacyTypeLabel(t: string): PromoTypeLabel {
+  return (PROMO_TYPES_LIST as readonly string[]).includes(t) ? promoTypeLabel(t as PromoType) : "Bonus bet";
+}
+
 function legacyTitle(c: DoneCompletionInput): string {
   const parsed = c.promoParsed;
   if (parsed && typeof parsed === "object" && "title" in parsed) {
     const title = (parsed as { title: unknown }).title;
     if (typeof title === "string" && title.trim() !== "") return title;
   }
+  // A no-sweat (or unknown) type must never be titled as a bonus bet (FEED-02).
+  const guaranteedType: GuaranteedPromoType | null =
+    c.promoType === "profit_boost" ? "profit_boost" : c.promoType === "bonus_bet" ? "bonus_bet" : null;
   if (
-    c.promoBoostPercent !== undefined ||
-    c.promoBonusAmount !== undefined ||
-    c.promoBoostedOddsAmerican !== undefined
+    guaranteedType !== null &&
+    (c.promoBoostPercent !== undefined ||
+      c.promoBonusAmount !== undefined ||
+      c.promoBoostedOddsAmerican !== undefined)
   ) {
     return promoTitle({
-      promoType: c.promoType === "profit_boost" ? "profit_boost" : "bonus_bet",
+      promoType: guaranteedType,
       boostPercent: c.promoBoostPercent ?? null,
       boostedOddsAmerican: c.promoBoostedOddsAmerican ?? null,
       bonusAmount: c.promoBonusAmount ?? null,
@@ -265,7 +274,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     ...base,
     kind: "legacy",
     bookName: bookNames.get(c.promoBookKey) ?? c.promoBookKey,
-    promoTypeLabel: c.promoType === "profit_boost" ? "Boost" : "Bonus bet",
+    promoTypeLabel: legacyTypeLabel(c.promoType),
     title: legacyTitle(c),
     scopeLabel: null,
     profitExtracted,

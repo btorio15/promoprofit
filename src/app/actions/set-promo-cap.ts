@@ -42,6 +42,7 @@ export async function setPromoCapAction(input: unknown): Promise<SetPromoCapResp
   if (promo === null) {
     return { status: "not_found", message: "This promo is no longer available." };
   }
+  // no_sweat and bonus_bet have no per-promo cap (D-19).
   if (promo.promoType !== "profit_boost") {
     return { status: "invalid", message: "Only profit boosts have a max stake." };
   }

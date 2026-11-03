@@ -1,4 +1,5 @@
-import type { CapField, PromoType, ReviewReason } from "./types";
+import type { CapField, GuaranteedPromoType, PromoType, ReviewReason } from "./types";
+import type { PromoTypeLabel } from "./promoTypeLabel";
 import type { CorrectionOptions } from "./correctionOptions";
 import type { DonePromoDTO } from "./doneSnapshot";
 
@@ -53,7 +54,7 @@ export type PromosEmptyVariant = "none-scraped" | "no-active" | "no-books" | "no
 export interface PromoRowDTO {
   rowKey: string;
   promoId: number;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   promoTypeLabel: "Boost" | "Bonus bet";
   sportLabel: string;
   commenceTime: string;
@@ -125,7 +126,7 @@ export interface PromoRowDTO {
 export interface UnprofitablePromoRowDTO {
   rowKey: string;
   promoId: number;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   promoTypeLabel: "Boost" | "Bonus bet";
   bookKey: string;
   bookName: string;
@@ -188,7 +189,7 @@ export interface QueueItemDTO {
   promoId: number;
   kind: ReviewReason;
   bookName: string;
-  promoTypeLabel: "Boost" | "Bonus bet";
+  promoTypeLabel: PromoTypeLabel;
   description: string;
   bestGuessLabel: string | null;
   matchedLabel: string | null;
