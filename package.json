@@ -17,6 +17,7 @@
     "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
     "db:check": "tsx --env-file=.env.local scripts/db-check.ts",
     "promos:check": "tsx --env-file=.env.local scripts/promos-check.ts",
+    "promos:audit-no-sweat": "tsx --env-file=.env.local scripts/audit-no-sweat.ts",
     "promos:match-report": "tsx --env-file=.env.local scripts/promo-match-report.ts",
     "scrape:promos": "tsx scripts/scrape-promos.ts",
     "scrape:already-ran-today": "tsx scripts/already-ran-today.ts",
