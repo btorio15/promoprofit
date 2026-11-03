@@ -193,9 +193,9 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
-- [ ] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
-- [ ] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
+- [x] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
+- [x] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
+- [x] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
 - [ ] 12-15-PLAN.md — Kalshi public API client, game matcher and pure depth/price enrichment, not yet wired (MKT-07, MKT-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -222,7 +222,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 6/16 | In Progress|  |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 9/16 | In Progress|  |
 
 ## Backlog
 
