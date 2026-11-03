@@ -5,11 +5,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
 import { TOTALS_LOAD_ERROR, buildTotalsView } from "./dashboardTotalsView";
 
-const SHELL = "flex flex-col gap-3 rounded-lg border border-border bg-secondary p-3 sm:p-4";
+const SHELL = "deep-card flex flex-col gap-3 bg-card p-4 sm:p-6";
 
 const VALUE_CLASS = {
-  extracted: "num text-lg font-semibold text-primary",
-  available: "num text-lg font-semibold text-muted-foreground",
+  extracted: "num text-2xl font-bold text-primary sm:text-3xl",
+  available: "num text-2xl font-bold text-foreground sm:text-3xl",
   muted: "text-sm font-normal text-muted-foreground",
 } as const;
 

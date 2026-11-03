@@ -38,7 +38,8 @@ describe("settings navigation (owner-reported gap closure)", () => {
   it("AppHeader wordmark is an anchor linking to / with text MarginMind", () => {
     const markup = renderToStaticMarkup(React.createElement(AppHeader, { displayName: "Mike" }));
 
-    expect(markup).toMatch(/<a href="\/"[^>]*>MarginMind<\/a>/);
+    const homeLink = markup.match(/<a href="\/"[^>]*>([\s\S]*?)<\/a>/)?.[1];
+    expect(homeLink?.replace(/<[^>]*>/g, "")).toBe("MarginMind");
   });
 
   it("SettingsPage renders a Back to MarginMind anchor linking to /", async () => {

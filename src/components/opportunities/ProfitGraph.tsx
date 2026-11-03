@@ -23,7 +23,7 @@ import {
   type ChartPoint,
 } from "./profitGraphView";
 
-const SHELL = "flex flex-col gap-4 rounded-lg border border-border bg-secondary p-4";
+const SHELL = "deep-card flex flex-col gap-4 bg-card p-4 sm:p-6";
 const RANGES: GraphRange[] = ["7d", "30d", "all"];
 
 /**
