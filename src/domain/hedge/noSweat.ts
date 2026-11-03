@@ -3,6 +3,9 @@ import { americanToDecimal } from "./americanOdds";
 import type { StakePrecision } from "./arbMath";
 import { clean, floorCents } from "./profitBoost";
 
+/** Re-exported so settle math rounds exactly like the solver (Phase 9, D-04). */
+export { floorCents };
+
 /**
  * No-sweat (refund-as-bonus-bet) single-line solver. Self-contained: no shared
  * generic hedge function (mirrors bonusBet.ts).

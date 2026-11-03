@@ -5,7 +5,7 @@ import { usableOddsBooks } from "@/config/books";
 import { buildFixtureEvents } from "@/test/fixtures/oddsEvents";
 import { extractTwoWayMoneylines } from "./marketFilter";
 import { rankBonusBetHedges } from "./rankBonusBetHedges";
-import { makeConversionRateFor, topConversionFor } from "./conversionRate";
+import { makeConversionRateFor, rankRefundOpportunities, topConversionFor } from "./conversionRate";
 
 const now = new Date("2026-10-01T12:00:00.000Z");
 const events = buildFixtureEvents(now);
@@ -141,5 +141,45 @@ describe("makeConversionRateFor", () => {
     expect(mine).not.toBe(wide);
     expect(mine!.hedgeBookKey).not.toBe("draftkings");
     expect(fn("draftkings", new Decimal(100), new Set())).toBeNull();
+  });
+});
+
+describe("rankRefundOpportunities", () => {
+  const cases: Array<[string, string, ReadonlySet<string>]> = [
+    ["draftkings", "100", allKeys],
+    ["fanduel", "25", allKeys],
+    ["draftkings", "40", new Set([...allKeys].filter((k) => k !== "draftkings"))],
+  ];
+
+  it.each(cases)("limit 1 matches topConversionFor for %s %s", (book, amt, hedge) => {
+    const amount = new Decimal(amt);
+    const ranked = rankRefundOpportunities({ events, now, refundBookKey: book, amount, hedgeBookKeys: hedge, limit: 1 });
+    const top = topConversionFor({ events, now, refundBookKey: book, amount, hedgeBookKeys: hedge });
+    expect(ranked[0].eventId).toBe(top!.eventId);
+    expect(ranked[0].hedge.bookKey).toBe(top!.hedgeBookKey);
+    expect(ranked[0].result.guaranteedProfit.equals(top!.profit)).toBe(true);
+  });
+
+  it("returns [] and null when the refund book has no odds", () => {
+    const args = { events, now, refundBookKey: "no_such_book", amount: new Decimal(50), hedgeBookKeys: allKeys };
+    expect(rankRefundOpportunities({ ...args, limit: 1 })).toEqual([]);
+    expect(topConversionFor(args)).toBeNull();
+  });
+
+  it("limit 3 returns at most 3, best first", () => {
+    const r = rankRefundOpportunities({
+      events, now, refundBookKey: "draftkings", amount: new Decimal(100), hedgeBookKeys: allKeys, limit: 3,
+    });
+    expect(r.length).toBeLessThanOrEqual(3);
+    expect(r.length).toBeGreaterThan(0);
+    for (let i = 1; i < r.length; i++) {
+      expect(r[i - 1].result.guaranteedProfit.gte(r[i].result.guaranteedProfit)).toBe(true);
+    }
+  });
+
+  it("rejects bad amounts", () => {
+    expect(() =>
+      rankRefundOpportunities({ events, now, refundBookKey: "draftkings", amount: new Decimal("25.004"), hedgeBookKeys: allKeys, limit: 1 }),
+    ).toThrow(RangeError);
   });
 });
