@@ -72,6 +72,27 @@ describe("planNoSweatBackfill", () => {
     expect(actions[0]).toMatchObject({ kind: "expire_duplicate", id: 94, duplicateOfDedupeKey: plan.newDedupeKey });
   });
 
+  // WR-03: dedupe_key is UNIQUE across every status, and two live rows can map to one new key.
+  it("expires instead of retyping when an expired or dismissed row already holds the new key", () => {
+    const [plan] = planNoSweatBackfill([row()]);
+    if (plan.kind !== "retype") throw new Error("expected retype");
+    for (const status of ["expired", "dismissed"]) {
+      const holder = row({ id: 300, promoType: "no_sweat", status, dedupeKey: plan.newDedupeKey });
+      const actions = planNoSweatBackfill([row(), holder]);
+      expect(actions).toEqual([{ kind: "expire_duplicate", id: 94, duplicateOfDedupeKey: plan.newDedupeKey }]);
+    }
+  });
+
+  it("two live rows mapping to the same new key: the first retypes, the second expires", () => {
+    const first = row({ id: 94, status: "active", dedupeKey: "old-key-a" });
+    const second = row({ id: 95, status: "pending_review", dedupeKey: "old-key-b" });
+    const actions = planNoSweatBackfill([first, second]);
+    expect(actions).toHaveLength(2);
+    expect(actions[0].kind).toBe("retype");
+    if (actions[0].kind !== "retype") return;
+    expect(actions[1]).toEqual({ kind: "expire_duplicate", id: 95, duplicateOfDedupeKey: actions[0].newDedupeKey });
+  });
+
   it("sends cash refunds to review", () => {
     const text = "No Sweat. If your qualifying bet loses, get your stake back in cash. MAX REWARD: $10";
     const [a] = planNoSweatBackfill([row({ rawText: text }, { rawText: text })]);

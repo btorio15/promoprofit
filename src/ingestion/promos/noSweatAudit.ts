@@ -9,8 +9,11 @@ import { classifyNoSweat } from "./noSweat";
  * promo, whether it is a mis-typed no-sweat to re-type, a duplicate to expire,
  * an uncertain one for review, or a hand-added one to list only. Pure; no I/O.
  *
- * Pass ALL live rows (including ones already typed no_sweat): those are never
- * acted on, but their dedupe keys are used to detect duplicates.
+ * Pass EVERY stored row, any status (including ones already typed no_sweat or
+ * expired/dismissed): only live rows are acted on, but every row's dedupe key
+ * is used to detect duplicates -- promos.dedupe_key is UNIQUE across all
+ * statuses, so a retype onto a key an expired/dismissed row already holds
+ * would fail (WR-03).
  */
 export interface AuditRow {
   id: number;
@@ -43,7 +46,9 @@ function sameAmount(a: string | null, b: string | null): boolean {
 }
 
 export function planNoSweatBackfill(rows: AuditRow[]): BackfillAction[] {
-  const liveKeys = new Set(rows.filter((r) => LIVE_STATUSES.has(r.status)).map((r) => r.dedupeKey));
+  // WR-03: every row's key (UNIQUE across all statuses), plus each planned retype's
+  // new key as it is planned, so two rows mapping to one key never both retype.
+  const takenKeys = new Set(rows.map((r) => r.dedupeKey));
   const actions: BackfillAction[] = [];
 
   for (const row of rows) {
@@ -87,9 +92,10 @@ export function planNoSweatBackfill(rows: AuditRow[]): BackfillAction[] {
     const newParsed = result.data as ScrapedPromo;
     const newDedupeKey = promoDedupeKey(newParsed);
 
-    if (liveKeys.has(newDedupeKey)) {
+    if (takenKeys.has(newDedupeKey)) {
       actions.push({ kind: "expire_duplicate", id: row.id, duplicateOfDedupeKey: newDedupeKey });
     } else {
+      takenKeys.add(newDedupeKey);
       actions.push({ kind: "retype", id: row.id, refundCap: cap, newDedupeKey, newParsed });
     }
   }
