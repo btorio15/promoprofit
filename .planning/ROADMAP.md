@@ -112,8 +112,8 @@ Plans:
 
 **Wave 5**
 
-- [ ] 09-15-PLAN.md — no-sweat row components, Track button with risk line, risk advisory (FEED-03)
-- [ ] 09-17-PLAN.md — Settings Low-profile card, No-sweat add form, review disagreement card (FEED-03, FEED-02)
+- [x] 09-15-PLAN.md — no-sweat row components, Track button with risk line, risk advisory (FEED-03)
+- [x] 09-17-PLAN.md — Settings Low-profile card, No-sweat add form, review disagreement card (FEED-03, FEED-02)
 
 **Wave 6**
 
@@ -162,7 +162,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 16/20 | In Progress|  |
+| 9. No-Sweat Promos in the Feed | v1.2 | 18/20 | In Progress|  |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 
