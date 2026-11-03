@@ -26,9 +26,9 @@ describe("CLEAR_SKIP_REASONS / REVIEW_SKIP_REASONS", () => {
     const clear = [...CLEAR_SKIP_REASONS].sort();
     const review = [...REVIEW_SKIP_REASONS].sort();
     expect(clear).toEqual(
-      ["new_customer", "deposit", "no_sweat", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
+      ["new_customer", "deposit", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
     );
-    expect(review).toEqual(["unrecognized", "unsupported_sport", "schema_invalid"].sort());
+    expect(review).toEqual(["unrecognized", "unsupported_sport", "schema_invalid", "no_sweat_cash"].sort());
 
     const all = new Set([...clear, ...review, "not_a_promo"]);
     expect([...all].sort()).toEqual([...SKIP_REASONS].sort());
@@ -328,5 +328,40 @@ describe("NHL sport resolution (quick-260928-it1)", () => {
     );
     expect(result.candidates).toEqual([]);
     expect(result.skipped[0]?.reason).toBe("futures");
+  });
+});
+
+describe("no_sweat in review triage (Phase 9)", () => {
+  it("a no_sweat_cash skip is review-worthy", () => {
+    expect(isReviewWorthySkip(skip("no_sweat_cash"))).toBe(true);
+  });
+
+  it("buildClassifyDraft keeps a partial no_sweat and its refund cap", () => {
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("no_sweat_cash", {
+        evidence: {
+          rawText: "Get a $10 refund",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: { promoType: "no_sweat", bonusAmount: "10.00" },
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("10.00");
+    expect(draft.boostPercent).toBeNull();
+  });
+
+  it("never picks no_sweat without a partial type", () => {
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("unrecognized", {
+        evidence: { rawText: "No Sweat first bet up to $10 in bonus bets", sourceUrl: "https://x.test", expiresAt: null, partial: null },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).not.toBe("no_sweat");
   });
 });
