@@ -1,7 +1,7 @@
 ---
 phase: 09-no-sweat-promos-in-the-feed
 plan: 02
-status: partial (Task 3 pending owner approval)
+status: complete
 requirements: [FEED-05, FEED-03]
 tags: [schema, migration, drizzle, tracking, low-profile]
 key-files:
@@ -26,15 +26,15 @@ Two new tables (tracked_no_sweats, user_low_profile_settings) with migration 001
 |------|--------|--------|
 | 1. Snapshot and Low-profile domain schemas | done | c62a27b |
 | 2. Tables, migration 0018, DB modules | done | see git log (feat(09-02) tables commit) |
-| 3. [BLOCKING] Apply migration 0018 | PENDING owner approval | - |
+| 3. [BLOCKING] Apply migration 0018 | done (owner approved 2026-11-03) | - (database only) |
 
 ## Task 3 status
 
-`npm run db:migrate` was deliberately not run. The orchestrator must get the owner's OK, then apply from the main checkout and run `npm run db:check`. `git fetch origin` showed no newer drizzle migration on origin/main or origin/codex/deepbook-ui (both end at 0017), so 0018 is the next free index.
+Owner approved on 2026-11-03. The orchestrator re-ran `git fetch origin` (no newer migration on origin), then ran `npm run db:migrate` from the main checkout: migrations applied successfully. `npm run db:check` passed, and an information_schema query confirmed both `tracked_no_sweats` and `user_low_profile_settings` exist on the live Neon database.
 
 ## Deviations
 
 - Worktree base was reset to 064b92f per the startup check; node_modules was symlinked from the main checkout to run tests (untracked, not committed).
 - `npm run typecheck` reports one error, `LayoutProps` not found in src/app/layout.tsx. It is in a file this plan did not touch (likely missing generated Next types in the worktree).
 
-## Self-Check: PASSED (Tasks 1-2; vitest 33 tests pass)
+## Self-Check: PASSED (vitest 33 tests pass; migration 0018 applied and verified)

@@ -84,10 +84,10 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — no_sweat type, guaranteed-only type guard, getActivePromos excludes no-sweats, Statistics queries exclude them (FEED-02, FEED-04)
-- [ ] 09-02-PLAN.md — tracked_no_sweats + user_low_profile_settings tables (migration 0018, BLOCKING apply), snapshot and settings schemas (FEED-05)
-- [ ] 09-03-PLAN.md — classifyNoSweat detector, exclusions reorder, tighter new-customer rule (fixture sweep), Sign-up offers headline fix (FEED-01)
-- [ ] 09-04-PLAN.md — live recon of DraftKings / FanDuel / Bally promo lists, fixtures + decision note (FEED-01)
+- [x] 09-01-PLAN.md — no_sweat type, guaranteed-only type guard, getActivePromos excludes no-sweats, Statistics queries exclude them (FEED-02, FEED-04)
+- [x] 09-02-PLAN.md — tracked_no_sweats + user_low_profile_settings tables (migration 0018, BLOCKING apply), snapshot and settings schemas (FEED-05)
+- [x] 09-03-PLAN.md — classifyNoSweat detector, exclusions reorder, tighter new-customer rule (fixture sweep), Sign-up offers headline fix (FEED-01)
+- [x] 09-04-PLAN.md — live recon of DraftKings / FanDuel / Bally promo lists, fixtures + decision note (FEED-01)
 
 **Wave 2**
 
@@ -162,7 +162,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
+| 9. No-Sweat Promos in the Feed | v1.2 | 4/20 | In Progress|  |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 
