@@ -16,6 +16,8 @@ vi.mock("@/lib/session", () => ({
 vi.mock("@/db/queries", () => ({
   getUsableUserBooks: mockGetUsableUserBooks,
   getBonusBooks: mockGetBonusBooks,
+  getMyBookOptions: mockGetBonusBooks,
+  getUserMyBookKeys: () => Promise.resolve([]),
 }));
 vi.mock("@/components/AccountMenu", () => ({
   AccountMenu: () => null,
