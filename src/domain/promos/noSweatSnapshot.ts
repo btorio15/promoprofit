@@ -56,14 +56,15 @@ export const TrackedNoSweatSnapshotSchema = z.object({
   qualifying: z.object({
     bookKey: z.string(),
     bookName: z.string(),
-    oddsAmerican: z.number().int(),
+    // WR-04: a stored value inside (-100, 100) would throw in americanToDecimal.
+    oddsAmerican: americanOdds,
     stake: money,
     winnings: money,
   }),
   hedge: z.object({
     bookKey: z.string(),
     bookName: z.string(),
-    oddsAmerican: z.number().int(),
+    oddsAmerican: americanOdds,
     stake: money,
     payout: money,
   }),

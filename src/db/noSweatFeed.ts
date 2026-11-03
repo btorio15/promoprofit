@@ -75,30 +75,85 @@ export async function loadNoSweatFeed({
   now: Date;
   ctx: MemberFeedContext;
 }): Promise<NoSweatFeedResult> {
-  const [activeNoSweats, trackedRows, lowProfile] = await Promise.all([
-    getActiveNoSweatPromos(now, userId),
+  // WR-04: tracked cards are real bets with money on them, so they load
+  // independently of the ranked feed -- a failure loading or ranking promos
+  // must never hide the Tracking strip.
+  const [activeResult, trackedRows, lowProfileResult] = await Promise.all([
+    getActiveNoSweatPromos(now, userId).then(
+      (v) => ({ ok: true as const, v }),
+      (err: unknown) => ({ ok: false as const, err }),
+    ),
     getTrackedNoSweats(userId),
-    getMemberLowProfile(userId),
+    getMemberLowProfile(userId).then(
+      (v) => ({ ok: true as const, v }),
+      (err: unknown) => ({ ok: false as const, err }),
+    ),
   ]);
 
   const trackedIds = new Set(trackedRows.map((r) => r.promoId));
   const hasOdds = !(ctx.oddsFetchedAt === null && ctx.extendedOddsFetchedAt === null);
 
   // Tracked rows whose promo is already done (settled) do not show as Tracking cards.
-  const tracking = trackedRows
-    .filter((r) => !ctx.doneIds.has(r.promoId))
-    .map((r) =>
-      buildTrackedCardDTO(r, {
-        now,
-        moneylineEvents: ctx.moneylineEvents,
-        hedgeBookKeys: ctx.rankOpts.hedgeBookKeys,
-        bookNames: ctx.bookNames,
-        oddsFetchedAt: ctx.oddsFetchedAt,
-      }),
+  // Each card is built on its own so one bad stored row drops only that card (WR-04).
+  const tracking: TrackedNoSweatCardDTO[] = [];
+  for (const r of trackedRows) {
+    if (ctx.doneIds.has(r.promoId)) continue;
+    try {
+      tracking.push(
+        buildTrackedCardDTO(r, {
+          now,
+          moneylineEvents: ctx.moneylineEvents,
+          hedgeBookKeys: ctx.rankOpts.hedgeBookKeys,
+          bookNames: ctx.bookNames,
+          oddsFetchedAt: ctx.oddsFetchedAt,
+        }),
+      );
+    } catch (err) {
+      console.warn(`loadNoSweatFeed: dropping tracked card for promo ${r.promoId} (could not build it)`, err);
+    }
+  }
+
+  if (!activeResult.ok || !lowProfileResult.ok) {
+    console.error(
+      "loadNoSweatFeed: could not load no-sweat promos; showing Tracking only",
+      activeResult.ok ? null : activeResult.err,
+      lowProfileResult.ok ? null : lowProfileResult.err,
     );
+    return { rows: [], notes: [], tracking, ranked: [], trackedIds, activeCount: 0 };
+  }
+  const activeNoSweats = activeResult.v;
+  const lowProfile = lowProfileResult.v;
 
   if (!hasOdds) return { rows: [], notes: [], tracking, ranked: [], trackedIds, activeCount: activeNoSweats.length };
 
+  try {
+    return {
+      ...rankForMember({ activeNoSweats, trackedIds, precision, now, ctx, lowProfile }),
+      tracking,
+      trackedIds,
+      activeCount: activeNoSweats.length,
+    };
+  } catch (err) {
+    console.error("loadNoSweatFeed: ranking no-sweats failed; showing Tracking only", err);
+    return { rows: [], notes: [], tracking, ranked: [], trackedIds, activeCount: activeNoSweats.length };
+  }
+}
+
+function rankForMember({
+  activeNoSweats,
+  trackedIds,
+  precision,
+  now,
+  ctx,
+  lowProfile,
+}: {
+  activeNoSweats: ActiveNoSweatPromo[];
+  trackedIds: ReadonlySet<number>;
+  precision: StakePrecision;
+  now: Date;
+  ctx: MemberFeedContext;
+  lowProfile: LowProfileSettings;
+}): Pick<NoSweatFeedResult, "rows" | "notes" | "ranked"> {
   // D-16: only promos at the member's own books; done and tracked promos leave the ranked feed.
   const candidates = activeNoSweats.filter(
     (p) => ctx.userBookSet.has(p.bookKey) && !ctx.doneIds.has(p.id) && !trackedIds.has(p.id),
@@ -119,7 +174,7 @@ export async function loadNoSweatFeed({
     ),
   ];
 
-  return { rows, notes, tracking, ranked: result.ranked, trackedIds, activeCount: activeNoSweats.length };
+  return { rows, notes, ranked: result.ranked };
 }
 
 export type PriceOneNoSweatResult =

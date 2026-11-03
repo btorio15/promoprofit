@@ -23,6 +23,13 @@ describe("TrackedNoSweatSnapshotSchema", () => {
     const { commenceTime: _omit, ...game } = f.game;
     expect(TrackedNoSweatSnapshotSchema.safeParse({ ...f, game }).success).toBe(false);
   });
+  it("rejects qualifying/hedge odds inside (-100, 100) (WR-04)", () => {
+    const f = buildTrackedSnapshotFixture();
+    for (const odds of [0, 50, -99, 99]) {
+      expect(TrackedNoSweatSnapshotSchema.safeParse({ ...f, qualifying: { ...f.qualifying, oddsAmerican: odds } }).success).toBe(false);
+      expect(TrackedNoSweatSnapshotSchema.safeParse({ ...f, hedge: { ...f.hedge, oddsAmerican: odds } }).success).toBe(false);
+    }
+  });
 });
 
 describe("NoSweatCorrectionSchema", () => {

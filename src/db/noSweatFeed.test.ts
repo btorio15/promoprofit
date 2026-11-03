@@ -149,4 +149,41 @@ describe("loadNoSweatFeed", () => {
     expect(out.notes).toEqual([]);
     expect(out.tracking.map((t) => t.promoId)).toEqual([7]);
   });
+
+  // WR-04: tracking cards are real bets; they must survive one bad row or a ranker failure.
+  it("drops only the tracked card that cannot be built, keeping the rest", async () => {
+    const bad = tracked(8);
+    bad.snapshot.hedge.oddsAmerican = 50; // inside (-100, 100): americanToDecimal throws
+    mockTracked.mockResolvedValue([tracked(7), bad, tracked(9)]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const out = await loadNoSweatFeed({ userId: 1, precision: "whole", now: NOW, ctx: ctxWith() });
+    expect(out.tracking.map((t) => t.promoId)).toEqual([7, 9]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("keeps the Tracking strip when ranking throws", async () => {
+    mockActive.mockResolvedValue([promo(1)]);
+    mockTracked.mockResolvedValue([tracked(7)]);
+    mockMakeRate.mockImplementationOnce(() => {
+      throw new Error("ranker blew up");
+    });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await loadNoSweatFeed({ userId: 1, precision: "whole", now: NOW, ctx: ctxWith() });
+    expect(out.rows).toEqual([]);
+    expect(out.tracking.map((t) => t.promoId)).toEqual([7]);
+    expect(out.activeCount).toBe(1);
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it("keeps the Tracking strip when loading active no-sweats fails", async () => {
+    mockActive.mockRejectedValue(new Error("db down"));
+    mockTracked.mockResolvedValue([tracked(7)]);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = await loadNoSweatFeed({ userId: 1, precision: "whole", now: NOW, ctx: ctxWith() });
+    expect(out.rows).toEqual([]);
+    expect(out.tracking.map((t) => t.promoId)).toEqual([7]);
+    err.mockRestore();
+  });
 });
