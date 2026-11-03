@@ -24,19 +24,44 @@ const CASH_REFUND_RE = /\b(?:in|as) cash\b|\bcash back\b|\bwithdrawable\b|\breal
 const BONUS_REFUND_RE =
   /\bbonus bets?\b|\bfree bets?\b|\bsite credit\b|\btokens?\b|\bcrown cash\b|\bdk dollars\b/i;
 
-const CAP_PATTERNS: RegExp[] = [
-  /max(?:imum)? reward:?\s*\$(\d+(?:\.\d{1,2})?)/i,
-  /up to \$(\d+(?:\.\d{1,2})?)/i,
-  /\$(\d+(?:\.\d{1,2})?)\s+(?:bonus bet|no[- ]sweat|refund)/i,
+// A dollar amount: "$1,000", "$25", "$12.5". Group 1 = whole dollars (commas
+// allowed only as real thousands separators), group 2 = optional cents.
+const AMOUNT = String.raw`\$\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?(?![\d,]*\d)`;
+const REFUND_NOUN = String.raw`(?:bonus bets?|free bets?|no[- ]sweat|refunds?|back)\b`;
+
+/**
+ * Refund-cap patterns in priority order (CR-01). Every pattern is tied to
+ * refund wording -- there is deliberately NO bare "up to $N" pattern, because
+ * "Bet up to $500 ... get a $25 bonus bet" would otherwise read the wager limit
+ * as the refund. Within one tier, two different amounts are ambiguous and the
+ * parser returns null so the promo goes to review instead of going live with a
+ * guessed cap.
+ */
+const CAP_TIERS: RegExp[] = [
+  // "MAX REWARD: $10", "Maximum refund $25"
+  new RegExp(String.raw`\bmax(?:imum)?\.? (?:reward|refund|bonus bet):?\s*` + AMOUNT, "gi"),
+  // "$25 bonus bet", "$1,000 in Bonus Bets", "up to $25 back", "$50 refund"
+  new RegExp(AMOUNT + String.raw`\s+(?:in\s+|as\s+(?:an?\s+)?)?` + REFUND_NOUN, "gi"),
+  // "get a bonus bet up to $25", "refunded up to $50"
+  new RegExp(String.raw`\b(?:refund(?:ed)?|back|bonus bets?|free bets?)\b[^.\n$]{0,40}\bup to\s*` + AMOUNT, "gi"),
 ];
 
-/** Refund cap as a 2-decimal string, or null when absent / not positive. */
+function amountOf(m: RegExpMatchArray): Decimal {
+  const whole = m[1].replace(/,/g, "");
+  return new Decimal(m[2] ? `${whole}.${m[2]}` : whole);
+}
+
+/**
+ * Refund cap as a 2-decimal string, or null when absent / not positive /
+ * ambiguous (several different amounts in the same tier).
+ */
 export function parseNoSweatRefundCap(text: string): string | null {
-  for (const re of CAP_PATTERNS) {
-    const m = re.exec(text);
-    if (!m) continue;
-    const value = new Decimal(m[1]);
-    return value.gt(0) ? value.toFixed(2) : null;
+  for (const re of CAP_TIERS) {
+    const values = [...text.matchAll(re)].map(amountOf);
+    if (values.length === 0) continue;
+    const first = values[0];
+    if (values.some((v) => !v.eq(first))) return null;
+    return first.gt(0) ? first.toFixed(2) : null;
   }
   return null;
 }

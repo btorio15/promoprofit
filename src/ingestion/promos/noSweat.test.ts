@@ -63,4 +63,43 @@ describe("parseNoSweatRefundCap", () => {
     expect(parseNoSweatRefundCap("nothing here")).toBeNull();
     expect(parseNoSweatRefundCap("MAX REWARD: $0")).toBeNull();
   });
+
+  // CR-01 regressions.
+  it("keeps thousands separators: $1,000 in Bonus Bets is 1000.00, not 1.00", () => {
+    expect(parseNoSweatRefundCap("No Sweat up to $1,000 in Bonus Bets")).toBe("1000.00");
+    expect(parseNoSweatRefundCap("MAX REWARD: $1,000")).toBe("1000.00");
+    expect(parseNoSweatRefundCap("Get a $2,500.50 bonus bet")).toBe("2500.50");
+  });
+
+  it("the bonus-bet amount wins over a generic wager limit 'up to $'", () => {
+    expect(
+      parseNoSweatRefundCap("Bet up to $500 on any NFL game. If your bet loses, get a $25 bonus bet."),
+    ).toBe("25.00");
+  });
+
+  it("'up to $25 back in bonus bets' is 25.00", () => {
+    expect(parseNoSweatRefundCap("If your bet loses, get up to $25 back in bonus bets")).toBe("25.00");
+  });
+
+  it("the NFL London fixture still reads 10.00", () => {
+    expect(parseNoSweatRefundCap(LONDON_TEXT)).toBe("10.00");
+  });
+
+  it("a bare 'up to $N' with no refund wording is not a refund cap", () => {
+    expect(parseNoSweatRefundCap("Bet up to $500 on any NFL game")).toBeNull();
+  });
+
+  it("two different refund-worded amounts are ambiguous and give null", () => {
+    expect(parseNoSweatRefundCap("Get a $25 bonus bet or a $50 bonus bet")).toBeNull();
+    expect(parseNoSweatRefundCap("Get a $25 bonus bet. Max one $25 bonus bet per customer")).toBe("25.00");
+  });
+
+  it("classifyNoSweat carries the corrected cap through", () => {
+    expect(
+      classifyNoSweat({
+        title: "NFL No Sweat",
+        text: "Bet up to $500 on any NFL game. If your bet loses, get a $25 bonus bet.",
+      }),
+    ).toEqual({ kind: "bonus_bet_refund", refundCap: "25.00" });
+  });
 });
