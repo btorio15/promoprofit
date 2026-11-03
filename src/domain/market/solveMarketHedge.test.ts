@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import Decimal from "decimal.js";
 import {
   solveBonusBetMarketHedge,
+  solveArbWithMarket,
   solveMarketHedgeForPayout,
   solveProfitBoostMarketHedge,
 } from "./solveMarketHedge";
 import type { MarketLeg } from "./marketLeg";
 import {
+  bruteForceMarketArb,
   bruteForceMarketBonus,
   bruteForceMarketBoost,
   mulberry32,
@@ -221,5 +223,77 @@ describe("solveProfitBoostMarketHedge", () => {
     }
     expect(compared).toBeGreaterThan(100);
     expect(exact).toBeGreaterThan(compared * 0.9);
+  });
+});
+
+describe("solveArbWithMarket", () => {
+  it("returns null when the market is not an arb (1/d + p >= 1)", () => {
+    const r = solveArbWithMarket({
+      totalStake: new Decimal(100),
+      bookOddsAmerican: -150,
+      leg: leg("kalshi", 50),
+      precision: "cents",
+    });
+    expect(r).toBeNull();
+  });
+
+  it("finds a positive arb with whole-dollar book stake inside the cap", () => {
+    const r = solveArbWithMarket({
+      totalStake: new Decimal(100),
+      bookOddsAmerican: 300,
+      leg: leg("kalshi", 50),
+      precision: "whole",
+    });
+    expect(r).not.toBeNull();
+    expect(r!.bookStake.decimalPlaces()).toBe(0);
+    expect(r!.result.totalLaid.lte(100)).toBe(true);
+    expect(r!.result.guaranteedProfit.gt(0)).toBe(true);
+  });
+
+  it("equals the full-grid oracle on 1,000 seeded cases (seed 1203)", () => {
+    const rng = mulberry32(1203);
+    let found = 0;
+    for (let k = 0; k < 1000; k++) {
+      const precision = rng() < 0.5 ? ("whole" as const) : ("cents" as const);
+      const totalStake = precision === "whole" ? randInt(rng, 10, 120) : randInt(rng, 10, 15);
+      const venue = pick(rng, VENUES);
+      let odds = 0;
+      let price = 0;
+      for (let tries = 0; tries < 200; tries++) {
+        odds = rng() < 0.7 ? randInt(rng, 100, 600) : -randInt(rng, 110, 300);
+        price = randInt(rng, 5, 95);
+        const num = odds > 0 ? odds + 100 : -odds + 100;
+        const den = odds > 0 ? 100 : -odds;
+        // 1/d + p/100 < 0.99, integers only
+        if (100 * den + price * num < 99 * num) break;
+      }
+      const r = solveArbWithMarket({
+        totalStake: new Decimal(totalStake),
+        bookOddsAmerican: odds,
+        leg: leg(venue, price),
+        precision,
+      });
+      const o = bruteForceMarketArb({
+        totalCents: totalStake * 100,
+        unitCents: precision === "whole" ? 100 : 1,
+        bookOddsAmerican: odds,
+        venueKey: venue,
+        priceCents: price,
+      });
+      const label = `#${k} ${venue} ${price}c book ${odds} total ${totalStake} ${precision}`;
+      if (o.profit.lte(0)) {
+        expect(r, label).toBeNull();
+      } else {
+        expect(r, label).not.toBeNull();
+        found++;
+        expect(cents(r!.result.guaranteedProfit), label).toBe(cents(o.profit));
+        expect(r!.result.totalLaid.lte(totalStake), label).toBe(true);
+        if (precision === "whole") expect(r!.bookStake.decimalPlaces(), label).toBe(0);
+        expect(r!.result.totalLaid.toFixed(2), label).toBe(
+          r!.bookStake.plus(r!.market.outlay).toFixed(2),
+        );
+      }
+    }
+    expect(found).toBeGreaterThan(200);
   });
 });
