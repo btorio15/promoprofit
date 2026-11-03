@@ -185,10 +185,10 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 12-04-PLAN.md — TDD whole-contract solvers for bonus bet, profit boost and arb with brute-force oracle (MKT-05)
-- [ ] 12-05-PLAN.md — TDD boost + boost pair with a market top-up leg, oracle-proven (MKT-05)
-- [ ] 12-06-PLAN.md — MarketLegDTO, leg text, settlement notes and shared MarketLeg component (MKT-07)
-- [ ] 12-07-PLAN.md — My Books "Prediction markets" group with availability note (MKT-01)
+- [x] 12-04-PLAN.md — TDD whole-contract solvers for bonus bet, profit boost and arb with brute-force oracle (MKT-05)
+- [x] 12-05-PLAN.md — TDD boost + boost pair with a market top-up leg, oracle-proven (MKT-05)
+- [x] 12-06-PLAN.md — MarketLegDTO, leg text, settlement notes and shared MarketLeg component (MKT-07)
+- [x] 12-07-PLAN.md — My Books "Prediction markets" group with availability note (MKT-01)
 - [ ] 12-08-PLAN.md — Apply probe branch to venue config; finalize PROJECT/REQUIREMENTS (MKT-09, MKT-10)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -222,7 +222,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 2/16 | In Progress|  |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 6/16 | In Progress|  |
 
 ## Backlog
 
