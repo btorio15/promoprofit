@@ -2,7 +2,6 @@ import type { NoSweatRowDTO } from "@/domain/promos/noSweatRowDto";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { AddedPromoActions } from "./AddedPromoActions";
 import { PriceAgeNote } from "./PriceAgeNote";
-import { signedUsd } from "./noSweatRowView";
 import {
   buildNoSweatWaterfalls,
   estimateLegendLabel,
@@ -189,9 +188,6 @@ export function NoSweatDetails({ dto, onChanged, addedActions }: NoSweatDetailsP
           </span>
         </div>
       </div>
-      <span className="text-base text-muted-foreground">
-        If the refund is worth $0: <span className="num">{signedUsd(dto.worstCaseProfit)}</span>
-      </span>
       {dto.addedByYou ? (
         <span className="text-sm text-muted-foreground">You added this promo.</span>
       ) : dto.attribution ? (

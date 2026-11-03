@@ -133,8 +133,11 @@ describe("toNoSweatRowDTO", () => {
 describe("noSweatAriaLabel", () => {
   it("speaks plus/minus dollars and cents", () => {
     expect(
-      noSweatAriaLabel({ estimatedProfit: "14.20", ratePct: "78.00", worstCaseProfit: "-3.10" }),
-    ).toBe("Estimate plus 14 dollars 20 cents at 78 percent, worst case minus 3 dollars 10 cents.");
+      noSweatAriaLabel({ estimatedProfit: "14.20", ratePct: "78.00" }),
+    ).toBe("Estimate plus 14 dollars 20 cents at 78 percent.");
+    expect(
+      noSweatAriaLabel({ estimatedProfit: "-3.10", ratePct: "78.50" }),
+    ).toBe("Estimate minus 3 dollars 10 cents at 78.50 percent.");
   });
 });
 

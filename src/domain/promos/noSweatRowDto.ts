@@ -228,7 +228,7 @@ function spokenPercent(pct: string): string {
 
 /** Spoken form for screen readers, per UI-SPEC. */
 export function noSweatAriaLabel(
-  dto: Pick<NoSweatRowDTO, "estimatedProfit" | "ratePct" | "worstCaseProfit">,
+  dto: Pick<NoSweatRowDTO, "estimatedProfit" | "ratePct">,
 ): string {
-  return `Estimate ${spokenSigned(dto.estimatedProfit)} at ${spokenPercent(dto.ratePct)} percent, worst case ${spokenSigned(dto.worstCaseProfit)}.`;
+  return `Estimate ${spokenSigned(dto.estimatedProfit)} at ${spokenPercent(dto.ratePct)} percent.`;
 }

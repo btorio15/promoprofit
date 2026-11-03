@@ -9,12 +9,8 @@ import {
 
 describe("noSweatRowView", () => {
   it("builds the secondary estimate line", () => {
-    expect(estimateSecondaryLine({ ratePct: "78.00", worstCaseProfit: "-3.10" })).toBe(
-      "at 78% · worst case −$3.10",
-    );
-    expect(estimateSecondaryLine({ ratePct: "78.50", worstCaseProfit: "2.00" })).toBe(
-      "at 78.50% · worst case $2.00",
-    );
+    expect(estimateSecondaryLine({ ratePct: "78.00" })).toBe("at 78%");
+    expect(estimateSecondaryLine({ ratePct: "78.50" })).toBe("at 78.50%");
   });
 
   it("returns warning copy", () => {

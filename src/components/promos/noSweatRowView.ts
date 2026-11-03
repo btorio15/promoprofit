@@ -22,10 +22,10 @@ export const TRACK_ODDS_CHANGED_COPY =
 
 export const TRACK_FAILED_COPY = "Couldn't track this one. Try again.";
 
-/** "at 78% · worst case −$3.10" (U+2212 minus on negatives, via formatUsd of the magnitude). */
-export function estimateSecondaryLine(dto: Pick<NoSweatRowDTO, "ratePct" | "worstCaseProfit">): string {
+/** "at 78%": the refund conversion rate the estimate assumes. */
+export function estimateSecondaryLine(dto: Pick<NoSweatRowDTO, "ratePct">): string {
   const rate = Number.isInteger(Number(dto.ratePct)) ? Number(dto.ratePct).toFixed(0) : dto.ratePct;
-  return `at ${rate}% · worst case ${signedUsd(dto.worstCaseProfit)}`;
+  return `at ${rate}%`;
 }
 
 /** formatUsd with U+2212 for negatives, to match formatAmerican's typography. */
