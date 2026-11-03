@@ -17,6 +17,9 @@ const {
   mockRecordCurrentProfitObservations,
   mockRecordMemberProfitObservations,
   mockGetMemberProfitHistory,
+  mockGetActiveNoSweatPromos,
+  mockGetTrackedNoSweats,
+  mockGetMemberLowProfile,
 } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
   mockGetActivePromos: vi.fn(),
@@ -29,10 +32,18 @@ const {
   mockRecordCurrentProfitObservations: vi.fn(),
   mockRecordMemberProfitObservations: vi.fn(),
   mockGetMemberProfitHistory: vi.fn(),
+  mockGetActiveNoSweatPromos: vi.fn(),
+  mockGetTrackedNoSweats: vi.fn(),
+  mockGetMemberLowProfile: vi.fn(),
 }));
 
 vi.mock("@/lib/session", () => ({ requireUser: mockRequireUser }));
-vi.mock("@/db/promos", () => ({ getActivePromos: mockGetActivePromos }));
+vi.mock("@/db/promos", () => ({
+  getActivePromos: mockGetActivePromos,
+  getActiveNoSweatPromos: mockGetActiveNoSweatPromos,
+}));
+vi.mock("@/db/trackedNoSweats", () => ({ getTrackedNoSweats: mockGetTrackedNoSweats }));
+vi.mock("@/db/lowProfile", () => ({ getMemberLowProfile: mockGetMemberLowProfile }));
 vi.mock("@/db/queries", () => ({
   getBonusBooks: mockGetBonusBooks,
   getCachedEvents: mockGetCachedEvents,
@@ -53,6 +64,10 @@ vi.mock("@/db/memberObservations", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { getOpportunities } from "./get-opportunities";
+import { isNoSweatRow } from "@/domain/opportunities/types";
+import { buildTrackedSnapshotFixture } from "@/domain/promos/noSweatSnapshot.fixture";
+import type { ActiveNoSweatPromo } from "@/db/promos";
+import Decimal from "decimal.js";
 
 const NOW_ISO = new Date().toISOString();
 
@@ -154,6 +169,14 @@ beforeEach(() => {
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
   mockRecordMemberProfitObservations.mockResolvedValue(undefined);
   mockGetMemberProfitHistory.mockResolvedValue({ status: "ready", graphStartDay: null, rows: [] });
+  mockGetActiveNoSweatPromos.mockResolvedValue([]);
+  mockGetTrackedNoSweats.mockResolvedValue([]);
+  mockGetMemberLowProfile.mockResolvedValue({
+    oddsCapEnabled: false,
+    oddsCapAmerican: 300,
+    mainLinesOnly: false,
+    naturalStakes: false,
+  });
 });
 
 describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
@@ -191,6 +214,7 @@ describe("getOpportunities (D-16, D-17, T-04-01..04)", () => {
     const promos = result.sources.find((s) => s.id === "promos");
     expect(promos?.items).toHaveLength(1);
     const item = promos!.items[0];
+    if (isNoSweatRow(item.data)) throw new Error("unreachable");
     expect(item.rowKey).toBe(item.data.rowKey);
     expect(item.profit).toBe(item.data.guaranteedProfit);
     expect(item.pct).toBe(item.data.ratePct);
@@ -621,5 +645,133 @@ describe("getOpportunities profitSeries (STATS-01..03)", () => {
     if (result.status !== "ok" || result.profitSeries.status !== "ready") throw new Error("unreachable");
     expect(result.profitSeries.graphStartDay).toBe(denverDate(new Date()));
     expect(result.profitSeries.days).toHaveLength(1);
+  });
+});
+
+function activeNoSweat(overrides: Partial<ActiveNoSweatPromo> = {}): ActiveNoSweatPromo {
+  return {
+    id: 501,
+    bookKey: "draftkings",
+    title: "No-sweat first bet",
+    refundCap: new Decimal("50.00"),
+    minOddsAmerican: null,
+    scope: { kind: "any" },
+    eligibleMarketTypes: ["moneyline"],
+    expiresAt: null,
+    finePrintNote: null,
+    claimHint: null,
+    scopeLabel: "Any game",
+    autoMatched: true,
+    scraped: true,
+    attribution: [],
+    addedByYou: false,
+    addedByUserId: null,
+    ...overrides,
+  };
+}
+
+function trackedRow(promoId = 777) {
+  const snapshot = buildTrackedSnapshotFixture();
+  snapshot.promo.id = promoId;
+  return {
+    promoId,
+    state: "tracking" as const,
+    trackedAt: new Date(NOW_ISO),
+    outcome: null,
+    outcomeAt: null,
+    correction: null,
+    snapshot,
+  };
+}
+
+describe("getOpportunities no-sweat estimates (FEED-03, FEED-04, A-01, A-10)", () => {
+  it("ranks a priced no-sweat inside the promos source, flagged as an estimate", async () => {
+    mockGetActiveNoSweatPromos.mockResolvedValue([activeNoSweat()]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    const promos = result.sources.find((s) => s.id === "promos")!;
+    const item = promos.items.find((i) => isNoSweatRow(i.data));
+    expect(item).toBeDefined();
+    expect(item!.estimated).toBe(true);
+    expect(item!.pctLabel).toBe("Est. ROI");
+    if (!isNoSweatRow(item!.data)) throw new Error("unreachable");
+    expect(item!.data.kind).toBe("no_sweat");
+    expect(item!.profit).toBe(item!.data.estimatedProfit);
+    expect(item!.pct).toBe(item!.data.estRoiPct);
+    expect(result.emptyVariant).toBeNull();
+  });
+
+  it("a screen with only no-sweats is not 'nothing-profitable'", async () => {
+    mockGetActiveNoSweatPromos.mockResolvedValue([activeNoSweat()]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+  });
+
+  it("puts a can't-price no-sweat in noSweatNotes, never in the ranked list", async () => {
+    mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel", "betmgm"]);
+    mockGetActiveNoSweatPromos.mockResolvedValue([activeNoSweat({ id: 502, bookKey: "betmgm" })]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBeNull();
+    expect(result.noSweatNotes.map((n) => n.note)).toEqual(["cant_price"]);
+    const promos = result.sources.find((s) => s.id === "promos")!;
+    expect(promos.items).toHaveLength(0);
+  });
+
+  it("removes a tracked no-sweat from the ranked feed and returns it as a Tracking card", async () => {
+    mockGetActiveNoSweatPromos.mockResolvedValue([activeNoSweat({ id: 777 })]);
+    mockGetTrackedNoSweats.mockResolvedValue([trackedRow(777)]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.tracking.map((t) => t.promoId)).toEqual([777]);
+    const promos = result.sources.find((s) => s.id === "promos")!;
+    expect(promos.items.some((i) => isNoSweatRow(i.data))).toBe(false);
+    expect(result.emptyVariant).toBeNull();
+  });
+
+  it("still returns Tracking cards when there is no cached odds at all", async () => {
+    mockGetCachedEvents.mockResolvedValue({ events: [], fetchedAt: null });
+    mockGetTrackedNoSweats.mockResolvedValue([trackedRow(778)]);
+    const result = await getOpportunities({ precision: "whole" });
+    if (result.status !== "ok") throw new Error("unreachable");
+    expect(result.emptyVariant).toBe("no-odds");
+    expect(result.tracking.map((t) => t.promoId)).toEqual([778]);
+  });
+
+  it("guaranteed outputs are unchanged by no-sweat presence", async () => {
+    mockGetActivePromos.mockResolvedValue([activeBoostPromo()]);
+    mockGetUserBookKeys.mockResolvedValue(["draftkings", "fanduel", "betmgm"]);
+
+    const without = await getOpportunities({ precision: "whole" });
+    const recordedWithout = {
+      current: mockRecordCurrentProfitObservations.mock.calls.map((c) => c[1]),
+      member: mockRecordMemberProfitObservations.mock.calls.map((c) => c.slice(0, 2)),
+    };
+    vi.clearAllMocks();
+    // clearAllMocks keeps implementations set via mockResolvedValue? Re-assert the ones we rely on.
+    mockRequireUser.mockResolvedValue({ userId: 1, email: "friend@example.com", displayName: "Friend" });
+
+    mockGetActiveNoSweatPromos.mockResolvedValue([
+      activeNoSweat({ id: 501 }),
+      activeNoSweat({ id: 502, bookKey: "betmgm" }),
+      activeNoSweat({ id: 777 }),
+    ]);
+    mockGetTrackedNoSweats.mockResolvedValue([trackedRow(777)]);
+    const withNoSweat = await getOpportunities({ precision: "whole" });
+    const recordedWith = {
+      current: mockRecordCurrentProfitObservations.mock.calls.map((c) => c[1]),
+      member: mockRecordMemberProfitObservations.mock.calls.map((c) => c.slice(0, 2)),
+    };
+
+    if (without.status !== "ok" || withNoSweat.status !== "ok") throw new Error("unreachable");
+    expect(withNoSweat.noSweatNotes.length).toBeGreaterThan(0);
+    expect(withNoSweat.tracking.length).toBe(1);
+    expect(recordedWithout.current.length).toBeGreaterThan(0);
+    expect(without.sources.find((x) => x.id === "promos")!.items.length).toBeGreaterThan(0);
+    expect(recordedWith.current.length).toBe(recordedWithout.current.length);
+    expect(recordedWith).toEqual(recordedWithout);
+    expect(withNoSweat.dashboard).toEqual(without.dashboard);
+    expect(withNoSweat.profitSeries).toEqual(without.profitSeries);
   });
 });
