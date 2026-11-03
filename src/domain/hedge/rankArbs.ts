@@ -2,6 +2,9 @@ import Decimal from "decimal.js";
 import { americanToDecimal } from "./americanOdds";
 import { calculateArb, type ArbResult, type StakePrecision } from "./arbMath";
 import type { TwoWayMoneylineMarket } from "./marketFilter";
+import { isMarketVenue } from "@/config/books";
+import { toMarketLeg, type ContractSide, type MarketFill } from "@/domain/market/marketLeg";
+import { solveArbWithMarket } from "@/domain/market/solveMarketHedge";
 
 /**
  * Book-pair arb search + ranking (D-06/D-07/D-11). Unlike the finder's
@@ -13,6 +16,9 @@ import type { TwoWayMoneylineMarket } from "./marketFilter";
 export interface ArbSideQuote {
   bookKey: string;
   oddsAmerican: number;
+  /** Market venues only: displayed depth at the ask (D-13) and contract side. */
+  askSize?: number | null;
+  contractSide?: ContractSide | null;
 }
 
 export interface ArbSide {
@@ -55,6 +61,10 @@ export function findBestArbPair(
   sideBQuotes: ArbSideQuote[],
 ): BestArbPair | null {
   let best: BestArbPair | null = null;
+
+  // D-04: this search is book-vs-book only; market quotes never take part.
+  sideAQuotes = sideAQuotes.filter((q) => !isMarketVenue(q.bookKey));
+  sideBQuotes = sideBQuotes.filter((q) => !isMarketVenue(q.bookKey));
 
   for (const a of sideAQuotes) {
     for (const b of sideBQuotes) {
@@ -107,6 +117,8 @@ export interface ArbLeg {
   point: number | null;
   oddsAmerican: number;
   tiedBookKeys: string[];
+  /** Whole-contract fill when this leg is a prediction-market buy, else null. */
+  market: MarketFill | null;
 }
 
 export interface ArbOpportunity {
@@ -144,6 +156,110 @@ export function moneylineToArbMarket(market: TwoWayMoneylineMarket): ArbMarket {
   };
 }
 
+/** Highest decimal odds among sportsbooks, ties by bookKey. */
+function bestBookQuote(quotes: ArbSideQuote[]): ArbSideQuote | null {
+  let best: ArbSideQuote | null = null;
+  let bestDec: Decimal | null = null;
+  for (const q of quotes) {
+    if (isMarketVenue(q.bookKey)) continue;
+    const dec = americanToDecimal(q.oddsAmerican);
+    if (
+      best === null ||
+      bestDec === null ||
+      dec.gt(bestDec) ||
+      (dec.equals(bestDec) && q.bookKey < best.bookKey)
+    ) {
+      best = q;
+      bestDec = dec;
+    }
+  }
+  return best;
+}
+
+/**
+ * Best book-vs-market arb for one row (D-04: exactly one market leg). Each
+ * market quote is tried against the best sportsbook quote on the opposite
+ * side; ties on guaranteed profit go to the venue key, then side A first.
+ */
+function bestMarketArb(
+  market: ArbMarket,
+  base: Omit<ArbOpportunity, "sideA" | "sideB" | "result">,
+  opts: { totalStake: Decimal; precision: StakePrecision },
+): ArbOpportunity | null {
+  let best: ArbOpportunity | null = null;
+  let bestRank: { venue: string; side: number } | null = null;
+
+  for (const marketSide of ["A", "B"] as const) {
+    const mine = marketSide === "A" ? market.sideA : market.sideB;
+    const other = marketSide === "A" ? market.sideB : market.sideA;
+    const book = bestBookQuote(other.quotes);
+    if (book === null) continue;
+
+    for (const q of mine.quotes) {
+      if (!isMarketVenue(q.bookKey)) continue;
+      const leg = toMarketLeg(q);
+      if (leg === null) continue;
+      const solved = solveArbWithMarket({
+        totalStake: opts.totalStake,
+        bookOddsAmerican: book.oddsAmerican,
+        leg,
+        precision: opts.precision,
+      });
+      if (solved === null) continue;
+
+      const rank = { venue: q.bookKey, side: marketSide === "A" ? 0 : 1 };
+      const better =
+        best === null ||
+        bestRank === null ||
+        solved.result.guaranteedProfit.gt(best.result.guaranteedProfit) ||
+        (solved.result.guaranteedProfit.equals(best.result.guaranteedProfit) &&
+          (rank.venue < bestRank.venue ||
+            (rank.venue === bestRank.venue && rank.side < bestRank.side)));
+      if (!better) continue;
+
+      const r = solved.result;
+      // The solver reports the book as A and the market as B; swap when the
+      // market sits on side A so stakes/payouts follow the leg order.
+      const result: ArbResult =
+        marketSide === "B"
+          ? r
+          : {
+              ...r,
+              stakeA: r.stakeB,
+              stakeB: r.stakeA,
+              payoutA: r.payoutB,
+              payoutB: r.payoutA,
+              netIfAWins: r.netIfBWins,
+              netIfBWins: r.netIfAWins,
+            };
+      const marketLeg: ArbLeg = {
+        bookKey: q.bookKey,
+        selection: mine.selection,
+        point: mine.point,
+        oddsAmerican: q.oddsAmerican,
+        tiedBookKeys: [],
+        market: solved.market,
+      };
+      const bookLeg: ArbLeg = {
+        bookKey: book.bookKey,
+        selection: other.selection,
+        point: other.point,
+        oddsAmerican: book.oddsAmerican,
+        tiedBookKeys: [],
+        market: null,
+      };
+      best = {
+        ...base,
+        sideA: marketSide === "A" ? marketLeg : bookLeg,
+        sideB: marketSide === "A" ? bookLeg : marketLeg,
+        result,
+      };
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
 export function rankArbs(
   markets: ArbMarket[],
   opts: { totalStake: Decimal; precision: StakePrecision },
@@ -151,21 +267,8 @@ export function rankArbs(
   const opportunities: ArbOpportunity[] = [];
 
   for (const market of markets) {
-    const pair = findBestArbPair(market.sideA.quotes, market.sideB.quotes);
-    if (pair === null) continue;
-    if (!pair.impliedSum.lt(1)) continue;
-
-    const result = calculateArb({
-      totalStake: opts.totalStake,
-      oddsAmericanA: pair.sideA.oddsAmerican,
-      oddsAmericanB: pair.sideB.oddsAmerican,
-      precision: opts.precision,
-    });
-    if (result === null) continue; // rounding erased the arb
-
     const rowKey = `${market.eventId}:${market.marketType}:${market.line ?? "ml"}`;
-
-    opportunities.push({
+    const base = {
       rowKey,
       eventId: market.eventId,
       sportKey: market.sportKey,
@@ -175,22 +278,53 @@ export function rankArbs(
       marketType: market.marketType,
       line: market.line,
       tieRisk: market.tieRisk,
-      sideA: {
-        bookKey: pair.sideA.bookKey,
-        selection: market.sideA.selection,
-        point: market.sideA.point,
-        oddsAmerican: pair.sideA.oddsAmerican,
-        tiedBookKeys: pair.tiedBooksA,
-      },
-      sideB: {
-        bookKey: pair.sideB.bookKey,
-        selection: market.sideB.selection,
-        point: market.sideB.point,
-        oddsAmerican: pair.sideB.oddsAmerican,
-        tiedBookKeys: pair.tiedBooksB,
-      },
-      result,
-    });
+    };
+
+    let candidate: ArbOpportunity | null = null;
+
+    const pair = findBestArbPair(market.sideA.quotes, market.sideB.quotes);
+    if (pair !== null && pair.impliedSum.lt(1)) {
+      const result = calculateArb({
+        totalStake: opts.totalStake,
+        oddsAmericanA: pair.sideA.oddsAmerican,
+        oddsAmericanB: pair.sideB.oddsAmerican,
+        precision: opts.precision,
+      });
+      if (result !== null) {
+        candidate = {
+          ...base,
+          sideA: {
+            bookKey: pair.sideA.bookKey,
+            selection: market.sideA.selection,
+            point: market.sideA.point,
+            oddsAmerican: pair.sideA.oddsAmerican,
+            tiedBookKeys: pair.tiedBooksA,
+            market: null,
+          },
+          sideB: {
+            bookKey: pair.sideB.bookKey,
+            selection: market.sideB.selection,
+            point: market.sideB.point,
+            oddsAmerican: pair.sideB.oddsAmerican,
+            tiedBookKeys: pair.tiedBooksB,
+            market: null,
+          },
+          result,
+        };
+      }
+    }
+
+    // D-02: the market arb replaces the book-book arb only when strictly better.
+    const marketCandidate = bestMarketArb(market, base, opts);
+    if (
+      marketCandidate !== null &&
+      (candidate === null ||
+        marketCandidate.result.guaranteedProfit.gt(candidate.result.guaranteedProfit))
+    ) {
+      candidate = marketCandidate;
+    }
+
+    if (candidate !== null) opportunities.push(candidate);
   }
 
   opportunities.sort((a, b) => {
