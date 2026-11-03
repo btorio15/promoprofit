@@ -5,7 +5,14 @@ import * as schema from "@/db/schema";
 
 vi.mock("./client", () => ({ getDb: vi.fn() }));
 
-import { activePromoWhere, mapActivePromoRow, promoVisibilityCondition } from "./promos";
+import {
+  activePromoWhere,
+  guaranteedPromoWhere,
+  mapActiveNoSweatRow,
+  mapActivePromoRow,
+  noSweatPromoWhere,
+  promoVisibilityCondition,
+} from "./promos";
 
 const { promos } = schema;
 
@@ -174,5 +181,49 @@ describe("mapActivePromoRow games scope", () => {
     expect(mapActivePromoRow(gamesRow([GAME_A, GAME_B], { sportKey: "hockey_nhl" }))).toBeNull();
     expect(mapActivePromoRow(gamesRow([GAME_A, GAME_B], { windowEnd: null }))).toBeNull();
     warn.mockRestore();
+  });
+});
+
+describe("no_sweat separation (A-01, FEED-04)", () => {
+  const noSweatRow = (overrides: Record<string, unknown> = {}) =>
+    makeRow({ promoType: "no_sweat", bonusAmount: "10.00", minOddsAmerican: -200, ...overrides });
+
+  it("guaranteedPromoWhere excludes no_sweat in SQL", () => {
+    const q = buildTestDb().select({ id: promos.id }).from(promos).where(guaranteedPromoWhere(NOW, 7)).toSQL();
+    expect(q.sql).toContain('"promo_type" <> $');
+    expect(q.params).toContain("no_sweat");
+    expect(q.sql).toContain('"added_by_user_id" is null');
+  });
+
+  it("activePromoWhere itself is not narrowed (shared by other callers)", () => {
+    expect(compile(undefined).params).not.toContain("no_sweat");
+  });
+
+  it("noSweatPromoWhere selects only no_sweat with the same visibility rule", () => {
+    const q = buildTestDb().select({ id: promos.id }).from(promos).where(noSweatPromoWhere(NOW, undefined)).toSQL();
+    expect(q.sql).toContain('"promo_type" = $');
+    expect(q.params).toContain("no_sweat");
+    expect(q.sql).toContain('"added_by_user_id" is null');
+    expect(q.sql).not.toContain('"added_by_user_id" = $');
+  });
+
+  it("mapActivePromoRow never returns a no_sweat row", () => {
+    expect(mapActivePromoRow(noSweatRow())).toBeNull();
+  });
+
+  it("mapActiveNoSweatRow maps a no_sweat row", () => {
+    const mapped = mapActiveNoSweatRow(noSweatRow());
+    expect(mapped?.refundCap.toFixed(2)).toBe("10.00");
+    expect(mapped?.minOddsAmerican).toBe(-200);
+    expect(mapped?.bookKey).toBe("draftkings");
+    expect(mapped?.scope).toEqual({ kind: "any" });
+    expect(mapped?.eligibleMarketTypes).toEqual(["moneyline"]);
+  });
+
+  it("mapActiveNoSweatRow rejects other types and bad refund caps", () => {
+    expect(mapActiveNoSweatRow(makeRow({ promoType: "profit_boost" }))).toBeNull();
+    expect(mapActiveNoSweatRow(noSweatRow({ bonusAmount: null }))).toBeNull();
+    expect(mapActiveNoSweatRow(noSweatRow({ bonusAmount: "0.00" }))).toBeNull();
+    expect(mapActiveNoSweatRow(noSweatRow({ bonusAmount: "-5.00" }))).toBeNull();
   });
 });

@@ -11,7 +11,7 @@ import { calculateBonusBetHedge, type BonusBetHedgeResult } from "@/domain/hedge
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import { enumerateScopeSelections, resolveSelection, type ResolvedSelection, type SelectionQuote } from "./selection";
 import { eventInScope, type PromoScope } from "./scope";
-import type { PromoMarketType, PromoSelection, PromoSide, PromoType, WinningsCapKind } from "./types";
+import { assertNever, type GuaranteedPromoType, type PromoMarketType, type PromoSelection, type PromoSide, type WinningsCapKind } from "./types";
 
 /**
  * Per-promo best-candidate search and ranking (D-02..D-05, D-16, D-17, D-18,
@@ -26,7 +26,7 @@ import type { PromoMarketType, PromoSelection, PromoSide, PromoType, WinningsCap
 export interface RankablePromo {
   id: number;
   bookKey: string;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   scope: PromoScope;
   pinned: PromoSelection | null;
   eligibleMarketTypes: readonly PromoMarketType[];
@@ -248,9 +248,14 @@ function evaluateCandidate(
 
   const sameBook = hedge.bookKey === promo.bookKey;
 
-  return promo.promoType === "profit_boost"
-    ? evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive)
-    : evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
+  switch (promo.promoType) {
+    case "profit_boost":
+      return evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
+    case "bonus_bet":
+      return evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
+    default:
+      return assertNever(promo.promoType);
+  }
 }
 
 function guaranteedProfitOf(candidate: EvaluatedCandidate): Decimal {
