@@ -8,6 +8,7 @@ function validReading(overrides: Partial<PromoReading> = {}): PromoReading {
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: "50",
     bonusAmount: null,
     maxStake: "25",

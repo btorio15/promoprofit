@@ -7,7 +7,7 @@ import {
   type SkippedEntry,
 } from "@/domain/promos/scraped";
 import { SPORT_KEYS } from "@/config/sports";
-import { PROMO_MARKET_TYPES, type PromoType } from "@/domain/promos/types";
+import { assertNever, PROMO_MARKET_TYPES, type PromoType } from "@/domain/promos/types";
 import { classifyExclusion } from "./exclusions";
 
 /**
@@ -41,7 +41,6 @@ import { classifyExclusion } from "./exclusions";
 export const CLEAR_SKIP_REASONS: ReadonlySet<SkipReason> = new Set([
   "new_customer",
   "deposit",
-  "no_sweat",
   "parlay",
   "sgp",
   "futures",
@@ -55,6 +54,7 @@ export const REVIEW_SKIP_REASONS: ReadonlySet<SkipReason> = new Set([
   "unrecognized",
   "unsupported_sport",
   "schema_invalid",
+  "no_sweat_cash",
 ]);
 
 /** "40% Profit Boost" / "40% boost" -- a percent number directly followed by "[profit|odds ]boost". */
@@ -149,6 +149,27 @@ function truncate(text: string, max: number): string {
   return text.length > max ? text.slice(0, max) : text;
 }
 
+/** Exhaustive over a validated partial type; a no_sweat is only ever kept, never inferred from text. */
+function chooseDraftPromoType(
+  partialType: PromoType | null,
+  boostPercent: string | null,
+  bonusAmountFromText: string | null,
+): PromoType {
+  if (partialType !== null) {
+    switch (partialType) {
+      case "profit_boost":
+      case "bonus_bet":
+      case "no_sweat":
+        return partialType;
+      default:
+        return assertNever(partialType);
+    }
+  }
+  if (boostPercent !== null) return "profit_boost";
+  if (bonusAmountFromText !== null) return "bonus_bet";
+  return "profit_boost";
+}
+
 /**
  * Builds a ScrapedPromo draft from an uncertain skip (unrecognized/
  * unsupported_sport/schema_invalid, or a concrete-offer not_a_promo), for a
@@ -178,16 +199,7 @@ export function buildClassifyDraft(
   const boostPercent = partialBoostPercent ?? extractBoostPercent(combined);
   const bonusAmountFromText = extractBonusAmount(combined);
 
-  let promoType: PromoType;
-  if (partialPromoType) {
-    promoType = partialPromoType;
-  } else if (boostPercent !== null) {
-    promoType = "profit_boost";
-  } else if (bonusAmountFromText !== null) {
-    promoType = "bonus_bet";
-  } else {
-    promoType = "profit_boost";
-  }
+  const promoType: PromoType = chooseDraftPromoType(partialPromoType, boostPercent, bonusAmountFromText);
 
   const bonusAmount = partialBonusAmount ?? (promoType === "bonus_bet" ? bonusAmountFromText : null);
 
@@ -222,6 +234,8 @@ export function buildClassifyDraft(
     claimRequired: validatedField(partial, "claimRequired"),
     finePrintNote: validatedField(partial, "finePrintNote"),
   };
+  const reviewReadings = validatedField(partial, "reviewReadings");
+  if (reviewReadings) draft.reviewReadings = reviewReadings;
 
   return draft;
 }

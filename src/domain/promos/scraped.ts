@@ -36,7 +36,7 @@ export const SKIP_REASONS = [
   "prop",
   "new_customer",
   "deposit",
-  "no_sweat",
+  "no_sweat_cash",
   "not_a_promo",
   "unsupported_sport",
   "not_half_point",
@@ -44,6 +44,21 @@ export const SKIP_REASONS = [
   "schema_invalid",
 ] as const;
 export type SkipReason = (typeof SKIP_REASONS)[number];
+
+/**
+ * Phase 9 (D-15): both readings of an ambiguous promo, as structured data so
+ * the review card can show "Scraper read" and "Reader read" side by side.
+ */
+export interface ReviewReadings {
+  scraper: { promoType: PromoType | null; amount: string | null; minOddsAmerican: number | null };
+  reader: {
+    kind: "profit_boost" | "bonus_bet" | "no_sweat" | "not_usable";
+    amount: string | null;
+    minOddsAmerican: number | null;
+    confidence: "high" | "medium" | "low";
+    refundForm: "bonus_bet" | "cash" | "unknown" | null;
+  };
+}
 
 export interface ScrapedPromo {
   bookKey: string;
@@ -96,6 +111,8 @@ export interface ScrapedPromo {
   claimRequired: "opt_in" | "claim_token" | null;
   /** <= 160 chars. */
   finePrintNote: string | null;
+  /** Phase 9 (D-15): only set on review drafts; never hashed into the dedupe key. */
+  reviewReadings?: ReviewReadings;
 }
 
 /**
@@ -206,6 +223,21 @@ const MaxWinningsSchema = z.strictObject({
  * every member-completed promo must still pass the full schema before it is
  * written.
  */
+const ReviewReadingsSchema = z.strictObject({
+  scraper: z.strictObject({
+    promoType: z.enum(PROMO_TYPES).nullable(),
+    amount: z.string().nullable(),
+    minOddsAmerican: z.number().int().nullable(),
+  }),
+  reader: z.strictObject({
+    kind: z.enum(["profit_boost", "bonus_bet", "no_sweat", "not_usable"]),
+    amount: z.string().nullable(),
+    minOddsAmerican: z.number().int().nullable(),
+    confidence: z.enum(["high", "medium", "low"]),
+    refundForm: z.enum(["bonus_bet", "cash", "unknown"]).nullable(),
+  }),
+});
+
 export const ScrapedPromoFieldsSchema = z.strictObject({
   bookKey: z.string().min(1),
   externalId: z.string().max(200).nullable(),
@@ -233,6 +265,7 @@ export const ScrapedPromoFieldsSchema = z.strictObject({
   unparsedCapFields: z.array(z.enum(CAP_FIELDS)),
   claimRequired: z.enum(["opt_in", "claim_token"]).nullable(),
   finePrintNote: z.string().max(160).nullable(),
+  reviewReadings: ReviewReadingsSchema.optional(),
 });
 
 export const ScrapedPromoSchema = ScrapedPromoFieldsSchema
@@ -295,6 +328,25 @@ export const ScrapedPromoSchema = ScrapedPromoFieldsSchema
         path: ["bonusAmount"],
         message: "a bonus_bet needs bonusAmount",
       });
+    }
+
+    // Phase 9 (D-19): a no_sweat's bonusAmount is its refund cap; it carries
+    // no boost fields and no stake cap of its own.
+    if (promo.promoType === "no_sweat") {
+      if (promo.bonusAmount === null || Number(promo.bonusAmount) <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["bonusAmount"],
+          message: "a no_sweat needs bonusAmount (the refund cap)",
+        });
+      }
+      if (promo.boostPercent !== null || promo.boostedOddsAmerican !== null || promo.maxStake !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["boostPercent"],
+          message: "a no_sweat must not have boostPercent, boostedOddsAmerican or maxStake",
+        });
+      }
     }
 
     // D-03: a published price belongs to one selection -- it can only be

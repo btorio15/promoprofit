@@ -82,6 +82,7 @@ function reading(overrides: ReadingOverrides = {}): PromoReading {
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: null,
     bonusAmount: null,
     maxStake: null,

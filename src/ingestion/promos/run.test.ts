@@ -539,6 +539,7 @@ describe("runPromoScrape", () => {
         reading: {
           kind: "not_usable",
           skipReason: "new_customer",
+          refundForm: null,
           boostPercent: null,
           bonusAmount: null,
           maxStake: null,
@@ -1004,6 +1005,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
             reading: {
               kind: "profit_boost",
               skipReason: null,
+              refundForm: null,
               boostPercent: "50",
               bonusAmount: null,
               maxStake: "25",
@@ -1035,6 +1037,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
           reading: {
             kind: "not_usable",
             skipReason: "prop",
+            refundForm: null,
             boostPercent: null,
             bonusAmount: null,
             maxStake: null,
@@ -1109,6 +1112,7 @@ describe("runPromoScrape with the promo reader (quick-260928-kc5)", () => {
         reading: {
           kind: "profit_boost",
           skipReason: null,
+          refundForm: null,
           boostPercent: "50",
           bonusAmount: null,
           maxStake: "25",

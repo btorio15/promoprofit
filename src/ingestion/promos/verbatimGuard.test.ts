@@ -11,6 +11,7 @@ function baseReading(overrides: ReadingOverrides = {}): PromoReading {
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: null,
     bonusAmount: null,
     maxStake: null,
@@ -258,5 +259,27 @@ describe("guardReading -- structural", () => {
       expect(guarded[field]).toBeNull();
     }
     expect(guarded.droppedFields).toEqual([]);
+  });
+});
+
+describe("guardReading on a no_sweat reading (Phase 9)", () => {
+  const TEXT = "NFL London No Sweat\nMAX REWARD: $10";
+
+  it("keeps the refund cap with $-preceded evidence", () => {
+    const g = guardReading(
+      baseReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "10", evidence: { bonusAmount: "MAX REWARD: $10" } }),
+      TEXT,
+    );
+    expect(g.bonusAmount).toBe("10.00");
+    expect(g.droppedFields).toEqual([]);
+  });
+
+  it("drops the refund cap when evidence has no $", () => {
+    const g = guardReading(
+      baseReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "10", evidence: { bonusAmount: "NFL London No Sweat" } }),
+      TEXT,
+    );
+    expect(g.bonusAmount).toBeNull();
+    expect(g.droppedFields).toContain("bonusAmount");
   });
 });
