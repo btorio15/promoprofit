@@ -53,7 +53,7 @@ import {
   tryAcquireRefreshLock,
   type ExtendedSportOddsWrite,
 } from "./store";
-import { usableOddsBooks } from "@/config/books";
+import { refreshBookmakerKeys } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
@@ -239,7 +239,7 @@ async function runGuardedSpreadsTotalsRefresh(
   if (scope && targets.length === 0) {
     return { status: "no_promos", message: NO_PROMOS_MESSAGE };
   }
-  const bookKeys = usableOddsBooks().map((b) => b.key); // D-15, never paid_only
+  const bookKeys = refreshBookmakerKeys(); // D-06: sportsbooks + Odds-API market venues, <= 10 keys = 1 bucket
   const mainEstimate = estimateRefreshCredits(targets.length, bookKeys.length, EXTENDED_MARKETS.length);
   // D-04 quote: the gate stays on the main fetch (alt is skippable, as in the
   // full search); the confirm dialog quotes main + an alt-game upper bound.

@@ -6,7 +6,7 @@
  * DB connection string (T-01-19).
  */
 import { getExtendedOddsFreshness, getOddsFreshness } from "@/db/queries";
-import { usableOddsBooks } from "@/config/books";
+import { refreshBookmakerKeys } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 import {
   creditLevel,
@@ -117,10 +117,10 @@ export async function getOddsStatus(now: Date = new Date()): Promise<OddsStatus>
   // records its full in-season count even when it fails mid-way.
   const inSeasonSportCount =
     latest && latest.sportsFetched > 0 ? latest.sportsFetched : SPORT_KEYS.length;
-  const estimatedRefreshCredits = estimateRefreshCredits(inSeasonSportCount, usableOddsBooks().length);
+  const estimatedRefreshCredits = estimateRefreshCredits(inSeasonSportCount, refreshBookmakerKeys().length);
   const estimatedExtendedRefreshCredits = estimateRefreshCredits(
     inSeasonSportCount,
-    usableOddsBooks().length,
+    refreshBookmakerKeys().length,
     EXTENDED_MARKET_COUNT,
   );
 
