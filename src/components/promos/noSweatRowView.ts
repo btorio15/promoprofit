@@ -49,6 +49,30 @@ export function hiddenLinesNote(count: number): string | null {
   return `${count} ${count === 1 ? "line" : "lines"} hidden by your Low-profile settings.`;
 }
 
+/**
+ * WR-06: the Opportunities notes section's three groups. Low-profile-blocked
+ * promos may be profitable -- the member's own settings hid every line -- so
+ * they get their own heading instead of sitting under "Not worth it right now".
+ */
+export function groupNoSweatNotes(notes: readonly NoSweatNoteRowDTO[]): {
+  cantPrice: NoSweatNoteRowDTO[];
+  notWorth: NoSweatNoteRowDTO[];
+  lowProfileBlocked: NoSweatNoteRowDTO[];
+} {
+  return {
+    cantPrice: notes.filter((n) => n.note === "cant_price"),
+    notWorth: notes.filter((n) => n.note === "not_worth_it"),
+    lowProfileBlocked: notes.filter((n) => n.note === "low_profile_blocked"),
+  };
+}
+
+/** WR-06: "Hidden by your Low-profile settings (N lines)"; the count is dropped when no lines were counted. */
+export function lowProfileBlockedHeading(notes: readonly NoSweatNoteRowDTO[]): string {
+  const lines = notes.reduce((sum, n) => sum + n.filteredOut, 0);
+  if (lines <= 0) return "Hidden by your Low-profile settings";
+  return `Hidden by your Low-profile settings (${lines} ${lines === 1 ? "line" : "lines"})`;
+}
+
 export function noteCopy(note: NoSweatNoteRowDTO["note"], bookName: string): string {
   switch (note) {
     case "cant_price":

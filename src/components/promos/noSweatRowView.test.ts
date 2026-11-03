@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   NO_SWEAT_RISK_COPY,
   estimateSecondaryLine,
+  groupNoSweatNotes,
   hiddenLinesNote,
+  lowProfileBlockedHeading,
   noteCopy,
   warningCopy,
 } from "./noSweatRowView";
+import type { NoSweatNoteRowDTO } from "@/domain/promos/noSweatRowDto";
 
 describe("noSweatRowView", () => {
   it("builds the secondary estimate line", () => {
@@ -38,5 +41,45 @@ describe("noSweatRowView", () => {
     for (const bad of ["multiple accounts", "VPN", "location", "guaranteed"]) {
       expect(NO_SWEAT_RISK_COPY.toLowerCase()).not.toContain(bad.toLowerCase());
     }
+  });
+});
+
+// WR-06: Low-profile-blocked no-sweats get their own heading, never "Not worth it right now".
+describe("groupNoSweatNotes / lowProfileBlockedHeading", () => {
+  const note = (id: number, n: NoSweatNoteRowDTO["note"], filteredOut = 0): NoSweatNoteRowDTO => ({
+    kind: "no_sweat_note",
+    note: n,
+    rowKey: `nosweat-${n}-${id}`,
+    promoId: id,
+    bookKey: "draftkings",
+    bookName: "DraftKings",
+    title: "No-sweat",
+    scopeLabel: null,
+    refundCap: "25.00",
+    expiresAt: null,
+    addedByYou: false,
+    filteredOut,
+  });
+
+  it("keeps low_profile_blocked out of the not-worth-it group", () => {
+    const g = groupNoSweatNotes([
+      note(1, "cant_price"),
+      note(2, "not_worth_it", 1),
+      note(3, "low_profile_blocked", 4),
+      note(4, "low_profile_blocked", 2),
+    ]);
+    expect(g.cantPrice.map((n) => n.promoId)).toEqual([1]);
+    expect(g.notWorth.map((n) => n.promoId)).toEqual([2]);
+    expect(g.lowProfileBlocked.map((n) => n.promoId)).toEqual([3, 4]);
+  });
+
+  it("headings count the hidden lines", () => {
+    expect(lowProfileBlockedHeading([note(3, "low_profile_blocked", 4), note(4, "low_profile_blocked", 2)])).toBe(
+      "Hidden by your Low-profile settings (6 lines)",
+    );
+    expect(lowProfileBlockedHeading([note(3, "low_profile_blocked", 1)])).toBe(
+      "Hidden by your Low-profile settings (1 line)",
+    );
+    expect(lowProfileBlockedHeading([note(3, "low_profile_blocked", 0)])).toBe("Hidden by your Low-profile settings");
   });
 });

@@ -23,6 +23,7 @@ import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { PromoRow } from "@/components/promos/PromoRow";
 import { NoSweatRow } from "@/components/promos/NoSweatRow";
 import { NoSweatNoteRow } from "@/components/promos/NoSweatNoteRow";
+import { groupNoSweatNotes, lowProfileBlockedHeading } from "@/components/promos/noSweatRowView";
 import { AddPromoForm } from "@/components/promos/AddPromoForm";
 import { ArbRow } from "@/components/arb/ArbRow";
 import { formatUsd } from "@/lib/format";
@@ -95,8 +96,7 @@ function NoSweatNotesSection({
   onChanged: () => void;
   addedActions: { onError: (message: string) => void; onEdit: (promoId: number, trigger: HTMLElement | null) => void };
 }) {
-  const cantPrice = notes.filter((n) => n.note === "cant_price");
-  const notWorth = notes.filter((n) => n.note !== "cant_price");
+  const { cantPrice, notWorth, lowProfileBlocked } = groupNoSweatNotes(notes);
   const render = (n: NoSweatNoteRowDTO) => (
     <NoSweatNoteRow key={n.rowKey} dto={n} onChanged={onChanged} addedActions={n.addedByYou ? addedActions : undefined} />
   );
@@ -117,6 +117,12 @@ function NoSweatNotesSection({
         <>
           <h3 className="text-sm text-muted-foreground">Not worth it right now</h3>
           <div className="flex flex-col gap-3">{notWorth.map(render)}</div>
+        </>
+      ) : null}
+      {lowProfileBlocked.length > 0 ? (
+        <>
+          <h3 className="text-sm text-muted-foreground">{lowProfileBlockedHeading(lowProfileBlocked)}</h3>
+          <div className="flex flex-col gap-3">{lowProfileBlocked.map(render)}</div>
         </>
       ) : null}
     </section>
