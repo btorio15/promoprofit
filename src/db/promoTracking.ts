@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
+import type { NoSweatDoneSnapshot } from "@/domain/promos/noSweatSnapshot";
 import {
   DonePairSnapshotSchema,
   PairMemberSnapshotSchema,
@@ -56,7 +57,7 @@ export async function markPromoDone(args: {
   userId: number;
   promoId: number;
   now: Date;
-  snapshot: DonePromoSnapshot;
+  snapshot: DonePromoSnapshot | NoSweatDoneSnapshot;
   profitExtracted: string;
 }): Promise<void> {
   const { userId, promoId, now, snapshot, profitExtracted } = args;
@@ -65,6 +66,23 @@ export async function markPromoDone(args: {
     .insert(promoCompletions)
     .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
     .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
+}
+
+/**
+ * Phase 9 (A-09): "Fix amounts" on a settled no-sweat. One UPDATE of the
+ * snapshot and profit, filtered by the session user id and promo id.
+ */
+export async function updateNoSweatCompletion(args: {
+  userId: number;
+  promoId: number;
+  snapshot: NoSweatDoneSnapshot;
+  profitExtracted: string;
+}): Promise<void> {
+  const { userId, promoId, snapshot, profitExtracted } = args;
+  await getDb()
+    .update(promoCompletions)
+    .set({ snapshot, profitExtracted })
+    .where(and(eq(promoCompletions.userId, userId), eq(promoCompletions.promoId, promoId)));
 }
 
 /**
