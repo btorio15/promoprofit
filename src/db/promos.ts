@@ -1,4 +1,5 @@
-import { and, eq, gt, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import Decimal from "decimal.js";
+import { and, eq, gt, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getDb } from "./client";
 import { promos, scrapeRuns, users } from "./schema";
@@ -8,6 +9,7 @@ import {
   PROMO_SIDES,
   PROMO_TYPES,
   WINNINGS_CAP_KINDS,
+  isGuaranteedPromoType,
   type PromoMarketType,
   type PromoSelection,
   type PromoSide,
@@ -92,6 +94,32 @@ export interface ActivePromo extends RankablePromo {
   /** quick-261014-u6k: the cap in effect with no per-promo override, and its source. */
   fallbackCap?: string | null;
   fallbackSource?: Exclude<CapSource, "your_promo_cap"> | null;
+}
+
+/**
+ * A no-sweat promo (refund-if-it-loses, A-01). Deliberately NOT a
+ * RankablePromo: it never reaches the guaranteed pipeline, only the
+ * estimate-only ranker (rankNoSweat.ts). Shape is a superset of
+ * rankNoSweat's NoSweatPromo.
+ */
+export interface ActiveNoSweatPromo {
+  id: number;
+  bookKey: string;
+  title: string;
+  /** The refund cap (bonus_amount): the most the book refunds as a bonus bet. */
+  refundCap: Decimal;
+  minOddsAmerican: number | null;
+  scope: PromoScope;
+  eligibleMarketTypes: readonly PromoMarketType[];
+  expiresAt: Date | null;
+  finePrintNote: string | null;
+  claimHint: string | null;
+  scopeLabel: string;
+  autoMatched: boolean;
+  scraped: boolean;
+  attribution: ActivePromo["attribution"];
+  addedByYou: boolean;
+  addedByUserId: number | null;
 }
 
 const ET_DAY_KEY_FORMATTER = new Intl.DateTimeFormat("en-CA", {
@@ -180,6 +208,7 @@ interface ActivePromoRow {
   confirmedByName: string | null;
   correctedByName: string | null;
   capEnteredByName: string | null;
+  expiresAt?: Date | null;
 }
 
 /**
@@ -194,6 +223,17 @@ export function mapActivePromoRow(row: ActivePromoRow, viewerUserId?: number): A
     return null;
   }
   const promoType = row.promoType as PromoType;
+  // A no-sweat is expected here (it has its own reader) -- never a guaranteed promo (A-01, FEED-04).
+  if (!isGuaranteedPromoType(promoType)) return null;
+  return mapPromoRowCore(row, promoType, viewerUserId);
+}
+
+/** Shared scope/pin/payload validation for both the guaranteed and no-sweat readers. */
+function mapPromoRowCore<T extends PromoType>(
+  row: ActivePromoRow,
+  promoType: T,
+  viewerUserId?: number,
+): (Omit<ActivePromo, "promoType"> & { promoType: T }) | null {
 
   let scope: PromoScope;
   let scopeLabel: string;
@@ -298,6 +338,46 @@ export function mapActivePromoRow(row: ActivePromoRow, viewerUserId?: number): A
 }
 
 /**
+ * Maps a no_sweat row to an ActiveNoSweatPromo, or null for any other
+ * promo_type or a missing/non-positive refund cap (bonus_amount).
+ */
+export function mapActiveNoSweatRow(row: ActivePromoRow, viewerUserId?: number): ActiveNoSweatPromo | null {
+  if (row.promoType !== "no_sweat") return null;
+  if (row.bonusAmount === null) return null;
+  let refundCap: Decimal;
+  try {
+    refundCap = new Decimal(row.bonusAmount);
+  } catch {
+    return null;
+  }
+  if (!refundCap.isFinite() || refundCap.lte(0)) return null;
+
+  const core = mapPromoRowCore(row, "no_sweat", viewerUserId);
+  if (!core) return null;
+  const parsed = ScrapedPromoSchema.safeParse(row.parsed);
+  if (!parsed.success) return null;
+
+  return {
+    id: core.id,
+    bookKey: core.bookKey,
+    title: parsed.data.title,
+    refundCap: refundCap.toDecimalPlaces(2),
+    minOddsAmerican: core.minOddsAmerican,
+    scope: core.scope,
+    eligibleMarketTypes: core.eligibleMarketTypes,
+    expiresAt: row.expiresAt ?? null,
+    finePrintNote: core.finePrintNote,
+    claimHint: core.claimHint,
+    scopeLabel: core.scopeLabel,
+    autoMatched: core.autoMatched,
+    scraped: core.scraped,
+    attribution: core.attribution,
+    addedByYou: core.addedByYou,
+    addedByUserId: row.addedByUserId,
+  };
+}
+
+/**
  * The single visibility rule for personal promos (D-01, T-5-visibility).
  * Secure by default: no viewer means scraped/group promos only.
  */
@@ -322,26 +402,13 @@ export function activePromoWhere(now: Date, viewerUserId?: number): SQL {
   ) as SQL;
 }
 
-/**
- * Every promo currently hedgeable (D-01, D-16, PROMO-04): status='active',
- * a resolved scope, and not past its own expiry, its matched event's
- * commence_time (event scope) or its window's end (sport_window scope,
- * D-16). pending_review promos never reach this query -- they have no
- * resolved scope_kind until a reviewer or the auto-matcher sets one.
- *
- * quick-261001-dhn: when a viewer is given, THAT viewer's own "Your cap"
- * overrides are applied here (maxStake becomes the override for boosts), so
- * every member-scoped caller (Promos, Opportunities, pairs, alt-spreads,
- * mark-done) gets them with no change. recordCurrentProfitObservations
- * strips them again so shared observations stay group-level.
- */
-export async function getActivePromos(now: Date, viewerUserId?: number): Promise<ActivePromo[]> {
+function selectActivePromoRows(where: SQL) {
   const confirmedByUsers = alias(users, "confirmed_by_users");
   const correctedByUsers = alias(users, "corrected_by_users");
   const capEnteredByUsers = alias(users, "cap_entered_by_users");
 
   const db = getDb();
-  const rowsQuery = db
+  return db
     .select({
       id: promos.id,
       bookKey: promos.bookKey,
@@ -367,6 +434,7 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
       maxWinningsKind: promos.maxWinningsKind,
       minOddsAmerican: promos.minOddsAmerican,
       finePrintNote: promos.finePrintNote,
+      expiresAt: promos.expiresAt,
       autoMatched: promos.autoMatched,
       addedByUserId: promos.addedByUserId,
       confirmedByName: confirmedByUsers.displayName,
@@ -377,7 +445,34 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
     .leftJoin(confirmedByUsers, eq(promos.confirmedByUserId, confirmedByUsers.id))
     .leftJoin(correctedByUsers, eq(promos.correctedByUserId, correctedByUsers.id))
     .leftJoin(capEnteredByUsers, eq(promos.capEnteredByUserId, capEnteredByUsers.id))
-    .where(activePromoWhere(now, viewerUserId));
+    .where(where);
+}
+
+/** Guaranteed-only active promos: no_sweat is excluded in SQL (A-01, FEED-04). */
+export function guaranteedPromoWhere(now: Date, viewerUserId?: number): SQL {
+  return and(activePromoWhere(now, viewerUserId), ne(promos.promoType, "no_sweat")) as SQL;
+}
+
+/** Active no_sweat promos visible to the viewer (same visibility rule, A-01). */
+export function noSweatPromoWhere(now: Date, viewerUserId?: number): SQL {
+  return and(activePromoWhere(now, viewerUserId), eq(promos.promoType, "no_sweat")) as SQL;
+}
+
+/**
+ * Every promo currently hedgeable (D-01, D-16, PROMO-04): status='active',
+ * a resolved scope, and not past its own expiry, its matched event's
+ * commence_time (event scope) or its window's end (sport_window scope,
+ * D-16). pending_review promos never reach this query -- they have no
+ * resolved scope_kind until a reviewer or the auto-matcher sets one.
+ *
+ * quick-261001-dhn: when a viewer is given, THAT viewer's own "Your cap"
+ * overrides are applied here (maxStake becomes the override for boosts), so
+ * every member-scoped caller (Promos, Opportunities, pairs, alt-spreads,
+ * mark-done) gets them with no change. recordCurrentProfitObservations
+ * strips them again so shared observations stay group-level.
+ */
+export async function getActivePromos(now: Date, viewerUserId?: number): Promise<ActivePromo[]> {
+  const rowsQuery = selectActivePromoRows(guaranteedPromoWhere(now, viewerUserId));
 
   const [rows, caps, bookCaps] = await Promise.all([
     rowsQuery,
@@ -391,4 +486,19 @@ export async function getActivePromos(now: Date, viewerUserId?: number): Promise
     if (mapped) activePromos.push(mapped);
   }
   return caps === null || bookCaps === null ? activePromos : applyMemberCaps(activePromos, caps, bookCaps);
+}
+
+/**
+ * Active no_sweat promos for the estimate section of the feed (A-01). Uses
+ * the same visibility rule as getActivePromos; member caps do not apply
+ * (a no-sweat has no stake cap, only a refund cap).
+ */
+export async function getActiveNoSweatPromos(now: Date, viewerUserId?: number): Promise<ActiveNoSweatPromo[]> {
+  const rows = await selectActivePromoRows(noSweatPromoWhere(now, viewerUserId));
+  const result: ActiveNoSweatPromo[] = [];
+  for (const row of rows) {
+    const mapped = mapActiveNoSweatRow(row, viewerUserId);
+    if (mapped) result.push(mapped);
+  }
+  return result;
 }
