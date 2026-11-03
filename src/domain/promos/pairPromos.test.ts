@@ -220,6 +220,13 @@ describe("findPairCandidates: discovery rules", () => {
     expect(c.gain.equals(c.result.guaranteedProfit)).toBe(true);
   });
 
+  it("never pairs a no_sweat even if one slips past the types (A-01 runtime guard)", () => {
+    const boost = boostPromo({ id: 1, bookKey: "draftkings" });
+    const sneaky = bonusPromo({ id: 2, bookKey: "fanduel", promoType: "no_sweat" as unknown as "bonus_bet" });
+    const found = findPairCandidates([boost, sneaky], NO_SINGLES, optsFor([baseEvent]));
+    expect(found).toHaveLength(0);
+  });
+
   it("boost_boost promoA is the lower id regardless of input order", () => {
     const a = boostPromo({ id: 1, bookKey: "draftkings" });
     const b = boostPromo({ id: 2, bookKey: "fanduel" });
