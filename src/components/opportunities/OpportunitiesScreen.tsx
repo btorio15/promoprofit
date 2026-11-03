@@ -7,6 +7,7 @@ import { getOpportunities } from "@/app/actions/get-opportunities";
 import { pickTop, TOP_N } from "@/domain/opportunities/pick";
 import {
   OPPORTUNITIES_ARB_TOTAL_STAKE,
+  isNoSweatRow,
   SOURCE_META,
   SOURCE_ORDER,
   type OpportunitiesEmptyVariant,
@@ -227,7 +228,9 @@ export function OpportunitiesScreen({
                     emptyCopy={meta.emptyCopy}
                     isEmpty={top.length === 0}
                   >
-                    {top.map((item) => (
+                    {top.map((item) =>
+                      // Phase 9: no-sweat estimate rows get their own card in a later plan.
+                      isNoSweatRow(item.data) ? null : (
                       <PromoRow
                         key={item.rowKey}
                         row={item.data}
@@ -236,7 +239,8 @@ export function OpportunitiesScreen({
                         capEditable
                         capFieldIdPrefix="opp-your-cap"
                       />
-                    ))}
+                      ),
+                    )}
                   </OpportunitySection>
                 );
               }
