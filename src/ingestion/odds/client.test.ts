@@ -114,6 +114,25 @@ describe("client (Odds API v4 wrapper)", () => {
     expect(calledUrl).toContain("commenceTimeTo=2026-10-02T00%3A00%3A00Z");
   });
 
+  it("fetchSportOdds sends includeBetLimits only when the option is true", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(async () => makeOddsResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const { fetchSportOdds } = await import("./client");
+    const base = {
+      bookmakerKeys: ["kalshi"],
+      commenceTimeFrom: new Date("2026-09-25T00:00:00.000Z"),
+      commenceTimeTo: new Date("2026-10-02T00:00:00.000Z"),
+    };
+    await fetchSportOdds("basketball_nba", base, SENTINEL_KEY);
+    await fetchSportOdds("basketball_nba", { ...base, includeBetLimits: false }, SENTINEL_KEY);
+    await fetchSportOdds("basketball_nba", { ...base, includeBetLimits: true }, SENTINEL_KEY);
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("includeBetLimits");
+    expect(String(fetchMock.mock.calls[1][0])).not.toContain("includeBetLimits");
+    expect(String(fetchMock.mock.calls[2][0])).toContain("includeBetLimits=true");
+  });
+
   it("fetchSportOdds rejects an empty key without falling back or fetching (IN-02)", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
