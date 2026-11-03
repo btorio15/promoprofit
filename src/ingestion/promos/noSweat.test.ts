@@ -45,6 +45,34 @@ describe("classifyNoSweat", () => {
     expect(r.kind).not.toBe("cash_refund");
   });
 
+  // WR-01 regressions: the refund form comes from the refund phrase itself.
+  it("a cash refund whose fine print mentions bonus bets is still cash_refund", () => {
+    expect(
+      classifyNoSweat({
+        title: "No Sweat Bet",
+        text: "If your bet loses, get your stake back in cash. Not valid with bonus bets.",
+      }).kind,
+    ).toBe("cash_refund");
+  });
+
+  it("a bonus-bet refund whose fine print mentions cash stays bonus_bet_refund", () => {
+    expect(
+      classifyNoSweat({
+        title: "No Sweat Bet",
+        text: "If your bet loses, get your stake back as a Bonus Bet. Bonus Bets have no cash value.",
+      }).kind,
+    ).toBe("bonus_bet_refund");
+  });
+
+  it("both refund forms stated is treated as cash (never priced, goes to review)", () => {
+    expect(
+      classifyNoSweat({
+        title: "No Sweat Bet",
+        text: "If your bet loses, get your stake back in cash. Or refunded as a bonus bet in some states.",
+      }).kind,
+    ).toBe("cash_refund");
+  });
+
   it("no cap stated gives refundCap null", () => {
     expect(
       classifyNoSweat({ title: "No Sweat", text: "If your bet loses, get a bonus bet back" }),

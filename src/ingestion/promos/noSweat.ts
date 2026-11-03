@@ -83,8 +83,36 @@ export function classifyNoSweat(input: {
   if (!detected) return { kind: "none" };
 
   const refundCap = parseNoSweatRefundCap(combined);
+  const form = refundFormOf(combined);
+  if (form === "cash" || form === "mixed") return { kind: "cash_refund", refundCap };
+  if (form === "bonus") return { kind: "bonus_bet_refund", refundCap };
+  // No refund phrase states its form: fall back to the whole-text signals.
   if (CASH_REFUND_RE.test(combined) && !BONUS_REFUND_RE.test(combined)) {
     return { kind: "cash_refund", refundCap };
   }
   return { kind: "bonus_bet_refund", refundCap };
+}
+
+/**
+ * WR-01: the refund form stated right next to the refund phrase ("stake back in
+ * cash", "refunded as a Bonus Bet", "back in the form of a Bonus Bet"). A bonus
+ * bet mentioned elsewhere ("Not valid with bonus bets") is not the refund form.
+ * "cash" / "bonus" from the adjacent match(es); "mixed" when both forms are
+ * stated (treated as cash -- never priced, goes to review, D-17); null when no
+ * refund phrase states a form.
+ */
+const REFUND_FORM_RE =
+  /\b(?:refund(?:ed)?|back|returned)\b[^.\n]{0,30}?\b(?:in|as)\s+(?:the form of\s+)?(?:an?\s+)?(cash|bonus bets?|free bets?|site credit|tokens?|crown cash|dk dollars)\b/gi;
+
+function refundFormOf(text: string): "cash" | "bonus" | "mixed" | null {
+  let cash = false;
+  let bonus = false;
+  for (const m of text.matchAll(REFUND_FORM_RE)) {
+    if (m[1].toLowerCase() === "cash") cash = true;
+    else bonus = true;
+  }
+  if (cash && bonus) return "mixed";
+  if (cash) return "cash";
+  if (bonus) return "bonus";
+  return null;
 }
