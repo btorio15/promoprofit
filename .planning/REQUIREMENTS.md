@@ -34,6 +34,7 @@
 - [ ] **INTRO-08**: The Opportunities page has its own "Best intro offers" section showing the top-ranked intro offers; the full ranked list with whole-plan views stays on the Sign-up offers screen (owner, 2026-11-03)
 - [ ] **INTRO-09**: Intro offers are never mixed into the promos list or its sort on Opportunities, including intro offers entered by hand (owner, 2026-11-03)
 - [ ] **INTRO-10**: Profit from intro offers is not counted in the Dashboard profit graph (owner, 2026-11-03)
+- [ ] **INTRO-11**: Bonus bets from no-sweat refunds and intro offers are valued at a historical conversion rate per book (e.g. a trailing median from `bonus_conversion_snapshots`, recorded since 2026-11-03), not only today's single best conversion (owner, 2026-11-03)
 
 ### More sportsbooks
 
@@ -84,6 +85,7 @@
 | INTRO-08 | Phase 10 | Pending |
 | INTRO-09 | Phase 10 | Pending |
 | INTRO-10 | Phase 10 | Pending |
+| INTRO-11 | Phase 10 | Pending |
 | BOOKS-01 | Phase 11 | Pending |
 | BOOKS-02 | Phase 11 | Pending |
 | BOOKS-03 | Phase 11 | Pending |
@@ -91,4 +93,4 @@
 | BOOKS-05 | Phase 11 | Pending |
 | BOOKS-06 | Phase 11 | Pending |
 
-**Coverage:** 25/25 v1.2 requirements mapped
+**Coverage:** 26/26 v1.2 requirements mapped

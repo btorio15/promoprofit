@@ -1,7 +1,7 @@
 ---
 phase: quick-261103-mok
 plan: 01
-status: partial
+status: complete
 subsystem: hedge / ingestion
 tags: [bonus-bet, conversion-rate, history, drizzle]
 requires: []
@@ -21,7 +21,7 @@ key-files:
     - src/ingestion/odds/morningObserve.test.ts
     - drizzle/meta/_journal.json
 metrics:
-  tasks: "2/3 (Task 3 pending owner approval)"
+  tasks: "3/3"
   completed: 2026-11-03
 ---
 
@@ -33,7 +33,7 @@ Every scheduled odds run now builds one row per usable Colorado book valuing a f
 
 - Task 1 (pure row builder + tests): done, commit 643dcae
 - Task 2 (table, migration 0019, recorder, wiring, tests): done (commit in git log after 643dcae)
-- Task 3 (apply migration 0019 to live Neon): PENDING owner approval. Until applied, the scheduled run logs "recordCurrentBonusConversionSnapshots: failed to record conversion snapshots" and carries on by design.
+- Task 3 (apply migration 0019 to live Neon): done 2026-11-03 with owner approval. `git fetch origin` showed no migration 0019+ on origin/main or origin/codex/deepbook-ui; `npm run db:migrate` applied it. A one-off manual run of `recordCurrentBonusConversionSnapshots` wrote the first rows (e.g. ballybet top 77.27% / median 73.07%, betmgm 69.44% / 67.85%, draftkings 69.41% / 66.66%), proving the path end to end with 0 Odds API credits.
 
 ## Verification
 
