@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildArbFixtureEvents, buildArbExtendedFixtureEvents } from "@/test/fixtures/arbEvents";
-import { usableOddsBooks } from "@/config/books";
+import { groupHedgeBookKeys, usableHedgeBooks, usableOddsBooks } from "@/config/books";
+import type { OddsEvent } from "@/domain/odds/schemas";
 import type { FindArbsResponse } from "@/domain/arb/types";
 
 /**
@@ -23,7 +24,13 @@ vi.mock("@/db/queries", () => {
       Promise.resolve(allowedKeys ? books.filter((b) => allowedKeys.has(b.key)) : books),
     ),
     getHedgeBookKeys: vi.fn((allowedKeys?: ReadonlySet<string>) =>
-      Promise.resolve(allowedKeys ? allKeys.filter((k) => allowedKeys.has(k)) : allKeys),
+      Promise.resolve(
+        allowedKeys
+          ? usableHedgeBooks()
+              .map((b) => b.key)
+              .filter((k) => allowedKeys.has(k))
+          : groupHedgeBookKeys(),
+      ),
     ),
     getCachedEvents: vi.fn().mockResolvedValue({ events: buildArbFixtureEvents(now), fetchedAt: now }),
     getCachedExtendedEvents: vi
@@ -241,5 +248,77 @@ describe("findArbs (per-user book scoping, D-16..D-20)", () => {
     await expect(findArbs({ totalStake: "200" })).rejects.toThrow("NEXT_REDIRECT");
 
     expect(vi.mocked(getCachedEvents).mock.calls.length).toBe(callsBefore);
+  });
+});
+
+describe("findArbs (market venues are opt-in)", () => {
+  beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  function marketEvent(): OddsEvent {
+    return {
+      id: "mkt-event",
+      sport_key: "basketball_nba",
+      sport_title: "NBA",
+      commence_time: new Date(now.getTime() + 24 * 3600 * 1000).toISOString(),
+      home_team: "Home Team",
+      away_team: "Away Team",
+      bookmakers: [
+        {
+          key: "draftkings",
+          title: "DraftKings",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: "Away Team", price: 120 },
+                { name: "Home Team", price: -400 },
+              ],
+            },
+          ],
+        },
+        {
+          key: "kalshi",
+          title: "Kalshi",
+          markets: [
+            {
+              key: "h2h",
+              outcomes: [
+                { name: "Away Team", price: -400 },
+                { name: "Home Team", price: 127 },
+              ],
+            },
+          ],
+        },
+      ],
+    } as OddsEvent;
+  }
+
+  it("shows a book-vs-market arb only when the member saved the venue", async () => {
+    const sportsbookKeys = usableOddsBooks().map((b) => b.key);
+
+    vi.mocked(getCachedEvents).mockResolvedValueOnce({ events: [marketEvent()], fetchedAt: now });
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce([...sportsbookKeys, "kalshi"]);
+    const withVenue = await findArbs({ totalStake: "200" });
+    expect(withVenue.status).toBe("ok");
+    if (withVenue.status !== "ok") return;
+    const row = withVenue.resultsBySport.all.find((r) => r.eventId === "mkt-event");
+    expect(row).toBeDefined();
+    expect(row!.sideB.market).not.toBeNull();
+    expect(row!.sideB.bookName).toBe("Kalshi");
+    expect(row!.sideA.market).toBeNull();
+
+    vi.mocked(getCachedEvents).mockResolvedValueOnce({ events: [marketEvent()], fetchedAt: now });
+    vi.mocked(getUserBookKeys).mockResolvedValueOnce(sportsbookKeys);
+    const without = await findArbs({ totalStake: "200" });
+    expect(without.status).toBe("ok");
+    if (without.status !== "ok") return;
+    expect(without.resultsBySport.all.some((r) => r.eventId === "mkt-event")).toBe(false);
   });
 });
