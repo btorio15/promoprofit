@@ -167,7 +167,9 @@ export function dailyHistoryStats(
   window?: { start: string; end: string },
 ): DailyHistoryStats {
   const inWindow = (date: string) => !window || (date >= window.start && date <= window.end);
-  const windowRows = allRows.filter((row) => inWindow(row.denverDate));
+  // Estimates never count in Statistics (FEED-04): drop no-sweats up front so
+  // every total, group and average below stays guaranteed-only.
+  const windowRows = allRows.filter((row) => row.promoType !== "no_sweat" && inWindow(row.denverDate));
   const rows = bestRowPerPromo(windowRows);
 
   const byDay = new Map<string, { total: Decimal; bySport: Map<string, Decimal>; segments: DaySegment[] }>();
@@ -226,25 +228,37 @@ export function dailyHistoryStats(
   let boostExcluded = 0;
   for (const row of rows) {
     const profit = new Decimal(row.profit);
-    if (row.promoType === "bonus_bet" && row.bonusAmount !== null) {
-      const face = new Decimal(row.bonusAmount);
-      if (face.greaterThan(0) && face.lessThanOrEqualTo(MAX_PLAUSIBLE_BONUS)) {
-        bonusNum = bonusNum.plus(profit);
-        bonusDen = bonusDen.plus(face);
-        bonusRecords += 1;
-      } else {
-        bonusExcluded += 1;
-      }
-    }
-    if (row.promoType === "profit_boost" && row.maxStake !== null) {
-      const stake = new Decimal(row.maxStake);
-      if (stake.greaterThan(0)) {
-        boostNum = boostNum.plus(profit);
-        boostDen = boostDen.plus(stake);
-        boostRecords += 1;
-      } else {
-        boostExcluded += 1;
-      }
+    switch (row.promoType) {
+      case "bonus_bet":
+        if (row.bonusAmount !== null) {
+          const face = new Decimal(row.bonusAmount);
+          if (face.greaterThan(0) && face.lessThanOrEqualTo(MAX_PLAUSIBLE_BONUS)) {
+            bonusNum = bonusNum.plus(profit);
+            bonusDen = bonusDen.plus(face);
+            bonusRecords += 1;
+          } else {
+            bonusExcluded += 1;
+          }
+        }
+        break;
+      case "profit_boost":
+        if (row.maxStake !== null) {
+          const stake = new Decimal(row.maxStake);
+          if (stake.greaterThan(0)) {
+            boostNum = boostNum.plus(profit);
+            boostDen = boostDen.plus(stake);
+            boostRecords += 1;
+          } else {
+            boostExcluded += 1;
+          }
+        }
+        break;
+      case "no_sweat":
+        // estimates never count in Statistics, FEED-04
+        break;
+      default:
+        // HistoryRow.promoType is a plain string from SQL ("unknown" etc.): no conversion stat.
+        break;
     }
   }
 

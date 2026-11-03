@@ -193,3 +193,20 @@ describe("dailyHistoryStats counts each promo once (quick-261021-gy4)", () => {
     expect(stats.days.find((d) => d.total === "1.00")?.date).toBe("2026-10-04");
   });
 });
+
+describe("dailyHistoryStats ignores no_sweat estimates (FEED-04)", () => {
+  it("a no_sweat row changes no totals, counts or conversion stats", () => {
+    const guaranteed = [
+      row({ denverDate: "2026-10-01", profit: "4.00", promoType: "bonus_bet", bonusAmount: "25.00" }),
+      row({ denverDate: "2026-10-02", profit: "2.00", promoType: "profit_boost", maxStake: "25.00" }),
+    ];
+    const noSweat = row({ denverDate: "2026-10-03", profit: "9.00", promoType: "no_sweat", bonusAmount: "50.00", maxStake: "50.00" });
+    const without = dailyHistoryStats(guaranteed);
+    const withEstimate = dailyHistoryStats([...guaranteed, noSweat]);
+    expect(withEstimate.grandTotal).toBe(without.grandTotal);
+    expect(withEstimate.promoCount).toBe(2);
+    expect(withEstimate.bonusConversion).toEqual(without.bonusConversion);
+    expect(withEstimate.boostConversion).toEqual(without.boostConversion);
+    expect(withEstimate.types.find((t) => t.key === "no_sweat")).toBeUndefined();
+  });
+});
