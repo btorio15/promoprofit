@@ -52,7 +52,14 @@ describe("effectiveBets", () => {
 
 describe("lostTotal", () => {
   it("matches the solver estimate with no correction", () => {
-    expect(lostTotal(snap, null, snap.conversion.refundValue)).toBe(snap.estimate.profitIfLose);
+    // The shared fixture's estimate numbers are illustrative; build a
+    // solver-consistent snapshot: hedge 47.00 @ -160 pays floor(76.375) = 76.37,
+    // so lose = 76.37 - 47.00 - 50.00 + 35.00 = 14.37.
+    const consistent = buildTrackedSnapshotFixture({
+      estimate: { ...snap.estimate, profitIfWin: "28.00", profitIfLose: "14.37" },
+    });
+    expect(lostTotal(consistent, null, consistent.conversion.refundValue)).toBe("14.37");
+    expect(wonProfit(consistent, corr({ qualifyingStake: "50.00", hedgeStake: "47.00" }))).toBe("28.00");
   });
   it("hand case 52.00 - 20.00 - 25.00 + 18.40 = 25.40", () => {
     expect(lostTotal(snap, corr({ hedgeOddsAmerican: 160 }), "18.40")).toBe("25.40");
