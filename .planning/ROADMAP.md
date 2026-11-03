@@ -91,11 +91,11 @@ Plans:
 
 **Wave 2**
 
-- [ ] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline (bounded typecheck sweep), pair finder guard (FEED-02, FEED-04)
-- [ ] 09-06-PLAN.md — Low-profile limits in the line search, rankNoSweatFeed, no-sweat row DTOs (FEED-03)
-- [ ] 09-07-PLAN.md — TDD settle math and shared refund-conversion ranker (FEED-05)
-- [ ] 09-08-PLAN.md — AI reader no_sweat kind, prompt bump, reconcile disagreements to review, reader budget (FEED-01, FEED-02)
-- [ ] 09-20-PLAN.md — Refresh promos covers no-sweat sports (FEED-03)
+- [x] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline (bounded typecheck sweep), pair finder guard (FEED-02, FEED-04)
+- [x] 09-06-PLAN.md — Low-profile limits in the line search, rankNoSweatFeed, no-sweat row DTOs (FEED-03)
+- [x] 09-07-PLAN.md — TDD settle math and shared refund-conversion ranker (FEED-05)
+- [x] 09-08-PLAN.md — AI reader no_sweat kind, prompt bump, reconcile disagreements to review, reader budget (FEED-01, FEED-02)
+- [x] 09-20-PLAN.md — Refresh promos covers no-sweat sports (FEED-03)
 
 **Wave 3**
 
@@ -162,7 +162,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 4/20 | In Progress|  |
+| 9. No-Sweat Promos in the Feed | v1.2 | 9/20 | In Progress|  |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 
