@@ -177,8 +177,43 @@ describe("toPairRowDTO", () => {
       stake: "30.76",
       payout: "48.63",
       note: expect.stringContaining("Ordinary bet (no promo)"),
+      market: null,
     });
     expect(dto.totalStaked).toBe(forced.result.totalStaked.toFixed(2));
     expect(dto.legC?.note).toContain(dto.legC!.selectionLabel);
+  });
+  it("a market top-up maps legC.market, venue name, outlay stake and contract payout", () => {
+    const c = candidate([base(1, "draftkings"), base(2, "fanduel")]);
+    const fill = {
+      venueKey: "kalshi" as const,
+      side: "yes" as const,
+      priceCents: 61,
+      contracts: 42,
+      availableContracts: null,
+      cost: new Decimal("25.62"),
+      fee: new Decimal("0.70"),
+      outlay: new Decimal("26.32"),
+    };
+    const topUpLeg = {
+      stake: fill.outlay,
+      payout: new Decimal(42),
+      oddsDecimal: new Decimal("1.6"),
+      priceSource: "quote" as const,
+      capBound: null,
+    };
+    const forced = {
+      ...c,
+      result: { ...c.result, topUp: { side: "B" as const, leg: topUpLeg } },
+      topUp: { side: "B" as const, selection: c.selectionB, bookKey: "kalshi", oddsAmerican: -156 },
+      topUpMarket: fill,
+    } as unknown as PairCandidate<PresentablePromo>;
+    const dto = toPairRowDTO(forced, bookNames);
+    expect(dto.legC?.market?.contracts).toBe(42);
+    expect(dto.legC?.market?.venueKey).toBe("kalshi");
+    expect(dto.legC?.bookName).toBe(dto.legC?.market?.venueName);
+    expect(dto.legC?.stake).toBe(dto.legC?.market?.outlay);
+    expect(dto.legC?.stake).toBe("26.32");
+    expect(dto.legC?.payout).toBe("42.00");
+    expect(dto.legC?.note).toBe(`Top up with 42 ${dto.legC?.bookName} contracts so both sides pay the same.`);
   });
 });

@@ -1,7 +1,9 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
+import { MarketLegDTOSchema } from "@/domain/market/legDto";
 // Type-only imports: Plan 08 makes doneSnapshot.ts import runtime values from
 // this module, so a runtime import back would be a cycle.
+import type { MarketLegDTO } from "@/domain/market/legDto";
 import type { DonePromoTerms } from "./doneSnapshot";
 import type { PairRowDTO } from "./pairRowDto";
 import { PROMO_TYPES } from "./types";
@@ -37,6 +39,8 @@ const PairTopUpSnapshotSchema = z.object({
   stake: z.string(),
   payout: z.string(),
   note: z.string(),
+  // Additive: snapshots stored before Phase 12 have no market leg and still parse.
+  market: MarketLegDTOSchema.nullable().optional(),
 });
 
 export const PairRowSnapshotSchema = z.object({
@@ -123,6 +127,7 @@ export interface DonePairLegDTO {
 }
 
 export interface DonePairLegC {
+  market: MarketLegDTO | null;
   side: "A" | "B";
   bookName: string;
   selectionLabel: string;
@@ -176,6 +181,7 @@ export function toDonePairDTO(snapshot: DonePairSnapshot): DonePairDTO {
     legB: toDoneLeg(r.legB),
     legC: r.legC
       ? {
+          market: r.legC.market ?? null,
           side: r.legC.side,
           bookName: r.legC.bookName,
           selectionLabel: r.legC.selectionLabel,
