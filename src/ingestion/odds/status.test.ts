@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { estimateRefreshCredits } from "./quota";
-import { usableOddsBooks } from "@/config/books";
+import { refreshBookmakerKeys } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 
 vi.mock("@/db/queries", () => ({
@@ -55,7 +55,7 @@ describe("getOddsStatus", () => {
     expect(status.level).toBe("normal");
     // WR-03 (01.1 review): the formula over the row's in-season sport count,
     // never the row's refreshCost verbatim.
-    expect(status.estimatedRefreshCredits).toBe(estimateRefreshCredits(4, usableOddsBooks().length));
+    expect(status.estimatedRefreshCredits).toBe(estimateRefreshCredits(4, refreshBookmakerKeys().length));
     expect(status.oddsFetchedAt).toBe(new Date(NOW.getTime() - 42 * 60_000).toISOString());
     expect(status.lastRefreshAt).toBe(new Date(NOW.getTime() - 10 * 60_000).toISOString());
     expect(status.resetsOn).toBe("2026-11-01T00:00:00.000Z");
@@ -73,7 +73,7 @@ describe("getOddsStatus", () => {
     expect(status.oddsFetchedAt).toBeNull();
     expect(status.lastRefreshAt).toBeNull();
     expect(status.estimatedRefreshCredits).toBe(
-      estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length),
+      estimateRefreshCredits(SPORT_KEYS.length, refreshBookmakerKeys().length),
     );
   });
 
@@ -90,8 +90,17 @@ describe("getOddsStatus", () => {
     const status = await getOddsStatus(NOW);
 
     expect(status.estimatedRefreshCredits).toBe(
-      estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length),
+      estimateRefreshCredits(SPORT_KEYS.length, refreshBookmakerKeys().length),
     );
+  });
+
+  it("estimate equals the pre-phase 7-book value (9 keys and 7 keys are one bucket, D-06)", async () => {
+    mockGetOddsFreshness.mockResolvedValue(null);
+    mockGetLatestCreditUsage.mockResolvedValue(null);
+
+    const status = await getOddsStatus(NOW);
+
+    expect(status.estimatedRefreshCredits).toBe(estimateRefreshCredits(SPORT_KEYS.length, 7));
   });
 
   it("reports unknown (not blocked) when the latest row is from before the monthly reset (CR-01)", async () => {
@@ -146,14 +155,14 @@ describe("getOddsStatus", () => {
     const status = await getOddsStatus(NOW);
 
     expect(status.estimatedExtendedRefreshCredits).toBe(
-      estimateRefreshCredits(4, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
+      estimateRefreshCredits(4, refreshBookmakerKeys().length, EXTENDED_MARKET_COUNT),
     );
   });
 
   it("after a spreads/totals search, the normal-refresh estimate is not the 3x extended cost (WR-03)", async () => {
     mockGetOddsFreshness.mockResolvedValue(NOW);
     mockGetExtendedOddsFreshness.mockResolvedValue(NOW);
-    const books = usableOddsBooks().length;
+    const books = refreshBookmakerKeys().length;
     // Latest row is an extended run over 4 sports: refreshCost is 3x.
     mockGetLatestCreditUsage.mockResolvedValue({
       requestsRemaining: 400,
@@ -179,7 +188,7 @@ describe("getOddsStatus", () => {
     const status = await getOddsStatus(NOW);
 
     expect(status.estimatedExtendedRefreshCredits).toBe(
-      estimateRefreshCredits(SPORT_KEYS.length, usableOddsBooks().length, EXTENDED_MARKET_COUNT),
+      estimateRefreshCredits(SPORT_KEYS.length, refreshBookmakerKeys().length, EXTENDED_MARKET_COUNT),
     );
   });
 

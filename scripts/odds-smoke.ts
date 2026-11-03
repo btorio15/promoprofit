@@ -52,7 +52,7 @@ async function main() {
   const to = new Date(now.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   if (extended) {
-    const bookmakerKeys = usableOddsBooks().map((b) => b.key); // 7 free-tier keys, 1 region-group, 3 credits/sport
+    const bookmakerKeys = usableOddsBooks().map((b) => b.key); // 7 free-tier keys, 1 region-group, 3 credits/sport // market venues are probed by scripts/smoke-venues.ts
     const { events, quota } = await fetchSportOdds(sportKey, {
       bookmakerKeys,
       commenceTimeFrom: now,

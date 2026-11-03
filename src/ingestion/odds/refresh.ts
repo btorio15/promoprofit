@@ -15,7 +15,7 @@ import {
   tryAcquireRefreshLock,
   type SportOddsWrite,
 } from "./store";
-import { usableOddsBooks } from "@/config/books";
+import { refreshBookmakerKeys } from "@/config/books";
 import { SPORT_KEYS } from "@/config/sports";
 
 const FETCH_WINDOW_DAYS = 7;
@@ -102,7 +102,7 @@ async function runGuardedRefresh(opts: {
 
   const sports = selected.sports;
   const inSeason = sports.filter((s) => s.active && SPORT_KEYS.includes(s.key));
-  const bookKeys = usableOddsBooks().map((b) => b.key); // D-15, never paid_only
+  const bookKeys = refreshBookmakerKeys(); // D-06: sportsbooks + Odds-API market venues, <= 10 keys = 1 bucket
   const estimatedCredits = estimateRefreshCredits(inSeason.length, bookKeys.length);
 
   // The chosen key's balance (monthly-reset aware, free /sports probe first).

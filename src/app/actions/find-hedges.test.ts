@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildFixtureEvents } from "@/test/fixtures/oddsEvents";
-import { usableOddsBooks } from "@/config/books";
+import { groupHedgeBookKeys, usableHedgeBooks, usableOddsBooks } from "@/config/books";
 import type { FindHedgesResponse } from "@/domain/finder/types";
 
 /**
@@ -26,7 +26,13 @@ vi.mock("@/db/queries", () => {
       Promise.resolve(allowedKeys ? books.filter((b) => allowedKeys.has(b.key)) : books),
     ),
     getHedgeBookKeys: vi.fn((allowedKeys?: ReadonlySet<string>) =>
-      Promise.resolve(allowedKeys ? allKeys.filter((k) => allowedKeys.has(k)) : allKeys),
+      Promise.resolve(
+        allowedKeys
+          ? usableHedgeBooks()
+              .map((b) => b.key)
+              .filter((k) => allowedKeys.has(k))
+          : groupHedgeBookKeys(),
+      ),
     ),
     getCachedEvents: vi.fn().mockResolvedValue({ events: buildFixtureEvents(now), fetchedAt: now }),
   };
@@ -341,6 +347,17 @@ describe("findHedges (per-user book scoping, D-13..D-20)", () => {
 
     expect(response.status).toBe("ok");
     if (response.status !== "ok") return;
+    expect(response.booksExcludedAll).toBe(false);
+  });
+
+  it("does not report books-excluded for a member with every sportsbook and no market, even with no results", async () => {
+    vi.mocked(getCachedEvents).mockResolvedValueOnce({ events: [], fetchedAt: now });
+
+    const response = await findHedges({ bookKey: "draftkings", bonusAmount: "100" });
+
+    expect(response.status).toBe("ok");
+    if (response.status !== "ok") return;
+    expect(response.resultsBySport.all).toEqual([]);
     expect(response.booksExcludedAll).toBe(false);
   });
 
