@@ -3,6 +3,8 @@
  * a fixed 2-dp string, never a number, so it can cross the server/client
  * boundary without ever passing through float arithmetic.
  */
+import type { MarketLegDTO } from "@/domain/market/legDto";
+
 export interface FinderLegDTO {
   bookKey: string;
   bookName: string;
@@ -21,6 +23,8 @@ export interface FinderResultDTO {
   sameBook: boolean;
   bonus: FinderLegDTO;
   hedge: FinderLegDTO;
+  /** Whole-contract prediction-market fill when the hedge is at Kalshi/Polymarket, else null. */
+  hedgeMarket: MarketLegDTO | null;
   bonusAmount: string;
   hedgeStake: string;
   bonusPayout: string;
