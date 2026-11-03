@@ -5,7 +5,10 @@ export function parseSortMode(value: string | null | undefined): SortKey {
   return value === "roi" ? "roi" : "profit";
 }
 
-export function sortCaption(sort: SortKey): string {
+export function sortCaption(sort: SortKey, hasEstimate = false): string {
+  if (hasEstimate) {
+    return sort === "roi" ? "Top 5 by Est. ROI" : "Top 5 by profit (no-sweats are estimates)";
+  }
   return sort === "roi" ? "Top 5 by ROI" : "Top 5 by guaranteed profit";
 }
 
