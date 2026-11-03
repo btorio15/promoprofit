@@ -167,7 +167,7 @@ Plans:
   2. A refresh costs the same credits as before (venues fit in the existing bookmaker bucket) and the credit meter estimate is unchanged.
   3. The bonus-bet finder, promo hedges, paired promos and Arbitrage tab suggest a market hedge exactly when its after-fee profit beats every sportsbook hedge; every opportunity keeps one sportsbook leg.
   4. A market leg reads like "buy 42 YES @ 61¢ ($25.62 + $0.70 fee) ≈ −156", with a "Settlement differs" badge and either "Price may move" or (from Kalshi depth) "Thin market: only N contracts at P¢"; fees and profit are correct to the cent and proven against brute-force oracles.
-  5. Marking a market-hedged promo or pair done records the same profit the card showed, and it counts in Dashboard totals, the graph and Statistics.
+  5. Marking a market-hedged promo or pair done records the same profit the card showed, and it counts in that member's Dashboard totals and graph; site-wide Statistics and group recording stay sportsbook-only, so one member's markets never change group numbers.
   6. Only venues proven priceable by the live probe (or Kalshi's public API) and usable from Colorado ship; PROJECT.md records the outcome.
 
 **Deferred follow-ups (wire in after Phase 9 lands):**
@@ -179,7 +179,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — Venue-aware book config (kalshi, polymarket_us), refresh list + credit estimate at zero extra cost, member hedge-book scoping, saveBooks needs a sportsbook (MKT-01, MKT-02)
+- [ ] 12-01-PLAN.md — Venue-aware book config (kalshi, polymarket_us), refresh list + credit estimate at zero extra cost, member hedge-book scoping (group/site-wide lists stay sportsbook-only), saveBooks needs a sportsbook (MKT-01, MKT-02)
 - [ ] 12-02-PLAN.md — TDD venue fees (Kalshi ceil, Polymarket banker's) + MarketLeg / cents <-> American conversions (MKT-03, MKT-04)
 - [ ] 12-03-PLAN.md — Wave 0 live probe (owner-approved, ~1 credit) of Odds API us_ex venues + Kalshi public API recon; branch A/B/C/D recorded in 12-PROBE.md (MKT-10)
 
@@ -196,6 +196,7 @@ Plans:
 - [ ] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
 - [ ] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
 - [ ] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
+- [ ] 12-15-PLAN.md — Kalshi public API client, game matcher and pure depth/price enrichment, not yet wired (MKT-07, MKT-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -207,10 +208,6 @@ Plans:
 - [ ] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-
-- [ ] 12-15-PLAN.md — Kalshi public API client, game matcher and pure depth/price enrichment (MKT-07, MKT-10)
-
-**Wave 7** *(blocked on Wave 6 completion)*
 
 - [ ] 12-16-PLAN.md — Kalshi depth in the refresh (Thin market), quote plumbing, owner end-to-end check (MKT-06, MKT-07, MKT-10)
 **UI hint**: yes

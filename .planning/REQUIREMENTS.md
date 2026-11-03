@@ -50,7 +50,7 @@
 - [ ] **MKT-05**: Whole-contract solvers (bonus bet, profit boost, arbitrage, paired-promo top-up) pick the contract count that maximizes worst-case profit after fees, proven against brute-force oracles
 - [ ] **MKT-06**: The bonus-bet finder, promo hedges, paired promos and Arbitrage tab use a market hedge only when its after-fee profit strictly beats every sportsbook hedge, and only for members who ticked that market; every opportunity keeps one sportsbook leg
 - [ ] **MKT-07**: Market legs show the contract instruction with native and American price ("buy 42 YES @ 61¢ ($25.62 + $0.70 fee) ≈ −156"), a "Settlement differs" badge explaining the case, and "Price may move" or (with Kalshi depth) "Thin market: only N contracts at P¢"
-- [ ] **MKT-08**: Done snapshots store contracts, price, fee and outlay so recorded profit matches; market-hedged profit counts the same in Dashboard totals, the graph lines and Statistics
+- [ ] **MKT-08**: Done snapshots store contracts, price, fee and outlay so recorded profit matches; a member's market-hedged profit counts the same in their own Dashboard totals and graph lines (recorded profitExtracted); site-wide Statistics and group recording stay sportsbook-only
 - [ ] **MKT-09**: PROJECT.md (Constraints, Out of Scope, Key Decisions) and REQUIREMENTS.md reflect the scope reversal and the venues actually shipped
 - [ ] **MKT-10**: Only venues proven priceable (live Odds API probe on the free key, or Kalshi's public API) and usable from Colorado ship
 

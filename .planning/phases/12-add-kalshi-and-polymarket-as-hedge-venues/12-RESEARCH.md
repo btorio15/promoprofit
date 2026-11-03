@@ -422,18 +422,25 @@ Not a rename phase, but there is persisted state to extend:
 | A8 | Prediction-market h2h from Odds API gives only plain `h2h` (no lay) | Venue API | Low |
 | A9 | Polymarket US sports tie/postponement rules are per-market and not uniform | Settlement | Med: badge text |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does the free Odds API key return `kalshi`/`polymarket_us`?**
    - Known: listed under `us_ex`, not flagged paid-only; free plan says "most bookmakers".
    - Unclear: actual entitlement and price semantics (ask/mid/last).
    - Recommendation: Wave 0 probe task (owner approves 1-2 credits); plan has a fallback branch: if only Kalshi returns, ship Kalshi alone; if neither, use Kalshi native public REST for prices (zero credits) and drop Polymarket.
+   - **RESOLVED:** Answered by the Wave 0 live probe (plan 12-03, owner-approved, about 1 credit), which records branch A (both via Odds API), B (Kalshi only), C (Kalshi via its public API, Polymarket dropped) or D (no venue; re-scope) in 12-PROBE.md; plan 12-08 applies the branch to `src/config/books.ts`.
 2. **Is the exchange price the ask?** Compare against Kalshi `/orderbook` in the same probe. Decide Odds-API-only vs native-priced Kalshi accordingly.
+   - **RESOLVED:** The same 12-03 probe compares Odds API Kalshi cents with Kalshi's native ask; "not the ask" forces branch C (native asks, plans 12-15/12-16), applied in 12-08.
 3. **Thin-market (D-13) scope:** `includeBetLimits` may supply depth cheaply; otherwise Kalshi native orderbook needs event matching. Recommend making this the last wave and shipping "price may move" first.
+   - **RESOLVED:** Thin market is the last wave: Kalshi client/enrichment in 12-15, refresh wiring and the badge in 12-16; "Price may move" ships first with every engine (12-06, 12-09..12-14).
 4. **Polymarket US Colorado eligibility:** confirm in-app / terms before the ship checkpoint.
+   - **RESOLVED:** The owner checks Polymarket US Colorado eligibility at the 12-03 checkpoint; not eligible -> Polymarket dropped (branch B/C), applied in 12-08; unknown ships with the CFTC note (D-15).
 5. **Kalshi fee precision (cent vs centicent) for the member's account type.** Default cent-ceil.
+   - **RESOLVED:** Cent precision, rounded up (conservative; never overstates profit), as implemented in plan 12-02.
 6. **Spreads/totals on venues (D-07):** coverage unverified; extended refresh should be tested on the same probe. Default: moneyline only in v1.
+   - **RESOLVED:** Moneylines (D-07). No extra spreads/totals fetch for venues; a venue spread/total is used only if the existing extended refresh already returns the exact same line, through the existing exact-line matching.
 7. **Fee-coefficient drift:** Polymarket US changed schedules at least 3 times in 2026. Pin in tests; add a "last verified" comment.
+   - **RESOLVED:** Coefficients pinned in `src/config/venues.ts` with `FEES_LAST_VERIFIED` and source URLs, plus a pinning test (plan 12-02).
 
 ## Sources
 
