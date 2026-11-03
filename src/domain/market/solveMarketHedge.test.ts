@@ -153,6 +153,7 @@ describe("solveProfitBoostMarketHedge", () => {
     const rng = mulberry32(1202);
     const kinds = [null, "net_winnings", "total_payout", "boost_extra"] as const;
     let compared = 0;
+    let exact = 0;
     for (let k = 0; k < 1000; k++) {
       const base =
         rng() < 0.6 ? randInt(rng, 100, 400) : -randInt(rng, 110, 250);
@@ -195,11 +196,23 @@ describe("solveProfitBoostMarketHedge", () => {
         priceCents: price,
       });
       const label = `#${k} ${venue} ${price}c base ${base} +${boostPercent}% max ${maxStake} ${kind} ${capAmount} ${precision}`;
+      // A derived (boost %) price goes through effectiveBoostedDecimal, which
+      // snaps to 20dp like the sportsbook engine; when the exact payout lands
+      // on a cent boundary the engine's floor is conservative by one cent.
+      // A published price is exact, so it must match the oracle exactly.
+      const tolerance = usePublished ? 0 : 1;
       if (o.profit.lte(0)) {
         expect(r, label).toBeNull();
       } else {
-        expect(r, label).not.toBeNull();
-        expect(cents(r!.guaranteedProfit), label).toBe(cents(o.profit));
+        if (r === null) {
+          expect(tolerance, label).toBe(1);
+          expect(cents(o.profit), label).toBe(1);
+          continue;
+        }
+        const diff = cents(o.profit) - cents(r.guaranteedProfit);
+        expect(diff, label).toBeGreaterThanOrEqual(0);
+        expect(diff, label).toBeLessThanOrEqual(tolerance);
+        if (diff === 0) exact++;
         expect(r!.totalStaked.toFixed(2), label).toBe(
           r!.promoStake.plus(r!.market.outlay).toFixed(2),
         );
@@ -207,5 +220,6 @@ describe("solveProfitBoostMarketHedge", () => {
       }
     }
     expect(compared).toBeGreaterThan(100);
+    expect(exact).toBeGreaterThan(compared * 0.9);
   });
 });
