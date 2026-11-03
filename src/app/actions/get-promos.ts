@@ -354,6 +354,8 @@ function toQueueItemDTO(row: QueueRow): QueueItemDTO {
     unparsedCapFields: row.unparsedCapFields,
     classify: row.reviewReason === "classify" ? toClassifyQueueItemDTO(row) : null,
     scrapedWindow: scrapedWindowFor(row),
+    readings: row.readings,
+    cashRefund: row.cashRefund,
   };
 }
 
