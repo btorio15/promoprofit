@@ -210,3 +210,24 @@ describe("SIGNUP_PAGE_URLS", () => {
     expect(SIGNUP_PAGE_URLS.ballybet).toBe("https://play.ballybet.com/");
   });
 });
+
+describe("extractSignupOffers -- no-sweat caps (Phase 9, A-11)", () => {
+  it("a new-customer No Sweat First Bet keeps its headline but has no bonusAmount", () => {
+    const rawText = "New customers: get up to $1,000 in Bonus Bets back if your first bet loses";
+    const title = "No Sweat First Bet up to $1,000";
+    const skip = newCustomerSkip({ title, externalId: "ns-1" }, { rawText });
+    const result = extractSignupOffers("draftkings", [skip]);
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0].title).toBe(title);
+    expect(result.offers[0].bonusAmount).toBeNull();
+  });
+
+  it("a plain new-customer Bet $5, Get $200 in Bonus Bets still parses 200.00", () => {
+    const skip = newCustomerSkip(
+      { title: "Bet $5, Get $200 in Bonus Bets", externalId: "bb-1" },
+      { rawText: "New customers: Bet $5, Get $200 in Bonus Bets" },
+    );
+    const result = extractSignupOffers("draftkings", [skip]);
+    expect(result.offers[0].bonusAmount).toBe("200.00");
+  });
+});

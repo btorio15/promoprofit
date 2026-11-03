@@ -2,6 +2,7 @@ import Decimal from "decimal.js";
 import { createHash } from "node:crypto";
 import type { SkippedEntry } from "@/domain/promos/scraped";
 import { mentionsNewCustomer } from "./exclusions";
+import { classifyNoSweat } from "./noSweat";
 
 /**
  * quick-260928-mgi (owner decision 3): pure, deterministic sign-up-offer
@@ -195,7 +196,10 @@ export function extractSignupOffers(
       title,
       description: buildDescription(effectiveText),
       rawText,
-      bonusAmount: parseSignupBonusAmount(title, rawText),
+      bonusAmount:
+        classifyNoSweat({ title, text: rawText }).kind === "none"
+          ? parseSignupBonusAmount(title, rawText)
+          : null,
       sourceUrl: pageUrl,
       expiresAt: skip.evidence.expiresAt,
     };
