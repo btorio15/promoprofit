@@ -35,26 +35,26 @@ New ui primitives: none. Use existing `Badge`, `Button`, `Card`, `Alert`, `Colla
 Unchanged 4-multiple scale (Tailwind 1 unit = 4px): xs 4, sm 8 (`gap-2`), md 16 (`p-4`), lg 24 (`p-6`), xl 32 (`gap-8` between screen sections), 2xl/3xl not used.
 
 Exceptions (all already in the codebase):
-- 12px (`gap-3`) inside rows and card stacks, copied from NoSweatRow / SignupOffersScreen.
+- 12px (`gap-3`) only inside `IntroOfferRow` (copied from NoSweatRow) and the existing SignupOffersScreen cards. All other new containers use `gap-2` or `gap-4`.
 - Touch targets: Track button, "See all" link button, step action buttons are `min-h-11` (44px). Ghost `size="sm"` buttons `min-h-10`.
-- DashboardTotals keeps its own `text-xs` captions and `p-3 sm:p-4` shell (existing; the new line reuses them).
+- DashboardTotals keeps its existing `text-xs` captions, `text-lg` values and `p-3 sm:p-4` shell. That is existing code left untouched. The NEW intro row stays inside the four declared sizes (14/16/20 plus none other).
 
 Layout rules:
-- "Best intro offers" section: `flex flex-col gap-3`, sits `gap-8` below the last promos section.
-- Sign-up offers: ranked list rows `flex flex-col gap-3`; book sections keep `gap-8`.
+- "Best intro offers" section: `flex flex-col gap-4`, sits `gap-8` below the last promos section.
+- Sign-up offers: ranked list rows `flex flex-col gap-4`; book sections keep `gap-8`.
 - Phone-first: single column below `md`; row desktop grid reuses the NoSweatRow template.
 
 ---
 
 ## Typography
 
-Same three sizes and two weights. No new sizes.
+Three sizes (14, 16, 20) and two weights (400, 600) for all NEW UI. Existing DashboardTotals markup (12px captions, 18px values) is untouched existing code and is not part of this contract.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body / row text (`text-base`) | 16px | 400 | 1.5 |
-| Label / secondary / helper / badges / notes (`text-sm`; `text-xs` only for the existing DashboardTotals captions) | 14px (12px existing totals captions) | 400 | 1.5 |
-| Heading (`text-xl`: "Best intro offers", "Sign-up offers", book names, "Intro offers extracted" value uses `text-lg` like the other totals) | 20px | 600 | 1.2 |
+| Label / secondary / helper / badges / notes (`text-sm`) | 14px | 400 | 1.5 |
+| Heading (`text-xl`: "Best intro offers", "Sign-up offers", book names, "Intro offers extracted" value is `num text-xl`) | 20px | 600 | 1.2 |
 | Estimate figure (`num text-xl`) | 20px | 600 | 1.2 |
 
 Rules:
@@ -76,7 +76,7 @@ Accent reserved for (unchanged list, plus one explicit exclusion):
 Phase 10 rules:
 - **Every intro-offer figure on Opportunities and Sign-up offers is an estimate: `text-foreground`, never green.** This includes "est. +$X", per-bonus-bet values, and the whole-plan total.
 - Waterfall bars follow the lx2 implementation (neutral tokens, hatched estimated bonus bars, solid Net bar, no `text-primary`/`bg-primary`). The qualifying-bet cost (a few cents) and hedge bars are neutral too.
-- **"Intro offers extracted" on the Dashboard is real recorded money but is deliberately NOT green.** Use `text-foreground` (`num text-lg font-semibold`) so it cannot be read as part of the green "Extracted all-time" total (D-18, INTRO-10). A caption states it is separate.
+- **"Intro offers extracted" on the Dashboard is real recorded money but is deliberately NOT green.** Use `text-foreground` (`num text-xl font-semibold`) so it cannot be read as part of the green "Extracted all-time" total (D-18, INTRO-10). A caption states it is separate.
 - Step checklist in the Tracking card: done step uses a `Check` icon in `text-muted-foreground` inside a neutral circle (`border-border`), not green. The recorded final "Recorded +$X" line on a finished intro-offer card may be `text-primary` (real money, same as the no-sweat Done row) - only on the card's own done state, never on the Dashboard.
 - Amber `text-warning` + `TriangleAlert`: "can't price", "terms incomplete" note, expiring-soon bonus bet (under 24h left), rate-basis is never amber. Never destructive red for these.
 - Destructive red: only the Stop tracking confirm button text. "Bet lost" stays neutral outline.
@@ -101,11 +101,11 @@ Plain English. No jargon, no decision IDs, no "arb", "EV", "median", "snapshot",
 | Rate basis short chip (collapsed, next to est. badge on phone-width rows) | Badge outline `recent rate` or `starting guess` |
 | ROI column | Not shown for intro offers (value ranking, not percent). Replace with day count: "Bonus over" / `4 days` (`num`) when installments, otherwise omitted |
 | Primary CTA | `Track offer` (filled primary, `Pin` icon, `min-h-11`) |
-| Secondary link | `Open {book}` text link when `link` exists (`text-sm text-primary underline-offset-4`, opens new tab, `rel="noopener noreferrer"`, same as SignupOffersScreen) |
+| Secondary link | `Open {book}` text link when `link` exists (`text-sm text-foreground underline underline-offset-4`, opens new tab, `rel="noopener noreferrer"`, same as SignupOffersScreen) |
 | See all | Outline button `See all intro offers` (`nativeButton={false} render={<Link href="/signup-offers"/>}`, `min-h-11`) shown whenever the full list has more than 3 books, or always if 1-3 as plain link `See the full plan list`. Executor: confirm the Sign-up offers route path from the app router |
 | Section empty (no priceable offers, but screen otherwise fine) | Section is not rendered at all (no empty box) |
 | Section loading | 3 `Skeleton h-24` rows |
-| Section load failure | Inline muted line "Couldn't load intro offers." + `Try again` ghost button. Never blocks the promos list |
+| Section load failure | Inline muted line "Couldn't load intro offers." + `Reload intro offers` ghost button. Never blocks the promos list |
 | Aria-label on row trigger | "Show the plan for {book} intro offer. Estimate plus {dollars} dollars {cents} cents at {rate} percent. This is an estimate." |
 
 ### Expanded whole plan (shared by Opportunities row and Sign-up offers)
@@ -181,10 +181,10 @@ Card shell: same as `TrackedNoSweatCard` (`rounded-lg border border-border bg-se
 | Title row | `Intro offer` badge + "{book}: {offer title}" |
 | Added-to-books confirmation (shown once, in the Track success message and as a muted line on the card for the first view) | "{book} was added to My Books." |
 | Estimate line | "Estimated +$132.40 · not counted in your totals until you finish" (muted, figures `num`) |
-| Checklist | Vertical ordered list `ol`, `gap-3`. Each step: status circle (`size-6`, empty ring = to do, `Check` = done, `Hourglass`/`Clock` = waiting), title `text-base`, detail `text-sm text-muted-foreground`, action area below the detail |
+| Checklist | Vertical ordered list `ol`, `gap-4`. Each step: status circle (`size-6`, empty ring = to do, `Check` = done, `Hourglass`/`Clock` = waiting), title `text-base`, detail `text-sm text-muted-foreground`, action area below the detail |
 | Step 1 | Title "Place the qualifying bet and hedge". Detail "Bet {stake} on {selection} {odds} at {book}. Hedge {hedgeStake} on {selection} {odds} at {hedgeBook}." Action: `I placed both` (outline, `min-h-11`); disabled-looking helper if kickoff not reached is NOT used here (they place before the game) |
 | Step 2 | Title "How did the bet go?" shown after step 1 and after kickoff. Buttons `Bet won`, `Bet lost`, `Push`, `Game voided` (outline, 2x2 on phone) - reuse the Phase 9 control and the `I bet different amounts` correction panel. Before kickoff: "Game starts {formatKickoff}. Come back after it ends." For win-only offers, helper: "{book} only pays the bonus if your bet wins." After "Bet lost" on a win-only offer: no bonus steps appear, card goes to Done with the real small result. Offers whose qualifying bet does not depend on a game result (win-or-lose) skip this step's gating on win/lose for bonus arrival, but still ask the result so the real money is recorded |
-| Step 3..n (one per bonus bet) | Title "{amount} bonus bet from {book}". Detail: "Use by {expiry}. Arrives {day}." Status words: `Waiting for it to arrive` (Hourglass), `Ready to use` (after member taps arrival), `Used` (after conversion). Actions: `It arrived` (outline) then link button `Turn it into cash` (-> bonus-bet finder, prefilled) and `Mark done` (outline) which opens an inline field `What you got back` (prefix `$`, `h-11 num`, helper "Enter the profit you made turning this bonus bet into cash. Use 0 if it expired.") with `Save` / `Cancel` |
+| Step 3..n (one per bonus bet) | Title "{amount} bonus bet from {book}". Detail: "Use by {expiry}. Arrives {day}." Status words: `Waiting for it to arrive` (Hourglass), `Ready to use` (after member taps arrival), `Used` (after conversion). Actions: `It arrived` (outline) then link button `Turn it into cash` (-> bonus-bet finder, prefilled) and `Mark done` (outline) which opens an inline field `What you got back` (prefix `$`, `h-11 num`, helper "Enter the profit you made turning this bonus bet into cash. Use 0 if it expired.") with `Record bonus bet` (primary) / `Keep waiting` (ghost) |
 | Expiry urgency | Expiring in under 24h: amber `TriangleAlert` line "Expires in {hours} hours." ; expired and not marked: amber "This bonus bet expired. Mark it done with 0 if you didn't use it." |
 | Last step | Title "All done". Appears when every step is complete. Shows "Recorded +$X for this offer" (`num`, `text-primary` allowed here only, `aria-live="polite"`), with breakdown muted line "Qualifying and hedge {a}, bonus bets {b}." and `Undo` (ghost, `Undo2`, aria-label "Go back one step"). The card then moves to the Done area and counts only in "Intro offers extracted" |
 | Edit amounts | `I bet different amounts` (existing correction panel) available on step 1/2; labels unchanged from 09 |
@@ -203,9 +203,9 @@ Steps behave as: one step is "current" (expanded actions, full opacity); complet
 | Element | Copy |
 |---------|------|
 | Placement | NOT a fifth cell in the 4-column cells grid (that grid is one conceptual total). A separate row between the cells grid and the count line, inside the same `DashboardTotals` shell, separated by the existing `border-t border-border pt-3` pattern |
-| Label | `Intro offers extracted` (`text-xs sm:text-sm text-muted-foreground`) |
-| Value | `num text-lg font-semibold text-foreground` (not green) e.g. `$38.60` |
-| Caption (`text-xs text-muted-foreground`) | "From {n} finished intro offers. Not included in the totals above or the graph." |
+| Label | `Intro offers extracted` (`text-sm text-muted-foreground`) |
+| Value | `num text-xl font-semibold text-foreground` (not green) e.g. `$38.60` |
+| Caption (`text-sm text-muted-foreground`) | "From {n} finished intro offers. Not included in the totals above or the graph." |
 | Zero state | Row not rendered when no intro offer has ever been finished and none is tracked (no empty box) |
 | In-progress hint | When some are tracked but none finished: value `$0.00`, caption "{n} in progress. Counted when you finish them." |
 | Loading | Existing skeleton; row hidden while loading |
