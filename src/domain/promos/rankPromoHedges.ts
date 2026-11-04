@@ -18,7 +18,7 @@ import {
 } from "@/domain/market/solveMarketHedge";
 import { enumerateScopeSelections, resolveSelection, type ResolvedSelection, type SelectionQuote } from "./selection";
 import { eventInScope, type PromoScope } from "./scope";
-import type { PromoMarketType, PromoSelection, PromoSide, PromoType, WinningsCapKind } from "./types";
+import { assertNever, type GuaranteedPromoType, type PromoMarketType, type PromoSelection, type PromoSide, type WinningsCapKind } from "./types";
 
 /**
  * Per-promo best-candidate search and ranking (D-02..D-05, D-16, D-17, D-18,
@@ -33,7 +33,7 @@ import type { PromoMarketType, PromoSelection, PromoSide, PromoType, WinningsCap
 export interface RankablePromo {
   id: number;
   bookKey: string;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   scope: PromoScope;
   pinned: PromoSelection | null;
   eligibleMarketTypes: readonly PromoMarketType[];

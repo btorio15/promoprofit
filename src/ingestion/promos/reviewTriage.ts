@@ -1,14 +1,16 @@
 import Decimal from "decimal.js";
 import { z } from "zod";
 import {
+  NO_SWEAT_CASH_MARKER,
   ScrapedPromoFieldsSchema,
   type ScrapedPromo,
   type SkipReason,
   type SkippedEntry,
 } from "@/domain/promos/scraped";
 import { SPORT_KEYS } from "@/config/sports";
-import { PROMO_MARKET_TYPES, type PromoType } from "@/domain/promos/types";
+import { assertNever, PROMO_MARKET_TYPES, type PromoType } from "@/domain/promos/types";
 import { classifyExclusion } from "./exclusions";
+import { classifyNoSweat, parseNoSweatRefundCap } from "./noSweat";
 
 /**
  * quick-260928-it1: decides which parser skips are worth surfacing to a
@@ -41,7 +43,6 @@ import { classifyExclusion } from "./exclusions";
 export const CLEAR_SKIP_REASONS: ReadonlySet<SkipReason> = new Set([
   "new_customer",
   "deposit",
-  "no_sweat",
   "parlay",
   "sgp",
   "futures",
@@ -55,6 +56,7 @@ export const REVIEW_SKIP_REASONS: ReadonlySet<SkipReason> = new Set([
   "unrecognized",
   "unsupported_sport",
   "schema_invalid",
+  "no_sweat_cash",
 ]);
 
 /** "40% Profit Boost" / "40% boost" -- a percent number directly followed by "[profit|odds ]boost". */
@@ -150,6 +152,35 @@ function truncate(text: string, max: number): string {
 }
 
 /**
+ * Exhaustive over a validated partial type. Without a partial type, a skip the
+ * parser identified as a no-sweat (WR-02: a no_sweat_cash skip, or text
+ * classifyNoSweat detects) drafts as no_sweat -- never as a guaranteed
+ * bonus_bet/profit_boost, which would put a stake-back promo into the
+ * guaranteed pipeline on one accept.
+ */
+function chooseDraftPromoType(
+  partialType: PromoType | null,
+  isNoSweat: boolean,
+  boostPercent: string | null,
+  bonusAmountFromText: string | null,
+): PromoType {
+  if (partialType !== null) {
+    switch (partialType) {
+      case "profit_boost":
+      case "bonus_bet":
+      case "no_sweat":
+        return partialType;
+      default:
+        return assertNever(partialType);
+    }
+  }
+  if (isNoSweat) return "no_sweat";
+  if (boostPercent !== null) return "profit_boost";
+  if (bonusAmountFromText !== null) return "bonus_bet";
+  return "profit_boost";
+}
+
+/**
  * Builds a ScrapedPromo draft from an uncertain skip (unrecognized/
  * unsupported_sport/schema_invalid, or a concrete-offer not_a_promo), for a
  * member to complete into a real profit_boost/bonus_bet promo
@@ -160,15 +191,25 @@ function truncate(text: string, max: number): string {
  * value silently drops to null/the field's default, it never fails the
  * whole draft.
  */
-export function buildClassifyDraft(
-  bookKey: string,
-  skip: SkippedEntry,
-  fallbackSourceUrl: string,
-): ScrapedPromo {
+export function buildClassifyDraft(bookKey: string, skip: SkippedEntry, fallbackSourceUrl: string): ScrapedPromo {
   const evidence = skip.evidence ?? null;
   const partial = evidence?.partial ?? null;
-  const rawText = truncate(evidence?.rawText ?? "", 2000);
+  const sourceText = evidence?.rawText ?? "";
   const title = truncate(skip.title, 200);
+  const sourceCombined = `${title}\n${sourceText}`;
+
+  // WR-02: carry the parser's no-sweat finding into the draft.
+  const noSweat = classifyNoSweat({ title, text: sourceText });
+  const isCashRefund = skip.reason === "no_sweat_cash" || noSweat.kind === "cash_refund";
+  const isNoSweat = isCashRefund || noSweat.kind !== "none";
+  const rawText = truncate(
+    isCashRefund &&
+      !sourceText.includes(NO_SWEAT_CASH_MARKER) &&
+      !sourceText.includes("[Promo reader check: no_sweat_cash]")
+      ? `${NO_SWEAT_CASH_MARKER}\n${sourceText}`
+      : sourceText,
+    2000,
+  );
   const combined = `${title}\n${rawText}`;
 
   const partialPromoType = validatedField(partial, "promoType");
@@ -178,18 +219,15 @@ export function buildClassifyDraft(
   const boostPercent = partialBoostPercent ?? extractBoostPercent(combined);
   const bonusAmountFromText = extractBonusAmount(combined);
 
-  let promoType: PromoType;
-  if (partialPromoType) {
-    promoType = partialPromoType;
-  } else if (boostPercent !== null) {
-    promoType = "profit_boost";
-  } else if (bonusAmountFromText !== null) {
-    promoType = "bonus_bet";
-  } else {
-    promoType = "profit_boost";
-  }
+  const promoType: PromoType = chooseDraftPromoType(partialPromoType, isNoSweat, boostPercent, bonusAmountFromText);
 
-  const bonusAmount = partialBonusAmount ?? (promoType === "bonus_bet" ? bonusAmountFromText : null);
+  const bonusAmountGuess =
+    promoType === "bonus_bet"
+      ? bonusAmountFromText
+      : promoType === "no_sweat"
+        ? parseNoSweatRefundCap(sourceCombined)
+        : null;
+  const bonusAmount = partialBonusAmount ?? bonusAmountGuess;
 
   // A games list and a single-game pair are mutually exclusive on a promo.
   const gamesText = validatedGamesText(partial);
@@ -222,6 +260,8 @@ export function buildClassifyDraft(
     claimRequired: validatedField(partial, "claimRequired"),
     finePrintNote: validatedField(partial, "finePrintNote"),
   };
+  const reviewReadings = validatedField(partial, "reviewReadings");
+  if (reviewReadings) draft.reviewReadings = reviewReadings;
 
   return draft;
 }

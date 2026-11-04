@@ -18,7 +18,7 @@ import { SKIP_REASONS } from "@/domain/promos/scraped";
  * instructions change in a way that could change the model's output shape.
  */
 export const PROMO_READER_MODEL = "claude-haiku-4-5";
-export const PROMO_READER_PROMPT_VERSION = "2026-10-16.2";
+export const PROMO_READER_PROMPT_VERSION = "2026-11-03.1";
 
 /** SPORT_KEYS is a readonly string[] (built from SPORTS.map), not a literal
  * tuple -- cast once here so z.enum (which requires a non-empty tuple of
@@ -34,7 +34,8 @@ const SPORT_KEY_TUPLE = SPORT_KEYS as unknown as [string, ...string[]];
  * prompt's own instructions; minOddsAmerican is the only true number.
  */
 export const PromoReadingSchema = z.strictObject({
-  kind: z.enum(["profit_boost", "bonus_bet", "not_usable"]),
+  kind: z.enum(["profit_boost", "bonus_bet", "no_sweat", "not_usable"]),
+  refundForm: z.enum(["bonus_bet", "cash", "unknown"]).nullable(),
   skipReason: z.enum(SKIP_REASONS).nullable(),
   boostPercent: z.string().nullable(),
   bonusAmount: z.string().nullable(),
@@ -78,9 +79,10 @@ Supported sports (sport field values): ${SPORT_LIST_TEXT}. Use null when the pro
 Skip reasons (skipReason field values, use only one when kind is "not_usable"): ${SKIP_REASON_LIST_TEXT}.
 
 Classification rules:
-- Use "not_usable" for casino games, deposit match offers, no-sweat offers (a losing bet refunded as a bonus bet), new-customer/welcome offers, refer-a-friend, giveaways, pick'em contests, futures/outright bets, and any marketing copy with no concrete offer. Choose the closest skipReason from the list above.
+- Use "not_usable" for casino games, deposit match offers, new-customer/welcome offers, refer-a-friend, giveaways, pick'em contests, futures/outright bets, and any marketing copy with no concrete offer. Choose the closest skipReason from the list above.
 - Use "profit_boost" for an offer that boosts winnings by a stated percent.
 - Use "bonus_bet" for a stated-dollar bonus bet, free bet, or token the user already holds or will receive.
+- Use "no_sweat" when a losing single bet is refunded (bonus bet, free bet, token or site credit). Put the most you can get back in bonusAmount, with "$" evidence. Set refundForm to "bonus_bet", "cash" (refunded as withdrawable cash) or "unknown". A refund that only applies to a parlay or same-game parlay is "not_usable" with skipReason parlay or sgp. Set refundForm to null for every other kind.
 
 Number rules (these are the most important rules -- read them twice):
 - Output a number ONLY when it is explicitly stated in the promo's own text. Never compute, convert, round, or infer a number that is not written down.

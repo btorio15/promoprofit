@@ -136,8 +136,8 @@ export function OddsStatusBar({ status, onRefreshed, showExtendedAge = false }: 
   }
 
   return (
-    <div className="sticky top-0 z-40 border-b border-border bg-secondary px-4 py-3">
-      <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-2">
+    <div className="sticky top-0 z-40 border-b border-border bg-card px-4 py-3 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1152px] flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <p className="text-sm">

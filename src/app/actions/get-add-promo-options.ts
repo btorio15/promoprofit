@@ -5,10 +5,39 @@ import { COLORADO_BOOKS } from "@/config/books";
 import { requireUser } from "@/lib/session";
 import { getCachedEvents, getCachedExtendedEvents, getUsableUserBooks } from "@/db/queries";
 import { getOwnActiveAddedPromo } from "@/db/addedPromos";
-import { getActivePromos } from "@/db/promos";
+import { getActiveNoSweatPromos, getActivePromos } from "@/db/promos";
 import type { DuplicateCandidate } from "@/domain/promos/duplicateHint";
 import { listCorrectionOptions } from "@/domain/promos/correctionOptions";
 import type { AddPromoFormOptions } from "@/domain/promos/addedPromoInput";
+
+type CandidateScope = DuplicateCandidate["scope"];
+type PromoScopeLike =
+  | { kind: "games"; sportKey: string; eventIds: string[]; windowStart: Date; windowEnd: Date }
+  | { kind: "sport_window"; sportKey: string; windowStart: Date; windowEnd: Date }
+  | { kind: "event"; eventId: string; sportKey: string }
+  | { kind: "any" };
+
+function candidateScope(scope: PromoScopeLike): CandidateScope {
+  switch (scope.kind) {
+    case "games":
+      return {
+        kind: "games",
+        sportKey: scope.sportKey,
+        eventIds: scope.eventIds,
+        windowStart: scope.windowStart.toISOString(),
+        windowEnd: scope.windowEnd.toISOString(),
+      };
+    case "sport_window":
+      return {
+        kind: "sport_window",
+        sportKey: scope.sportKey,
+        windowStart: scope.windowStart.toISOString(),
+        windowEnd: scope.windowEnd.toISOString(),
+      };
+    default:
+      return scope;
+  }
+}
 
 const OptionsInputSchema = z.strictObject({ promoId: z.number().int().positive().optional() });
 
@@ -33,42 +62,40 @@ export async function getAddPromoFormOptions(input: unknown): Promise<AddPromoFo
   }
 
   const now = new Date();
-  const [books, { events: moneyline }, { events: extended }, activePromos] = await Promise.all([
+  const [books, { events: moneyline }, { events: extended }, activePromos, activeNoSweats] = await Promise.all([
     getUsableUserBooks(user.userId),
     getCachedEvents(),
     getCachedExtendedEvents(),
     getActivePromos(now, user.userId),
+    getActiveNoSweatPromos(now, user.userId),
   ]);
 
   // D-12 / T-5-visibility: only the member's own visible SCRAPED promos at their own books.
   // getActivePromos is viewer-scoped, and !addedByYou drops every added promo.
   const ownBookKeys = new Set(books.map((b) => b.key));
-  const duplicateCandidates: DuplicateCandidate[] = activePromos
-    .filter((p) => !p.addedByYou && ownBookKeys.has(p.bookKey))
-    .map((p) => ({
-      bookKey: p.bookKey,
-      promoType: p.promoType,
-      bonusAmount: p.bonusAmount,
-      boostPercent: p.boostPercent,
-      boostedOddsAmerican: p.boostedOddsAmerican,
-      scope:
-        p.scope.kind === "games"
-          ? {
-              kind: "games" as const,
-              sportKey: p.scope.sportKey,
-              eventIds: p.scope.eventIds,
-              windowStart: p.scope.windowStart.toISOString(),
-              windowEnd: p.scope.windowEnd.toISOString(),
-            }
-          : p.scope.kind === "sport_window"
-          ? {
-              kind: "sport_window" as const,
-              sportKey: p.scope.sportKey,
-              windowStart: p.scope.windowStart.toISOString(),
-              windowEnd: p.scope.windowEnd.toISOString(),
-            }
-          : p.scope,
-    }));
+  const duplicateCandidates: DuplicateCandidate[] = [
+    ...activePromos
+      .filter((p) => !p.addedByYou && ownBookKeys.has(p.bookKey))
+      .map((p) => ({
+        bookKey: p.bookKey,
+        promoType: p.promoType,
+        bonusAmount: p.bonusAmount,
+        boostPercent: p.boostPercent,
+        boostedOddsAmerican: p.boostedOddsAmerican,
+        scope: candidateScope(p.scope),
+      })),
+    // D-13: the member's visible scraped no-sweats (refund cap as the amount) so the form can hint at a repeat.
+    ...activeNoSweats
+      .filter((p) => !p.addedByYou && ownBookKeys.has(p.bookKey))
+      .map((p) => ({
+        bookKey: p.bookKey,
+        promoType: "no_sweat",
+        bonusAmount: p.refundCap.toFixed(2),
+        boostPercent: null,
+        boostedOddsAmerican: null,
+        scope: candidateScope(p.scope),
+      })),
+  ];
 
   // WR-03: the edit form's Book is locked; if the member has since dropped
   // that book, still list it so the locked field shows its name.

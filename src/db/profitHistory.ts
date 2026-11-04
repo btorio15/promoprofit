@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promoProfitObservations, promos, scrapeRuns } from "./schema";
 import { promoVisibilityCondition } from "./promos";
@@ -28,8 +28,10 @@ export function buildDailyProfitHistoryQuery(db: Db) {
     .from(promoProfitObservations)
     .leftJoin(promos, eq(promos.id, promoProfitObservations.promoId))
     // Site-wide page: scraped promos only, never a member's private promo
-    // (WR-02). No viewer means the group-only visibility rule.
-    .where(promoVisibilityCondition());
+    // (WR-02). No viewer means the group-only visibility rule. No-sweats are
+    // estimates, never counted in Statistics (A-01, FEED-04); the left join
+    // can leave promo_type null, which stays in (as "unknown").
+    .where(and(promoVisibilityCondition(), or(isNull(promos.promoType), ne(promos.promoType, "no_sweat"))));
 }
 
 export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
@@ -59,7 +61,8 @@ export function buildFunnelPromosQuery(db: Db) {
     .from(promos)
     // Site-wide only: members' private hand-added promos stay out of the
     // funnel and book health, like the rest of Statistics (07.1 review fix).
-    .where(promoVisibilityCondition());
+    // No-sweats are estimates and stay out too (A-01, FEED-04).
+    .where(and(promoVisibilityCondition(), ne(promos.promoType, "no_sweat")));
 }
 
 export async function loadFunnelPromos(): Promise<FunnelPromo[]> {

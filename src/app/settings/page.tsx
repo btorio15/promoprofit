@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Card } from "@/components/ui/card";
 import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
 import { SettingsBookCapsForm } from "@/components/settings/SettingsBookCapsForm";
+import { SettingsLowProfileForm } from "@/components/settings/SettingsLowProfileForm";
 import { getMemberBookCaps } from "@/db/bookCaps";
 import { getMyBookOptions, getUsableUserBooks, getUserMyBookKeys } from "@/db/queries";
 import { DEFAULT_MAX_STAKE } from "@/domain/promos/yourCap";
@@ -36,6 +37,7 @@ export default async function SettingsPage() {
     getUserMyBookKeys(user.userId),
     getUsableUserBooks(user.userId),
     getMemberBookCaps(user.userId),
+    getMemberLowProfile(user.userId),
   ]);
 
   return (
@@ -69,6 +71,10 @@ export default async function SettingsPage() {
               cap still applies if it&apos;s lower, and a cap you set on a single promo always wins.
             </p>
             <SettingsBookCapsForm books={usableSaved} caps={Object.fromEntries(bookCaps)} />
+          </Card>
+
+          <Card className="p-6">
+            <SettingsLowProfileForm initial={lowProfile} />
           </Card>
         </div>
       </main>

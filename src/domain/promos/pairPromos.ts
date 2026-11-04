@@ -21,7 +21,7 @@ import {
   type RankOptions,
 } from "./rankPromoHedges";
 import type { ResolvedSelection, SelectionQuote } from "./selection";
-import type { PromoMarketType, PromoSide } from "./types";
+import { assertNever, isGuaranteedPromoType, type GuaranteedPromoType, type PromoMarketType, type PromoSide } from "./types";
 
 /**
  * Pair discovery (D-08, D-09, D-18) and exact non-conflicting selection
@@ -111,6 +111,17 @@ function flipSelection(sel: ResolvedSelection): ResolvedSelection {
   };
 }
 
+function isBoostType(t: GuaranteedPromoType): boolean {
+  switch (t) {
+    case "profit_boost":
+      return true;
+    case "bonus_bet":
+      return false;
+    default:
+      return assertNever(t);
+  }
+}
+
 interface LegOption<P extends RankablePromo> {
   promo: P;
   selection: ResolvedSelection;
@@ -131,51 +142,56 @@ function buildLegOption<P extends RankablePromo>(
   const ownQuote: SelectionQuote | null = selection.promoSideQuotes.find((q) => q.bookKey === promo.bookKey) ?? null;
   const base = { promo, selection, marketKey: marketKeyOf(selection), side: selection.side };
 
-  if (promo.promoType === "profit_boost") {
-    if (promo.maxStake === null) return null; // D-18
-    const isPinned = promo.pinned !== null;
-    if (!isPinned && !ownQuote) return null;
-    if (!passesBaseMinOdds(promo, ownQuote)) return null;
+  switch (promo.promoType) {
+    case "profit_boost": {
+      if (promo.maxStake === null) return null; // D-18
+      const isPinned = promo.pinned !== null;
+      if (!isPinned && !ownQuote) return null;
+      if (!passesBaseMinOdds(promo, ownQuote)) return null;
 
-    const input: BoostLegInput = {
-      boostedOddsAmerican: isPinned ? promo.boostedOddsAmerican : null,
-      baseOddsAmerican: ownQuote?.oddsAmerican ?? (isPinned ? promo.baseOddsAmerican : null),
-      boostPercent: promo.boostPercent !== null ? new Decimal(promo.boostPercent) : null,
-      maxStake: new Decimal(promo.maxStake),
-      winningsCap: promo.winningsCap
-        ? { kind: promo.winningsCap.kind, amount: new Decimal(promo.winningsCap.amount) }
-        : null,
-      minOddsAmerican: promo.minOddsAmerican,
-    };
-
-    try {
-      const { decimal } = effectiveBoostedDecimal(input);
-      return {
-        ...base,
-        oddsAmerican: input.boostedOddsAmerican ?? decimalToAmericanDisplay(decimal),
-        baseOddsAmerican: input.baseOddsAmerican,
-        oddsDecimal: new LocalDecimal(decimal),
-        boost: input,
-        bonus: null,
+      const input: BoostLegInput = {
+        boostedOddsAmerican: isPinned ? promo.boostedOddsAmerican : null,
+        baseOddsAmerican: ownQuote?.oddsAmerican ?? (isPinned ? promo.baseOddsAmerican : null),
+        boostPercent: promo.boostPercent !== null ? new Decimal(promo.boostPercent) : null,
+        maxStake: new Decimal(promo.maxStake),
+        winningsCap: promo.winningsCap
+          ? { kind: promo.winningsCap.kind, amount: new Decimal(promo.winningsCap.amount) }
+          : null,
+        minOddsAmerican: promo.minOddsAmerican,
       };
-    } catch (err) {
-      if (err instanceof RangeError) {
-        console.warn(`pairPromos: promo ${promo.id} leg raised RangeError: ${err.message}`);
-        return null;
-      }
-      throw err;
-    }
-  }
 
-  if (!ownQuote || promo.bonusAmount === null) return null;
-  return {
-    ...base,
-    oddsAmerican: ownQuote.oddsAmerican,
-    baseOddsAmerican: null,
-    oddsDecimal: new LocalDecimal(americanToDecimal(ownQuote.oddsAmerican)),
-    boost: null,
-    bonus: { bonusAmount: new Decimal(promo.bonusAmount), oddsAmerican: ownQuote.oddsAmerican },
-  };
+      try {
+        const { decimal } = effectiveBoostedDecimal(input);
+        return {
+          ...base,
+          oddsAmerican: input.boostedOddsAmerican ?? decimalToAmericanDisplay(decimal),
+          baseOddsAmerican: input.baseOddsAmerican,
+          oddsDecimal: new LocalDecimal(decimal),
+          boost: input,
+          bonus: null,
+        };
+      } catch (err) {
+        if (err instanceof RangeError) {
+          console.warn(`pairPromos: promo ${promo.id} leg raised RangeError: ${err.message}`);
+          return null;
+        }
+        throw err;
+      }
+    }
+    case "bonus_bet": {
+    if (!ownQuote || promo.bonusAmount === null) return null;
+    return {
+      ...base,
+      oddsAmerican: ownQuote.oddsAmerican,
+      baseOddsAmerican: null,
+      oddsDecimal: new LocalDecimal(americanToDecimal(ownQuote.oddsAmerican)),
+      boost: null,
+      bonus: { bonusAmount: new Decimal(promo.bonusAmount), oddsAmerican: ownQuote.oddsAmerican },
+    };
+    }
+    default:
+      return assertNever(promo.promoType);
+  }
 }
 
 function legOptionsFor<P extends RankablePromo>(promo: P, opts: RankOptions): Map<string, LegOption<P>[]> {
@@ -288,6 +304,7 @@ export function findPairCandidates<P extends RankablePromo>(
   opts: RankOptions & { memberBookKeys: ReadonlySet<string> },
 ): PairCandidate<P>[] {
   const eligible = promos
+    .filter((p) => isGuaranteedPromoType(p.promoType)) // A-01: no-sweats never pair
     .filter((p) => opts.memberBookKeys.has(p.bookKey)) // D-18
     .sort((x, y) => x.id - y.id);
 
@@ -302,8 +319,8 @@ export function findPairCandidates<P extends RankablePromo>(
       const lo = eligible[i];
       const hi = eligible[j];
       if (lo.bookKey === hi.bookKey) continue;
-      const loBoost = lo.promoType === "profit_boost";
-      const hiBoost = hi.promoType === "profit_boost";
+      const loBoost = isBoostType(lo.promoType);
+      const hiBoost = isBoostType(hi.promoType);
       if (!loBoost && !hiBoost) continue; // D-09
 
       // boost_boost: lower id is A. boost_bonus: the boost is A.

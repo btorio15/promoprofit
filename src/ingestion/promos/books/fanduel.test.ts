@@ -458,3 +458,76 @@ describe("fanduelScraper -- multi-game promos (A @ B or C @ D)", () => {
     expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
   });
 });
+
+// Phase 9 (FEED-01, A-07). FanDuel: fixture pending (09-RECON-NO-SWEAT.md) --
+// no real no-sweat was live at recon, so every entry below is SYNTHETIC.
+describe("fanduelScraper -- no-sweat path (fixture pending)", () => {
+  const PARSE_CTX = { now: new Date("2026-11-03T18:00:00Z"), sourceUrl: "https://example.test/list" };
+
+  function noSweatList(over: { promoCode?: string; title: string; name: string; tags?: string[] }): string {
+    return JSON.stringify({
+      promoPlacements: [
+        {
+          placementId: "SBK_PROMOHUB",
+          promotions: [{ promoCode: "SYNNOSWEAT1", tags: ["nfl", "american-football"], ...over }],
+        },
+      ],
+    });
+  }
+
+  function detailBody(title: string, description: string): string {
+    return JSON.stringify([{ title, description, combinedEndDate: "2026-11-09T04:59:00Z" }]);
+  }
+
+  it("SYNTHETIC: 'NFL No Sweat' with a bonus-bet refund cap in the detail -> no_sweat candidate", () => {
+    const list = noSweatList({ title: "NFL No Sweat", name: "Get a Bonus Bet back if your bet loses on any NFL Games on November 8th, 2026!" });
+    expect(fanduelScraper.planDetails(list)).toHaveLength(1);
+    const result = fanduelScraper.parse(
+      {
+        listBody: list,
+        detailBodies: {
+          SYNNOSWEAT1: detailBody(
+            "NFL No Sweat",
+            "<p>If your bet loses, get a Bonus Bet up to $25. Odds of -200 or longer. For any NFL Games on November 8th, 2026.</p>",
+          ),
+        },
+      },
+      PARSE_CTX,
+    );
+    expect(result.skipped).toEqual([]);
+    expect(result.candidates).toHaveLength(1);
+    const c = result.candidates[0];
+    expect(c.promoType).toBe("no_sweat");
+    expect(c.bonusAmount).toBe("25.00");
+    expect(c.minOddsAmerican).toBe(-200);
+    expect(c.boostPercent).toBeNull();
+    expect(c.maxStake).toBeNull();
+  });
+
+  it("SYNTHETIC: a cash refund is skipped as no_sweat_cash", () => {
+    const list = noSweatList({ title: "NFL No Sweat", name: "If your bet loses, get refunded in cash up to $25 on any NFL Games" });
+    const result = fanduelScraper.parse({ listBody: list, detailBodies: {} }, PARSE_CTX);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("no_sweat_cash");
+  });
+
+  it("SYNTHETIC: an acq-tagged 'No Sweat First Bet' stays new_customer", () => {
+    const list = noSweatList({
+      promoCode: "SYNACQ1",
+      title: "No Sweat First Bet",
+      name: "Bet back as a Bonus Bet up to $100 if your first wager loses",
+      tags: ["acq-offer", "nfl"],
+    });
+    const result = fanduelScraper.parse({ listBody: list, detailBodies: {} }, PARSE_CTX);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("new_customer");
+  });
+
+  it("SYNTHETIC: no readable cap -> unrecognized skip with evidence, never a candidate", () => {
+    const list = noSweatList({ title: "NFL No Sweat", name: "Bonus Bet back if your bet loses on any NFL Games" });
+    const result = fanduelScraper.parse({ listBody: list, detailBodies: {} }, PARSE_CTX);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.skipped[0].reason).toBe("unrecognized");
+    expect(result.skipped[0].evidence?.rawText).toContain("No Sweat");
+  });
+});

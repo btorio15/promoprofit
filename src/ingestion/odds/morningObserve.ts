@@ -1,6 +1,7 @@
 import { configuredOddsKeys, MISSING_KEY_MESSAGE } from "./oddsKeys";
 import { runOddsRefresh, type RefreshOutcome } from "./refresh";
 import { recordCurrentProfitObservations, recordCurrentProfitSnapshots } from "@/db/promoObservations";
+import { recordCurrentBonusConversionSnapshots } from "@/db/bonusConversionSnapshots";
 import { listUserIds } from "@/db/queries";
 import { loadMemberFeedContext } from "@/db/feedContext";
 import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
@@ -30,6 +31,9 @@ import { isMorningObservationWindow } from "@/domain/promos/morningWindow";
  * promos and Your cap through the shared feed context, then records through
  * recordMemberFeedObservations, the same helper the Dashboard and the Promos
  * tab use. One member failing never stops the others.
+ *
+ * quick-261103-mok: each run also records the bonus-bet conversion-rate
+ * history (bonus_conversion_snapshots) from cached odds, isolated like the rest.
  */
 export type MorningObserveResult =
   | { status: "skipped"; reason: "not-morning-window" }
@@ -114,6 +118,12 @@ export async function runMorningObservation(opts: {
     await recordCurrentProfitSnapshots(now);
   } catch (err) {
     console.error("runMorningObservation: profit snapshots failed", err);
+  }
+  // Bonus-bet conversion-rate history ($100 reference per book), cached odds only.
+  try {
+    await recordCurrentBonusConversionSnapshots(now);
+  } catch (err) {
+    console.error("runMorningObservation: conversion snapshots failed", err);
   }
 
   const memberObservations = await recordAllMembersObservations(now);

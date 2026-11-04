@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   PROMO_READER_MODEL,
@@ -13,6 +14,7 @@ function validReading(overrides: Partial<PromoReading> = {}): PromoReading {
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: "50",
     bonusAmount: null,
     maxStake: "25",
@@ -137,5 +139,33 @@ describe("readingCacheKey", () => {
   it("returns a 64-char hex sha256 digest", () => {
     const key = readingCacheKey("draftkings", "text");
     expect(key).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe("no_sweat reading (Phase 9)", () => {
+  it("schema accepts kind no_sweat with each refundForm", () => {
+    for (const refundForm of ["bonus_bet", "cash", "unknown", null] as const) {
+      expect(PromoReadingSchema.safeParse(validReading({ kind: "no_sweat", refundForm })).success).toBe(true);
+    }
+  });
+
+  it("refundForm is a required key", () => {
+    const { refundForm: _omit, ...rest } = validReading();
+    void _omit;
+    expect(PromoReadingSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it("prompt version was bumped and changes the cache key", () => {
+    expect(PROMO_READER_PROMPT_VERSION).not.toBe("2026-10-16.2");
+    expect(readingCacheKey("draftkings", "text")).not.toBe(
+      createHash("sha256")
+        .update(["2026-10-16.2", "claude-haiku-4-5", "draftkings", "text"].join("\u0000"))
+        .digest("hex"),
+    );
+  });
+
+  it("prompt has a no_sweat rule and no longer lists no-sweats as not_usable", () => {
+    expect(PROMO_READER_SYSTEM_PROMPT).toContain('Use "no_sweat"');
+    expect(PROMO_READER_SYSTEM_PROMPT).not.toContain("no-sweat offers (a losing bet refunded as a bonus bet)");
   });
 });

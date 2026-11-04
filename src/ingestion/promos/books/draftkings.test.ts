@@ -398,7 +398,7 @@ describe("draftkingsScraper — 2026-09-28 fixture: MLB HR Bet and Get (1127668)
       "1126077": "sgp",
       "1126078": "futures",
       "1127118": "prop",
-      "1127122": "no_sweat", // quick-261016-k8a: "No Sweat" category (racing bet-back)
+      "1127122": "not_a_promo", // Phase 9: racing bet-back is no longer no_sweat; still a skip, never a candidate
       "1127668": "prop",
       "1127861": "not_a_promo",
     });
@@ -603,5 +603,49 @@ describe("draftkingsScraper — multi-game 'for the A @ B or C @ D games on <dat
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0].reason).toBe("unrecognized");
     expect(result.skipped[0].evidence?.rawText).toContain("Chiefs @ Raiders");
+  });
+});
+
+describe("draftkingsScraper — Phase 9 no-sweat (reconstructed fixture)", () => {
+  const body = readFileSync(
+    join(process.cwd(), "src/test/fixtures/promos/draftkings-no-sweat-reconstructed.json"),
+    "utf-8",
+  );
+  const result = draftkingsScraper.parse(
+    { listBody: body, detailBodies: {} },
+    { now: new Date("2026-10-16T12:00:00.000Z"), sourceUrl: "https://api.draftkings.com/en/api/promotions/v3/promotions/query" },
+  );
+
+  it("London no-sweat becomes a no_sweat candidate with cap, min odds and opt-in, never a bonus_bet", () => {
+    expect(result.candidates).toHaveLength(1);
+    const c = result.candidates[0];
+    expect(c.promoType).toBe("no_sweat");
+    expect(c.promoType).not.toBe("bonus_bet");
+    expect(c.bonusAmount).toBe("10.00");
+    expect(c.minOddsAmerican).toBe(-200);
+    expect(c.claimRequired).toBe("opt_in");
+    expect(c.sportKeyHint).toBe("americanfootball_nfl");
+    expect(c.teamsText.join(" ")).toMatch(/Texans/);
+    expect(c.teamsText.join(" ")).toMatch(/Jaguars/);
+    expect(c.boostPercent).toBeNull();
+    expect(c.maxStake).toBeNull();
+    expect(c.maxWinnings).toBeNull();
+    expect(c.winningsCapKind).toBeNull();
+    expect(ScrapedPromoSchema.safeParse(c).success).toBe(true);
+  });
+
+  it("SGP no-sweat is skipped as sgp", () => {
+    expect(result.skipped.find((s) => s.title === "SGP No Sweat")?.reason).toBe("sgp");
+  });
+
+  it("cash no-sweat is a review-worthy no_sweat_cash skip with evidence", () => {
+    const s = result.skipped.find((x) => x.title === "NBA Money Back");
+    expect(s?.reason).toBe("no_sweat_cash");
+    expect(s?.evidence?.rawText).toContain("cash");
+  });
+
+  it("racing Bet Back entry never becomes a candidate", () => {
+    expect(result.candidates.some((c) => c.externalId === "1127122")).toBe(false);
+    expect(result.skipped.some((s) => s.externalId === "1127122")).toBe(true);
   });
 });

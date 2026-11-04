@@ -175,3 +175,31 @@ describe("looksLikeDuplicate multi-game draft (quick-261016-1se)", () => {
     expect(looksLikeDuplicate(boostDraft({ scope: multi(["E1", "ZZ"]) }), [cand], evs)).toBe(false);
   });
 });
+
+describe("looksLikeDuplicate (no-sweat)", () => {
+  const noSweatDraft = (over: Partial<AddPromoDraft> = {}): AddPromoDraft => ({
+    ...emptyBonusDraft(NOW),
+    promoType: "no_sweat",
+    bookKey: "betmgm",
+    refundCap: "25",
+    ...over,
+  });
+  const noSweatCand: DuplicateCandidate = {
+    bookKey: "betmgm",
+    promoType: "no_sweat",
+    bonusAmount: "25.00",
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    scope: { kind: "any" },
+  };
+
+  it("matches another no-sweat at the same book and cap", () => {
+    expect(looksLikeDuplicate(noSweatDraft(), [noSweatCand], events)).toBe(true);
+  });
+
+  it("does not match a bonus bet with the same amount, another book or another cap", () => {
+    expect(looksLikeDuplicate(noSweatDraft(), [{ ...noSweatCand, promoType: "bonus_bet" }], events)).toBe(false);
+    expect(looksLikeDuplicate(noSweatDraft({ bookKey: "fanduel" }), [noSweatCand], events)).toBe(false);
+    expect(looksLikeDuplicate(noSweatDraft({ refundCap: "10" }), [noSweatCand], events)).toBe(false);
+  });
+});

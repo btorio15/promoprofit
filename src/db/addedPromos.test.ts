@@ -12,6 +12,7 @@ import {
   buildUpdateOwnStatements,
 } from "./addedPromos";
 import type { AddedPromoInsert } from "@/domain/promos/buildAddedPromo";
+import { mapOwnPromoToEditValues } from "./addedPromos";
 
 const db = drizzle({ client: neon("postgresql://u:p@db.invalid/x"), schema });
 
@@ -101,5 +102,77 @@ describe("buildUpdateOwnStatements (WR-01)", () => {
     expect(sql).toContain('"partner_promo_id" = $');
     expect(sql).toContain('exists (select "id" from "promos"');
     expect(params).toEqual(expect.arrayContaining([5, 7, "active"]));
+  });
+});
+
+describe("mapOwnPromoToEditValues (no-sweat edit prefill)", () => {
+  const baseRow = {
+    id: 5,
+    bookKey: "betmgm",
+    promoType: "no_sweat",
+    bonusAmount: "25.00",
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    maxStake: null,
+    maxWinnings: null,
+    maxWinningsKind: null,
+    minOddsAmerican: -200,
+    scopeKind: "any",
+    eventId: null,
+    scopeGames: null,
+    sportKey: null,
+    windowStart: null,
+    windowEnd: null,
+    marketType: null,
+    line: null,
+    side: null,
+    expiresAt: new Date("2026-10-05T03:59:00.000Z"),
+  };
+  const parsedWith = (eligibleMarketTypes: string[]) => ({
+    bookKey: "betmgm",
+    externalId: null,
+    promoType: "no_sweat",
+    title: "No-sweat up to $25.00",
+    rawText: "",
+    sourceUrl: "user-added",
+    sportKeyHint: null,
+    scopeText: "Any game",
+    teamsText: [],
+    windowStart: null,
+    windowEnd: null,
+    expiresAt: "2026-10-05T03:59:00.000Z",
+    eligibleMarketTypes,
+    pinned: null,
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: "25.00",
+    maxStake: null,
+    maxWinnings: null,
+    minOddsAmerican: -200,
+    unparsedCapFields: [],
+    claimRequired: null,
+    finePrintNote: null,
+  });
+  type Row = Parameters<typeof mapOwnPromoToEditValues>[0];
+
+  it("reads the refund cap from bonus_amount and a single market from parsed.eligibleMarketTypes", () => {
+    const v = mapOwnPromoToEditValues({ ...baseRow, parsed: parsedWith(["spread"]) } as unknown as Row);
+    expect(v.refundCap).toBe("25.00");
+    expect(v.marketType).toBe("spread");
+    expect(v.minOddsAmerican).toBe(-200);
+  });
+
+  it("maps all three markets to no limit", () => {
+    const v = mapOwnPromoToEditValues({
+      ...baseRow,
+      parsed: parsedWith(["moneyline", "spread", "total"]),
+    } as unknown as Row);
+    expect(v.marketType).toBeNull();
+  });
+
+  it("leaves refundCap null for a bonus bet", () => {
+    const v = mapOwnPromoToEditValues({ ...baseRow, promoType: "bonus_bet", parsed: {} } as unknown as Row);
+    expect(v.refundCap).toBeNull();
   });
 });

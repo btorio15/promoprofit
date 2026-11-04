@@ -7,6 +7,7 @@ import { getHedgeBookKeys } from "@/db/queries";
 import { loadMemberFeedContext, loadProfitSeries } from "@/db/feedContext";
 import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
+import { loadNoSweatFeed, type NoSweatFeedResult } from "@/db/noSweatFeed";
 import { toPromoRowDTO } from "@/domain/promos/promoRowDto";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { buildArbMarkets, toArbResultDTO } from "@/domain/arb/build";
@@ -25,6 +26,7 @@ import {
   type OpportunitySourceDTO,
 } from "@/domain/opportunities/types";
 import type { PromoRowDTO } from "@/domain/promos/dto";
+import type { NoSweatRowDTO } from "@/domain/promos/noSweatRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
 
 // T-04-02: strict, and no userId -- the acting user comes only from the session.
@@ -98,6 +100,15 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     now,
   });
 
+  // Phase 9 (A-01): no-sweat estimates are loaded AFTER the recorders and the
+  // dashboard above, from the same context, and never fed back into them.
+  let noSweat: NoSweatFeedResult = { rows: [], notes: [], tracking: [], ranked: [], trackedIds: new Set(), activeCount: 0 };
+  try {
+    noSweat = await loadNoSweatFeed({ userId: user.userId, precision, now, ctx });
+  } catch (err) {
+    console.error("getOpportunities: no-sweat feed failed", err);
+  }
+
   const respond = (
     emptyVariant: OpportunitiesEmptyVariant | null,
     sources: OpportunitySourceDTO[],
@@ -109,6 +120,8 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     dashboard,
     profitSeries,
     sources,
+    tracking: noSweat.tracking,
+    noSweatNotes: noSweat.notes,
   });
 
   if (!feed) {
@@ -131,7 +144,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet, priceAge))
     .filter((r) => r.hasPromoBook);
 
-  const items: OpportunityItem<PromoRowDTO>[] = rows.map((row) => ({
+  const items: OpportunityItem<PromoRowDTO | NoSweatRowDTO>[] = rows.map((row) => ({
     rowKey: row.rowKey,
     profit: row.guaranteedProfit,
     pct: row.ratePct,
@@ -139,6 +152,18 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     commenceTime: row.commenceTime,
     data: row,
   }));
+  // D-08, A-10: priced no-sweats ride in the promos source, flagged as estimates.
+  for (const row of noSweat.rows) {
+    items.push({
+      rowKey: row.rowKey,
+      profit: row.estimatedProfit,
+      pct: row.estRoiPct,
+      pctLabel: "Est. ROI",
+      estimated: true,
+      commenceTime: row.commenceTime,
+      data: row,
+    });
+  }
 
   // D-08/D-10/D-18: pairs of promos at two member books that beat hedging
   // each separately, each promo in at most one pair. Paired promos stay in
@@ -183,11 +208,12 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     { id: "arbs", items: arbItems },
   ];
 
-  if (sources.some((s) => s.items.length > 0)) {
+  // A-10: a screen with only no-sweat rows, notes or Tracking cards is not "Nothing profitable".
+  if (sources.some((s) => s.items.length > 0) || noSweat.notes.length > 0 || noSweat.tracking.length > 0) {
     return respond(null, sources);
   }
 
-  if (ctx.activePromos.length === 0) {
+  if (ctx.activePromos.length === 0 && noSweat.activeCount === 0) {
     return respond("none-scraped", sources);
   }
 

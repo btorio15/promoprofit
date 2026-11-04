@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DonePromoSnapshot } from "@/domain/promos/doneSnapshot";
+import type { NoSweatDoneSnapshot } from "@/domain/promos/noSweatSnapshot";
 import {
   DonePairSnapshotSchema,
   PairMemberSnapshotSchema,
@@ -51,20 +52,43 @@ export async function getPromoCompletions(userId: number) {
  * quick-260929-igk: records a member's mark-done with its server-built
  * snapshot. ON CONFLICT DO NOTHING keeps the FIRST snapshot on a double-tap
  * (idempotent); the caller's recompute already proved the promo exists.
+ *
+ * WR-05: resolves true when THIS call inserted the row, false when a
+ * completion already existed (a racing double tap / second tab), so the
+ * caller can report the stored figure instead of its own.
  */
 export async function markPromoDone(args: {
   userId: number;
   promoId: number;
   now: Date;
-  snapshot: DonePromoSnapshot;
+  snapshot: DonePromoSnapshot | NoSweatDoneSnapshot;
   profitExtracted: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const { userId, promoId, now, snapshot, profitExtracted } = args;
   const db = getDb();
-  await db
+  const inserted = await db
     .insert(promoCompletions)
     .values({ userId, promoId, completedAt: now, snapshot, profitExtracted })
-    .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] });
+    .onConflictDoNothing({ target: [promoCompletions.userId, promoCompletions.promoId] })
+    .returning({ promoId: promoCompletions.promoId });
+  return inserted.length > 0;
+}
+
+/**
+ * Phase 9 (A-09): "Fix amounts" on a settled no-sweat. One UPDATE of the
+ * snapshot and profit, filtered by the session user id and promo id.
+ */
+export async function updateNoSweatCompletion(args: {
+  userId: number;
+  promoId: number;
+  snapshot: NoSweatDoneSnapshot;
+  profitExtracted: string;
+}): Promise<void> {
+  const { userId, promoId, snapshot, profitExtracted } = args;
+  await getDb()
+    .update(promoCompletions)
+    .set({ snapshot, profitExtracted })
+    .where(and(eq(promoCompletions.userId, userId), eq(promoCompletions.promoId, promoId)));
 }
 
 /**

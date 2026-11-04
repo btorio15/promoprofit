@@ -13,7 +13,7 @@
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { extractTwoWayMoneylines } from "./marketFilter";
-import { rankBonusBetHedges } from "./rankBonusBetHedges";
+import { rankBonusBetHedges, type BonusBetOpportunity } from "./rankBonusBetHedges";
 import { SPORT_KEYS } from "@/config/sports";
 import { isMarketVenue } from "@/config/books";
 
@@ -45,7 +45,12 @@ export type ConversionRateFor = (
   hedgeBookKeys: ReadonlySet<string>,
 ) => ConversionRate | null;
 
-export function topConversionFor(args: {
+/**
+ * The single refund ranker: the estimate (topConversionFor, limit 1) and the
+ * Bet-lost card (limit N) both go through this so they cannot disagree
+ * (Phase 9 D-05).
+ */
+export function rankRefundOpportunities(args: {
   events: OddsEvent[];
   now: Date;
   refundBookKey: string;
@@ -62,12 +67,31 @@ export function topConversionFor(args: {
     allowedBookKeys: allowed,
     sportKeys: new Set(SPORT_KEYS),
   });
-  const top = rankBonusBetHedges(markets, {
+  return rankBonusBetHedges(markets, {
     bonusBookKey: refundBookKey,
     bonusAmount: amount,
     hedgeBookKeys,
-    limit: 1,
-  })[0];
+    limit,
+  });
+}
+
+function assertAmount(amount: Decimal): void {
+  if (amount.lte(0) || amount.decimalPlaces() > 2) {
+    throw new RangeError(
+      `amount must be greater than 0 with at most 2 decimal places, got ${amount.toString()}`,
+    );
+  }
+}
+
+export function topConversionFor(args: {
+  events: OddsEvent[];
+  now: Date;
+  refundBookKey: string;
+  amount: Decimal;
+  hedgeBookKeys: ReadonlySet<string>;
+}): ConversionRate | null {
+  const { refundBookKey, amount } = args;
+  const top = rankRefundOpportunities({ ...args, limit: 1 })[0];
   if (!top) return null;
   const profit = top.result.guaranteedProfit;
   return {
@@ -89,11 +113,7 @@ export function makeConversionRateFor(args: {
   return (bookKey, amount, hedgeBookKeys) => {
     // Reject before the cache: toFixed(2) below would otherwise round
     // 25.004 onto 25.00's entry and return a result for a different amount.
-    if (amount.lte(0) || amount.decimalPlaces() > 2) {
-      throw new RangeError(
-        `amount must be greater than 0 with at most 2 decimal places, got ${amount.toString()}`,
-      );
-    }
+    assertAmount(amount);
     const hedgeKey = [...hedgeBookKeys].sort().join(",");
     const key = `${bookKey}|${amount.toFixed(2)}|${hedgeKey}`;
     if (cache.has(key)) return cache.get(key)!;

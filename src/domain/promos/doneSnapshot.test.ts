@@ -7,6 +7,7 @@ import {
   toDonePromoDTO,
   type DonePromoTerms,
 } from "./doneSnapshot";
+import { buildDoneSnapshotFixture, buildTrackedSnapshotFixture } from "./noSweatSnapshot.fixture";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
 
 const NOW = new Date("2026-09-29T15:00:00.000Z");
@@ -172,6 +173,22 @@ describe("toDonePromoDTO", () => {
     const bare = toDonePromoDTO({ ...completion, snapshot: null, promoBookKey: "mystery" }, names);
     expect(bare.title).toBe("Promo #5");
     expect(bare.bookName).toBe("mystery");
+  });
+
+  it("legacy no_sweat completion is labelled No-sweat and never titled as a bonus bet", () => {
+    const dto = toDonePromoDTO(
+      { ...completion, snapshot: null, promoType: "no_sweat", promoBonusAmount: "50.00" },
+      names,
+    );
+    expect(dto.promoTypeLabel).toBe("No-sweat");
+    expect(dto.title).toBe("Promo #5");
+  });
+
+  it("v1 snapshot schema rejects a no_sweat promo type", () => {
+    const { snapshot } = buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx);
+    const bad = JSON.parse(JSON.stringify(snapshot));
+    bad.promo.promoType = "no_sweat";
+    expect(DonePromoSnapshotSchema.safeParse(bad).success).toBe(false);
   });
 
   it("unreadable snapshot is legacy with the column amount", () => {

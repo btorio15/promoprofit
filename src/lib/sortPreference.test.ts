@@ -15,6 +15,7 @@ describe("sortPreference", () => {
   it("sortCaption", () => {
     expect(sortCaption("profit")).toBe("Top 5 by guaranteed profit");
     expect(sortCaption("roi")).toBe("Top 5 by ROI");
+    expect(sortCaption("roi", true)).toBe("Top 5 by Est. ROI");
   });
 
   it("countLabel", () => {

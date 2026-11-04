@@ -24,6 +24,11 @@ vi.mock("@/components/AccountMenu", () => ({
 }));
 vi.mock("@/db/bookCaps", () => ({ getMemberBookCaps: async () => new Map<string, string>() }));
 vi.mock("@/components/settings/SettingsBookCapsForm", () => ({ SettingsBookCapsForm: () => null }));
+vi.mock("@/db/lowProfile", async () => {
+  const { DEFAULT_LOW_PROFILE } = await import("@/domain/promos/lowProfile");
+  return { getMemberLowProfile: async () => DEFAULT_LOW_PROFILE };
+});
+vi.mock("@/components/settings/SettingsLowProfileForm", () => ({ SettingsLowProfileForm: () => null }));
 vi.mock("@/components/settings/SettingsBooksForm", () => ({
   SettingsBooksForm: () => null,
 }));
@@ -40,7 +45,8 @@ describe("settings navigation (owner-reported gap closure)", () => {
   it("AppHeader wordmark is an anchor linking to / with text MarginMind", () => {
     const markup = renderToStaticMarkup(React.createElement(AppHeader, { displayName: "Mike" }));
 
-    expect(markup).toMatch(/<a href="\/"[^>]*>MarginMind<\/a>/);
+    const homeLink = markup.match(/<a href="\/"[^>]*>([\s\S]*?)<\/a>/)?.[1];
+    expect(homeLink?.replace(/<[^>]*>/g, "")).toBe("MarginMind");
   });
 
   it("SettingsPage renders a Back to MarginMind anchor linking to /", async () => {

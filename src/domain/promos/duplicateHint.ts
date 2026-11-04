@@ -119,13 +119,16 @@ export function looksLikeDuplicate(
   if (!scope) return false;
 
   const isBoost = draft.promoType === "profit_boost";
+  // A no-sweat's refund cap is compared like a bonus amount, and only against
+  // other no-sweats at the same book (the promoType check below).
+  const amountText = draft.promoType === "no_sweat" ? draft.refundCap : draft.bonusAmount;
   const oddsText = draft.boostedOdds.trim();
   const useOdds = isBoost && draft.boostMode === "odds";
   if (isBoost) {
     if (useOdds ? !AMERICAN_ODDS.test(oddsText) : !BOOST_PERCENT_PATTERN.test(draft.boostPercent.trim())) {
       return false;
     }
-  } else if (!MONEY_PATTERN.test(draft.bonusAmount.trim())) {
+  } else if (!MONEY_PATTERN.test(amountText.trim())) {
     return false;
   }
 
@@ -135,7 +138,7 @@ export function looksLikeDuplicate(
       ? useOdds
         ? c.boostedOddsAmerican !== null && c.boostedOddsAmerican === Number(oddsText)
         : decimalEq(draft.boostPercent, c.boostPercent, BOOST_PERCENT_PATTERN)
-      : decimalEq(draft.bonusAmount, c.bonusAmount, MONEY_PATTERN);
+      : decimalEq(amountText, c.bonusAmount, MONEY_PATTERN);
     return amountMatches && scopesOverlap(scope, c.scope, events);
   });
 }

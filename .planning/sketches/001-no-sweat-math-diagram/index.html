@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No-sweat math diagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 16px; line-height: 1.4; }
+  .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted-foreground); }
+  .sm { font-size: 14px; }
+  .xs { font-size: 12px; }
+
+  /* Sketch chrome */
+  .chrome { position: sticky; top: 0; z-index: 10; background: var(--background); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .chrome-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .chrome-label { font-size: 12px; color: var(--muted-foreground); width: 64px; }
+  .seg { border: 1px solid var(--border); background: var(--card); color: var(--foreground); border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  .seg[aria-pressed="true"] { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+
+  .frame { max-width: 390px; margin: 16px auto 48px; padding: 0 16px; }
+  .screen-h { font-size: 20px; font-weight: 600; margin: 8px 0 4px; }
+  .caption { font-size: 14px; color: var(--muted-foreground); margin-bottom: 12px; }
+
+  /* Row (mirrors NoSweatRow shell) */
+  .row { border: 1px solid var(--border); background: var(--secondary); border-radius: var(--radius); overflow: hidden; }
+  .row-head { width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 14px 16px; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; }
+  .meta { font-size: 13px; color: var(--muted-foreground); }
+  .title { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; font-size: 12px; line-height: 20px; color: var(--foreground); background: transparent; }
+  .fig { text-align: right; }
+  .fig-main { font-size: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .chev { transition: transform .2s; display: inline-block; color: var(--muted-foreground); }
+  .row[data-open="true"] .chev { transform: rotate(180deg); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); display: inline-block; }
+  .info { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); font: 600 12px var(--font-sans); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .pop { display: none; position: absolute; right: 0; top: 28px; width: 290px; z-index: 5; background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; text-align: left; font-weight: 400; font-size: 13px; color: var(--foreground); box-shadow: 0 8px 24px rgb(0 0 0 / .18); cursor: default; }
+  .pop.open { display: block; }
+  .pop p { margin: 0 0 8px; }
+  .pop p:last-child { margin: 0; }
+  .pop .warn { color: var(--warning); }
+
+  .body { display: none; border-top: 1px solid var(--border); padding: 16px; flex-direction: column; gap: 14px; }
+  .row[data-open="true"] .body { display: flex; }
+  .track { width: 100%; height: 44px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); font: 500 15px var(--font-sans); cursor: pointer; }
+  .riskline { font-size: 13px; color: var(--warning); display: flex; gap: 6px; }
+  .actions { display: flex; gap: 16px; font-size: 14px; color: var(--muted-foreground); }
+
+  /* Bet chips (shared) */
+  .bets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .bet { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .bet .k { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground); }
+  .bet .sel { font-weight: 500; }
+  .bet .stake { font-size: 13px; }
+
+  /* Variant A: fork */
+  .fork { position: relative; }
+  .fork svg { display: block; width: 100%; height: 28px; color: var(--border); }
+  .branches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .branch { border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: var(--card); display: flex; flex-direction: column; gap: 4px; }
+  .branch h4 { margin: 0 0 4px; font-size: 13px; font-weight: 500; color: var(--muted-foreground); }
+  .line { display: flex; justify-content: space-between; font-size: 13px; }
+  .line.est { color: var(--muted-foreground); font-style: italic; }
+  .net { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 600; }
+  .summary { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+
+  /* Variant B: bars */
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bar-h { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  .bar-h b { font-weight: 600; }
+  .track-bar { position: relative; height: 26px; border-radius: 6px; background: var(--muted); }
+  .axis { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--muted-foreground); opacity: .6; }
+  .segm { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; }
+  .segm.gain { background: var(--foreground); opacity: .85; }
+  .segm.loss { background: var(--destructive); opacity: .75; }
+  .segm.estd { background: repeating-linear-gradient(45deg, var(--muted-foreground) 0 4px, transparent 4px 8px); border: 1px dashed var(--muted-foreground); }
+  .wf-row { display: grid; grid-template-columns: 62px 1fr 76px; align-items: center; gap: 8px; font-size: 13px; margin: 0; }
+  .wf-v { text-align: right; }
+  .track-bar.wf { height: 22px; background: transparent; border-radius: 0; }
+  .track-bar.wf .axis { top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); opacity: .5; }
+  .track-bar.wf .segm { top: 4px; bottom: 4px; border-radius: 2px; }
+  .track-bar.wf .segm.net { background: var(--foreground); top: 3px; bottom: 3px; }
+  .conn { position: absolute; top: -4px; height: 8px; border-left: 1px dashed var(--muted-foreground); transform: translateX(-0.5px); }
+  .zero-row { height: 14px; }
+  .track-bar.zero { height: 14px; }
+  .zero-l { position: absolute; transform: translateX(-50%); font-size: 11px; color: var(--muted-foreground); top: -2px; }
+  .net-row { border-top: 1px solid var(--border); margin-top: 4px; }
+  .net-row .conn { top: -5px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  /* Laptop width: mirrors the real md: grid of NoSweatRow */
+  .frame.wide { max-width: 1120px; }
+  .wide .row-head { grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) 160px 110px; align-items: center; gap: 16px; padding: 16px 20px; }
+  .wide .col { display: flex; flex-direction: column; font-size: 15px; }
+  .wide .body { padding: 20px; }
+  .wide .body-grid { display: grid; grid-template-columns: 260px 1fr; gap: 24px; align-items: start; }
+  .wide .bets { grid-template-columns: 1fr; }
+  .wide .fork { display: none; }
+  .wide .branches { gap: 16px; }
+  .wide .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .wide .bars .legend-all { grid-column: 1 / -1; }
+  .wide .foot { display: flex; align-items: center; gap: 16px; }
+  .wide .foot .track { width: 200px; }
+  .wide .foot .riskline { flex: 1; }
+  .note { font-size: 12px; color: var(--muted-foreground); margin-top: 24px; border-top: 1px dashed var(--border); padding-top: 12px; }
+</style>
+</head>
+<body>
+
+<div class="chrome">
+  <div class="chrome-row"><span class="chrome-label">Diagram</span>
+    <button class="seg" data-k="v" data-v="A" aria-pressed="true">A · Two-outcome split</button>
+    <button class="seg" data-k="v" data-v="B" aria-pressed="false">B · Money-flow bars ★</button>
+  </div>
+  <div class="chrome-row"><span class="chrome-label">Width</span>
+    <button class="seg" data-k="w" data-v="laptop" aria-pressed="true">Laptop</button>
+    <button class="seg" data-k="w" data-v="phone" aria-pressed="false">Phone</button>
+  </div>
+  <div class="chrome-row"><span class="chrome-label">Notices</span>
+    <button class="seg" data-k="n" data-v="1" aria-pressed="true">1 · One (i) icon ★</button>
+    <button class="seg" data-k="n" data-v="2" aria-pressed="false">2 · Risk line once</button>
+    <button class="seg" data-k="n" data-v="3" aria-pressed="false">3 · None</button>
+  </div>
+</div>
+
+<div class="frame">
+  <div class="screen-h">Opportunities</div>
+  <div class="caption">Top 5 by Est. ROI</div>
+  <div id="mount"></div>
+  <div class="note">Sketch only. Example numbers for the BetMGM no-sweat (up to $1,500): $100 on Nuggets +150 at BetMGM, $112 hedge on Lakers −165 at DraftKings, refund valued at 70%. Tap the row to expand. Tap (i) for the notices.</div>
+</div>
+
+<script>
+const S = { v: "A", n: "1", w: window.innerWidth >= 900 ? "laptop" : "phone", open: true };
+
+// Example figures (cent-exact for these inputs)
+const D = {
+  meta: "NBA · Tonight 8:00 PM",
+  title: "No-sweat up to $1,500.00",
+  game: "Nuggets @ Lakers",
+  q: { book: "BetMGM", sel: "Nuggets", odds: "+150", stake: 100, win: 150 },
+  h: { book: "DraftKings", sel: "Lakers", odds: "−165", stake: 112, payout: 179.88 },
+  refund: 100, refundVal: 70, rate: 70,
+  winNet: 38.00, loseNet: 37.88, est: 38, worst: -32.12, roi: "17.9%",
+};
+const usd = (x, sign) => {
+  const s = Math.abs(x).toFixed(2).replace(/\.00$/, (m) => m);
+  const t = "$" + Number(Math.abs(x)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (x < 0) return "−" + t;
+  return (sign ? "+" : "") + t;
+};
+
+function infoBtn() {
+  const showWarnings = S.n === "1";
+  return `<span class="info" role="button" tabindex="0" aria-label="About this estimate" onclick="event.stopPropagation();this.querySelector('.pop').classList.toggle('open')">i
+    <span class="pop" onclick="event.stopPropagation()">
+      <p><b>An estimate.</b> It assumes you turn the $100 bonus bet into cash at today's best rate (70%), so it can change.</p>
+      ${showWarnings ? `<p class="warn">This stake has cents in it… (example Low-profile warning)</p>` : ""}
+      ${S.n === "1" ? `<p>You only get one shot at this at each book. Mix in some normal bets and skip very long odds so your account looks like a regular customer.</p>` : ""}
+      <p class="muted">Track bet pins this to the top so you can finish it after the game.</p>
+    </span></span>`;
+}
+
+function head() {
+  const notice = S.n === "3" ? "" : infoBtn();
+  const dot = S.n === "1" ? `<span class="dot" title="Low-profile warning"></span>` : "";
+  if (S.w === "laptop") {
+    return `<button class="row-head" onclick="S.open=!S.open;render()">
+      <span class="col">
+        <span class="meta">${D.meta}</span>
+        <span class="title"><span class="badge">No-sweat</span><span>BetMGM up to $1,500</span>${dot}</span>
+        <span>${D.game}</span>
+      </span>
+      <span class="col"><span>${D.q.sel} <span class="num">${D.q.odds}</span></span><span class="sm muted">${D.q.book} · <span class="num">${usd(D.q.stake)}</span></span></span>
+      <span class="col"><span>${D.h.sel} <span class="num">${D.h.odds}</span></span><span class="sm muted">${D.h.book} · <span class="num">${usd(D.h.stake)}</span></span></span>
+      <span class="fig"><span class="fig-main"><span class="num">+${usd(D.est)}</span><span class="badge">est.</span>${notice}</span></span>
+      <span class="fig"><div class="num">${D.roi}</div><div class="sm muted">Est. ROI <span class="chev">▾</span></div></span>
+    </button>`;
+  }
+  return `<button class="row-head" onclick="S.open=!S.open;render()">
+    <span>
+      <div class="meta">${D.meta}</div>
+      <div class="title"><span class="badge">No-sweat</span><span>BetMGM</span>${dot}</div>
+      <div class="sm">${D.game}</div>
+    </span>
+    <span class="fig">
+      <div class="fig-main"><span class="num">+${usd(D.est)}</span><span class="badge">est.</span>${notice}</div>
+      <div class="sm muted"><span class="num">${D.roi}</span> Est. ROI <span class="chev">▾</span></div>
+    </span>
+  </button>`;
+}
+
+function bets() {
+  return `<div class="bets">
+    <div class="bet"><div class="k">Your bet · ${D.q.book}</div><div class="sel">${D.q.sel} <span class="num">${D.q.odds}</span></div><div class="stake num">${usd(D.q.stake)}</div></div>
+    <div class="bet"><div class="k">Hedge · ${D.h.book}</div><div class="sel">${D.h.sel} <span class="num">${D.h.odds}</span></div><div class="stake num">${usd(D.h.stake)}</div></div>
+  </div>`;
+}
+
+function diagramA() {
+  return `${bets()}
+  <div class="fork"><svg viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M50 0 V10 M50 10 H25 V28 M50 10 H75 V28" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div>
+  <div class="branches">
+    <div class="branch"><h4>${D.q.sel} win</h4>
+      <div class="line"><span>Your bet</span><span class="num">+${usd(D.q.win)}</span></div>
+      <div class="line"><span>Hedge</span><span class="num">${usd(-D.h.stake)}</span></div>
+      <div class="net"><span>Net</span><span class="num">+${usd(D.winNet)}</span></div>
+    </div>
+    <div class="branch"><h4>${D.q.sel} lose</h4>
+      <div class="line"><span>Hedge</span><span class="num">+${usd(D.h.payout - D.h.stake)}</span></div>
+      <div class="line"><span>Your bet</span><span class="num">${usd(-D.q.stake)}</span></div>
+      <div class="line est"><span>Refund</span><span class="num">≈+${usd(D.refundVal)}</span></div>
+      <div class="xs muted" style="text-align:right">$${D.refund} bonus · ${D.rate}%</div>
+      <div class="net"><span>Net</span><span class="num">≈+${usd(D.loseNet)}</span></div>
+    </div>
+  </div>
+  <div class="summary"><span class="muted">If the refund is worth $0</span><span class="num">${usd(D.worst)}</span></div>`;
+}
+
+// Waterfall: one thin bar per step, each starting where the last one ended.
+function waterfall(steps, netLabel) {
+  const min = -110, max = 160;
+  const pct = (x) => ((x - min) / (max - min)) * 100;
+  let run = 0;
+  const axis = `<span class="axis" style="left:${pct(0)}%"></span>`;
+  const rows = steps.map((s, i) => {
+    const from = run, to = run + s.amt; run = to;
+    const l = pct(Math.min(from, to)), w = pct(Math.max(from, to)) - l;
+    // dotted connector from the previous bar's end down to this bar's start
+    const conn = i > 0 ? `<span class="conn" style="left:${pct(from)}%"></span>` : "";
+    return `<div class="wf-row"><span class="wf-l">${s.label}</span>
+      <span class="track-bar wf">${axis}${conn}<span class="segm ${s.cls}" style="left:${l}%;width:${w}%"></span></span>
+      <span class="wf-v num ${s.cls === "estd" ? "muted" : ""}">${s.cls === "estd" ? "≈" : ""}${s.amt > 0 ? "+" : ""}${usd(s.amt)}</span></div>`;
+  }).join("");
+  const l = pct(Math.min(0, run)), w = pct(Math.max(0, run)) - l;
+  return `<div class="wf-row zero-row"><span></span><span class="track-bar wf zero"><span class="zero-l" style="left:${pct(0)}%">$0</span></span><span></span></div>`
+    + rows + `<div class="wf-row net-row"><span class="wf-l"><b>Net</b></span>
+    <span class="track-bar wf">${axis}<span class="conn" style="left:${pct(run)}%"></span><span class="segm net" style="left:${l}%;width:${w}%"></span></span>
+    <span class="wf-v num"><b>${netLabel}</b></span></div>`;
+}
+function diagramB() {
+  const hedgeGain = D.h.payout - D.h.stake;
+  return `${bets()}
+  <div class="bars">
+    <div><div class="bar-h"><span>${D.q.sel} win</span></div>
+      ${waterfall([{ label: "Your bet", amt: D.q.win, cls: "gain" }, { label: "Hedge", amt: -D.h.stake, cls: "loss" }], "+" + usd(D.winNet))}</div>
+    <div><div class="bar-h"><span>${D.q.sel} lose</span></div>
+      ${waterfall([{ label: "Hedge", amt: hedgeGain, cls: "gain" }, { label: "Your bet", amt: -D.q.stake, cls: "loss" }, { label: "Refund", amt: D.refundVal, cls: "estd" }], "≈+" + usd(D.loseNet))}</div>
+    <div class="legend legend-all">
+      <span><span class="sw" style="background:var(--foreground);opacity:.85"></span>money in</span>
+      <span><span class="sw" style="background:var(--destructive);opacity:.75"></span>money out</span>
+      <span><span class="sw" style="background:repeating-linear-gradient(45deg,var(--muted-foreground) 0 3px,transparent 3px 6px);border:1px dashed var(--muted-foreground)"></span>estimate (bonus bet at 70%)</span>
+    </div>
+  </div>
+  <div class="summary"><span class="muted">If the refund is worth $0</span><span class="num">${usd(D.worst)}</span></div>`;
+}
+
+function render() {
+  const risk = S.n === "2" ? `<div class="riskline">⚠ One shot per book. Mix in normal bets.</div>` : "";
+  const frame = document.querySelector(".frame");
+  frame.classList.toggle("wide", S.w === "laptop");
+  let diagram = S.v === "A" ? diagramA() : diagramB();
+  if (S.w === "laptop") {
+    // Laptop: bets in a left column, the math beside them.
+    diagram = diagram.replace(bets(), "");
+    diagram = `<div class="body-grid"><div>${bets()}</div><div style="display:flex;flex-direction:column;gap:12px">${diagram}</div></div>`;
+  }
+  document.getElementById("mount").innerHTML = `<div class="row" data-open="${S.open}">
+    ${head()}
+    <div class="body">
+      ${diagram}
+      <div class="foot" style="display:flex;flex-direction:column;gap:10px">${risk}<button class="track">Track bet</button></div>
+      <div class="actions"><span>Edit</span><span>Expire now</span><span>Delete</span></div>
+    </div>
+  </div>`;
+  if (S.w === "laptop") document.querySelector(".foot").style.flexDirection = "row";
+  document.querySelectorAll(".seg").forEach(b => b.setAttribute("aria-pressed", String(S[b.dataset.k] === b.dataset.v)));
+}
+document.querySelectorAll(".seg").forEach(b => b.addEventListener("click", () => { S[b.dataset.k] = b.dataset.v; render(); }));
+document.addEventListener("click", () => document.querySelectorAll(".pop.open").forEach(p => p.classList.remove("open")));
+render();
+</script>
+</body>
+</html>

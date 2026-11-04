@@ -36,6 +36,7 @@ function guardedReading(overrides: Partial<GuardedReading> = {}): GuardedReading
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: null,
     bonusAmount: null,
     maxStake: null,
@@ -65,6 +66,7 @@ function fullReading(overrides: ReadingOverrides = {}): PromoReading {
   return {
     kind: "profit_boost",
     skipReason: null,
+    refundForm: null,
     boostPercent: null,
     bonusAmount: null,
     maxStake: null,
@@ -91,6 +93,115 @@ function fullReading(overrides: ReadingOverrides = {}): PromoReading {
     ...rest,
   };
 }
+
+const LONDON_TEXT =
+  "MAX REWARD: $10\n2. Opt-In and receive a No Sweat Token for the London HOU Texans vs JAX Jaguars game on 10/18\n5. If your qualifying bet loses, receive your stake back in the form of a Bonus Bet";
+
+function noSweatCandidate(overrides: Partial<ScrapedPromo> = {}): ScrapedPromo {
+  return {
+    bookKey: "draftkings",
+    externalId: "london-ns",
+    promoType: "no_sweat",
+    title: "NFL London No Sweat",
+    rawText: LONDON_TEXT,
+    sourceUrl: SOURCE_URL,
+    sportKeyHint: "americanfootball_nfl",
+    scopeText: "HOU Texans vs JAX Jaguars",
+    teamsText: ["HOU Texans", "JAX Jaguars"],
+    windowStart: null,
+    windowEnd: null,
+    expiresAt: null,
+    eligibleMarketTypes: ["moneyline", "spread", "total"],
+    pinned: null,
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: "10.00",
+    maxStake: null,
+    maxWinnings: null,
+    minOddsAmerican: null,
+    unparsedCapFields: [],
+    claimRequired: "opt_in",
+    finePrintNote: null,
+    ...overrides,
+  };
+}
+
+describe("reconcileEntry no-sweat disagreements (Phase 9, FEED-02)", () => {
+  for (const confidence of ["high", "medium", "low"] as const) {
+    it(`NFL London No Sweat: parser no_sweat + reader bonus_bet $10 -> review (${confidence})`, () => {
+      const outcome = reconcileEntry(
+        "draftkings",
+        { kind: "candidate", candidate: noSweatCandidate() },
+        guardedReading({ kind: "bonus_bet", bonusAmount: "10.00", confidence }),
+        SOURCE_URL,
+      );
+      expect(outcome.kind).toBe("review");
+      if (outcome.kind !== "review") throw new Error("expected review");
+      expect(outcome.why).toBe("disagreement");
+      const rr = outcome.skip.evidence?.partial?.reviewReadings;
+      expect(rr?.scraper.promoType).toBe("no_sweat");
+      expect(rr?.reader.kind).toBe("bonus_bet");
+    });
+
+    it(`parser bonus_bet + reader no_sweat -> review (${confidence})`, () => {
+      const outcome = reconcileEntry(
+        "draftkings",
+        { kind: "candidate", candidate: noSweatCandidate({ promoType: "bonus_bet" }) },
+        guardedReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "10.00", confidence }),
+        SOURCE_URL,
+      );
+      expect(outcome.kind).toBe("review");
+      if (outcome.kind !== "review") throw new Error("expected review");
+      expect(outcome.skip.evidence?.partial?.reviewReadings?.reader.kind).toBe("no_sweat");
+    });
+
+    it(`parser no_sweat + reader no_sweat cash -> review (${confidence})`, () => {
+      const outcome = reconcileEntry(
+        "draftkings",
+        { kind: "candidate", candidate: noSweatCandidate() },
+        guardedReading({ kind: "no_sweat", refundForm: "cash", bonusAmount: "10.00", confidence }),
+        SOURCE_URL,
+      );
+      expect(outcome.kind).toBe("review");
+    });
+
+    it(`parser no_sweat cap 10.00 + reader no_sweat cap 25 -> review (${confidence})`, () => {
+      const outcome = reconcileEntry(
+        "draftkings",
+        { kind: "candidate", candidate: noSweatCandidate() },
+        guardedReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "25.00", confidence }),
+        SOURCE_URL,
+      );
+      expect(outcome.kind).toBe("review");
+      if (outcome.kind !== "review") throw new Error("expected review");
+      expect(outcome.skip.evidence?.partial?.reviewReadings?.reader.amount).toBe("25.00");
+    });
+  }
+
+  it("parser no_sweat + reader no_sweat, same cap, bonus_bet refund, high -> kept as candidate", () => {
+    const candidate = noSweatCandidate();
+    const outcome = reconcileEntry(
+      "draftkings",
+      { kind: "candidate", candidate },
+      guardedReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "10.00", confidence: "high" }),
+      SOURCE_URL,
+    );
+    expect(outcome.kind).toBe("candidate");
+    if (outcome.kind !== "candidate") throw new Error("expected candidate");
+    expect(outcome.candidate.promoType).toBe("no_sweat");
+  });
+
+  it("parser no_sweat + reader not_usable high -> review, never silently skipped", () => {
+    const outcome = reconcileEntry(
+      "draftkings",
+      { kind: "candidate", candidate: noSweatCandidate() },
+      guardedReading({ kind: "not_usable", skipReason: "not_a_promo", confidence: "high" }),
+      SOURCE_URL,
+    );
+    expect(outcome.kind).toBe("review");
+  });
+});
 
 describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
   it("(a) agreement on 1125873 gives the candidate deep-equal to the parser's", () => {
@@ -262,11 +373,79 @@ describe("reconcileEntry against the real DK 2026-09-28 fixture", () => {
     expect(outcome.skip.reason).toBe("futures");
   });
 
-  it("(g2) quick-261016-k8a: a no_sweat skip stays skipped even when the reader says bonus_bet usable", () => {
-    const skip = { ...findSkip("1126078"), reason: "no_sweat" as const, title: "NFL London No Sweat" };
-    const reading = guardedReading({ kind: "bonus_bet", bonusAmount: "10.00", confidence: "high" });
+  it("(g2) Phase 9: the London no-sweat text rescued from an unrecognized skip becomes a no_sweat candidate, never a bonus_bet", () => {
+    const skip: SkippedEntry = {
+      reason: "unrecognized",
+      externalId: "london-1",
+      title: "NFL London No Sweat",
+      evidence: { rawText: LONDON_TEXT, sourceUrl: SOURCE_URL, expiresAt: null, partial: null },
+    };
+    const reading = guardedReading({
+      kind: "no_sweat",
+      refundForm: "bonus_bet",
+      bonusAmount: "10.00",
+      sport: "americanfootball_nfl",
+      confidence: "high",
+    });
+    const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("candidate");
+    if (outcome.kind !== "candidate") throw new Error("expected candidate");
+    expect(outcome.via).toBe("rescued");
+    expect(outcome.candidate.promoType).toBe("no_sweat");
+    expect(outcome.candidate.bonusAmount).toBe("10.00");
+    expect(outcome.candidate.boostPercent).toBeNull();
+    expect(outcome.candidate.maxStake).toBeNull();
+  });
+
+  it("(g3) a parser clear skip (parlay) stays skipped even when the reader says no_sweat high", () => {
+    const skip: SkippedEntry = {
+      reason: "parlay",
+      externalId: "p-1",
+      title: "Parlay refund",
+      evidence: { rawText: LONDON_TEXT, sourceUrl: SOURCE_URL, expiresAt: null, partial: null },
+    };
+    const reading = guardedReading({ kind: "no_sweat", refundForm: "bonus_bet", bonusAmount: "10.00", confidence: "high" });
     const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
     expect(outcome).toEqual({ kind: "skip", skip, via: "clear_reason_kept" });
+  });
+
+  it("(g4) a reader no_sweat with refundForm cash on an unrecognized skip goes to review as no_sweat_cash", () => {
+    const skip: SkippedEntry = {
+      reason: "unrecognized",
+      externalId: "cash-1",
+      title: "Cash Back No Sweat",
+      evidence: { rawText: LONDON_TEXT, sourceUrl: SOURCE_URL, expiresAt: null, partial: null },
+    };
+    const reading = guardedReading({
+      kind: "no_sweat",
+      refundForm: "cash",
+      bonusAmount: "10.00",
+      sport: "americanfootball_nfl",
+      confidence: "high",
+    });
+    const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("review");
+    if (outcome.kind !== "review") throw new Error("expected review");
+    expect(outcome.skip.reason).toBe("no_sweat_cash");
+    expect(outcome.skip.evidence?.partial?.reviewReadings?.reader.refundForm).toBe("cash");
+  });
+
+  it("(g5) a reader no_sweat with an unknown refund form is not auto-rescued", () => {
+    const skip: SkippedEntry = {
+      reason: "unrecognized",
+      externalId: "unk-1",
+      title: "NFL London No Sweat",
+      evidence: { rawText: LONDON_TEXT, sourceUrl: SOURCE_URL, expiresAt: null, partial: null },
+    };
+    const reading = guardedReading({
+      kind: "no_sweat",
+      refundForm: "unknown",
+      bonusAmount: "10.00",
+      sport: "americanfootball_nfl",
+      confidence: "high",
+    });
+    const outcome = reconcileEntry("draftkings", { kind: "skip", skip }, reading, SOURCE_URL);
+    expect(outcome.kind).toBe("review");
   });
 
   it("(k) a not_a_promo skip plus a high-confidence usable reading with no amount gives skip(rescue_without_amount), reviewSuppressed set", () => {

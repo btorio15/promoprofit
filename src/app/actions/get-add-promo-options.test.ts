@@ -6,6 +6,7 @@ const {
   mockGetCachedEvents,
   mockGetCachedExtendedEvents,
   mockGetActivePromos,
+  mockGetActiveNoSweatPromos,
   mockGetOwnActiveAddedPromo,
 } = vi.hoisted(() => ({
   mockRequireUser: vi.fn(),
@@ -13,6 +14,7 @@ const {
   mockGetCachedEvents: vi.fn(),
   mockGetCachedExtendedEvents: vi.fn(),
   mockGetActivePromos: vi.fn(),
+  mockGetActiveNoSweatPromos: vi.fn(),
   mockGetOwnActiveAddedPromo: vi.fn(),
 }));
 
@@ -22,7 +24,10 @@ vi.mock("@/db/queries", () => ({
   getCachedEvents: mockGetCachedEvents,
   getCachedExtendedEvents: mockGetCachedExtendedEvents,
 }));
-vi.mock("@/db/promos", () => ({ getActivePromos: mockGetActivePromos }));
+vi.mock("@/db/promos", () => ({
+  getActivePromos: mockGetActivePromos,
+  getActiveNoSweatPromos: mockGetActiveNoSweatPromos,
+}));
 vi.mock("@/db/addedPromos", () => ({ getOwnActiveAddedPromo: mockGetOwnActiveAddedPromo }));
 
 import { getAddPromoFormOptions } from "./get-add-promo-options";
@@ -47,6 +52,7 @@ beforeEach(() => {
   mockGetCachedEvents.mockReset().mockResolvedValue({ events: [] });
   mockGetCachedExtendedEvents.mockReset().mockResolvedValue({ events: [] });
   mockGetActivePromos.mockReset().mockResolvedValue([]);
+  mockGetActiveNoSweatPromos.mockReset().mockResolvedValue([]);
   mockGetOwnActiveAddedPromo.mockReset().mockResolvedValue(null);
 });
 
@@ -100,6 +106,27 @@ describe("getAddPromoFormOptions duplicateCandidates", () => {
       windowStart: "2026-10-03T04:00:00.000Z",
       windowEnd: "2026-10-04T03:59:59.999Z",
     });
+  });
+
+  it("includes the member's visible no-sweats (refund cap as the amount) for duplicate hints", async () => {
+    mockGetActiveNoSweatPromos.mockResolvedValue([
+      { id: 9, bookKey: "fanduel", refundCap: { toFixed: () => "25.00" }, scope: { kind: "any" }, addedByYou: false },
+      { id: 10, bookKey: "betmgm", refundCap: { toFixed: () => "10.00" }, scope: { kind: "any" }, addedByYou: false },
+      { id: 11, bookKey: "fanduel", refundCap: { toFixed: () => "5.00" }, scope: { kind: "any" }, addedByYou: true },
+    ]);
+    const result = await getAddPromoFormOptions({});
+    if (result.status !== "ok") throw new Error("expected ok");
+    expect(mockGetActiveNoSweatPromos).toHaveBeenCalledWith(expect.any(Date), 7);
+    expect(result.duplicateCandidates).toEqual([
+      {
+        bookKey: "fanduel",
+        promoType: "no_sweat",
+        bonusAmount: "25.00",
+        boostPercent: null,
+        boostedOddsAmerican: null,
+        scope: { kind: "any" },
+      },
+    ]);
   });
 
   it("rejects unknown input keys", async () => {

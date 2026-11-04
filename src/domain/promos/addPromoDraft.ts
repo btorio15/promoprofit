@@ -6,6 +6,7 @@ import {
   MSG_BOOST_REQUIRED,
   MSG_EXPIRY_PASSED,
   MSG_GAME_INVALID,
+  MSG_REFUND_CAP,
   MSG_PICK_BOOK,
   MSG_PICK_EXACT_BET,
   fieldErrorsFromIssues,
@@ -15,7 +16,14 @@ import {
 } from "./addedPromoInput";
 import { EMPTY_SCOPE_DRAFT, scopeInputFromDraft, type ScopeDraft } from "./scopeDraft";
 import { etDayBounds, etDayLabel } from "./etTime";
-import { PROMO_MARKET_TYPES, PROMO_SIDES, type PromoMarketType, type PromoSide } from "./types";
+import {
+  PROMO_MARKET_TYPES,
+  PROMO_SIDES,
+  assertNever,
+  type PromoMarketType,
+  type PromoSide,
+  type PromoType,
+} from "./types";
 
 /**
  * Phase 5: the add-promo form's draft state and its mapping to the server
@@ -25,7 +33,7 @@ import { PROMO_MARKET_TYPES, PROMO_SIDES, type PromoMarketType, type PromoSide }
 
 export type AddPromoFieldErrors = Partial<Record<AddedPromoField, string[]>>;
 
-export type AddPromoType = "bonus_bet" | "profit_boost";
+export type AddPromoType = PromoType;
 export type BoostMode = "percent" | "odds";
 export type MaxWinningsKind = "total_payout" | "boost_extra";
 
@@ -49,6 +57,9 @@ export interface AddPromoDraft {
   /** null = the default "When the last game starts". */
   boostExpiresEtDate: string | null;
   boostExpiresEtTime: string;
+  /** No-sweat fields (D-13): the refund cap and the optional bet-type limit (null = all three markets). */
+  refundCap: string;
+  marketType: PromoMarketType | null;
 }
 
 const BOOST_DEFAULTS = {
@@ -62,6 +73,8 @@ const BOOST_DEFAULTS = {
   maxWinningsKind: "total_payout" as MaxWinningsKind,
   boostExpiresEtDate: null as string | null,
   boostExpiresEtTime: "23:59",
+  refundCap: "",
+  marketType: null as PromoMarketType | null,
 };
 
 export const DEFAULT_EXPIRY_TIME = "23:59";
@@ -190,6 +203,7 @@ function signedOdds(value: number | null): string {
 export function draftFromEditValues(values: AddedPromoEditValues): AddPromoDraft {
   const expires = values.expiresAt ? etDateAndTime(values.expiresAt) : null;
   const isBoost = values.promoType === "profit_boost";
+  const isNoSweat = values.promoType === "no_sweat";
 
   let scope: ScopeDraft = EMPTY_SCOPE_DRAFT;
   if (values.scopeKind === "event" && values.eventId) {
@@ -213,9 +227,14 @@ export function draftFromEditValues(values: AddedPromoEditValues): AddPromoDraft
 
   return {
     ...BOOST_DEFAULTS,
-    promoType: isBoost ? "profit_boost" : "bonus_bet",
+    promoType: isBoost ? "profit_boost" : isNoSweat ? "no_sweat" : "bonus_bet",
     bookKey: values.bookKey,
-    bonusAmount: values.bonusAmount ?? "",
+    bonusAmount: isNoSweat ? "" : (values.bonusAmount ?? ""),
+    refundCap: isNoSweat ? (values.refundCap ?? values.bonusAmount ?? "") : "",
+    marketType:
+      isNoSweat && values.marketType && (PROMO_MARKET_TYPES as readonly string[]).includes(values.marketType)
+        ? (values.marketType as PromoMarketType)
+        : null,
     // Bonus bets always carry an expiry; a boost's expiry is optional (null = default).
     expiresEtDate: isBoost ? null : (expires?.date ?? null),
     expiresEtTime: !isBoost && expires ? expires.time : DEFAULT_EXPIRY_TIME,
@@ -278,12 +297,21 @@ export function bonusPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult 
 /** D-03: switching Type keeps Book, scope and min odds; the other type's own values are dropped. */
 export function switchPromoType(draft: AddPromoDraft, next: AddPromoType): AddPromoDraft {
   if (draft.promoType === next) return draft;
-  if (next === "profit_boost") {
-    return { ...draft, promoType: next, bonusAmount: "" };
+  switch (next) {
+    case "profit_boost":
+      return { ...draft, promoType: next, bonusAmount: "", refundCap: "", marketType: null };
+    case "no_sweat":
+      return { ...clearedBoostFields(draft), promoType: next, bonusAmount: "", refundCap: "", marketType: null };
+    case "bonus_bet":
+      return { ...clearedBoostFields(draft), promoType: next, refundCap: "", marketType: null };
+    default:
+      return assertNever(next);
   }
+}
+
+function clearedBoostFields(draft: AddPromoDraft): AddPromoDraft {
   return {
     ...draft,
-    promoType: next,
     boostMode: BOOST_DEFAULTS.boostMode,
     boostPercent: "",
     boostedOdds: "",
@@ -382,7 +410,50 @@ export function boostPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult 
   return { payload: parsed.data };
 }
 
+/** Draft -> server input for a hand-added no-sweat (D-13), or the field errors to show. */
+export function noSweatPayloadFromDraft(draft: AddPromoDraft): BonusPayloadResult {
+  const errors: AddPromoFieldErrors = {};
+
+  if (!draft.bookKey) errors.bookKey = [MSG_PICK_BOOK];
+  const cap = draft.refundCap.trim();
+  if (cap === "") errors.refundCap = [MSG_REFUND_CAP];
+  if (!draft.expiresEtDate) errors.expires = [MSG_EXPIRY_PASSED];
+
+  const oddsText = draft.minOdds.trim();
+  let minOdds: number | undefined;
+  if (oddsText !== "") {
+    const parsedOdds = parseOddsText(oddsText);
+    if (parsedOdds === null) errors.minOddsAmerican = [MSG_ODDS];
+    else minOdds = parsedOdds;
+  }
+
+  if (Object.keys(errors).length > 0) return { fieldErrors: errors };
+
+  const candidate = {
+    promoType: "no_sweat",
+    bookKey: draft.bookKey,
+    refundCap: cap,
+    expires: { etDate: draft.expiresEtDate, etTime: draft.expiresEtTime },
+    scope: scopeInputFromDraft(draft.scope),
+    ...(minOdds !== undefined ? { minOddsAmerican: minOdds } : {}),
+    ...(draft.marketType !== null ? { marketType: draft.marketType } : {}),
+  };
+
+  const parsed = AddPromoInputSchema.safeParse(candidate);
+  if (!parsed.success) return { fieldErrors: fieldErrorsFromIssues(parsed.error.issues) };
+  return { payload: parsed.data };
+}
+
 /** Dispatches on the draft's Type. */
 export function payloadFromDraft(draft: AddPromoDraft): BonusPayloadResult {
-  return draft.promoType === "profit_boost" ? boostPayloadFromDraft(draft) : bonusPayloadFromDraft(draft);
+  switch (draft.promoType) {
+    case "profit_boost":
+      return boostPayloadFromDraft(draft);
+    case "bonus_bet":
+      return bonusPayloadFromDraft(draft);
+    case "no_sweat":
+      return noSweatPayloadFromDraft(draft);
+    default:
+      return assertNever(draft.promoType);
+  }
 }

@@ -255,9 +255,19 @@ const ClassifyBonusBetInputSchema = z.strictObject({
   scope: ClassifyScopeInputSchema.nullable(),
 });
 
+/** Phase 9 (D-15, D-19): a reviewer's "It's a no-sweat"; refundCap is stored as bonus_amount. */
+const ClassifyNoSweatInputSchema = z.strictObject({
+  promoId: z.number().int().positive(),
+  promoType: z.literal("no_sweat"),
+  refundCap: MoneyFieldSchema,
+  minOddsAmerican: MinOddsFieldSchema.optional(),
+  scope: ClassifyScopeInputSchema.nullable(),
+});
+
 export const ClassifyPromoInputSchema = z.discriminatedUnion("promoType", [
   ClassifyProfitBoostInputSchema,
   ClassifyBonusBetInputSchema,
+  ClassifyNoSweatInputSchema,
 ]);
 
 export type ClassifyPromoInput = z.infer<typeof ClassifyPromoInputSchema>;

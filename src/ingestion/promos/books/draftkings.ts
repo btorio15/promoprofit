@@ -9,10 +9,11 @@ import {
   type SkipReason,
   type SkippedEntry,
 } from "@/domain/promos/scraped";
-import { PROMO_MARKET_TYPES, type WinningsCapKind } from "@/domain/promos/types";
+import { PROMO_MARKET_TYPES, type PromoMarketType, type WinningsCapKind } from "@/domain/promos/types";
 import { slateWindow, parseEtDateTime } from "@/domain/promos/etTime";
 import { parseMaxStake, parseMaxWinnings, parseMinOdds, extractFinePrintNote } from "@/ingestion/promos/finePrint";
 import { classifyExclusion } from "@/ingestion/promos/exclusions";
+import { classifyNoSweat, parseNoSweatRefundCap, type NoSweatDetection } from "@/ingestion/promos/noSweat";
 import { sportFromText, sportFromTeamPair } from "@/ingestion/promos/sportHints";
 import { mentionsSeveralGames, splitGames } from "@/ingestion/promos/promoText";
 
@@ -405,6 +406,38 @@ function buildCandidate(entry: PromotionEntry, title: string, text: string): Scr
   };
 }
 
+/**
+ * Phase 9 (FEED-01, A-07): a single-bet, bonus-bet-refund no-sweat. Reuses
+ * buildCandidate for scope / window / sport / opt-in, then overrides the money
+ * fields: the refund cap is bonusAmount; no boost fields, no stake cap.
+ */
+function buildNoSweatCandidate(
+  entry: PromotionEntry,
+  title: string,
+  text: string,
+  refundCap: string,
+): ScrapedPromo {
+  const base = buildCandidate(entry, title, text);
+  const namedMarkets: PromoMarketType[] = [];
+  const lower = `${title}\n${text}`.toLowerCase();
+  if (/\bmoneyline\b/.test(lower)) namedMarkets.push("moneyline");
+  if (/\bspread\b/.test(lower)) namedMarkets.push("spread");
+  if (/\b(?:total|over\/under)\b/.test(lower)) namedMarkets.push("total");
+  return {
+    ...base,
+    promoType: "no_sweat",
+    boostPercent: null,
+    boostedOddsAmerican: null,
+    baseOddsAmerican: null,
+    bonusAmount: refundCap,
+    maxStake: null,
+    maxWinnings: null,
+    winningsCapKind: null,
+    unparsedCapFields: base.unparsedCapFields.filter((f) => f === "minOdds"),
+    eligibleMarketTypes: namedMarkets.length === 1 ? namedMarkets : [...PROMO_MARKET_TYPES],
+  };
+}
+
 export const draftkingsScraper: BookScraper = {
   bookKey: "draftkings",
   render: "http",
@@ -449,6 +482,44 @@ export const draftkingsScraper: BookScraper = {
         continue;
       }
 
+      const noSweat: NoSweatDetection = classifyNoSweat({ title, text, category });
+      if (noSweat.kind === "cash_refund") {
+        skipped.push(skippedEntry("no_sweat_cash", entry, title, text));
+        continue;
+      }
+      // A no-sweat needs a supported sport or a parseable game scope. Anything
+      // else (e.g. the racing "Bet Back" entry, Pitfall 9) falls through to
+      // the existing gates below and stays skipped as before.
+      const nsSport = sportFromText(`${title} ${text}`);
+      const nsHasScope = parseGameScope(text) !== null || parseMultiGameScope(text) !== null;
+      if (noSweat.kind === "bonus_bet_refund" && nsSport.kind === "unsupported") {
+        skipped.push(skippedEntry("unsupported_sport", entry, title, text));
+        continue;
+      }
+      if (noSweat.kind === "bonus_bet_refund" && (nsSport.kind === "supported" || nsHasScope)) {
+        const refundCap = noSweat.refundCap ?? parseNoSweatRefundCap(text);
+        if (refundCap === null) {
+          skipped.push(skippedEntry("unrecognized", entry, title, text));
+          continue;
+        }
+        const nsCandidate = buildNoSweatCandidate(entry, title, text, refundCap);
+        if (
+          nsCandidate.gamesText === undefined &&
+          nsCandidate.teamsText.length === 0 &&
+          mentionsSeveralGames(`${title}\n${text}`)
+        ) {
+          skipped.push(skippedEntry("unrecognized", entry, title, text, nsCandidate));
+          continue;
+        }
+        const nsValidated = ScrapedPromoSchema.safeParse(nsCandidate);
+        if (!nsValidated.success) {
+          skipped.push(skippedEntry("schema_invalid", entry, title, text, nsCandidate));
+          continue;
+        }
+        candidates.push(nsValidated.data);
+        continue;
+      }
+
       if (!MENTIONS_BOOST_OR_BONUS_RE.test(`${title}\n${text}`)) {
         skipped.push(skippedEntry("not_a_promo", entry, title, text));
         continue;
@@ -469,7 +540,8 @@ export const draftkingsScraper: BookScraper = {
         }
       }
 
-      // buildCandidate always emits promoType "profit_boost" with
+      // buildCandidate emits promoType "profit_boost" (no-sweats take the
+      // buildNoSweatCandidate branch above) with
       // boostedOddsAmerican null, so a missing "Profit Boost: N%" match
       // could only ever produce a ScrapedPromoSchema failure. Treat that as
       // a new promo shape needing review -- skip it as "unrecognized" here,
