@@ -10,6 +10,7 @@ import { getSportLabel } from "@/config/sports";
 import { formatUsd } from "@/lib/format";
 import { ANY_SPORT_KEY, WEEKDAYS, type SportWeekdayRow } from "@/domain/stats/profitStats";
 import { HistorySection } from "@/components/stats/HistorySection";
+import { ProfitOfferedHero } from "@/components/stats/ProfitOfferedHero";
 import { StatsCard } from "@/components/stats/StatsCard";
 import { STATS_RANGES, STATS_RANGE_LABELS, type StatsRange } from "@/domain/stats/statsRange";
 
@@ -93,6 +94,7 @@ export function StatsScreen({ active }: { active: boolean }) {
     return (
       <div className="flex flex-col gap-8">
         {picker}
+        {stats.runningTotal.points.length > 0 ? <ProfitOfferedHero running={stats.runningTotal} /> : null}
         {SCOPE_NOTE}
         <Card>
           <CardHeader>
@@ -121,6 +123,7 @@ export function StatsScreen({ active }: { active: boolean }) {
   return (
     <div className="flex flex-col gap-8">
       {picker}
+      <ProfitOfferedHero running={stats.runningTotal} />
       {SCOPE_NOTE}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Summary">
         <Stat label="Scrape runs" value={String(stats.runs)} />

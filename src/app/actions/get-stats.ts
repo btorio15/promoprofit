@@ -10,6 +10,7 @@ import {
   type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
 import { dailyHistoryStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
+import { buildRunningTotal, type RunningTotal } from "@/domain/stats/runningTotal";
 import { promoFunnel, type PromoFunnelStats } from "@/domain/stats/promoFunnel";
 import { parseStatsRange, rangeStartDate, type StatsRange } from "@/domain/stats/statsRange";
 import { denverDate } from "@/domain/promos/profitTotals";
@@ -25,6 +26,8 @@ export interface StatsDTO {
   sportWeekday: SportWeekdayStats;
   /** Older daily data (promo_profit_observations) in the range. */
   history: DailyHistoryStats;
+  /** Running total of profit offered (each promo once, at its best) for the hero chart. */
+  runningTotal: RunningTotal;
   /** Promo availability and per-book health (current state, not ranged). */
   funnel: PromoFunnelStats;
 }
@@ -68,6 +71,7 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     timeOfDay: timeOfDayStats(rows, runTimes),
     sportWeekday: sportWeekdayStats(rows),
     history: dailyHistoryStats(historyRows, window),
+    runningTotal: buildRunningTotal(historyRows, window),
     funnel: promoFunnel(funnelPromos),
   };
 }
