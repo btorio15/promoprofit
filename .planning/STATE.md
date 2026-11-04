@@ -7,11 +7,11 @@ stopped_at: Phase 10 UI-SPEC approved
 last_updated: "2026-11-04T00:18:48.326Z"
 last_activity: 2026-11-03 -- Phase 9 complete
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 2
-  total_plans: 23
-  completed_plans: 23
-  percent: 40
+  total_plans: 39
+  completed_plans: 25
+  percent: 64
 ---
 
 # Project State
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 10 — Ranked Intro Offers
+**Current focus:** Phase 10 — Ranked Intro Offers (owner); Phase 12 — Kalshi and Polymarket as hedge venues (teammate, in parallel)
 
 ## Current Position
 
-Phase: 10 (Ranked Intro Offers)
+Phase: 10 (Ranked Intro Offers) — READY TO PLAN (context + UI-SPEC approved)
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-03 -- Phase 9 complete
+Status: Ready to plan Phase 10
+Last activity: 2026-11-03 -- Phase 10 UI-SPEC approved; merged teammate's Phase 12 wave 1 + DeepBook restyle from origin/main
+
+Parallel: Phase 12 (add-kalshi-and-polymarket-as-hedge-venues) — EXECUTING by teammate, 2 of 16 plans done (12-01, 12-02)
 
 ## Performance Metrics
 
@@ -93,6 +95,7 @@ Last activity: 2026-11-03 -- Phase 9 complete
 - Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
 - v1.2 roadmap (2026-10-22): placeholder Phase 8 More Sportsbooks absorbed; v1.2 phases 8 No-Sweat Bet Math, 9 No-Sweat Promos in the Feed, 10 Ranked Intro Offers, 11 More Sportsbooks
 - Phase 07.1 inserted after Phase 7: Profit Stats Cleanup: close v1.1 audit tech debt (owner chose option B 2026-10-22)
+- Phase 12 added (owner 2026-10-22): Add Kalshi and Polymarket as hedge venues (prediction markets alongside regulated sportsbooks)
 
 ### Decisions
 
@@ -244,6 +247,7 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 Last session: 2026-11-04T00:18:48.312Z
 Stopped at: Phase 10 UI-SPEC approved
 Resume file: .planning/phases/10-ranked-intro-offers/10-UI-SPEC.md
+Parallel work: teammate (Joel) is executing Phase 12 (Kalshi and Polymarket as hedge venues) on main; last recorded 2026-11-03, wave 1 done (12-01, 12-02). Resume file for that work: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-UI-SPEC.md
 
 ## Operator Next Steps
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { usableOddsBooks } from "@/config/books";
+import { groupHedgeBookKeys, usableOddsBooks } from "@/config/books";
 
 // Any DB access in these tests is a failure: the book lists must come from config.
 vi.mock("./client", () => ({
@@ -9,7 +9,7 @@ vi.mock("./client", () => ({
 }));
 
 import { getDb } from "./client";
-import { collectCachedEventRows, toDateOrNull, getBonusBooks, getHedgeBookKeys, getUsableUserBooks, getUserBookKeys, saveUserBooks } from "./queries";
+import { collectCachedEventRows, toDateOrNull, getBonusBooks, getHedgeBookKeys, getUsableUserBooks, getUserBookKeys, getMyBookOptions, getUserMyBookKeys, saveUserBooks } from "./queries";
 
 describe("book lists share one runtime source with runOddsRefresh (WR-05)", () => {
   it("getBonusBooks returns exactly usableOddsBooks(), in config sort order", async () => {
@@ -19,7 +19,7 @@ describe("book lists share one runtime source with runOddsRefresh (WR-05)", () =
   });
 
   it("getHedgeBookKeys returns exactly the keys runOddsRefresh fetches odds for", async () => {
-    expect(await getHedgeBookKeys()).toEqual(usableOddsBooks().map((b) => b.key));
+    expect(await getHedgeBookKeys()).toEqual(groupHedgeBookKeys());
   });
 });
 
@@ -39,7 +39,42 @@ describe("getBonusBooks/getHedgeBookKeys scoped to a user's allowed keys (D-13)"
     expect(await getBonusBooks()).toEqual(
       usableOddsBooks().map((b) => ({ key: b.key, displayName: b.displayName })),
     );
-    expect(await getHedgeBookKeys()).toEqual(usableOddsBooks().map((b) => b.key));
+    expect(await getHedgeBookKeys()).toEqual(groupHedgeBookKeys());
+  });
+
+  it("getHedgeBookKeys(allowedKeys) includes a market only when the member saved it (D-14)", async () => {
+    expect(await getHedgeBookKeys(new Set(["fanduel"]))).toEqual(["fanduel"]);
+    expect(await getHedgeBookKeys(new Set(["fanduel", "kalshi"]))).toEqual(["fanduel", "kalshi"]);
+  });
+
+  it("no-arg getHedgeBookKeys() is sportsbook-only and equals the group list (feedContext uses the same source)", async () => {
+    const keys = await getHedgeBookKeys();
+    expect(keys).toEqual(groupHedgeBookKeys());
+    expect(keys).not.toContain("kalshi");
+    expect(keys).not.toContain("polymarket_us");
+  });
+});
+
+describe("getMyBookOptions / getUserMyBookKeys (Phase 12)", () => {
+  it("getMyBookOptions lists sportsbooks then markets with venue", async () => {
+    const opts = await getMyBookOptions();
+    expect(opts).toHaveLength(9);
+    expect(opts.slice(-2)).toEqual([
+      { key: "kalshi", displayName: "Kalshi", venue: "market" },
+      { key: "polymarket_us", displayName: "Polymarket", venue: "market" },
+    ]);
+    expect(opts[0]).toEqual({ key: "draftkings", displayName: "DraftKings", venue: "sportsbook" });
+  });
+
+  it("getUserMyBookKeys returns saved keys in config order, including markets, dropping stale keys", async () => {
+    const mockWhere = vi.fn(() =>
+      Promise.resolve([{ bookKey: "kalshi" }, { bookKey: "williamhill_us" }, { bookKey: "fanduel" }]),
+    );
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    expect(await getUserMyBookKeys(7)).toEqual(["fanduel", "kalshi"]);
   });
 });
 
@@ -65,6 +100,15 @@ describe("getUsableUserBooks (CR-02, WR-01)", () => {
       { key: "draftkings", displayName: "DraftKings" },
       { key: "fanduel", displayName: "FanDuel" },
     ]);
+  });
+
+  it("returns [] when the member only saved a market (markets are never promo books)", async () => {
+    const mockWhere = vi.fn(() => Promise.resolve([{ bookKey: "kalshi" }]));
+    const mockFrom = vi.fn(() => ({ where: mockWhere }));
+    const mockSelect = vi.fn(() => ({ from: mockFrom }));
+    vi.mocked(getDb).mockReturnValueOnce({ select: mockSelect } as unknown as ReturnType<typeof getDb>);
+
+    expect(await getUsableUserBooks(7)).toEqual([]);
   });
 
   it("returns [] when the user has no saved books", async () => {

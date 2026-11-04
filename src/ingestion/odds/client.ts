@@ -114,6 +114,8 @@ export interface FetchSportOddsOptions {
   commenceTimeTo: Date;
   /** Defaults to ["h2h"] (SC1: the normal refresh never requests extra markets). */
   markets?: readonly string[];
+  /** Adds includeBetLimits=true (venue depth probe). Omitted by default. */
+  includeBetLimits?: boolean;
 }
 
 /**
@@ -136,6 +138,7 @@ export async function fetchSportOdds(
   url.searchParams.set("dateFormat", "iso");
   url.searchParams.set("commenceTimeFrom", formatDateParam(opts.commenceTimeFrom));
   url.searchParams.set("commenceTimeTo", formatDateParam(opts.commenceTimeTo));
+  if (opts.includeBetLimits) url.searchParams.set("includeBetLimits", "true");
 
   let res: Response;
   try {

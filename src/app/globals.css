@@ -58,26 +58,25 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* Accent (UI-SPEC "Accent 10%"): emerald-600, reserved for the CTA,
-     guaranteed-profit figure, active sport chip, and focus ring only. */
-  --primary: #059669;
+  --background: #f1f1ed;
+  --foreground: #0b0b0b;
+  --card: #ffffff;
+  --card-foreground: #0b0b0b;
+  --popover: #ffffff;
+  --popover-foreground: #0b0b0b;
+  /* DeepBook-inspired electric blue for actions, accents, and focus. */
+  --primary: #1e6ef3;
   --primary-foreground: #ffffff;
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: #dc2626;
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #059669;
+  --secondary: #ffffff;
+  --secondary-foreground: #0b0b0b;
+  --muted: #e5e5e0;
+  --muted-foreground: #6a7681;
+  --accent: #1e6ef3;
+  --accent-foreground: #ffffff;
+  --destructive: #d94841;
+  --border: #bfc2c0;
+  --input: #aeb4b8;
+  --ring: #1e6ef3;
   --warning: #d97706;
   --warning-foreground: #ffffff;
   /* No-sweat flow bars (waterfall): blue money-in / red money-out, matching
@@ -90,7 +89,7 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.2rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -109,24 +108,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.145 0 0);
+    --background: #0b0b0b;
     --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
+    --card: #171717;
     --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
+    --popover: #171717;
     --popover-foreground: oklch(0.985 0 0);
-    --primary: #10b981;
-    --primary-foreground: #022c22;
-    --secondary: oklch(0.269 0 0);
+    --primary: #5d96ff;
+    --primary-foreground: #06112a;
+    --secondary: #171717;
     --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
+    --muted: #252525;
+    --muted-foreground: #a3a9ad;
+    --accent: #1e6ef3;
     --accent-foreground: oklch(0.985 0 0);
     --destructive: #ef4444;
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: #10b981;
+    --ring: #5d96ff;
     --warning: #f59e0b;
     --warning-foreground: #022c22;
     --flow-in: #5d96ff;
@@ -157,6 +156,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.5;
   }
   html {
     @apply font-sans;
@@ -176,4 +176,67 @@
    without leaving the feed or losing its place. */
 @utility used-row-bg {
   background-image: linear-gradient(to right, var(--used-gradient-from), var(--used-gradient-to));
+}
+
+/* The top-level navigation follows DeepBook's black, editorial header. */
+.sportsbook-nav [data-slot="tabs-trigger"] {
+  color: #9ca3a7;
+  border-radius: 0;
+}
+.sportsbook-nav [data-slot="tabs-trigger"]:hover {
+  color: white;
+  background: #ffffff0d;
+}
+.sportsbook-nav [data-slot="tabs-trigger"][data-active] {
+  color: white;
+  background: #ffffff0a;
+}
+.sportsbook-nav [data-slot="tabs-trigger"]::after {
+  bottom: 0;
+  height: 2px;
+  background: #1e6ef3;
+}
+.sportsbook-hero {
+  background: radial-gradient(ellipse at 92% 8%, #1e6ef3 0%, transparent 42%),
+    linear-gradient(118deg, #050505 0%, #0d0d0d 55%, #151515 100%);
+  border: 1px solid #0b0b0b;
+  border-radius: 0;
+}
+.sportsbook-court {
+  position: absolute;
+  z-index: -1;
+  right: -5rem;
+  top: -7rem;
+  width: 32rem;
+  height: 32rem;
+  border: 1px solid #ffffff1f;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4rem #ffffff08, 0 0 0 8rem #ffffff06;
+  transform: rotate(-25deg);
+}
+
+.deep-rule {
+  border-color: #0b0b0b;
+}
+
+.deep-card {
+  border: 1px solid #0b0b0b;
+  border-radius: 0;
+  box-shadow: none;
+}
+.sportsbook-court::before {
+  content: "";
+  position: absolute;
+  inset: 30% 0;
+  border: 1px solid #ffffff25;
+}
+.sportsbook-court::after {
+  content: "";
+  position: absolute;
+  inset: 35%;
+  border: 1px solid #ffffff30;
+  border-radius: 50%;
+}
+@media (max-width: 639px) {
+  .sportsbook-court { opacity: 0.4; right: -20rem; }
 }

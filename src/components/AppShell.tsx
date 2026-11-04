@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import type { OddsStatus } from "@/ingestion/odds/status";
-import { Separator } from "@/components/ui/separator";
+import { LayoutDashboard, ChartNoAxesCombined, ArrowLeftRight, Ticket, Wrench } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/AppHeader";
 import { OddsStatusBar } from "@/components/finder/OddsStatusBar";
@@ -48,45 +48,38 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
 
   return (
     <>
+      <a href="#main-content" className="sr-only z-50 bg-background p-3 focus:not-sr-only focus:absolute">Skip to content</a>
       <AppHeader displayName={displayName} />
-      <OddsStatusBar
-        status={status}
-        onRefreshed={bumpRecompute}
-        showExtendedAge={activeTab === "arbitrage"}
-      />
-      <Separator />
-      <main className="mx-auto flex w-full max-w-[1080px] flex-1 flex-col gap-8 px-4 py-12">
-        <CreditBanner status={status} />
-
-        <Tabs
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as ActiveTab)}
-          className="gap-6 sm:gap-8"
-        >
-          {/* On a phone the five tabs are wider than the screen: scroll the bar
-              itself so the page never scrolls sideways. pb keeps the active
-              underline (bottom -5px) inside the scroll box; h-auto lets the
-              list grow to the 44px triggers instead of clipping them. */}
-          <div className="-mx-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as ActiveTab)}
+        className="flex-1 gap-0"
+      >
+          {/* Scroll navigation independently on narrow screens. */}
+          <div className="border-b border-white/15 bg-[#080808] px-4 sm:px-6">
             <TabsList
               variant="line"
               aria-label="Select a tab"
-              className="mt-2 group-data-horizontal/tabs:h-auto"
+              className="sportsbook-nav mx-auto flex w-full max-w-[1200px] justify-start gap-1 overflow-x-auto p-0 group-data-horizontal/tabs:h-auto [scrollbar-width:none]"
             >
-              <TabsTrigger value="opportunities" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+              <TabsTrigger value="opportunities" className="min-h-14 flex-none gap-2 whitespace-nowrap px-3 text-[13px] font-semibold sm:px-5 sm:text-sm">
+                <LayoutDashboard className="size-4" aria-hidden="true" />
                 Dashboard
               </TabsTrigger>
-              <TabsTrigger value="stats" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+              <TabsTrigger value="stats" className="min-h-14 flex-none gap-2 whitespace-nowrap px-3 text-[13px] font-semibold sm:px-5 sm:text-sm">
+                <ChartNoAxesCombined className="size-4" aria-hidden="true" />
                 Statistics
               </TabsTrigger>
-              <TabsTrigger value="arbitrage" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+              <TabsTrigger value="arbitrage" className="min-h-14 flex-none gap-2 whitespace-nowrap px-3 text-[13px] font-semibold sm:px-5 sm:text-sm">
+                <ArrowLeftRight className="size-4" aria-hidden="true" />
                 Arbitrage
               </TabsTrigger>
               <TabsTrigger
                 value="promos"
-                className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm"
+                className="min-h-14 flex-none gap-2 whitespace-nowrap px-3 text-[13px] font-semibold sm:px-5 sm:text-sm"
                 aria-label={countLabel("Promos", reviewCount)}
               >
+                <Ticket className="size-4" aria-hidden="true" />
                 Promos
                 {reviewCount > 0 ? (
                   <>
@@ -95,12 +88,20 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
                   </>
                 ) : null}
               </TabsTrigger>
-              <TabsTrigger value="tools" className="min-h-11 whitespace-nowrap text-[13px] sm:text-sm">
+              <TabsTrigger value="tools" className="min-h-14 flex-none gap-2 whitespace-nowrap px-3 text-[13px] font-semibold sm:px-5 sm:text-sm">
+                <Wrench className="size-4" aria-hidden="true" />
                 Tools
               </TabsTrigger>
             </TabsList>
           </div>
 
+        <OddsStatusBar
+          status={status}
+          onRefreshed={bumpRecompute}
+          showExtendedAge={activeTab === "arbitrage"}
+        />
+        <main id="main-content" className="mx-auto flex w-full max-w-[1200px] flex-1 flex-col gap-5 px-4 py-7 sm:gap-7 sm:px-6 sm:py-10">
+          <CreditBanner status={status} />
           <TabsContent value="opportunities" keepMounted>
             <OpportunitiesScreen
               hasCachedOdds={hasCachedOdds}
@@ -146,8 +147,8 @@ export function AppShell({ status, bonusBooks, hasCachedOdds, displayName }: App
               recomputeKey={recomputeKey}
             />
           </TabsContent>
-        </Tabs>
-      </main>
+        </main>
+      </Tabs>
     </>
   );
 }

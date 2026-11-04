@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { TriangleAlert } from "lucide-react";
+import { ArrowUpRight, TriangleAlert } from "lucide-react";
 import { getOpportunities } from "@/app/actions/get-opportunities";
 import { pickTop, TOP_N } from "@/domain/opportunities/pick";
 import {
@@ -230,9 +230,16 @@ export function OpportunitiesScreen({
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Your profit so far, and the best money available right now at your books.</p>
+      <header className="sportsbook-hero relative isolate overflow-hidden px-6 py-10 text-white sm:px-10 sm:py-16">
+        <div className="relative z-10 max-w-xl">
+          <p className="mb-5 text-xs font-bold tracking-[0.24em] text-[#8eb4ff]">THE MARGINMIND TERMINAL</p>
+          <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-[-0.05em] sm:text-7xl">Make every promo count.</h1>
+          <p className="mt-6 max-w-md text-base leading-relaxed text-[#d2d8e0]">Your profit so far, and the best opportunities available right now at your books.</p>
+          <Button type="button" onClick={() => onNavigate("promos")} className="mt-7 min-h-11 rounded-none bg-[#1e6ef3] font-bold text-white hover:bg-[#4a8cff]">
+            Explore promos <ArrowUpRight aria-hidden="true" className="size-4" />
+          </Button>
+        </div>
+        <div className="sportsbook-court" aria-hidden="true" />
       </header>
 
       <DashboardTotals
@@ -249,7 +256,7 @@ export function OpportunitiesScreen({
 
       {/* The stale-odds warning is about the feed, so it sits under the feed
           heading; keeps the heading on a phone's first screen (07-07). */}
-      <h2 className="text-xl font-semibold">Opportunities</h2>
+      <h2 className="border-t border-foreground pt-4 text-2xl font-black tracking-[-0.03em] sm:text-3xl">Top opportunities</h2>
 
       {stale ? (
         <p className="flex items-center gap-2 text-sm text-warning">

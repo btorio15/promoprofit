@@ -2,7 +2,7 @@ import { eq, gt, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { getDb } from "./client";
 import { cachedExtendedOdds, cachedOdds, userBooks, users } from "./schema";
-import { usableOddsBooks } from "@/config/books";
+import { groupHedgeBookKeys, usableHedgeBooks, usableOddsBooks } from "@/config/books";
 import { OddsEventSchema, type OddsEvent } from "@/domain/odds/schemas";
 
 export interface BookOption {
@@ -13,10 +13,10 @@ export interface BookOption {
 /**
  * Books usable in the bonus-book dropdown (D-14, D-13): API-covered,
  * free-tier, sort_order ASC. Read from src/config/books.ts via
- * usableOddsBooks() -- the SAME list runOddsRefresh fetches odds for --
- * never from the DB `books` mirror, so the dropdown, the hedge venues and
- * the refresh can't drift apart when the config changes without a re-seed
- * (WR-05). The DB `books` table is display/seed metadata only.
+ * usableOddsBooks() (sportsbooks only) -- hedge search and My Books use
+ * usableHedgeBooks(), and the refresh uses refreshBookmakerKeys() -- never
+ * from the DB `books` mirror, so they can't drift apart when the config
+ * changes without a re-seed (WR-05). The DB `books` table is display/seed metadata only.
  *
  * When `allowedKeys` is provided (a user's saved book_key set), the result
  * is further restricted to usable ∩ allowed, still in config order -- this
@@ -32,13 +32,29 @@ export async function getBonusBooks(allowedKeys?: ReadonlySet<string>): Promise<
 }
 
 /**
- * Every hedge-book key usable as a hedge venue (D-15), optionally scoped to
- * a user's allowed keys the same way getBonusBooks is (D-14 superseded by
- * D-13 when a set is passed).
+ * Hedge-book keys. With `allowedKeys` (a member's saved keys): usableHedgeBooks()
+ * scoped to them, in config order, so a prediction market appears only when the
+ * member saved it (D-14, D-03). With no argument: groupHedgeBookKeys(), which is
+ * deliberately sportsbook-only -- it feeds site-wide / group lists (promo
+ * observation recording, Statistics, empty-state checks) so market hedges stay
+ * per-member (orchestrator decision revision 1, D-03).
  */
 export async function getHedgeBookKeys(allowedKeys?: ReadonlySet<string>): Promise<string[]> {
-  const bonusBooks = await getBonusBooks(allowedKeys);
-  return bonusBooks.map((b) => b.key);
+  if (!allowedKeys) return groupHedgeBookKeys();
+  return usableHedgeBooks()
+    .filter((b) => allowedKeys.has(b.key))
+    .map((b) => b.key);
+}
+
+export interface MyBookOption {
+  key: string;
+  displayName: string;
+  venue: "sportsbook" | "market";
+}
+
+/** Every book a member can pick in My Books: sportsbooks then markets. Config only, never the DB (WR-05). */
+export async function getMyBookOptions(): Promise<MyBookOption[]> {
+  return usableHedgeBooks().map((b) => ({ key: b.key, displayName: b.displayName, venue: b.venue }));
 }
 
 /** A user's saved book_key selection (D-12), in whatever order Postgres returns rows. */
@@ -59,10 +75,21 @@ export async function getUserBookKeys(userId: number): Promise<string[]> {
  * other -- a saved key that has lost API/free-tier coverage (a "stale" key)
  * is silently excluded here rather than left to strand the user between
  * pages that disagree about whether they have usable books.
+ *
+ * Sportsbooks only (D-04): every opportunity needs a sportsbook, so a market
+ * alone never satisfies onboarding; book caps and add-promo use this too.
  */
 export async function getUsableUserBooks(userId: number): Promise<BookOption[]> {
   const savedKeys = await getUserBookKeys(userId);
   return getBonusBooks(new Set(savedKeys));
+}
+
+/** A member's saved keys ∩ usableHedgeBooks(), config order (Settings seed). */
+export async function getUserMyBookKeys(userId: number): Promise<string[]> {
+  const saved = new Set(await getUserBookKeys(userId));
+  return usableHedgeBooks()
+    .filter((b) => saved.has(b.key))
+    .map((b) => b.key);
 }
 
 /**
