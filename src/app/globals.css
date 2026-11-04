@@ -14,6 +14,8 @@
   --color-foreground: var(--foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-flow-in: var(--flow-in);
+  --color-flow-out: var(--flow-out);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
@@ -78,6 +80,11 @@
   --ring: #059669;
   --warning: #d97706;
   --warning-foreground: #ffffff;
+  /* No-sweat flow bars (waterfall): blue money-in / red money-out, matching
+     the DeepBook restyle. Own tokens, not --primary, so the bars are never
+     the green reserved for guaranteed profit. */
+  --flow-in: #1e6ef3;
+  --flow-out: #d94841;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -122,6 +129,8 @@
     --ring: #10b981;
     --warning: #f59e0b;
     --warning-foreground: #022c22;
+    --flow-in: #5d96ff;
+    --flow-out: #ef4444;
     --chart-1: oklch(0.87 0 0);
     --chart-2: oklch(0.556 0 0);
     --chart-3: oklch(0.439 0 0);

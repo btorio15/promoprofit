@@ -19,12 +19,13 @@ interface NoSweatDetailsProps {
   };
 }
 
-const HATCH = "repeating-linear-gradient(45deg, var(--muted-foreground) 0 4px, transparent 4px 8px)";
+const HATCH =
+  "repeating-linear-gradient(45deg, color-mix(in oklab, var(--flow-in) 55%, transparent) 0 4px, transparent 4px 8px)";
 
 function barClass(kind: WaterfallKind): string {
-  if (kind === "in") return "bg-foreground/85";
-  if (kind === "out") return "bg-destructive/75";
-  return "border border-dashed border-muted-foreground";
+  if (kind === "in") return "bg-flow-in";
+  if (kind === "out") return "bg-flow-out/85";
+  return "border border-dashed border-flow-in/60";
 }
 
 function BarTrack({
@@ -177,13 +178,13 @@ export function NoSweatDetails({ dto, onChanged, addedActions }: NoSweatDetailsP
         <WaterfallView wf={lose} zeroPct={zeroPct} />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground md:col-span-2 md:col-start-2">
           <span className="flex items-center gap-1.5">
-            <Swatch className="bg-foreground/85" /> money in
+            <Swatch className="bg-flow-in" /> money in
           </span>
           <span className="flex items-center gap-1.5">
-            <Swatch className="bg-destructive/75" /> money out
+            <Swatch className="bg-flow-out/85" /> money out
           </span>
           <span className="flex items-center gap-1.5">
-            <Swatch className="border border-dashed border-muted-foreground" hatched />{" "}
+            <Swatch className="border border-dashed border-flow-in/60" hatched />{" "}
             {estimateLegendLabel(dto.ratePct)}
           </span>
         </div>
