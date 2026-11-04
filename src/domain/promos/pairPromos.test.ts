@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Decimal from "decimal.js";
 import type { OddsEvent } from "@/domain/odds/schemas";
 import { solveBoostBoostPairWithTopUp } from "@/domain/hedge/pairMath";
+import { solveBoostBoostPairWithMarketTopUp } from "@/domain/market/solvePairMarketTopUp";
+import { toMarketLeg } from "@/domain/market/marketLeg";
 import { rankPromoHedges,type RankablePromo, type RankOptions } from "./rankPromoHedges";
 import type { ResolvedSelection } from "./selection";
 import type { PromoScope } from "./scope";
@@ -454,6 +456,7 @@ function stubCandidate(s: StubPair): PairCandidate<RankablePromo> {
     baseOddsAAmerican: null,
     baseOddsBAmerican: null,
     result: { guaranteedProfit: gain } as PairCandidate<RankablePromo>["result"],
+    topUpMarket: null,
     separateProfitA: new Decimal(0),
     separateProfitB: new Decimal(0),
     gain,
@@ -680,5 +683,104 @@ describe("findPairCandidates: boost + boost with an ordinary top-up bet", () => 
         expect(found[0].result.guaranteedProfit.gte(direct.guaranteedProfit)).toBe(true);
       }
     }
+  });
+});
+
+describe("findPairCandidates: boost + boost with a market top-up", () => {
+  const dk = boostPromo({ id: 36, bookKey: "draftkings", boostPercent: "50", maxStake: "20", minOddsAmerican: -200 });
+  const fd = boostPromo({ id: 39, bookKey: "fanduel", boostPercent: "30", maxStake: "10", minOddsAmerican: -200 });
+
+  function eventWith(kalshiHome: number, bookHome?: number) {
+    const quotes = [
+      { bookKey: "draftkings", homePrice: -250, awayPrice: 154 },
+      { bookKey: "fanduel", homePrice: -172, awayPrice: -250 },
+      { bookKey: "kalshi", homePrice: kalshiHome, awayPrice: 100 },
+    ];
+    if (bookHome !== undefined) quotes.push({ bookKey: "betrivers", homePrice: bookHome, awayPrice: 100 });
+    return moneylineEvent({ id: "e1", quotes });
+  }
+
+  function opts(event: OddsEvent, hedge: string[]) {
+    return { ...optsFor([event], ["draftkings", "fanduel"]), hedgeBookKeys: new Set(hedge) };
+  }
+
+  function run(event: OddsEvent, hedge: string[]) {
+    const o = opts(event, hedge);
+    const singles = singleProfitMap(rankPromoHedges([dk, fd], o));
+    return findPairCandidates([dk, fd], singles, o);
+  }
+
+  it("a Kalshi top-up on B's side wins when no sportsbook top-up matches it", () => {
+    const found = run(eventWith(-150), ["draftkings", "fanduel", "kalshi"]);
+    expect(found).toHaveLength(1);
+    const c = found[0];
+    expect(c.topUpMarket).not.toBeNull();
+    expect(c.topUp?.bookKey).toBe("kalshi");
+    expect(c.topUp?.side).toBe("B");
+    expect(c.topUp?.oddsAmerican).toBe(-150);
+    expect(c.topUpMarket!.contracts).toBe(49);
+    expect(c.result.topUp?.leg.stake.equals(c.topUpMarket!.outlay)).toBe(true);
+    expect(c.result.topUp?.leg.payout.equals(49)).toBe(true);
+    expect(c.result.guaranteedProfit.toString()).toBe("5.98");
+    expect(c.gain.gt(0)).toBe(true);
+  });
+
+  it("market top-up beats a worse sportsbook top-up", () => {
+    const found = run(eventWith(-150, -165), ["draftkings", "fanduel", "kalshi", "betrivers"]);
+    expect(found).toHaveLength(1);
+    expect(found[0].topUp?.bookKey).toBe("kalshi");
+    expect(found[0].result.guaranteedProfit.toString()).toBe("5.98");
+  });
+
+  it("a market that is not strictly better leaves the sportsbook top-up in place", () => {
+    const found = run(eventWith(-165, -165), ["draftkings", "fanduel", "kalshi", "betrivers"]);
+    expect(found).toHaveLength(1);
+    expect(found[0].topUp?.bookKey).toBe("betrivers");
+    expect(found[0].topUpMarket).toBeNull();
+    expect(found[0].result.guaranteedProfit.toString()).toBe("5.91");
+  });
+
+  it("members without a market ticked get no market top-up (same as before)", () => {
+    for (const c of run(eventWith(-150), ["draftkings", "fanduel"])) {
+      expect(c.topUpMarket).toBeNull();
+      expect(c.topUp?.bookKey).not.toBe("kalshi");
+    }
+    const found = run(eventWith(-165), ["draftkings", "fanduel"]);
+    expect(found).toHaveLength(1);
+    expect(found[0].topUpMarket).toBeNull();
+    expect(found[0].topUp?.bookKey).toBe("fanduel");
+  });
+
+  it("the fee-aware prune never drops a pair only the market top-up makes profitable (seeded)", () => {
+    let state = 777;
+    const rnd = (n: number) => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state % n;
+    };
+    let checked = 0;
+    for (let i = 0; i < 60; i += 1) {
+      const kalshiHome = [-170, -160, -150, -140][rnd(4)];
+      const capA = 10 + rnd(30);
+      const capB = 5 + rnd(20);
+      const a = boostPromo({ id: 36, bookKey: "draftkings", boostPercent: "50", maxStake: String(capA), minOddsAmerican: -200 });
+      const b = boostPromo({ id: 39, bookKey: "fanduel", boostPercent: "30", maxStake: String(capB), minOddsAmerican: -200 });
+      const o = opts(eventWith(kalshiHome), ["draftkings", "fanduel", "kalshi"]);
+      const singles = singleProfitMap(rankPromoHedges([a, b], o));
+      const singleSum = (singles.get(36) ?? new Decimal(0)).plus(singles.get(39) ?? new Decimal(0));
+      const direct = solveBoostBoostPairWithMarketTopUp({
+        legA: { boostedOddsAmerican: null, baseOddsAmerican: 154, boostPercent: new Decimal(50), maxStake: new Decimal(capA), winningsCap: null, minOddsAmerican: -200 },
+        legB: { boostedOddsAmerican: null, baseOddsAmerican: -172, boostPercent: new Decimal(30), maxStake: new Decimal(capB), winningsCap: null, minOddsAmerican: -200 },
+        marketOnA: null,
+        marketOnB: toMarketLeg({ bookKey: "kalshi", oddsAmerican: kalshiHome }),
+        precision: "cents",
+      });
+      const found = findPairCandidates([a, b], singles, o);
+      if (direct && direct.guaranteedProfit.gt(singleSum)) {
+        checked += 1;
+        expect(found).toHaveLength(1);
+        expect(found[0].result.guaranteedProfit.gte(direct.guaranteedProfit)).toBe(true);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 });

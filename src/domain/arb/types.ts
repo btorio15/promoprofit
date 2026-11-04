@@ -1,3 +1,5 @@
+import type { MarketLegDTO } from "@/domain/market/legDto";
+
 /**
  * Serializable DTOs returned by the findArbs server action. All money is a
  * fixed 2-dp string, never a number, so it can cross the server/client
@@ -11,6 +13,8 @@ export interface ArbLegDTO {
   oddsAmerican: number;
   /** Display names of other books exactly tying this leg's price (D-07). */
   tiedBookNames: string[];
+  /** Whole-contract prediction-market buy when this leg is a market venue, else null. */
+  market: MarketLegDTO | null;
 }
 
 export interface ArbResultDTO {

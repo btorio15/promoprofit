@@ -29,10 +29,18 @@ function TopUpStep({ n, leg }: { n: number; leg: PairTopUpLegDTO }) {
       <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-border bg-secondary text-sm text-muted-foreground">
         {n}
       </span>
-      <span className="text-base">
-        Bet <span className="num">{formatUsd(leg.stake)}</span> at {leg.bookName} on {leg.selectionLabel} at{" "}
-        <span className="num">{formatAmerican(leg.oddsAmerican)}</span> (ordinary bet, no promo).
-      </span>
+      {leg.market ? (
+        <span className="text-base">
+          At {leg.bookName}, buy <span className="num">{leg.market.contracts}</span> {leg.market.side.toUpperCase()} on{" "}
+          {leg.selectionLabel} @ <span className="num">{leg.market.priceCents}¢</span> ($
+          <span className="num">{leg.market.cost}</span> + $<span className="num">{leg.market.fee}</span> fee).
+        </span>
+      ) : (
+        <span className="text-base">
+          Bet <span className="num">{formatUsd(leg.stake)}</span> at {leg.bookName} on {leg.selectionLabel} at{" "}
+          <span className="num">{formatAmerican(leg.oddsAmerican)}</span> (ordinary bet, no promo).
+        </span>
+      )}
     </li>
   );
 }
@@ -40,7 +48,9 @@ function TopUpStep({ n, leg }: { n: number; leg: PairTopUpLegDTO }) {
 function TopUpRow({ leg }: { leg: PairTopUpLegDTO }) {
   return (
     <TableRow>
-      <TableCell className="text-muted-foreground">+ ordinary bet at {leg.bookName}</TableCell>
+      <TableCell className="text-muted-foreground">
+        {leg.market ? `+ contracts at ${leg.bookName}` : `+ ordinary bet at ${leg.bookName}`}
+      </TableCell>
       <TableCell className="num text-right">{formatUsd(leg.stake)}</TableCell>
       <TableCell className="num text-right">{formatUsd(leg.payout)}</TableCell>
       <TableCell className="text-right text-muted-foreground">included above</TableCell>

@@ -1,5 +1,7 @@
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { getSportLabel } from "@/config/sports";
+import { usableHedgeBooks } from "@/config/books";
+import { toMarketLegDTO, type MarketLegDTO } from "@/domain/market/legDto";
 import type { PairLegResult } from "@/domain/hedge/pairMath";
 import type { YourCapDTO } from "./dto";
 import type { PairCandidate } from "./pairPromos";
@@ -43,6 +45,8 @@ export interface PairTopUpLegDTO {
   stake: string;
   payout: string;
   note: string;
+  /** Phase 12: set when the top-up is a Kalshi/Polymarket contract buy (stake = all-in outlay, payout = contracts). */
+  market?: MarketLegDTO | null;
 }
 
 export interface PairRowDTO {
@@ -109,6 +113,25 @@ function toTopUpLegDTO<P extends PresentablePromo>(
   const topUp = c.topUp ?? null;
   const leg = c.result.topUp?.leg;
   if (!topUp || !leg) return null;
+  if (c.topUpMarket) {
+    const venueName =
+      usableHedgeBooks().find((b) => b.key === c.topUpMarket!.venueKey)?.displayName ??
+      bookNames.get(c.topUpMarket.venueKey) ??
+      c.topUpMarket.venueKey;
+    const market = toMarketLegDTO(c.topUpMarket, { sportKey: c.selectionA.sportKey, venueName });
+    const mLabel = selectionLabel(topUp.selection.marketType, topUp.selection.sideSelection, topUp.selection.sidePoint);
+    return {
+      side: topUp.side,
+      bookKey: topUp.bookKey,
+      bookName: venueName,
+      selectionLabel: mLabel,
+      oddsAmerican: market.americanDisplay,
+      stake: market.outlay,
+      payout: `${market.contracts}.00`,
+      note: `Top up with ${market.contracts} ${venueName} contracts so both sides pay the same.`,
+      market,
+    };
+  }
   const label = selectionLabel(topUp.selection.marketType, topUp.selection.sideSelection, topUp.selection.sidePoint);
   return {
     side: topUp.side,
@@ -119,6 +142,7 @@ function toTopUpLegDTO<P extends PresentablePromo>(
     stake: leg.stake.toFixed(2),
     payout: leg.payout.toFixed(2),
     note: `Ordinary bet (no promo): tops up the ${label} side so the bigger boost can use its full cap.`,
+    market: null,
   };
 }
 

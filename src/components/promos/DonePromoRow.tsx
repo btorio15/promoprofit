@@ -11,6 +11,7 @@ import type { DonePromoDTO } from "@/domain/promos/dto";
 import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
 import { AddedPromoActions } from "./AddedPromoActions";
 import { MarkUsedButton } from "./MarkUsedButton";
 import { PromoDetails } from "./PromoDetails";
@@ -241,9 +242,14 @@ function DoneHedgeOrPlainRow({ row, onChanged, addedActions }: DonePromoRowProps
           <div className="flex min-w-0 flex-col text-base">
             <span className="text-sm text-muted-foreground md:hidden">Hedge</span>
             <span className="flex flex-wrap items-center gap-2">
-              {done.hedge.selectionLabel} <span className="num">{formatAmerican(done.hedge.oddsAmerican)}</span>
+              {done.hedge.selectionLabel}{" "}
+              {done.hedgeMarket ? null : <span className="num">{formatAmerican(done.hedge.oddsAmerican)}</span>}
             </span>
-            <span className="text-sm text-muted-foreground">{done.hedge.bookName}</span>
+            {done.hedgeMarket ? <MarketLegLine leg={done.hedgeMarket} /> : null}
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">{done.hedge.bookName}</span>
+              {done.hedgeMarket ? <MarketLegBadges leg={done.hedgeMarket} /> : null}
+            </span>
           </div>
 
           <span className="num text-xl font-semibold text-primary md:text-right">

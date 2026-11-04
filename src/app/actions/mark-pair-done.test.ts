@@ -150,6 +150,42 @@ describe("markPairDoneAction", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/");
   });
 
+  it("stores the market top-up leg in the snapshot and records the pair profit", async () => {
+    const market = {
+      venueKey: "kalshi" as const,
+      venueName: "Kalshi",
+      side: "yes" as const,
+      contracts: 42,
+      priceCents: 61,
+      cost: "25.62",
+      fee: "0.70",
+      outlay: "26.32",
+      americanDisplay: -156,
+      liquidity: { kind: "price_may_move" as const },
+      settlementNote: "note",
+    };
+    const withMarket: PairRowDTO = {
+      ...row,
+      legC: {
+        side: "B",
+        bookKey: "kalshi",
+        bookName: "Kalshi",
+        selectionLabel: "Team",
+        oddsAmerican: -156,
+        stake: "26.32",
+        payout: "42.00",
+        note: "Top up with 42 Kalshi contracts so both sides pay the same.",
+        market,
+      },
+    };
+    mockComputeMemberPairState.mockResolvedValue(pairState(withMarket));
+    const res = await markPairDoneAction({ ...input, expectedStakeC: "26.32" });
+    expect(res).toEqual({ status: "ok", profitExtracted: withMarket.guaranteedProfit });
+    const arg = mockMarkPairDone.mock.calls[0][0];
+    expect(arg.primary.profitExtracted).toBe(withMarket.guaranteedProfit);
+    expect(arg.primary.snapshot.row.legC.market).toEqual(market);
+  });
+
   it("returns save_failed when the write throws", async () => {
     mockMarkPairDone.mockRejectedValue(new Error("db down"));
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});

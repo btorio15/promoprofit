@@ -6,6 +6,8 @@ import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/forma
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
+import { tieRiskTooltipText } from "@/domain/market/legDto";
 import { MultipleBooksPopover } from "./MultipleBooksPopover";
 import { ArbDetails } from "./ArbDetails";
 
@@ -52,8 +54,7 @@ export function ArbRow({ result }: ArbRowProps) {
                     }
                   />
                   <TooltipContent>
-                    Regular-season NFL games can end in a tie (&lt;1% historically). A tie voids
-                    both legs: profit becomes $0, no cash loss.
+                    {tieRiskTooltipText(result.sideA.market !== null || result.sideB.market !== null)}
                   </TooltipContent>
                 </Tooltip>
               ) : null}
@@ -62,26 +63,52 @@ export function ArbRow({ result }: ArbRowProps) {
 
           <div className="flex min-w-0 flex-col text-base">
             <span className="text-sm text-muted-foreground md:hidden">Side A</span>
-            <span className="flex flex-wrap items-center gap-2">
-              {result.sideA.selection}{" "}
-              <span className="num">{formatAmerican(result.sideA.oddsAmerican)}</span>
-              {result.sideA.tiedBookNames.length > 0 ? (
-                <MultipleBooksPopover bookNames={result.sideA.tiedBookNames} />
-              ) : null}
-            </span>
-            <span className="text-sm text-muted-foreground">{result.sideA.bookName}</span>
+            {result.sideA.market ? (
+              <>
+                <span>{result.sideA.selection}</span>
+                <MarketLegLine leg={result.sideA.market} />
+                <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  {result.sideA.bookName}
+                  <MarketLegBadges leg={result.sideA.market} />
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex flex-wrap items-center gap-2">
+                  {result.sideA.selection}{" "}
+                  <span className="num">{formatAmerican(result.sideA.oddsAmerican)}</span>
+                  {result.sideA.tiedBookNames.length > 0 ? (
+                    <MultipleBooksPopover bookNames={result.sideA.tiedBookNames} />
+                  ) : null}
+                </span>
+                <span className="text-sm text-muted-foreground">{result.sideA.bookName}</span>
+              </>
+            )}
           </div>
 
           <div className="flex min-w-0 flex-col text-base">
             <span className="text-sm text-muted-foreground md:hidden">Side B</span>
-            <span className="flex flex-wrap items-center gap-2">
-              {result.sideB.selection}{" "}
-              <span className="num">{formatAmerican(result.sideB.oddsAmerican)}</span>
-              {result.sideB.tiedBookNames.length > 0 ? (
-                <MultipleBooksPopover bookNames={result.sideB.tiedBookNames} />
-              ) : null}
-            </span>
-            <span className="text-sm text-muted-foreground">{result.sideB.bookName}</span>
+            {result.sideB.market ? (
+              <>
+                <span>{result.sideB.selection}</span>
+                <MarketLegLine leg={result.sideB.market} />
+                <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  {result.sideB.bookName}
+                  <MarketLegBadges leg={result.sideB.market} />
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex flex-wrap items-center gap-2">
+                  {result.sideB.selection}{" "}
+                  <span className="num">{formatAmerican(result.sideB.oddsAmerican)}</span>
+                  {result.sideB.tiedBookNames.length > 0 ? (
+                    <MultipleBooksPopover bookNames={result.sideB.tiedBookNames} />
+                  ) : null}
+                </span>
+                <span className="text-sm text-muted-foreground">{result.sideB.bookName}</span>
+              </>
+            )}
           </div>
 
           <span className="num text-xl font-semibold text-primary md:text-right">

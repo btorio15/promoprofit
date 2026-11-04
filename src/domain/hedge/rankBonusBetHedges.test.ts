@@ -321,3 +321,77 @@ describe("rankBonusBetHedges", () => {
     });
   });
 });
+
+describe("rankBonusBetHedges market hedges (Phase 12)", () => {
+  type Q = TwoWayMoneylineMarket["quotes"][number];
+  function mk(quotes: Q[]): TwoWayMoneylineMarket {
+    return {
+      eventId: "mkt",
+      sportKey: "basketball_nba",
+      commenceTime: new Date(now.getTime() + 86_400_000),
+      homeTeam: "Home",
+      awayTeam: "Away",
+      tieRisk: false,
+      quotes,
+    };
+  }
+  const bonus = (odds: number): Q => ({ bookKey: "bookA", outcome: "home", team: "Home", oddsAmerican: odds });
+  const away = (bookKey: string, odds: number): Q => ({ bookKey, outcome: "away", team: "Away", oddsAmerican: odds });
+  const run = (quotes: Q[], hedge: string[], extra: Partial<Parameters<typeof rankBonusBetHedges>[1]> = {}) =>
+    rankBonusBetHedges([mk(quotes)], {
+      bonusBookKey: "bookA",
+      bonusAmount: new Decimal(100),
+      hedgeBookKeys: new Set(hedge),
+      ...extra,
+    });
+
+  it("is unchanged when no market key is in hedgeBookKeys", () => {
+    const r = run([bonus(250), away("bookB", -150), away("kalshi", -122)], ["bookB"]);
+    expect(r[0].market).toBeNull();
+    expect(r[0].hedge.bookKey).toBe("bookB");
+    expect(r[0].result.guaranteedProfit.toFixed(2)).toBe("100.00");
+  });
+
+  it("keeps the book when Kalshi has the better price but lower after-fee profit", () => {
+    // Book -150: payout 250, stake 150, profit 100.00.
+    // Kalshi 59c (-144): 250 contracts cost 147.50 + fee ceil(0.07*250*.59*.41=4.233)=4.24 -> profit 250-151.74 = 98.26 < 100.
+    const r = run([bonus(250), away("bookB", -150), away("kalshi", -144)], ["bookB", "kalshi"]);
+    expect(r[0].market).toBeNull();
+    expect(r[0].hedge.bookKey).toBe("bookB");
+    expect(r[0].result.guaranteedProfit.toFixed(2)).toBe("100.00");
+  });
+
+  it("picks Kalshi when its after-fee profit is higher", () => {
+    // Kalshi 55c (-122): 250 contracts cost 137.50 + fee 4.34 = 141.84 -> profit 108.16 > 100.
+    const r = run([bonus(250), away("bookB", -150), away("kalshi", -122)], ["bookB", "kalshi"]);
+    expect(r[0].hedge.bookKey).toBe("kalshi");
+    expect(r[0].market?.contracts).toBe(250);
+    expect(r[0].sameBook).toBe(false);
+    expect(r[0].result.guaranteedProfit.toFixed(2)).toBe("108.16");
+    expect(r[0].result.hedgeStake.toFixed(2)).toBe("141.84");
+  });
+
+  it("keeps the sportsbook on exactly equal after-fee profit (D-02)", () => {
+    // Bonus +110 (payout 110.00): book +114 and Kalshi 45c (+122) both net 58.59.
+    const r = run([bonus(110), away("bookB", 114), away("kalshi", 122)], ["bookB", "kalshi"]);
+    expect(r[0].result.guaranteedProfit.toFixed(2)).toBe("58.59");
+    expect(r[0].market).toBeNull();
+    expect(r[0].hedge.bookKey).toBe("bookB");
+  });
+
+  it("prefers the higher-profit market among venues", () => {
+    // Same 55c: Polymarket US fee coefficient 0.0695 < Kalshi 0.07, so it nets more.
+    const r = run([bonus(250), away("kalshi", -122), away("polymarket_us", -122)], ["kalshi", "polymarket_us"]);
+    expect(r[0].hedge.bookKey).toBe("polymarket_us");
+  });
+
+  it("applies maxHedgeStake to the market outlay", () => {
+    const quotes = [bonus(250), away("kalshi", -122)];
+    expect(run(quotes, ["kalshi"], { maxHedgeStake: new Decimal("141.84") })).toHaveLength(1);
+    expect(run(quotes, ["kalshi"], { maxHedgeStake: new Decimal("141.83") })).toHaveLength(0);
+  });
+
+  it("never shows a market that is not in hedgeBookKeys", () => {
+    expect(run([bonus(250), away("kalshi", -122)], ["bookB"])).toHaveLength(0);
+  });
+});

@@ -195,3 +195,124 @@ describe("rankArbs", () => {
     expect(results).toHaveLength(3);
   });
 });
+
+describe("book-vs-market arbs", () => {
+  const opts = { totalStake: new Decimal(200), precision: "whole" as const };
+  // Kalshi YES at 44c is American +127 (100 / 2.27 = 44.05% -> 44c).
+  const kalshi44: ArbSideQuote = { bookKey: "kalshi", oddsAmerican: 127 };
+  const dk120: ArbSideQuote = { bookKey: "draftkings", oddsAmerican: 120 };
+
+  it("ignores market quotes in findBestArbPair and in tie lists", () => {
+    const pair = findBestArbPair(
+      [
+        { bookKey: "kalshi", oddsAmerican: 300 },
+        { bookKey: "draftkings", oddsAmerican: 130 },
+        { bookKey: "polymarket_us", oddsAmerican: 130 },
+      ],
+      [{ bookKey: "betmgm", oddsAmerican: -120 }],
+    );
+    expect(pair!.sideA.bookKey).toBe("draftkings");
+    expect(pair!.tiedBooksA).toEqual([]);
+  });
+
+  it("leaves book-only rows with market null on both legs", () => {
+    const results = rankArbs(
+      [market({ sideAQuotes: [dk120], sideBQuotes: [{ bookKey: "fanduel", oddsAmerican: -105 }] })],
+      opts,
+    );
+    expect(results[0].sideA.market).toBeNull();
+    expect(results[0].sideB.market).toBeNull();
+  });
+
+  it("builds a DraftKings +120 vs Kalshi 44c arb under the stake cap", () => {
+    // Book decimal 2.20: 1/2.2 + 0.44 = 0.8945; fee rate 0.07 x .44 x .56 = 0.0172 -> still < 1.
+    const results = rankArbs([market({ sideAQuotes: [dk120], sideBQuotes: [kalshi44] })], opts);
+    expect(results).toHaveLength(1);
+    const r = results[0];
+    expect(r.sideA.market).toBeNull();
+    expect(r.sideB.bookKey).toBe("kalshi");
+    const fill = r.sideB.market!;
+    expect(fill.priceCents).toBe(44);
+    expect(fill.cost.equals(new Decimal(fill.contracts).times("0.44"))).toBe(true);
+    expect(r.result.stakeB.equals(fill.outlay)).toBe(true);
+    expect(r.result.payoutB.equals(fill.contracts)).toBe(true);
+    expect(r.result.totalLaid.equals(r.result.stakeA.plus(r.result.stakeB))).toBe(true);
+    expect(r.result.totalLaid.lte(200)).toBe(true);
+    expect(r.result.guaranteedProfit.gt(0)).toBe(true);
+    expect(
+      r.result.guaranteedProfit.equals(Decimal.min(r.result.netIfAWins, r.result.netIfBWins)),
+    ).toBe(true);
+  });
+
+  it("swaps stakes to follow leg order when the market is on side A", () => {
+    const onB = rankArbs([market({ sideAQuotes: [dk120], sideBQuotes: [kalshi44] })], opts)[0];
+    const onA = rankArbs([market({ sideAQuotes: [kalshi44], sideBQuotes: [dk120] })], opts)[0];
+    expect(onA.sideA.market).not.toBeNull();
+    expect(onA.sideB.market).toBeNull();
+    expect(onA.result.stakeA.equals(onB.result.stakeB)).toBe(true);
+    expect(onA.result.stakeB.equals(onB.result.stakeA)).toBe(true);
+    expect(onA.result.guaranteedProfit.equals(onB.result.guaranteedProfit)).toBe(true);
+  });
+
+  it("never pairs two market legs (D-04)", () => {
+    const results = rankArbs(
+      [
+        market({
+          sideAQuotes: [{ bookKey: "kalshi", oddsAmerican: 127 }],
+          sideBQuotes: [{ bookKey: "polymarket_us", oddsAmerican: 127 }],
+        }),
+      ],
+      opts,
+    );
+    expect(results).toHaveLength(0);
+  });
+
+  it("picks the best sportsbook opposite the market (highest odds, ties by key)", () => {
+    const results = rankArbs(
+      [
+        market({
+          sideAQuotes: [
+            { bookKey: "fanduel", oddsAmerican: 120 },
+            { bookKey: "betmgm", oddsAmerican: 120 },
+            { bookKey: "caesars", oddsAmerican: 110 },
+          ],
+          sideBQuotes: [kalshi44],
+        }),
+      ],
+      opts,
+    );
+    expect(results[0].sideA.bookKey).toBe("betmgm");
+  });
+
+  it("uses the market arb only when strictly more profitable than the book-book arb", () => {
+    const a: ArbSideQuote = { bookKey: "draftkings", oddsAmerican: 105 };
+    const fd: ArbSideQuote = { bookKey: "fanduel", oddsAmerican: -104 };
+    // Book-book is a tiny arb; Kalshi 44c against DK +105 is far richer.
+    const richer = rankArbs([market({ sideAQuotes: [a], sideBQuotes: [fd, kalshi44] })], opts);
+    expect(richer[0].sideB.bookKey).toBe("kalshi");
+    // Kalshi 50c vs DK +105: 1/2.05 + 0.5 + fee > 1 -> no market arb, book-book kept.
+    const poorer = rankArbs(
+      [market({ sideAQuotes: [a], sideBQuotes: [fd, { bookKey: "kalshi", oddsAmerican: 100 }] })],
+      opts,
+    );
+    expect(poorer[0].sideB.bookKey).toBe("fanduel");
+    expect(poorer[0].sideB.market).toBeNull();
+  });
+
+  it("works for spread rows with an exact line", () => {
+    const results = rankArbs(
+      [market({ marketType: "spread", line: -3.5, sideAQuotes: [dk120], sideBQuotes: [kalshi44] })],
+      opts,
+    );
+    expect(results[0].rowKey).toBe("event-1:spread:-3.5");
+    expect(results[0].sideB.market).not.toBeNull();
+  });
+
+  it("caps contracts at the displayed depth", () => {
+    const results = rankArbs(
+      [market({ sideAQuotes: [dk120], sideBQuotes: [{ ...kalshi44, askSize: 10 }] })],
+      opts,
+    );
+    expect(results[0].sideB.market!.contracts).toBeLessThanOrEqual(10);
+  });
+});

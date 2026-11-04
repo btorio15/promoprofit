@@ -6,6 +6,8 @@ import { calculateBonusBetHedge } from "@/domain/hedge/bonusBet";
 import { findUnprofitablePromos, rankPromoHedges, type RankablePromo } from "./rankPromoHedges";
 import type { PromoScope } from "./scope";
 import { applyMemberCaps } from "./yourCap";
+import { toMarketLeg } from "@/domain/market/marketLeg";
+import { solveProfitBoostMarketHedge } from "@/domain/market/solveMarketHedge";
 
 const NOW = new Date("2026-09-27T00:00:00Z");
 
@@ -1511,5 +1513,130 @@ describe("member cap override (quick-261001-dhn)", () => {
     expect(capped.result.boost.hedgeStake.equals(expected20!.hedgeStake)).toBe(true);
     expect(capped.result.boost.guaranteedProfit.equals(expected25!.guaranteedProfit)).toBe(false);
     expect(own.result.boost.guaranteedProfit.equals(expected25!.guaranteedProfit)).toBe(true);
+  });
+});
+
+describe("rankPromoHedges: prediction-market hedges (12-11)", () => {
+  const bonusPromo: RankablePromo = {
+    ...defaultPromo,
+    promoType: "bonus_bet",
+    scope: eventScope("mkt-1"),
+    pinned: { eventId: "mkt-1", marketType: "moneyline", line: null, side: "home" },
+    bookKey: "fanduel",
+    bonusAmount: "50.00",
+    maxStake: null,
+  };
+
+  function eventWith(awayBook: number, awayKalshi: number): OddsEvent {
+    return moneylineEvent({
+      id: "mkt-1",
+      homeTeam: "Lakers",
+      awayTeam: "Celtics",
+      quotes: [
+        { bookKey: "fanduel", homePrice: 150, awayPrice: -300 },
+        { bookKey: "betmgm", homePrice: 120, awayPrice: awayBook },
+        { bookKey: "kalshi", homePrice: 130, awayPrice: awayKalshi },
+      ],
+    });
+  }
+
+  const optsFor = (event: OddsEvent, keys: string[]) => ({
+    moneylineEvents: [event],
+    extendedEvents: [],
+    hedgeBookKeys: new Set(keys),
+    precision: "cents" as const,
+    now: NOW,
+  });
+
+  it("no market keys saved: identical to sportsbook-only, hedgeMarket null", () => {
+    const [opp] = rankPromoHedges([bonusPromo], optsFor(eventWith(-200, -156), ["fanduel", "betmgm"]));
+    expect(opp.hedge.bookKey).toBe("betmgm");
+    expect(opp.hedgeMarket).toBeNull();
+  });
+
+  it("bonus: Kalshi with higher after-fee profit wins ($28.00 worked example)", () => {
+    const [opp] = rankPromoHedges([bonusPromo], optsFor(eventWith(-200, -156), ["fanduel", "betmgm", "kalshi"]));
+    expect(opp.hedge.bookKey).toBe("kalshi");
+    expect(opp.hedgeMarket).not.toBeNull();
+    expect(opp.sameBook).toBe(false);
+    expect(opp.result.kind).toBe("bonus");
+    if (opp.result.kind === "bonus") {
+      expect(opp.result.bonus.guaranteedProfit.toFixed(2)).toBe("28.00");
+      expect(opp.result.bonus.hedgeStake.toFixed(2)).toBe("47.00");
+    }
+  });
+
+  it("bonus: a better sportsbook price keeps the sportsbook hedge", () => {
+    const [opp] = rankPromoHedges([bonusPromo], optsFor(eventWith(-130, -156), ["fanduel", "betmgm", "kalshi"]));
+    expect(opp.hedge.bookKey).toBe("betmgm");
+    expect(opp.hedgeMarket).toBeNull();
+  });
+
+  it("market-only selection (no sportsbook hedge) still yields an opportunity", () => {
+    const [opp] = rankPromoHedges([bonusPromo], optsFor(eventWith(-200, -156), ["kalshi"]));
+    expect(opp.hedge.bookKey).toBe("kalshi");
+    expect(opp.hedgeMarket).not.toBeNull();
+  });
+
+  it("a market quote never counts as the promo book", () => {
+    // Promo book is draftkings, which has no quote; Kalshi's home quote must not stand in for it.
+    const promo: RankablePromo = { ...bonusPromo, bookKey: "draftkings" };
+    const result = rankPromoHedges([promo], optsFor(eventWith(-200, -156), ["betmgm", "kalshi"]));
+    expect(result).toHaveLength(0);
+  });
+
+  it("boost: market solver receives the same inputs as the book solver", () => {
+    const event = moneylineEvent({
+      id: "mkt-1",
+      homeTeam: "Lakers",
+      awayTeam: "Celtics",
+      quotes: [
+        { bookKey: "ballybet", homePrice: 100, awayPrice: -300 },
+        { bookKey: "betmgm", homePrice: 120, awayPrice: -200 },
+        { bookKey: "kalshi", homePrice: 130, awayPrice: -156 },
+      ],
+    });
+    const promo: RankablePromo = {
+      ...defaultPromo,
+      scope: eventScope("mkt-1"),
+      boostPercent: "100",
+      maxStake: "50",
+    };
+    const [opp] = rankPromoHedges([promo], optsFor(event, ["ballybet", "betmgm", "kalshi"]));
+    expect(opp.hedge.bookKey).toBe("kalshi");
+    expect(opp.hedgeMarket).not.toBeNull();
+    const leg = toMarketLeg({ bookKey: "kalshi", oddsAmerican: -156 });
+    const expected = solveProfitBoostMarketHedge({
+      boostedOddsAmerican: null,
+      baseOddsAmerican: 100,
+      boostPercent: new Decimal("100"),
+      maxStake: new Decimal("50"),
+      winningsCap: null,
+      minOddsAmerican: null,
+      precision: "cents",
+      leg: leg!,
+    });
+    expect(opp.result.kind).toBe("boost");
+    if (opp.result.kind === "boost") {
+      expect(opp.result.boost.guaranteedProfit.toFixed(2)).toBe(expected!.guaranteedProfit.toFixed(2));
+      expect(opp.result.boost.promoStake.toFixed(2)).toBe(expected!.promoStake.toFixed(2));
+    }
+  });
+
+  it("findUnprofitablePromos stays sportsbook-only: market-only hedge is not evaluated there", () => {
+    const opts = optsFor(eventWith(-200, -156), ["kalshi"]);
+    expect(rankPromoHedges([bonusPromo], opts)).toHaveLength(1);
+    // Ranked promos are excluded from the unprofitable report entirely.
+    expect(findUnprofitablePromos([bonusPromo], opts)).toHaveLength(0);
+    // A promo the market cannot hedge (kalshi quote absent) reports no sportsbook figure.
+    const noQuote = moneylineEvent({
+      id: "mkt-1",
+      homeTeam: "Lakers",
+      awayTeam: "Celtics",
+      quotes: [{ bookKey: "fanduel", homePrice: 150, awayPrice: -300 }],
+    });
+    const entries = findUnprofitablePromos([bonusPromo], optsFor(noQuote, ["kalshi"]));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].bestGuaranteedProfit).toBeNull();
   });
 });

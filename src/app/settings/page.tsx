@@ -6,8 +6,7 @@ import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
 import { SettingsBookCapsForm } from "@/components/settings/SettingsBookCapsForm";
 import { SettingsLowProfileForm } from "@/components/settings/SettingsLowProfileForm";
 import { getMemberBookCaps } from "@/db/bookCaps";
-import { getMemberLowProfile } from "@/db/lowProfile";
-import { getBonusBooks, getUsableUserBooks } from "@/db/queries";
+import { getMyBookOptions, getUsableUserBooks, getUserMyBookKeys } from "@/db/queries";
 import { DEFAULT_MAX_STAKE } from "@/domain/promos/yourCap";
 import { formatUsd } from "@/lib/format";
 import { requireUser } from "@/lib/session";
@@ -29,17 +28,17 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage() {
   const user = await requireUser();
 
-  // usableSaved comes from getUsableUserBooks (CR-02/WR-01, the same
-  // predicate / and /onboarding/books use), so a stale saved key that no
-  // longer renders as a checkbox is never seeded into initialKeys -- Save
-  // changes can always succeed.
-  const [books, usableSaved, bookCaps, lowProfile] = await Promise.all([
-    getBonusBooks(),
+  // initialKeys come from getUserMyBookKeys (saved sportsbooks and markets
+  // that are still hedge venues), so a stale key never seeds a missing
+  // checkbox. usableSaved stays sportsbook-only and feeds the caps form,
+  // which never lists a market venue.
+  const [books, initialKeys, usableSaved, bookCaps] = await Promise.all([
+    getMyBookOptions(),
+    getUserMyBookKeys(user.userId),
     getUsableUserBooks(user.userId),
     getMemberBookCaps(user.userId),
     getMemberLowProfile(user.userId),
   ]);
-  const initialKeys = usableSaved.map((b) => b.key);
 
   return (
     <>

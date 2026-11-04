@@ -3,6 +3,8 @@ import type { ArbLegDTO, ArbResultDTO } from "@/domain/arb/types";
 import { extractTwoWayMoneylines } from "@/domain/hedge/marketFilter";
 import { extractTwoWaySpreadsAndTotals } from "@/domain/hedge/spreadsTotalsFilter";
 import { moneylineToArbMarket, type ArbLeg, type ArbMarket, type ArbOpportunity } from "@/domain/hedge/rankArbs";
+import { usableHedgeBooks } from "@/config/books";
+import { toMarketLegDTO } from "@/domain/market/legDto";
 import { getSportLabel } from "@/config/sports";
 import type { OddsEvent } from "@/domain/odds/schemas";
 
@@ -10,13 +12,26 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 // "use server" file so they are not exposed as server actions.
 export const ARB_WINDOW_DAYS = 7;
 
-function toLegDTO(leg: ArbLeg, bookNames: Map<string, string>, marketType: ArbMarket["marketType"]): ArbLegDTO {
+function venueNameFor(key: string, bookNames: Map<string, string>): string {
+  return (
+    bookNames.get(key) ?? usableHedgeBooks().find((b) => b.key === key)?.displayName ?? key
+  );
+}
+
+function toLegDTO(
+  leg: ArbLeg,
+  bookNames: Map<string, string>,
+  marketType: ArbMarket["marketType"],
+  sportKey: string,
+): ArbLegDTO {
+  const bookName = venueNameFor(leg.bookKey, bookNames);
   return {
     bookKey: leg.bookKey,
-    bookName: bookNames.get(leg.bookKey) ?? leg.bookKey,
+    bookName,
+    market: leg.market ? toMarketLegDTO(leg.market, { sportKey, venueName: bookName }) : null,
     selection: selectionLabel(marketType, leg.selection, leg.point),
     oddsAmerican: leg.oddsAmerican,
-    tiedBookNames: leg.tiedBookKeys.map((k) => bookNames.get(k) ?? k),
+    tiedBookNames: leg.tiedBookKeys.map((k) => venueNameFor(k, bookNames)),
   };
 }
 
@@ -36,8 +51,8 @@ export function toArbResultDTO(opportunity: ArbOpportunity, bookNames: Map<strin
     marketType: opportunity.marketType,
     marketBadge: marketBadgeLabel(opportunity.marketType, opportunity.line),
     tieRisk: opportunity.tieRisk,
-    sideA: toLegDTO(opportunity.sideA, bookNames, opportunity.marketType),
-    sideB: toLegDTO(opportunity.sideB, bookNames, opportunity.marketType),
+    sideA: toLegDTO(opportunity.sideA, bookNames, opportunity.marketType, opportunity.sportKey),
+    sideB: toLegDTO(opportunity.sideB, bookNames, opportunity.marketType, opportunity.sportKey),
     stakeA: result.stakeA.toFixed(2),
     stakeB: result.stakeB.toFixed(2),
     totalLaid: result.totalLaid.toFixed(2),

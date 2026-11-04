@@ -246,3 +246,17 @@ describe("best", () => {
     expect(totals({ doneRows: rows }).counts.best).toBeNull();
   });
 });
+
+describe("market-hedged completion (MKT-08)", () => {
+  it("adds exactly the stored profitExtracted, same as a sportsbook-hedged completion", () => {
+    const withMarket = {
+      ...done("hedge", "DraftKings", "Boost", "28.00", "2026-10-14T17:00:00.000Z"),
+      row: { hedgeMarket: { venueKey: "kalshi" as const, venueName: "Kalshi", side: "yes" as const, contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32", americanDisplay: -156, liquidity: { kind: "price_may_move" as const }, settlementNote: "Settles on the official result." } },
+    } as DoneRow;
+    const plain = done("hedge", "DraftKings", "Boost", "28.00", "2026-10-14T17:00:00.000Z");
+    const a = totals({ completions: [completion(withMarket.completedAt, "28.00")], doneRows: [withMarket] });
+    const b = totals({ completions: [completion(plain.completedAt, "28.00")], doneRows: [plain] });
+    expect(a.extracted.allTime).toBe("28.00");
+    expect(a).toEqual(b);
+  });
+});

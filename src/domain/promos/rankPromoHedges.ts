@@ -9,6 +9,13 @@ import {
 } from "@/domain/hedge/profitBoost";
 import { calculateBonusBetHedge, type BonusBetHedgeResult } from "@/domain/hedge/bonusBet";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
+import { isMarketVenue } from "@/config/books";
+import { toMarketLeg, type MarketLeg } from "@/domain/market/marketLeg";
+import {
+  solveBonusBetMarketHedge,
+  solveProfitBoostMarketHedge,
+  type MarketFill,
+} from "@/domain/market/solveMarketHedge";
 import { enumerateScopeSelections, resolveSelection, type ResolvedSelection, type SelectionQuote } from "./selection";
 import { eventInScope, type PromoScope } from "./scope";
 import { assertNever, type GuaranteedPromoType, type PromoMarketType, type PromoSelection, type PromoSide, type WinningsCapKind } from "./types";
@@ -47,6 +54,8 @@ export interface PromoOpportunity<P extends RankablePromo = RankablePromo> {
   /** The book's own price before the boost, as fed to the solver; null for bonus bets and for a pinned boost with only a published boosted price. */
   promoBaseOddsAmerican: number | null;
   hedge: SelectionQuote;
+  /** Set when the hedge is a prediction-market fill (whole contracts, after fees); null for sportsbook hedges. */
+  hedgeMarket: MarketFill | null;
   sameBook: boolean;
   candidatesEvaluated: number;
   result: { kind: "boost"; boost: ProfitBoostResult } | { kind: "bonus"; bonus: BonusBetHedgeResult };
@@ -66,6 +75,7 @@ interface EvaluatedCandidate {
   promoOddsDerived: boolean;
   promoBaseOddsAmerican: number | null;
   hedge: SelectionQuote;
+  hedgeMarket: MarketFill | null;
   sameBook: boolean;
   result: { kind: "boost"; boost: ProfitBoostResult } | { kind: "bonus"; bonus: BonusBetHedgeResult };
 }
@@ -73,9 +83,15 @@ interface EvaluatedCandidate {
 const MARKET_ORDER: Record<PromoMarketType, number> = { moneyline: 0, spread: 1, total: 2 };
 const SIDE_ORDER: Record<PromoSide, number> = { home: 0, away: 1, over: 2, under: 3 };
 
-/** Highest-decimal-odds quote among hedgeBookKeys; ties broken alphabetically by bookKey (copied from rankBonusBetHedges.ts's bestHedgeQuote). */
+/**
+ * Highest-decimal-odds SPORTSBOOK quote among hedgeBookKeys; ties broken alphabetically by bookKey
+ * (copied from rankBonusBetHedges.ts's bestHedgeQuote). Market venues (Kalshi, Polymarket) are
+ * always excluded: this is the sportsbook path for every caller (rankNoSweat stays
+ * sportsbook-only until the Phase 9 follow-up; pairPromos book top-up). Market hedges go through
+ * the fee-aware solvers in rankPromoHedges only.
+ */
 export function bestHedgeQuote(quotes: SelectionQuote[], hedgeBookKeys: ReadonlySet<string>): SelectionQuote | null {
-  const candidates = quotes.filter((q) => hedgeBookKeys.has(q.bookKey));
+  const candidates = quotes.filter((q) => hedgeBookKeys.has(q.bookKey) && !isMarketVenue(q.bookKey));
   if (candidates.length === 0) return null;
 
   let best = candidates[0];
@@ -145,6 +161,7 @@ function evaluateBoostCandidate(
   selection: ResolvedSelection,
   promoBookQuote: SelectionQuote | null,
   hedge: SelectionQuote,
+  marketLeg: MarketLeg | null,
   sameBook: boolean,
   opts: RankOptions,
   allowNonPositive: boolean,
@@ -165,19 +182,33 @@ function evaluateBoostCandidate(
     ? { kind: promo.winningsCap.kind, amount: new Decimal(promo.winningsCap.amount) }
     : null;
 
+  // One input construction shared by the book and market solvers so they cannot drift.
+  const sharedInput = {
+    boostedOddsAmerican,
+    baseOddsAmerican,
+    boostPercent,
+    maxStake: new Decimal(promo.maxStake),
+    winningsCap,
+    minOddsAmerican: promo.minOddsAmerican,
+    precision: opts.precision,
+  };
+
   let result: ProfitBoostResult | null;
+  let hedgeMarket: MarketFill | null = null;
   try {
-    const solve = allowNonPositive ? calculateProfitBoostHedgeUnfiltered : calculateProfitBoostHedge;
-    result = solve({
-      boostedOddsAmerican,
-      baseOddsAmerican,
-      boostPercent,
-      hedgeOddsAmerican: hedge.oddsAmerican,
-      maxStake: new Decimal(promo.maxStake),
-      winningsCap,
-      minOddsAmerican: promo.minOddsAmerican,
-      precision: opts.precision,
-    });
+    if (marketLeg) {
+      const solved = solveProfitBoostMarketHedge({ ...sharedInput, leg: marketLeg });
+      if (solved) {
+        const { market, ...boostResult } = solved;
+        result = boostResult;
+        hedgeMarket = market;
+      } else {
+        result = null;
+      }
+    } else {
+      const solve = allowNonPositive ? calculateProfitBoostHedgeUnfiltered : calculateProfitBoostHedge;
+      result = solve({ ...sharedInput, hedgeOddsAmerican: hedge.oddsAmerican });
+    }
   } catch (err) {
     if (err instanceof RangeError) {
       console.warn(`rankPromoHedges: promo ${promo.id} candidate raised RangeError: ${err.message}`);
@@ -197,6 +228,7 @@ function evaluateBoostCandidate(
     promoOddsDerived,
     promoBaseOddsAmerican: baseOddsAmerican,
     hedge,
+    hedgeMarket,
     sameBook,
     result: { kind: "boost", boost: result },
   };
@@ -207,18 +239,33 @@ function evaluateBonusCandidate(
   selection: ResolvedSelection,
   promoBookQuote: SelectionQuote | null,
   hedge: SelectionQuote,
+  marketLeg: MarketLeg | null,
   sameBook: boolean,
   opts: RankOptions,
   allowNonPositive: boolean,
 ): EvaluatedCandidate | null {
   if (!promoBookQuote || promo.bonusAmount === null) return null;
 
-  const bonus = calculateBonusBetHedge({
-    bonusAmount: new Decimal(promo.bonusAmount),
-    bonusOddsAmerican: promoBookQuote.oddsAmerican,
-    hedgeOddsAmerican: hedge.oddsAmerican,
-    precision: opts.precision,
-  });
+  let bonus: BonusBetHedgeResult;
+  let hedgeMarket: MarketFill | null = null;
+  if (marketLeg) {
+    const solved = solveBonusBetMarketHedge({
+      bonusAmount: new Decimal(promo.bonusAmount),
+      bonusOddsAmerican: promoBookQuote.oddsAmerican,
+      leg: marketLeg,
+    });
+    if (!solved) return null;
+    const { market, ...bonusResult } = solved;
+    bonus = bonusResult;
+    hedgeMarket = market;
+  } else {
+    bonus = calculateBonusBetHedge({
+      bonusAmount: new Decimal(promo.bonusAmount),
+      bonusOddsAmerican: promoBookQuote.oddsAmerican,
+      hedgeOddsAmerican: hedge.oddsAmerican,
+      precision: opts.precision,
+    });
+  }
 
   if (!allowNonPositive && bonus.guaranteedProfit.lte(0)) return null;
 
@@ -228,6 +275,7 @@ function evaluateBonusCandidate(
     promoOddsDerived: false,
     promoBaseOddsAmerican: null,
     hedge,
+    hedgeMarket,
     sameBook,
     result: { kind: "bonus", bonus },
   };
@@ -243,19 +291,34 @@ function evaluateCandidate(
 
   if (!passesBaseMinOdds(promo, promoBookQuote)) return null;
 
-  const hedge = bestHedgeQuote(selection.oppositeSideQuotes, opts.hedgeBookKeys);
-  if (!hedge) return null;
+  const evaluate = (hedge: SelectionQuote, leg: MarketLeg | null): EvaluatedCandidate | null => {
+    const sameBook = leg === null && hedge.bookKey === promo.bookKey;
+    return promo.promoType === "profit_boost"
+      ? evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive)
+      : evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive);
+  };
 
-  const sameBook = hedge.bookKey === promo.bookKey;
+  const bookHedge = bestHedgeQuote(selection.oppositeSideQuotes, opts.hedgeBookKeys);
+  const bookCandidate = bookHedge ? evaluate(bookHedge, null) : null;
 
-  switch (promo.promoType) {
-    case "profit_boost":
-      return evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
-    case "bonus_bet":
-      return evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, sameBook, opts, allowNonPositive);
-    default:
-      return assertNever(promo.promoType);
+  // The unprofitable-promo report stays on the sportsbook path only.
+  if (allowNonPositive) return bookCandidate;
+
+  // D-02: a market hedge wins only when its after-fee profit strictly beats the
+  // sportsbook hedge. Between markets: highest profit, then venue key.
+  const marketQuotes = selection.oppositeSideQuotes
+    .filter((q) => isMarketVenue(q.bookKey) && opts.hedgeBookKeys.has(q.bookKey))
+    .sort((a, b) => (a.bookKey < b.bookKey ? -1 : a.bookKey > b.bookKey ? 1 : 0));
+
+  let best = bookCandidate;
+  for (const quote of marketQuotes) {
+    const leg = toMarketLeg(quote);
+    if (!leg) continue;
+    const candidate = evaluate(quote, leg);
+    if (!candidate) continue;
+    if (best === null || guaranteedProfitOf(candidate).gt(guaranteedProfitOf(best))) best = candidate;
   }
+  return best;
 }
 
 function guaranteedProfitOf(candidate: EvaluatedCandidate): Decimal {
@@ -335,6 +398,7 @@ function evaluatePromo<P extends RankablePromo>(promo: P, opts: RankOptions): Pr
     promoOddsDerived: best.promoOddsDerived,
     promoBaseOddsAmerican: best.promoBaseOddsAmerican,
     hedge: best.hedge,
+    hedgeMarket: best.hedgeMarket,
     sameBook: best.sameBook,
     candidatesEvaluated,
     result: best.result,

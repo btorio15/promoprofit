@@ -4,6 +4,8 @@ import type { CapSource } from "./yourCap";
 import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
+import { usableHedgeBooks } from "@/config/books";
+import { toMarketLegDTO } from "@/domain/market/legDto";
 import { formatBoostPercent } from "./describe";
 import { guaranteedPromoTypeLabel } from "./promoTypeLabel";
 import { assertNever } from "./types";
@@ -81,7 +83,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
   userBookSet: ReadonlySet<string>,
   priceAge?: PriceAgeContext,
 ): PromoRowDTO {
-  const { promo, selection, hedge, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
+  const { promo, selection, hedge, hedgeMarket, sameBook, candidatesEvaluated, promoOddsAmerican, promoOddsDerived, result } = opportunity;
 
   const marketBadge = marketBadgeLabel(selection.marketType, selection.line);
   const promoSelectionLabel = selectionLabel(selection.marketType, selection.sideSelection, selection.sidePoint);
@@ -127,6 +129,20 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     capNote = null;
   }
 
+  const venueName =
+    hedgeMarket !== null && hedgeMarket !== undefined
+      ? (usableHedgeBooks().find((b) => b.key === hedgeMarket.venueKey)?.displayName ?? hedgeMarket.venueKey)
+      : null;
+  const hedgeMarketDto =
+    hedgeMarket !== null && hedgeMarket !== undefined && venueName !== null
+      ? toMarketLegDTO(hedgeMarket, { sportKey: selection.sportKey, venueName })
+      : null;
+  if (hedgeMarketDto !== null) {
+    // The contract leg: stake is the all-in outlay, payout is $1 per contract.
+    hedgeStake = hedgeMarketDto.outlay;
+    hedgePayout = `${hedgeMarketDto.contracts}.00`;
+  }
+
   return {
     rowKey: `promo-${promo.id}`,
     promoId: promo.id,
@@ -156,10 +172,11 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     },
     hedge: {
       bookKey: hedge.bookKey,
-      bookName: bookNames.get(hedge.bookKey) ?? hedge.bookKey,
+      bookName: bookNames.get(hedge.bookKey) ?? venueName ?? hedge.bookKey,
       selectionLabel: hedgeSelectionLabel,
       oddsAmerican: hedge.oddsAmerican,
     },
+    hedgeMarket: hedgeMarketDto,
     promoStake,
     hedgeStake,
     totalStaked,

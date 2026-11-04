@@ -2,6 +2,9 @@ import Decimal from "decimal.js";
 import { americanToDecimal } from "./americanOdds";
 import { calculateBonusBetHedge, type BonusBetHedgeResult } from "./bonusBet";
 import type { MoneylineQuote, TwoWayMoneylineMarket } from "./marketFilter";
+import { isMarketVenue } from "@/config/books";
+import { toMarketLeg } from "@/domain/market/marketLeg";
+import { solveBonusBetMarketHedge, type MarketFill } from "@/domain/market/solveMarketHedge";
 
 const DEFAULT_LIMIT = 10;
 const OPPOSITE_OUTCOME = { home: "away", away: "home" } as const;
@@ -24,6 +27,8 @@ export interface BonusBetOpportunity {
   hedge: HedgeLeg;
   sameBook: boolean;
   result: BonusBetHedgeResult;
+  /** Whole-contract market fill when the hedge is at a prediction market, else null. */
+  market: MarketFill | null;
 }
 
 export interface RankOptions {
@@ -54,7 +59,9 @@ function bestHedgeQuote(
   outcome: "home" | "away",
   hedgeBookKeys: ReadonlySet<string>,
 ): MoneylineQuote | null {
-  const candidates = quotes.filter((q) => q.outcome === outcome && hedgeBookKeys.has(q.bookKey));
+  const candidates = quotes.filter(
+    (q) => q.outcome === outcome && hedgeBookKeys.has(q.bookKey) && !isMarketVenue(q.bookKey),
+  );
   if (candidates.length === 0) return null;
 
   let best = candidates[0];
@@ -81,15 +88,53 @@ function buildOrientation(
 ): BonusBetOpportunity | null {
   const hedgeOutcome = OPPOSITE_OUTCOME[bonusQuote.outcome];
   const hedgeQuote = bestHedgeQuote(market.quotes, hedgeOutcome, opts.hedgeBookKeys);
-  if (!hedgeQuote) return null;
 
-  const result = calculateBonusBetHedge({
-    bonusAmount: opts.bonusAmount,
-    bonusOddsAmerican: bonusQuote.oddsAmerican,
-    hedgeOddsAmerican: hedgeQuote.oddsAmerican,
-  });
+  let chosenQuote: MoneylineQuote | null = null;
+  let chosenResult: BonusBetHedgeResult | null = null;
+  let chosenMarket: MarketFill | null = null;
 
-  if (result.guaranteedProfit.lte(0)) return null;
+  if (hedgeQuote) {
+    chosenQuote = hedgeQuote;
+    chosenResult = calculateBonusBetHedge({
+      bonusAmount: opts.bonusAmount,
+      bonusOddsAmerican: bonusQuote.oddsAmerican,
+      hedgeOddsAmerican: hedgeQuote.oddsAmerican,
+    });
+  }
+
+  // D-02: a market hedge replaces the book hedge only when its after-fee
+  // profit is strictly greater. Among markets: highest profit, then venue key.
+  const marketQuotes = market.quotes
+    .filter(
+      (q) =>
+        q.outcome === hedgeOutcome && opts.hedgeBookKeys.has(q.bookKey) && isMarketVenue(q.bookKey),
+    )
+    .sort((x, y) => (x.bookKey < y.bookKey ? -1 : x.bookKey > y.bookKey ? 1 : 0));
+  let bestMarket: { quote: MoneylineQuote; solved: NonNullable<ReturnType<typeof solveBonusBetMarketHedge>> } | null = null;
+  for (const quote of marketQuotes) {
+    const leg = toMarketLeg(quote);
+    if (!leg) continue;
+    const solved = solveBonusBetMarketHedge({
+      bonusAmount: opts.bonusAmount,
+      bonusOddsAmerican: bonusQuote.oddsAmerican,
+      leg,
+    });
+    if (!solved) continue;
+    if (!bestMarket || solved.guaranteedProfit.gt(bestMarket.solved.guaranteedProfit)) {
+      bestMarket = { quote, solved };
+    }
+  }
+  if (
+    bestMarket &&
+    (chosenResult === null || bestMarket.solved.guaranteedProfit.gt(chosenResult.guaranteedProfit))
+  ) {
+    chosenQuote = bestMarket.quote;
+    chosenResult = bestMarket.solved;
+    chosenMarket = bestMarket.solved.market;
+  }
+
+  if (!chosenQuote || !chosenResult) return null;
+  if (chosenResult.guaranteedProfit.lte(0)) return null;
 
   return {
     eventId: market.eventId,
@@ -99,9 +144,10 @@ function buildOrientation(
     awayTeam: market.awayTeam,
     tieRisk: market.tieRisk,
     bonus: toLeg(bonusQuote),
-    hedge: toLeg(hedgeQuote),
-    sameBook: hedgeQuote.bookKey === bonusQuote.bookKey,
-    result,
+    hedge: toLeg(chosenQuote),
+    sameBook: chosenMarket === null && chosenQuote.bookKey === bonusQuote.bookKey,
+    result: chosenResult,
+    market: chosenMarket,
   };
 }
 

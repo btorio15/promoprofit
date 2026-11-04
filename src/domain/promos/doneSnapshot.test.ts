@@ -261,67 +261,49 @@ describe("Done DTO source state (D-11)", () => {
   });
 });
 
-describe("toDonePromoDTO no-sweat (Phase 9)", () => {
-  const names = new Map<string, string>();
-  const base = {
-    promoId: 101,
-    completedAt: new Date("2026-11-08T23:00:00.000Z"),
-    profitExtracted: "26.38",
-    promoBookKey: "draftkings",
-    promoType: "no_sweat",
-    promoParsed: {},
-  };
+describe("market hedge snapshot (Phase 12)", () => {
+  const leg = { venueKey: "kalshi" as const, venueName: "Kalshi", side: "yes" as const, contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32", americanDisplay: -156, liquidity: { kind: "price_may_move" as const }, settlementNote: "Settles on the official result." };
+  const marketRow = () =>
+    makeRow({
+      hedge: { bookKey: "kalshi", bookName: "Kalshi", selectionLabel: "Home", oddsAmerican: -156 },
+      hedgeMarket: leg,
+      hedgeStake: "26.32",
+      hedgePayout: "42.00",
+      guaranteedProfit: "28.00",
+    });
 
-  it("maps a won settle to kind no_sweat, never v1", () => {
-    const dto = toDonePromoDTO({ ...base, snapshot: JSON.parse(JSON.stringify(buildDoneSnapshotFixture())) }, names);
-    expect(dto.kind).toBe("no_sweat");
-    expect(dto.promoTypeLabel).toBe("No-sweat");
-    expect(dto.profitExtracted).toBe("26.38");
-    expect(dto.noSweat?.outcomeLabel).toBe("Won");
-    expect(dto.noSweat?.profitSource).toBe("computed");
-    expect(dto.bookName).toBe("DraftKings");
-    expect(dto.row).toBeNull();
+  it("parses a pre-phase snapshot without hedgeMarket and one with it", () => {
+    const old = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx).snapshot));
+    expect("hedgeMarket" in old.row).toBe(false);
+    expect(DonePromoSnapshotSchema.safeParse(old).success).toBe(true);
+    const fresh = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx).snapshot));
+    expect(DonePromoSnapshotSchema.safeParse(fresh).success).toBe(true);
+    const nulled = { ...old, row: { ...old.row, hedgeMarket: null } };
+    expect(DonePromoSnapshotSchema.safeParse(nulled).success).toBe(true);
   });
 
-  it.each([
-    ["push", "Push"],
-    ["void", "Voided"],
-  ] as const)("labels %s", (outcome, label) => {
-    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ outcome }) }, names);
-    expect(dto.noSweat?.outcomeLabel).toBe(label);
+  it("rejects a snapshot whose hedgeMarket price is 0 cents", () => {
+    const snap = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx).snapshot));
+    snap.row.hedgeMarket.priceCents = 0;
+    expect(DonePromoSnapshotSchema.safeParse(snap).success).toBe(false);
   });
 
-  it("labels a lost outcome with its refund", () => {
-    const refund = {
-      optionKey: "k",
-      eventId: "e2",
-      refundBookKey: "draftkings",
-      amount: "50.00",
-      bonusSelectionLabel: "X ML",
-      bonusOddsAmerican: 200,
-      hedgeBookKey: "fanduel",
-      hedgeSelectionLabel: "Y ML",
-      hedgeOddsAmerican: -220,
-      hedgeStake: "30.00",
-      profit: "35.00",
-    };
-    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ outcome: "lost", refund }) }, names);
-    expect(dto.noSweat?.outcomeLabel).toBe("Lost, refund converted");
-    expect(dto.noSweat?.refund?.profit).toBe("35.00");
-  });
-
-  it("summarises corrected amounts", () => {
-    const correction = { qualifyingStake: "40.00", qualifyingOddsAmerican: 140, hedgeStake: "35.00", hedgeOddsAmerican: -150 };
-    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ correction, profitSource: "corrected" }) }, names);
-    expect(dto.noSweat?.qualifyingSummary).toContain("$40.00");
-    expect(dto.noSweat?.hedgeSummary).toContain("$35.00");
-  });
-
-  it("falls back to legacy for an invalid v2 snapshot", () => {
-    const bad = { ...buildDoneSnapshotFixture(), outcome: "lost", refund: null };
-    const dto = toDonePromoDTO({ ...base, snapshot: bad }, names);
-    expect(dto.kind).toBe("legacy");
-    expect(dto.note).toBe("Saved details unavailable");
-    expect(buildTrackedSnapshotFixture().stage).toBe("tracked");
+  it("round-trips contracts, price, cost, fee and outlay byte-identical; profit equals guaranteed", () => {
+    const { snapshot, profitExtracted } = buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx);
+    expect(profitExtracted).toBe("28.00");
+    const dto = toDonePromoDTO(
+      {
+        promoId: 5,
+        completedAt: new Date("2026-09-29T16:00:00.000Z"),
+        snapshot: JSON.parse(JSON.stringify(snapshot)),
+        profitExtracted,
+        promoBookKey: "draftkings",
+        promoType: "profit_boost",
+        promoParsed: {},
+      },
+      new Map(),
+    );
+    expect(dto.kind).toBe("hedge");
+    expect(dto.row?.hedgeMarket).toMatchObject({ contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32" });
   });
 });

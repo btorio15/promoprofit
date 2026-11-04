@@ -6,6 +6,8 @@ import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/forma
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
+import { tieRiskTooltipText } from "@/domain/market/legDto";
 import { ResultDetails } from "./ResultDetails";
 
 interface ResultRowProps {
@@ -41,7 +43,10 @@ export function ResultRow({ result }: ResultRowProps) {
         <div className="flex min-w-0 flex-col text-base">
           <span className="text-sm text-muted-foreground md:hidden">Hedge</span>
           <span className="flex flex-wrap items-center gap-2">
-            {result.hedge.team} <span className="num">{formatAmerican(result.hedge.oddsAmerican)}</span>
+            {result.hedge.team}{" "}
+            {result.hedgeMarket ? null : (
+              <span className="num">{formatAmerican(result.hedge.oddsAmerican)}</span>
+            )}
             {result.sameBook ? (
               <Tooltip>
                 <TooltipTrigger
@@ -63,14 +68,15 @@ export function ResultRow({ result }: ResultRowProps) {
                     </Badge>
                   }
                 />
-                <TooltipContent>
-                  Regular-season NFL games can end in a tie (&lt;1% historically). A tie voids
-                  both legs: profit becomes $0, no cash loss.
-                </TooltipContent>
+                <TooltipContent>{tieRiskTooltipText(result.hedgeMarket !== null)}</TooltipContent>
               </Tooltip>
             ) : null}
           </span>
-          <span className="text-sm text-muted-foreground">{result.hedge.bookName}</span>
+          {result.hedgeMarket ? <MarketLegLine leg={result.hedgeMarket} /> : null}
+          <span className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            {result.hedge.bookName}
+            {result.hedgeMarket ? <MarketLegBadges leg={result.hedgeMarket} /> : null}
+          </span>
         </div>
 
         <span className="num text-xl font-semibold text-primary md:text-right">

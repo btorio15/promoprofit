@@ -6,6 +6,7 @@ import { unmarkPairDoneAction } from "@/app/actions/mark-pair-done";
 import type { DonePromoDTO } from "@/domain/promos/dto";
 import type { DonePairLegDTO } from "@/domain/promos/pairSnapshot";
 import { formatAmerican, formatKickoff, formatUsd } from "@/lib/format";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ACTION_FAILED_MESSAGE, safeAction } from "@/lib/safeAction";
@@ -78,7 +79,14 @@ export function DonePairRow({ row, onChanged }: DonePairRowProps) {
           </span>
           <LegLine leg={pair.legA} />
           <LegLine leg={pair.legB} />
-          {pair.legC ? (
+          {pair.legC?.market ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
+              <span>{pair.legC.bookName}</span>
+              <span>{pair.legC.selectionLabel}</span>
+              <MarketLegLine leg={pair.legC.market} />
+              <MarketLegBadges leg={pair.legC.market} />
+            </div>
+          ) : pair.legC ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
               <span>{pair.legC.bookName}</span>
               <Badge variant="outline">Ordinary bet</Badge>
