@@ -4,12 +4,11 @@ import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
 import { loadDailyProfitHistory, loadFunnelPromos, loadScrapeRunTimes } from "@/db/profitHistory";
 import {
-  sportWeekdayStats,
   timeOfDayStats,
   type HourOfDayStat,
   type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
-import { dailyHistoryStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
+import { dailyHistoryStats, gameWeekdayStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
 import { promoFunnel, type PromoFunnelStats } from "@/domain/stats/promoFunnel";
 import { parseStatsRange, rangeStartDate, type StatsRange } from "@/domain/stats/statsRange";
 import { denverDate } from "@/domain/promos/profitTotals";
@@ -66,8 +65,8 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     firstRunAt: first === null ? null : new Date(first).toISOString(),
     lastRunAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows, runTimes),
-    // Always all time, whatever range is selected.
-    sportWeekday: sportWeekdayStats(allRows),
+    // Always all time, whatever range is selected. Same daily history as the By sport table.
+    sportWeekday: gameWeekdayStats(historyRows),
     history: dailyHistoryStats(historyRows, window),
     funnel: promoFunnel(funnelPromos),
   };

@@ -173,7 +173,7 @@ export function StatsScreen({ active }: { active: boolean }) {
 
       <StatsCard
         title="Profit by sport and game day"
-        description="All time. Profit by weekday its game starts (Denver time); strongest day highlighted. Each promo counts once, at its best. A promo covering several days sits on its first day."
+        description="All time. Profit by weekday its game starts (Denver time), from the same daily history as By sport; strongest day highlighted."
       >
         <div className="flex flex-col gap-3">
           {stats.sportWeekday.rows.length === 0 ? (

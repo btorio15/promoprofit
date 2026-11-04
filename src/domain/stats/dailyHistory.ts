@@ -1,4 +1,5 @@
 import Decimal from "decimal.js";
+import { WEEKDAYS, denverWeekday, type SportWeekdayRow, type SportWeekdayStats, type Weekday } from "./profitStats";
 
 /**
  * Totals for the "Since Sep 27" section, built from the older daily
@@ -40,6 +41,8 @@ export interface HistoryRow {
   profit: string;
   bonusAmount: string | null;
   maxStake: string | null;
+  /** Game start (or sport-window start) for the promo; null when neither is known. */
+  gameAt?: Date | null;
 }
 
 export interface DaySegment {
@@ -277,4 +280,46 @@ export function dailyHistoryStats(
     avgPerPromo: rows.length === 0 ? "0.00" : grand.dividedBy(rows.length).toDecimalPlaces(2).toFixed(2),
     avgPerDay: dayCount === 0 ? "0.00" : grand.dividedBy(dayCount).toDecimalPlaces(2).toFixed(2),
   };
+}
+
+/**
+ * Profit by sport and game weekday, from the same daily history as the By
+ * sport table: each daily record counts on the Denver weekday its game
+ * starts. Records with no game time are counted as unscheduled instead of
+ * being guessed onto a weekday. No I/O.
+ */
+export function gameWeekdayStats(rows: HistoryRow[]): SportWeekdayStats {
+  const sports = new Map<string, Record<Weekday, Decimal>>();
+  let unscheduledPromos = 0;
+  for (const row of rows) {
+    if (!row.gameAt) {
+      unscheduledPromos += 1;
+      continue;
+    }
+    const sportKey = row.sportKey ?? UNKNOWN_SPORT;
+    const days =
+      sports.get(sportKey) ?? (Object.fromEntries(WEEKDAYS.map((day) => [day, new Decimal(0)])) as Record<Weekday, Decimal>);
+    const day = denverWeekday(row.gameAt);
+    days[day] = days[day].plus(row.profit);
+    sports.set(sportKey, days);
+  }
+
+  const result: SportWeekdayRow[] = [...sports.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([sportKey, days]) => {
+      let total = new Decimal(0);
+      let bestDay: Weekday | null = null;
+      let bestValue = new Decimal(0);
+      for (const day of WEEKDAYS) {
+        total = total.plus(days[day]);
+        if (days[day].greaterThan(bestValue)) {
+          bestValue = days[day];
+          bestDay = day;
+        }
+      }
+      const byDay = Object.fromEntries(WEEKDAYS.map((day) => [day, days[day].toFixed(2)])) as Record<Weekday, string>;
+      return { sportKey, byDay, total: total.toFixed(2), bestDay };
+    });
+
+  return { rows: result, unscheduledPromos };
 }
