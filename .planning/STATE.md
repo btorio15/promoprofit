@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
-status: executing
-stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-11-03T06:27:08.075Z"
-last_activity: 2026-11-03 -- Phase 12 execution started
+status: planning
+stopped_at: Phase 10 UI-SPEC approved
+last_updated: "2026-11-04T00:18:48.326Z"
+last_activity: 2026-11-03 -- Phase 9 complete
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 39
-  completed_plans: 3
-  percent: 8
+  completed_plans: 25
+  percent: 64
 ---
 
 # Project State
@@ -21,14 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 12 — add-kalshi-and-polymarket-as-hedge-venues
+**Current focus:** Phase 10 — Ranked Intro Offers (owner); Phase 12 — Kalshi and Polymarket as hedge venues (teammate, in parallel)
 
 ## Current Position
 
-Phase: 12 (add-kalshi-and-polymarket-as-hedge-venues) — EXECUTING
-Plan: 1 of 16
-Status: Executing Phase 12
-Last activity: 2026-11-03 -- Phase 12 execution started
+Phase: 10 (Ranked Intro Offers) — READY TO PLAN (context + UI-SPEC approved)
+Plan: Not started
+Status: Ready to plan Phase 10
+Last activity: 2026-11-03 -- Phase 10 UI-SPEC approved; merged teammate's Phase 12 wave 1 + DeepBook restyle from origin/main
+
+Parallel: Phase 12 (add-kalshi-and-polymarket-as-hedge-venues) — EXECUTING by teammate, 2 of 16 plans done (12-01, 12-02)
 
 ## Performance Metrics
 
@@ -214,6 +216,7 @@ Recent decisions affecting current work:
 | 261022-i3j | Three standard scrape + odds runs a day: Vercel 14:00/19:00 UTC, GitHub 00:00 UTC (7 AM, 12 PM, 5 PM MST) | 2026-10-22 | 1c66c75 | Verified | [261022-i3j-standardize-three-daily-scrape-and-odds-](./quick/261022-i3j-standardize-three-daily-scrape-and-odds-/) |
 | 261103-lx2 | No-sweat row redesign from sketch 001: win/lose waterfall bars replace the text panel; all notices in one (i) popover with an amber dot for Low-profile warnings; one Track button | 2026-11-03 | 135df33 | Needs Review (owner visual check) | [261103-lx2-no-sweat-row-waterfall-diagram-and-singl](./quick/261103-lx2-no-sweat-row-waterfall-diagram-and-singl/) |
 | 261103-mok | Record bonus-bet conversion history: new bonus_conversion_snapshots table (migration 0019, applied with owner OK), each book's top-1 and median-of-top-5 conversion at a $100 reference recorded on every scheduled odds run, 0 credits; Phase 10 to switch valuation to it | 2026-11-03 | 1ca3317 | Verified (first live rows recorded) | [261103-mok-record-bonus-bet-conversion-rate-history](./quick/261103-mok-record-bonus-bet-conversion-rate-history/) |
+| fast | No-sweat flow bars recolored to the DeepBook blue theme: own --flow-in (#1e6ef3 / dark #5d96ff) and --flow-out (#d94841 / dark #ef4444) tokens, never the green --primary | 2026-11-03 | 0271ee4 | Needs Review (owner visual check) | - |
 
 ## Deferred Items
 
@@ -241,9 +244,10 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 
 ## Session Continuity
 
-Last session: 2026-10-29T21:36:46.093Z
-Stopped at: Phase 12 UI-SPEC approved
-Resume file: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-UI-SPEC.md
+Last session: 2026-11-04T00:18:48.312Z
+Stopped at: Phase 10 UI-SPEC approved
+Resume file: .planning/phases/10-ranked-intro-offers/10-UI-SPEC.md
+Parallel work: teammate (Joel) is executing Phase 12 (Kalshi and Polymarket as hedge venues) on main; last recorded 2026-11-03, wave 1 done (12-01, 12-02). Resume file for that work: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-UI-SPEC.md
 
 ## Operator Next Steps
 
