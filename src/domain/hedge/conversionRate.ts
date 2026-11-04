@@ -56,9 +56,11 @@ export function rankRefundOpportunities(args: {
   refundBookKey: string;
   amount: Decimal;
   hedgeBookKeys: ReadonlySet<string>;
-}): ConversionRate | null {
-  const { events, now, refundBookKey, amount } = args;
-  // Phase 12 D-01: market hedges for no-sweat are deferred until Phase 9 lands (ROADMAP follow-up)
+  limit: number;
+}): BonusBetOpportunity[] {
+  const { events, now, refundBookKey, amount, limit } = args;
+  assertAmount(amount);
+  // Phase 12 D-01: no-sweat refunds stay sportsbook-only (market hedges deferred, see ROADMAP).
   const hedgeBookKeys = new Set([...args.hedgeBookKeys].filter((k) => !isMarketVenue(k)));
   const allowed = new Set([...hedgeBookKeys, refundBookKey]);
   const markets = extractTwoWayMoneylines(events, {

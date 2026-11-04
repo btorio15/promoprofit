@@ -293,9 +293,14 @@ function evaluateCandidate(
 
   const evaluate = (hedge: SelectionQuote, leg: MarketLeg | null): EvaluatedCandidate | null => {
     const sameBook = leg === null && hedge.bookKey === promo.bookKey;
-    return promo.promoType === "profit_boost"
-      ? evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive)
-      : evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive);
+    switch (promo.promoType) {
+      case "profit_boost":
+        return evaluateBoostCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive);
+      case "bonus_bet":
+        return evaluateBonusCandidate(promo, selection, promoBookQuote, hedge, leg, sameBook, opts, allowNonPositive);
+      default:
+        return assertNever(promo.promoType);
+    }
   };
 
   const bookHedge = bestHedgeQuote(selection.oppositeSideQuotes, opts.hedgeBookKeys);

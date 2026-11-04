@@ -6,6 +6,7 @@ import { SettingsBooksForm } from "@/components/settings/SettingsBooksForm";
 import { SettingsBookCapsForm } from "@/components/settings/SettingsBookCapsForm";
 import { SettingsLowProfileForm } from "@/components/settings/SettingsLowProfileForm";
 import { getMemberBookCaps } from "@/db/bookCaps";
+import { getMemberLowProfile } from "@/db/lowProfile";
 import { getMyBookOptions, getUsableUserBooks, getUserMyBookKeys } from "@/db/queries";
 import { DEFAULT_MAX_STAKE } from "@/domain/promos/yourCap";
 import { formatUsd } from "@/lib/format";
@@ -32,7 +33,7 @@ export default async function SettingsPage() {
   // that are still hedge venues), so a stale key never seeds a missing
   // checkbox. usableSaved stays sportsbook-only and feeds the caps form,
   // which never lists a market venue.
-  const [books, initialKeys, usableSaved, bookCaps] = await Promise.all([
+  const [books, initialKeys, usableSaved, bookCaps, lowProfile] = await Promise.all([
     getMyBookOptions(),
     getUserMyBookKeys(user.userId),
     getUsableUserBooks(user.userId),
