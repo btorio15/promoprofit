@@ -103,6 +103,8 @@ export async function prepareAddedPromoValues(args: {
     scope = scopeResult.scope;
 
     // T-5-09: a boost's market/side pin is re-resolved against the cached odds.
+    // Bonus bets and no-sweats carry no pin (a no-sweat's market limit is a
+    // plain eligible-market list built in buildAddedPromoRow).
     if (data.promoType === "profit_boost" && data.scope.kind === "event" && data.scope.pinned && scopeResult.event) {
       const { marketType, line, side } = data.scope.pinned;
       const sel: PromoSelection = { eventId: scopeResult.event.id, marketType, line, side };

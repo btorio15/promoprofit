@@ -11,7 +11,7 @@ import { draftkingsScraper } from "./books/draftkings";
 import { ballybetScraper } from "./books/ballybet";
 import { fanduelScraper } from "./books/fanduel";
 import { promoDedupeKey } from "@/domain/promos/dedupe";
-import { ScrapedPromoFieldsSchema } from "@/domain/promos/scraped";
+import { NO_SWEAT_CASH_MARKER, ScrapedPromoFieldsSchema } from "@/domain/promos/scraped";
 import { sportFromTags, sportFromText } from "./sportHints";
 import { SKIP_REASONS, type SkippedEntry } from "@/domain/promos/scraped";
 
@@ -26,9 +26,9 @@ describe("CLEAR_SKIP_REASONS / REVIEW_SKIP_REASONS", () => {
     const clear = [...CLEAR_SKIP_REASONS].sort();
     const review = [...REVIEW_SKIP_REASONS].sort();
     expect(clear).toEqual(
-      ["new_customer", "deposit", "no_sweat", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
+      ["new_customer", "deposit", "parlay", "sgp", "futures", "outright", "prop", "live_only", "not_half_point"].sort(),
     );
-    expect(review).toEqual(["unrecognized", "unsupported_sport", "schema_invalid"].sort());
+    expect(review).toEqual(["unrecognized", "unsupported_sport", "schema_invalid", "no_sweat_cash"].sort());
 
     const all = new Set([...clear, ...review, "not_a_promo"]);
     expect([...all].sort()).toEqual([...SKIP_REASONS].sort());
@@ -45,13 +45,14 @@ function skip(reason: (typeof SKIP_REASONS)[number], overrides: Partial<SkippedE
 }
 
 describe("isReviewWorthySkip — real fixtures", () => {
-  it("ballybet-promos.json -> exactly {sbk-25-WNBA-Profit-Boost}", () => {
+  it("ballybet-promos.json -> exactly {sbk-25-WNBA-Profit-Boost, sbk-second-chance-bet-01}", () => {
     const result = ballybetScraper.parse(
       { listBody: readFixture("ballybet-promos.json"), detailBodies: {} },
       { now: new Date("2026-09-27T12:00:00Z"), sourceUrl: "https://example.test/ignored" },
     );
     const reviewWorthyIds = result.skipped.filter(isReviewWorthySkip).map((s) => s.externalId).sort();
-    expect(reviewWorthyIds).toEqual(["sbk-25-WNBA-Profit-Boost"]);
+    // Phase 9 (A-07): the existing-customer "Second Chance Bet" no-sweat is now review-worthy (reader can rescue it).
+    expect(reviewWorthyIds).toEqual(["sbk-25-WNBA-Profit-Boost", "sbk-second-chance-bet-01"]);
   });
 
   it("fanduel-promos.json -> exactly {LOSOCCERPB0925}", () => {
@@ -94,7 +95,7 @@ describe("isReviewWorthySkip — real fixtures", () => {
     const detailTerms = readFixture("ballybet-promo-detail-profit-boost-terms.json");
     const detailText: string = JSON.parse(detailTerms).sections.primaryContent[0].description;
 
-    for (const slug of ["sbk-profit-boost-01", "sbk-odds-boost-01", "sbk-second-chance-bet-01"]) {
+    for (const slug of ["sbk-profit-boost-01", "sbk-odds-boost-01"]) {
       const result = ballybetScraper.parse({ listBody, detailBodies: {} }, { now: new Date("2026-09-27T12:00:00Z"), sourceUrl: "x" });
       const found = result.skipped.find((s) => s.externalId === slug);
       if (!found) continue; // slug may not exist in this fixture under this id; covered by synthetic case below instead
@@ -328,5 +329,90 @@ describe("NHL sport resolution (quick-260928-it1)", () => {
     );
     expect(result.candidates).toEqual([]);
     expect(result.skipped[0]?.reason).toBe("futures");
+  });
+});
+
+describe("no_sweat in review triage (Phase 9)", () => {
+  it("a no_sweat_cash skip is review-worthy", () => {
+    expect(isReviewWorthySkip(skip("no_sweat_cash"))).toBe(true);
+  });
+
+  it("buildClassifyDraft keeps a partial no_sweat and its refund cap", () => {
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("no_sweat_cash", {
+        evidence: {
+          rawText: "Get a $10 refund",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: { promoType: "no_sweat", bonusAmount: "10.00" },
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("10.00");
+    expect(draft.boostPercent).toBeNull();
+  });
+
+  // WR-02: a reader-less no-sweat skip drafts as no_sweat, never as a guaranteed bonus_bet.
+  it("a no_sweat_cash skip with no reader drafts as no_sweat with the refund cap and the cash marker", () => {
+    const draft = buildClassifyDraft(
+      "ballybet",
+      skip("no_sweat_cash", {
+        title: "Second Chance Bet",
+        evidence: {
+          rawText: "If your bet loses, get your stake back in cash up to $25. Not valid with a $25 bonus bet.",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: null,
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("25.00");
+    expect(draft.boostPercent).toBeNull();
+    expect(draft.rawText.startsWith(`${NO_SWEAT_CASH_MARKER}\n`)).toBe(true);
+  });
+
+  it("an unrecognized bonus-bet-refund no-sweat with no reader drafts as no_sweat, not bonus_bet", () => {
+    const draft = buildClassifyDraft(
+      "fanduel",
+      skip("unrecognized", {
+        title: "NFL No Sweat",
+        evidence: {
+          rawText: "Bet up to $500 on any NFL game. If your bet loses, get a $25 bonus bet.",
+          sourceUrl: "https://x.test",
+          expiresAt: null,
+          partial: null,
+        },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).toBe("no_sweat");
+    expect(draft.bonusAmount).toBe("25.00");
+    expect(draft.rawText).not.toContain(NO_SWEAT_CASH_MARKER);
+  });
+
+  it("does not add the cash marker when the reader summary line already flags no_sweat_cash", () => {
+    const rawText = "[Promo reader check: no_sweat_cash] parser: x\nIf your bet loses, get your stake back in cash.";
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("no_sweat_cash", { title: "No Sweat", evidence: { rawText, sourceUrl: "x", expiresAt: null, partial: null } }),
+      "x",
+    );
+    expect(draft.rawText).toBe(rawText);
+  });
+
+  it("does not infer no_sweat from a passing 'no sweat' mention without refund wording", () => {
+    const draft = buildClassifyDraft(
+      "draftkings",
+      skip("unrecognized", {
+        evidence: { rawText: "No Sweat first bet up to $10 in bonus bets", sourceUrl: "https://x.test", expiresAt: null, partial: null },
+      }),
+      "https://fallback.test",
+    );
+    expect(draft.promoType).not.toBe("no_sweat");
   });
 });

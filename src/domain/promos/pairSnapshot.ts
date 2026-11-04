@@ -4,7 +4,7 @@ import Decimal from "decimal.js";
 // this module, so a runtime import back would be a cycle.
 import type { DonePromoTerms } from "./doneSnapshot";
 import type { PairRowDTO } from "./pairRowDto";
-import { PROMO_TYPES } from "./types";
+import { GUARANTEED_PROMO_TYPES } from "./types";
 
 /**
  * Phase 4 Plan 07: the frozen "mark pair done" snapshot. Pure module (no
@@ -75,7 +75,7 @@ export const _pairRowShapeGuard = (r: PairRowSnapshot): PairRowDTO => r;
 const PairTermsSchema = z.object({
   id: z.number(),
   bookKey: z.string(),
-  promoType: z.enum(PROMO_TYPES),
+  promoType: z.enum(GUARANTEED_PROMO_TYPES),
   title: z.string(),
   boostPercent: z.string().nullable(),
   boostedOddsAmerican: z.number().nullable(),

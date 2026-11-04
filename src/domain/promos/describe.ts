@@ -49,6 +49,10 @@ export function describePromo(parsed: ScrapedPromo): string {
     return `${percent} profit boost · ${parsed.scopeText}`;
   }
 
+  if (parsed.promoType === "no_sweat") {
+    return `No-sweat up to ${formatUsd(parsed.bonusAmount ?? "0.00")} · ${parsed.scopeText}`;
+  }
+
   return `${formatUsd(parsed.bonusAmount ?? "0.00")} bonus bet · ${parsed.scopeText}`;
 }
 

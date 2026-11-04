@@ -1,9 +1,12 @@
 import { z } from "zod";
 import Decimal from "decimal.js";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
-import { PROMO_TYPES, type PromoType } from "./types";
+import { GUARANTEED_PROMO_TYPES, PROMO_TYPES as PROMO_TYPES_LIST, type GuaranteedPromoType, type PromoType } from "./types";
+import { promoTypeLabel, type PromoTypeLabel } from "./promoTypeLabel";
 import { promoTitle } from "./promoRowDto";
 import { DonePairSnapshotSchema, isPairMemberSnapshot, toDonePairDTO, type DonePairDTO } from "./pairSnapshot";
+import { NoSweatDoneSnapshotSchema, type NoSweatDoneSnapshot, type RefundConversion } from "./noSweatSnapshot";
+import { formatAmerican, formatUsd } from "@/lib/format";
 
 export type { DonePairDTO } from "./pairSnapshot";
 
@@ -19,7 +22,7 @@ export type { DonePairDTO } from "./pairSnapshot";
 const SnapshotRowSchema = z.object({
   rowKey: z.string(),
   promoId: z.number(),
-  promoType: z.enum(PROMO_TYPES),
+  promoType: z.enum(GUARANTEED_PROMO_TYPES),
   promoTypeLabel: z.enum(["Boost", "Bonus bet"]),
   sportLabel: z.string(),
   commenceTime: z.string(),
@@ -77,7 +80,7 @@ export const DonePromoSnapshotSchema = z.object({
     id: z.number(),
     bookKey: z.string(),
     bookName: z.string(),
-    promoType: z.enum(PROMO_TYPES),
+    promoType: z.enum(GUARANTEED_PROMO_TYPES),
     promoTypeLabel: z.enum(["Boost", "Bonus bet"]),
     title: z.string(),
     scopeLabel: z.string(),
@@ -99,7 +102,7 @@ export type DonePromoSnapshot = z.infer<typeof DonePromoSnapshotSchema>;
 export interface DonePromoTerms {
   id: number;
   bookKey: string;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   title: string;
   boostPercent: string | null;
   boostedOddsAmerican: number | null;
@@ -185,15 +188,49 @@ export function buildDoneSnapshot(
   };
 }
 
+export interface DoneNoSweatDTO {
+  outcome: NoSweatDoneSnapshot["outcome"];
+  outcomeLabel: "Won" | "Lost, refund converted" | "Push" | "Voided";
+  qualifyingSummary: string;
+  hedgeSummary: string;
+  refund: RefundConversion | null;
+  profitSource: NoSweatDoneSnapshot["profitSource"];
+}
+
+const OUTCOME_LABELS: Record<NoSweatDoneSnapshot["outcome"], DoneNoSweatDTO["outcomeLabel"]> = {
+  won: "Won",
+  lost: "Lost, refund converted",
+  push: "Push",
+  void: "Voided",
+};
+
+function toDoneNoSweatDTO(snap: NoSweatDoneSnapshot): DoneNoSweatDTO {
+  const t = snap.tracked;
+  const q = snap.correction
+    ? { stake: snap.correction.qualifyingStake, odds: snap.correction.qualifyingOddsAmerican }
+    : { stake: t.qualifying.stake, odds: t.qualifying.oddsAmerican };
+  const h = snap.correction
+    ? { stake: snap.correction.hedgeStake, odds: snap.correction.hedgeOddsAmerican }
+    : { stake: t.hedge.stake, odds: t.hedge.oddsAmerican };
+  return {
+    outcome: snap.outcome,
+    outcomeLabel: OUTCOME_LABELS[snap.outcome],
+    qualifyingSummary: `${formatUsd(q.stake)} on ${t.game.qualifyingSelectionLabel} at ${formatAmerican(q.odds)} (${t.qualifying.bookName})`,
+    hedgeSummary: `${formatUsd(h.stake)} on ${t.game.hedgeSelectionLabel} at ${formatAmerican(h.odds)} (${t.hedge.bookName})`,
+    refund: snap.refund,
+    profitSource: snap.profitSource,
+  };
+}
+
 /** One Done-tab row, built only from the saved snapshot (never live odds). */
 export interface DonePromoDTO {
   rowKey: string;
   promoId: number;
   /** ISO timestamp of when the member marked it done. */
   completedAt: string;
-  kind: "hedge" | "no_hedge" | "legacy" | "pair";
+  kind: "hedge" | "no_hedge" | "legacy" | "pair" | "no_sweat";
   bookName: string;
-  promoTypeLabel: "Boost" | "Bonus bet";
+  promoTypeLabel: PromoTypeLabel;
   title: string;
   scopeLabel: string | null;
   profitExtracted: string;
@@ -202,6 +239,8 @@ export interface DonePromoDTO {
   recordedPrecision: "whole" | "cents" | null;
   /** Set only for kind "pair" (both legs, stakes and the paired profit). */
   pair: DonePairDTO | null;
+  /** Set only for kind "no_sweat" (Phase 9): how it settled, from the Track snapshot. */
+  noSweat: DoneNoSweatDTO | null;
   /** True when the member added the source promo (any source state). */
   addedByYou: boolean;
   /** Source promo state for added promos: "gone" = deleted; null = scraped promo. */
@@ -233,19 +272,27 @@ function addedState(c: DoneCompletionInput): Pick<DonePromoDTO, "addedByYou" | "
   return { addedByYou: true, addedPromoStatus: status };
 }
 
+function legacyTypeLabel(t: string): PromoTypeLabel {
+  return (PROMO_TYPES_LIST as readonly string[]).includes(t) ? promoTypeLabel(t as PromoType) : "Bonus bet";
+}
+
 function legacyTitle(c: DoneCompletionInput): string {
   const parsed = c.promoParsed;
   if (parsed && typeof parsed === "object" && "title" in parsed) {
     const title = (parsed as { title: unknown }).title;
     if (typeof title === "string" && title.trim() !== "") return title;
   }
+  // A no-sweat (or unknown) type must never be titled as a bonus bet (FEED-02).
+  const guaranteedType: GuaranteedPromoType | null =
+    c.promoType === "profit_boost" ? "profit_boost" : c.promoType === "bonus_bet" ? "bonus_bet" : null;
   if (
-    c.promoBoostPercent !== undefined ||
-    c.promoBonusAmount !== undefined ||
-    c.promoBoostedOddsAmerican !== undefined
+    guaranteedType !== null &&
+    (c.promoBoostPercent !== undefined ||
+      c.promoBonusAmount !== undefined ||
+      c.promoBoostedOddsAmerican !== undefined)
   ) {
     return promoTitle({
-      promoType: c.promoType === "profit_boost" ? "profit_boost" : "bonus_bet",
+      promoType: guaranteedType,
       boostPercent: c.promoBoostPercent ?? null,
       boostedOddsAmerican: c.promoBoostedOddsAmerican ?? null,
       bonusAmount: c.promoBonusAmount ?? null,
@@ -265,7 +312,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     ...base,
     kind: "legacy",
     bookName: bookNames.get(c.promoBookKey) ?? c.promoBookKey,
-    promoTypeLabel: c.promoType === "profit_boost" ? "Boost" : "Bonus bet",
+    promoTypeLabel: legacyTypeLabel(c.promoType),
     title: legacyTitle(c),
     scopeLabel: null,
     profitExtracted,
@@ -273,6 +320,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     note,
     recordedPrecision: null,
     pair: null,
+    noSweat: null,
   });
 
   if (c.snapshot === null || c.snapshot === undefined) {
@@ -294,6 +342,27 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
       note: null,
       recordedPrecision: pairParsed.data.precision,
       pair,
+      noSweat: null,
+    };
+  }
+
+  // Phase 9: a settled no-sweat (v2). Tried before the v1 parse so it never reads as v1.
+  const noSweatParsed = NoSweatDoneSnapshotSchema.safeParse(c.snapshot);
+  if (noSweatParsed.success) {
+    const snap = noSweatParsed.data;
+    return {
+      ...base,
+      kind: "no_sweat",
+      bookName: snap.tracked.promo.bookName,
+      promoTypeLabel: "No-sweat",
+      title: snap.tracked.promo.title,
+      scopeLabel: snap.tracked.promo.scopeLabel,
+      profitExtracted: c.profitExtracted,
+      row: null,
+      note: null,
+      recordedPrecision: snap.tracked.precision,
+      pair: null,
+      noSweat: toDoneNoSweatDTO(snap),
     };
   }
 
@@ -315,6 +384,7 @@ export function toDonePromoDTO(c: DoneCompletionInput, bookNames: ReadonlyMap<st
     note: snap.note,
     recordedPrecision: snap.precision,
     pair: null,
+    noSweat: null,
   };
 }
 

@@ -3,6 +3,13 @@ import type { PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
 import type { DashboardTotalsDTO } from "@/domain/promos/dashboardTotals";
 import type { ProfitSeriesDTO } from "@/domain/promos/profitSeries";
+import type { NoSweatRowDTO, NoSweatNoteRowDTO } from "@/domain/promos/noSweatRowDto";
+import type { TrackedNoSweatCardDTO } from "@/domain/promos/trackedCardDto";
+
+/** Narrow a promos-source row to a no-sweat estimate row. */
+export function isNoSweatRow(d: PromoRowDTO | NoSweatRowDTO): d is NoSweatRowDTO {
+  return "kind" in d && d.kind === "no_sweat";
+}
 
 /** D-13: the Opportunities sort switch. */
 export type SortKey = "profit" | "roi";
@@ -14,8 +21,10 @@ export interface RankKey {
   profit: string;
   /** ROI or Conversion percent, 2dp string. */
   pct: string;
-  pctLabel: "ROI" | "Conversion";
+  pctLabel: "ROI" | "Conversion" | "Est. ROI";
   commenceTime: string;
+  /** Phase 9 (A-10): true for no-sweat estimates; absent for guaranteed rows. */
+  estimated?: boolean;
 }
 
 export type OpportunityItem<T> = RankKey & { data: T };
@@ -24,7 +33,7 @@ export type SourceId = "promos" | "pairs" | "arbs";
 
 /** D-02: one member per source. */
 export type OpportunitySourceDTO =
-  | { id: "promos"; items: OpportunityItem<PromoRowDTO>[] }
+  | { id: "promos"; items: OpportunityItem<PromoRowDTO | NoSweatRowDTO>[] }
   | { id: "pairs"; items: OpportunityItem<PairRowDTO>[] }
   | { id: "arbs"; items: OpportunityItem<ArbResultDTO>[] };
 
@@ -45,6 +54,10 @@ export type OpportunitiesResponse =
       /** Phase 6 STATS-01: the member's own all-time daily gains; the client slices per range, no refetch. */
       profitSeries: ProfitSeriesDTO;
       sources: OpportunitySourceDTO[];
+      /** Phase 9 (D-01..D-07): the member's tracked no-sweats, outside the ranked feed. */
+      tracking: TrackedNoSweatCardDTO[];
+      /** Phase 9 (D-10, D-11): can't-price / not-worth-it / Low-profile-blocked no-sweats, unsliced. */
+      noSweatNotes: NoSweatNoteRowDTO[];
     };
 
 export const SOURCE_ORDER: SourceId[] = ["promos", "pairs", "arbs"];

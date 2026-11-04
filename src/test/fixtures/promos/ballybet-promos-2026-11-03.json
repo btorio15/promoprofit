@@ -1,0 +1,466 @@
+{
+  "theme": {},
+  "path": null,
+  "sections": {
+    "key": "promotions",
+    "path": null,
+    "topContent": [],
+    "leftNavigationContent": [],
+    "primaryContent": [
+      {
+        "sys": {
+          "id": "2vMndvoEmUK7IhJvyCvDld"
+        },
+        "componentType": "promotions",
+        "rewards": [],
+        "data": [
+          {
+            "sys": {
+              "id": "1CE8UkEHBirLIbmWelvfY7"
+            },
+            "type": "braze_promotion_content_card",
+            "promotionFilter": "medium_priority"
+          },
+          {
+            "sys": {
+              "id": "2rxoar1Vo4TPhIpkxkwkNj"
+            },
+            "type": "promotion_content_card",
+            "title": "NFL Weekly Pick 'Em - Over $1,000,000 in Bonus Bets! ",
+            "description": "Test your football knowledge and compete for up to $50,000 every week!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new - 2026-09-04T125007.905",
+              "src": "https://assets.ballys.com/asset/fa57f052-747b-48e4-9c47-c3a14f5d15d0/1344x372-PromoTab-new-2026-09-04T125007-905.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/fa57f052-747b-48e4-9c47-c3a14f5d15d0/1344x372-PromoTab-new-2026-09-04T125007-905",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 357789,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-NFL-Weekly-Pick-Em"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "5GMp0XUaL2cOyJTuy3uHWQ"
+            },
+            "type": "promotion_content_card",
+            "title": "Fastest Touchdown Frenzy",
+            "description": "Run to the Endzone and score a touchdown by taking part in the Fastest Touchdown Frenzy!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new - 2026-09-07T221507.317",
+              "src": "https://assets.ballys.com/asset/68c73037-b336-48c4-8034-42f9fcee25a6/1344x372-PromoTab-new-2026-09-07T221507-317.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/68c73037-b336-48c4-8034-42f9fcee25a6/1344x372-PromoTab-new-2026-09-07T221507-317",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 426010,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-Fastest-Touchdown-Frenzy-2026"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "25ipVP1pojdUCqTqbYLfUl"
+            },
+            "type": "promotion_content_card",
+            "title": "NBA Weekly Pick'Em",
+            "description": "Pick five NBA winners every Wednesday for a share of up to $40,000 in bonus bets!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (10)",
+              "src": "https://assets.ballys.com/asset/1c1277c8-5949-4404-99a6-3fcd48704130/1344x372-PromoTab-new-10.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/1c1277c8-5949-4404-99a6-3fcd48704130/1344x372-PromoTab-new-10",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 307698,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-NBA-Weekly-Pickem"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "5QHGO3kl6ma1tEQFbZArMu"
+            },
+            "type": "promotion_content_card",
+            "title": "25% JAX Jaguars vs. BAL Ravens SGP Profit Boost",
+            "description": "Make your play with a 25% SGP Profit Boost!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (6)",
+              "src": "https://assets.ballys.com/asset/8ed2cc8c-5c25-46a8-a45e-30638f66536f/1344x372-PromoTab-new-6.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/8ed2cc8c-5c25-46a8-a45e-30638f66536f/1344x372-PromoTab-new-6",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 421659,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-25-Jaguars-Ravens-SGP-Profit-Boost"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "6TH3YNI56zdRuMnz1AoFiG"
+            },
+            "type": "promotion_content_card",
+            "title": "Champions League 3x 20% Parlay Profit Boosts",
+            "description": "Shoot and score with these Champion's League Profit Boosts!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (4)",
+              "src": "https://assets.ballys.com/asset/3769363b-f725-44e7-97fe-5249b36ea178/1344x372-PromoTab-new-4.jpg",
+              "transformBaseUrl": "https://assets.ballys.com/transform/3769363b-f725-44e7-97fe-5249b36ea178/1344x372-PromoTab-new-4",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 159843,
+              "type": "image",
+              "extension": "jpg"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-Champions-League-3x-Parlay"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "mO3VcRuUly5BAue9LaDTW"
+            },
+            "type": "promotion_content_card",
+            "title": "20% College Basketball Parlay Profit Boost",
+            "description": "Build your college hoops parlay with a 20% Profit Boost!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (57)",
+              "src": "https://assets.ballys.com/asset/27eee066-7457-4b44-9703-74fd915e2d7a/1344x372-PromoTab-new-57.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/27eee066-7457-4b44-9703-74fd915e2d7a/1344x372-PromoTab-new-57",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 347245,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-20-College-Basketball-Parlay-Profit-Boost"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "6A021RMr0XCb4LPv79wY28"
+            },
+            "type": "promotion_content_card",
+            "title": "50% NHL Parlay Profit Boost",
+            "description": "Crash the boards with a 50% Profit Boost!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (50)",
+              "src": "https://assets.ballys.com/asset/c8a71a6d-d550-4f6e-a019-ca9c45316f34/1344x372-PromoTab-new-50.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/c8a71a6d-d550-4f6e-a019-ca9c45316f34/1344x372-PromoTab-new-50",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 336949,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-50-NHL-Parlay-Profit-Boost"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "wHQsyjKYEMxDuc3AK9GEF"
+            },
+            "type": "promotion_content_card",
+            "title": "50% 2026-2027 College Basketball Champion Profit Boost",
+            "description": "Become the campus champ with a 50% Profit Boost!",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new (55)",
+              "src": "https://assets.ballys.com/asset/6b90938d-2c78-466b-918e-97ec71711264/1344x372-PromoTab-new-55.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/6b90938d-2c78-466b-918e-97ec71711264/1344x372-PromoTab-new-55",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 347033,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-50-NCAAB-Championship-Profit-Boost"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "46NVwCGvN8pL0OL65eObaC"
+            },
+            "type": "promotion_content_card",
+            "title": "Fan View",
+            "description": "Same bets, same payouts — just easier to read. ",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372-PromoTab-new-3X (2)",
+              "src": "https://assets.ballys.com/asset/73708f4c-2352-4892-bee5-e5a38f43fbed/1344x372-PromoTab-new-3X-2.jpg",
+              "transformBaseUrl": "https://assets.ballys.com/transform/73708f4c-2352-4892-bee5-e5a38f43fbed/1344x372-PromoTab-new-3X-2",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 286470,
+              "type": "image",
+              "extension": "jpg"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-Bally-Bet-Fan-View"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "3E1o4DPD5lPaxUVhUUDUuE"
+            },
+            "type": "promotion_content_card",
+            "title": "🌟 Unlock the Ultimate VIP Experience 🌟",
+            "description": "Step into a world of luxury and exclusivity. As a VIP, you’re not just a very important player...",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "1344x372 onsite_PromoTab-New-1344-3X (1)",
+              "src": "https://assets.ballys.com/m/1f530c0d28ad6c5c/webimage-1344x372-onsite_PromoTab-New-1344-3X-1.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/d680e0b3-c0d1-4946-a851-2c9329e6f9a5/1344x372-onsite_PromoTab-New-1344-3X-1",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 177193,
+              "type": "image",
+              "extension": "jpg"
+            },
+            "link": {
+              "title": "See Details",
+              "url": "/promotions/sbk-welcome-to-vip"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedOut",
+              "showWhenLoggedIn"
+            ]
+          },
+          {
+            "sys": {
+              "id": "16xV9NdzHAXv8C9207vJRv"
+            },
+            "type": "promotion_content_card",
+            "title": "Parlay Zone",
+            "description": "Build parlays the easy way—your zone, your picks.",
+            "isTermsBlurred": false,
+            "image": "https://cdn.braze.eu/appboy/communication/assets/image_assets/images/67e33de0a3017400655e8aea/original.png?1742945760",
+            "link": {
+              "title": "See Details",
+              "url": "/promotions/sbk-parlay-zone"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "UA6rAP2IQxPpPS8o9LWGM"
+            },
+            "type": "promotion_content_card",
+            "title": "Bally's Profit Boost",
+            "description": "Boost your profits and take your game to the next level! Increase your winnings up to 100%",
+            "isTermsBlurred": false,
+            "image": "https://cdn.braze.eu/appboy/communication/assets/image_assets/images/67f5341fdead160073bab3f1/original.png?1744122910",
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-profit-boost-01"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedOut",
+              "showWhenLoggedIn"
+            ]
+          },
+          {
+            "sys": {
+              "id": "3bYnOgwRhUwRxaPxuADzHA"
+            },
+            "type": "promotion_content_card",
+            "title": "Bally's Odds Boost",
+            "description": "Enhance your betting experience with improved odds on select wagers. Bigger wins await!",
+            "isTermsBlurred": false,
+            "image": "https://cdn.braze.eu/appboy/communication/assets/image_assets/images/67f5344b6196e10084ad7214/original.png?1744122955",
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-odds-boost-01"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "5BiNhHU6u6lct2z3pfCjiZ"
+            },
+            "type": "promotion_content_card",
+            "title": "Second Chance Bet",
+            "description": "Available on Select Days. Check Your Rewards Tab!",
+            "isTermsBlurred": false,
+            "image": "https://cdn.braze.eu/appboy/communication/assets/image_assets/images/686beaea8705df2f50aca9de/original.png?1751902953",
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-second-chance-bet-01"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "74Epc5q9Eceg2F16I8IFUS"
+            },
+            "type": "promotion_content_card",
+            "title": "Bally's Bet & Get",
+            "description": "Place your bet and score a reward.",
+            "isTermsBlurred": false,
+            "bynderImage": {
+              "name": "betget1344",
+              "src": "https://assets.ballys.com/asset/6cad9d4a-6374-41e1-bfd9-6f1acc781e8e/betget1344.png",
+              "transformBaseUrl": "https://assets.ballys.com/transform/6cad9d4a-6374-41e1-bfd9-6f1acc781e8e/betget1344",
+              "height": 372,
+              "width": 1344,
+              "fileSize": 176543,
+              "type": "image",
+              "extension": "png"
+            },
+            "link": {
+              "title": "SEE DETAILS",
+              "url": "/promotions/sbk-bet-and-get-01"
+            },
+            "product": [
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          },
+          {
+            "sys": {
+              "id": "6eHPPwGGHOViyv90SWElOp"
+            },
+            "type": "promotion_content_card",
+            "title": "Game In Good Hands",
+            "description": "Check out all the tools we offer at Bally Bet that can help you stay in control of your play",
+            "isTermsBlurred": false,
+            "image": "https://cdn.braze.eu/appboy/communication/assets/image_assets/images/6a1daa06aeff5c00aabc3ccb/original.jpg?1780328966",
+            "link": {
+              "title": "See Details",
+              "url": "/promotions/game-in-good-hands"
+            },
+            "product": [
+              "CASINO",
+              "SPORTS"
+            ],
+            "segmentation": [
+              "showWhenLoggedIn",
+              "showWhenLoggedOut"
+            ]
+          }
+        ]
+      }
+    ],
+    "secondaryContent": [],
+    "primaryEmptyContent": []
+  }
+}

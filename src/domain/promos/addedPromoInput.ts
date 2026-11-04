@@ -9,6 +9,7 @@ import {
   PinnedSelectionInputSchema,
   SportDayScopeInputSchema,
 } from "./reviewInput";
+import { PROMO_MARKET_TYPES } from "./types";
 
 /**
  * Phase 5: member-added promo input contract (T-5-input). Every schema is a
@@ -36,6 +37,10 @@ export const MSG_BOOST_REQUIRED = "Enter a boost % or boosted odds.";
 export const MSG_BOOSTED_ODDS = "Enter the boosted odds, like +250.";
 export const MSG_PIN_GONE = "That bet isn't in the current odds. Pick another.";
 const MSG_BOOST_PERCENT = "Enter a boost % greater than 0 and at most 1000.";
+
+export const MSG_REFUND_CAP = "Enter a whole-cent amount, like 25 or 25.00.";
+/** Shown when a member tries to change a no-sweat they are already tracking or finished. */
+export const MSG_ALREADY_TRACKED = "This one is already being tracked. Stop tracking it first.";
 
 const MONEY_MESSAGE = "Enter a number greater than 0.";
 const ODDS_MESSAGE = "Enter odds like +250 or -110.";
@@ -84,6 +89,31 @@ export const AddBonusBetInputSchema = z.strictObject({
   expires: ExpiryInputSchema,
   scope: AddedScopeInputSchema.nullable(),
   minOddsAmerican: AddedOddsSchema.optional(),
+});
+
+/** T-09-37: a no-sweat's refund cap in whole cents, > 0 and <= 10000 (keeps downstream Decimal math in range). */
+export const AddedRefundCapSchema = z
+  .string({ error: MSG_REFUND_CAP })
+  .max(20, MSG_REFUND_CAP)
+  .regex(MONEY_PATTERN, MSG_REFUND_CAP)
+  // Refine skipped when the regex failed so Decimal never throws.
+  .refine((value) => !MONEY_PATTERN.test(value) || (new Decimal(value).gt(0) && new Decimal(value).lte(10000)), {
+    message: MSG_REFUND_CAP,
+  });
+
+/**
+ * D-13/D-14: a hand-added no-sweat. The refund is always a bonus bet (A-11),
+ * so there is no cash option. marketType limits the qualifying bet type;
+ * absent = any of the three markets.
+ */
+export const AddNoSweatInputSchema = z.strictObject({
+  promoType: z.literal("no_sweat"),
+  bookKey: z.string().min(1, MSG_PICK_BOOK).max(50),
+  refundCap: AddedRefundCapSchema,
+  expires: ExpiryInputSchema,
+  scope: AddedScopeInputSchema.nullable(),
+  minOddsAmerican: AddedOddsSchema.optional(),
+  marketType: z.enum(PROMO_MARKET_TYPES).optional(),
 });
 
 export const AddedBoostPercentSchema = z
@@ -141,6 +171,7 @@ export const AddProfitBoostInputSchema = z
 export const AddPromoInputSchema = z.discriminatedUnion("promoType", [
   AddBonusBetInputSchema,
   AddProfitBoostInputSchema,
+  AddNoSweatInputSchema,
 ]);
 
 export type AddPromoInput = z.infer<typeof AddPromoInputSchema>;
@@ -157,6 +188,8 @@ export type AddedPromoField =
   | "bookKey"
   | "promoType"
   | "bonusAmount"
+  | "refundCap"
+  | "marketType"
   | "boostPercent"
   | "boostedOddsAmerican"
   | "scope"
@@ -171,6 +204,8 @@ const ADDED_PROMO_FIELDS: readonly AddedPromoField[] = [
   "bookKey",
   "promoType",
   "bonusAmount",
+  "refundCap",
+  "marketType",
   "boostPercent",
   "boostedOddsAmerican",
   "scope",
@@ -194,6 +229,8 @@ export interface AddedPromoEditValues {
   bookKey: string;
   promoType: string;
   bonusAmount: string | null;
+  /** A no-sweat's refund cap (its stored bonus_amount); null for other types. */
+  refundCap: string | null;
   boostPercent: string | null;
   boostedOddsAmerican: number | null;
   maxStake: string | null;
@@ -207,6 +244,7 @@ export interface AddedPromoEditValues {
   sportKey: string | null;
   windowStart: string | null;
   windowEnd: string | null;
+  /** A boost's pinned market; for a no-sweat, the single bet-type limit (null = all three markets). */
   marketType: string | null;
   line: number | null;
   side: string | null;

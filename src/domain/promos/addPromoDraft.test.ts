@@ -23,6 +23,7 @@ const baseEdit: AddedPromoEditValues = {
   bookKey: "draftkings",
   promoType: "bonus_bet",
   bonusAmount: "50.00",
+  refundCap: null,
   boostPercent: null,
   boostedOddsAmerican: null,
   maxStake: null,
@@ -339,5 +340,79 @@ describe("multi-game drafts (quick-261016-1se)", () => {
       pinValue: "moneyline|ml|home",
     });
     expect(errors.pinned).toEqual(["Pick the exact bet this price is for."]);
+  });
+});
+
+describe("no-sweat draft", () => {
+  it("switchPromoType to no_sweat keeps book and expiry and clears boost fields", () => {
+    const boost: AddPromoDraft = {
+      ...emptyBonusDraft(NOW),
+      promoType: "profit_boost",
+      bookKey: "betmgm",
+      boostPercent: "30",
+      maxStake: "25",
+    };
+    const d = switchPromoType(boost, "no_sweat");
+    expect(d.promoType).toBe("no_sweat");
+    expect(d.bookKey).toBe("betmgm");
+    expect(d.expiresEtDate).toBe(boost.expiresEtDate);
+    expect(d.boostPercent).toBe("");
+    expect(d.maxStake).toBe("");
+  });
+
+  it("payloadFromDraft produces a valid no-sweat input", () => {
+    const d: AddPromoDraft = {
+      ...switchPromoType(emptyBonusDraft(NOW), "no_sweat"),
+      bookKey: "betmgm",
+      refundCap: "25",
+      minOdds: "-200",
+      marketType: "total",
+    };
+    const r = payloadFromDraft(d);
+    expect("payload" in r).toBe(true);
+    if ("payload" in r) {
+      expect(r.payload).toMatchObject({
+        promoType: "no_sweat",
+        bookKey: "betmgm",
+        refundCap: "25",
+        minOddsAmerican: -200,
+        marketType: "total",
+      });
+    }
+  });
+
+  it("shows the refund-cap message for a bad cap", () => {
+    const d: AddPromoDraft = { ...switchPromoType(emptyBonusDraft(NOW), "no_sweat"), bookKey: "betmgm", refundCap: "25.005" };
+    const r = payloadFromDraft(d);
+    expect("fieldErrors" in r && r.fieldErrors.refundCap).toEqual(["Enter a whole-cent amount, like 25 or 25.00."]);
+  });
+
+  it("round-trips edit values back to the same input", () => {
+    const edit: AddedPromoEditValues = {
+      ...baseEdit,
+      promoType: "no_sweat",
+      bonusAmount: "25.00",
+      refundCap: "25.00",
+      marketType: "spread",
+      minOddsAmerican: -200,
+    };
+    const d = draftFromEditValues(edit);
+    expect(d.promoType).toBe("no_sweat");
+    expect(d.refundCap).toBe("25.00");
+    expect(d.marketType).toBe("spread");
+    expect(d.minOdds).toBe("-200");
+    const r = payloadFromDraft(d);
+    expect("payload" in r && r.payload).toMatchObject({
+      promoType: "no_sweat",
+      refundCap: "25.00",
+      marketType: "spread",
+      minOddsAmerican: -200,
+      scope: null,
+    });
+  });
+
+  it("an all-markets edit prefills no market limit", () => {
+    const d = draftFromEditValues({ ...baseEdit, promoType: "no_sweat", refundCap: "25.00", marketType: null });
+    expect(d.marketType).toBeNull();
   });
 });

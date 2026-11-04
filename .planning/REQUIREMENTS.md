@@ -16,11 +16,11 @@
 
 ### No-sweat promos in the feed
 
-- [ ] **FEED-01**: DraftKings, FanDuel and Bally Bet no-sweat promos for existing customers are recognised (parser + AI reader with an explicit no-sweat kind) instead of skipped; new-customer no-sweat offers go to Sign-up offers
-- [ ] **FEED-02**: The 2026-10-08 case (a no-sweat bet read as a bonus bet) is a regression test; when the parser and reader disagree about no-sweat vs bonus bet the promo goes to review
-- [ ] **FEED-03**: No-sweat opportunities are ranked inline in the Opportunities feed with the other promos, marked with a small "est." label and the conversion rate used
-- [ ] **FEED-04**: No-sweat estimates never count toward the Dashboard totals, the profit graph's grey line, or the Statistics tab, which stay guaranteed-only
-- [ ] **FEED-05**: Marking a no-sweat promo done records the profit the member actually made (entered or confirmed by the member), not the estimate
+- [x] **FEED-01**: DraftKings, FanDuel and Bally Bet no-sweat promos for existing customers are recognised (parser + AI reader with an explicit no-sweat kind) instead of skipped; new-customer no-sweat offers go to Sign-up offers
+- [x] **FEED-02**: The 2026-10-08 case (a no-sweat bet read as a bonus bet) is a regression test; when the parser and reader disagree about no-sweat vs bonus bet the promo goes to review
+- [x] **FEED-03**: No-sweat opportunities are ranked inline in the Opportunities feed with the other promos, marked with a small "est." label and the conversion rate used
+- [x] **FEED-04**: No-sweat estimates never count toward the Dashboard totals, the profit graph's grey line, or the Statistics tab, which stay guaranteed-only
+- [x] **FEED-05**: Marking a no-sweat promo done records the profit the member actually made (entered or confirmed by the member), not the estimate
 
 ### Intro offers screen
 
@@ -31,6 +31,10 @@
 - [ ] **INTRO-05**: Each offer has a whole-plan view: step 1 place the qualifying bet and hedge, then each bonus bet as it arrives, linking to the bonus-bet finder to convert it
 - [ ] **INTRO-06**: Intro offers are stored with structured terms (offer kind, qualifying stake, min odds, refund cap / bonus total, installments, requires-win, expiry); offers whose terms can't be read in full are marked "terms incomplete" and ranked lower
 - [ ] **INTRO-07**: Offers at books whose odds aren't available (paid-tier Odds API books) show the headline only, under a "can't price" note, never invented odds
+- [ ] **INTRO-08**: The Opportunities page has its own "Best intro offers" section showing the top-ranked intro offers; the full ranked list with whole-plan views stays on the Sign-up offers screen (owner, 2026-11-03)
+- [ ] **INTRO-09**: Intro offers are never mixed into the promos list or its sort on Opportunities, including intro offers entered by hand (owner, 2026-11-03)
+- [ ] **INTRO-10**: Profit from intro offers is not counted in the Dashboard profit graph (owner, 2026-11-03)
+- [ ] **INTRO-11**: Bonus bets from no-sweat refunds and intro offers are valued at a historical conversion rate per book (e.g. a trailing median from `bonus_conversion_snapshots`, recorded since 2026-11-03), not only today's single best conversion (owner, 2026-11-03)
 
 ### More sportsbooks
 
@@ -85,11 +89,11 @@
 | NSB-02 | Phase 8 | Complete |
 | NSB-03 | Phase 8 | Complete |
 | NSB-04 | Phase 8 | Complete |
-| FEED-01 | Phase 9 | Pending |
-| FEED-02 | Phase 9 | Pending |
-| FEED-03 | Phase 9 | Pending |
-| FEED-04 | Phase 9 | Pending |
-| FEED-05 | Phase 9 | Pending |
+| FEED-01 | Phase 9 | Complete |
+| FEED-02 | Phase 9 | Complete |
+| FEED-03 | Phase 9 | Complete |
+| FEED-04 | Phase 9 | Complete |
+| FEED-05 | Phase 9 | Complete |
 | INTRO-01 | Phase 10 | Pending |
 | INTRO-02 | Phase 10 | Pending |
 | INTRO-03 | Phase 10 | Pending |
@@ -97,6 +101,10 @@
 | INTRO-05 | Phase 10 | Pending |
 | INTRO-06 | Phase 10 | Pending |
 | INTRO-07 | Phase 10 | Pending |
+| INTRO-08 | Phase 10 | Pending |
+| INTRO-09 | Phase 10 | Pending |
+| INTRO-10 | Phase 10 | Pending |
+| INTRO-11 | Phase 10 | Pending |
 | BOOKS-01 | Phase 11 | Pending |
 | BOOKS-02 | Phase 11 | Pending |
 | BOOKS-03 | Phase 11 | Pending |

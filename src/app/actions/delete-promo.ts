@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { isNoSweatTrackedOrDone } from "@/db/noSweatGuard";
 import { PromoIdInputSchema } from "@/domain/promos/reviewInput";
 import type { AddedPromoResponse } from "@/domain/promos/addedPromoInput";
 import { softDeleteOwnAddedPromo } from "@/db/addedPromos";
@@ -13,6 +14,14 @@ export async function deletePromo(input: unknown): Promise<AddedPromoResponse> {
   const parsed = PromoIdInputSchema.safeParse(input);
   if (!parsed.success) {
     return { status: "invalid", fieldErrors: {} };
+  }
+
+  // D-14: a no-sweat you are tracking (or finished) stays put until you stop tracking it.
+  if (await isNoSweatTrackedOrDone(user.userId, parsed.data.promoId)) {
+    return {
+      status: "invalid",
+      fieldErrors: { form: ["This one is already being tracked. Stop tracking it first."] },
+    };
   }
 
   const ok = await softDeleteOwnAddedPromo({ promoId: parsed.data.promoId, userId: user.userId });

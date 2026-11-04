@@ -4,6 +4,7 @@ const m = vi.hoisted(() => ({
   requireUser: vi.fn(),
   runPromoSportsRefresh: vi.fn(),
   getActivePromos: vi.fn(),
+  getActiveNoSweatPromos: vi.fn(),
   getUserBookKeys: vi.fn(),
   getHedgeBookKeys: vi.fn(),
   getCachedEvents: vi.fn(),
@@ -15,7 +16,7 @@ const m = vi.hoisted(() => ({
 vi.mock("next/cache", () => ({ revalidatePath: m.revalidatePath }));
 vi.mock("@/lib/session", () => ({ requireUser: m.requireUser }));
 vi.mock("@/ingestion/odds/refreshExtended", () => ({ runPromoSportsRefresh: m.runPromoSportsRefresh }));
-vi.mock("@/db/promos", () => ({ getActivePromos: m.getActivePromos }));
+vi.mock("@/db/promos", () => ({ getActivePromos: m.getActivePromos, getActiveNoSweatPromos: m.getActiveNoSweatPromos }));
 vi.mock("@/db/queries", () => ({
   getUserBookKeys: m.getUserBookKeys,
   getHedgeBookKeys: m.getHedgeBookKeys,
@@ -48,6 +49,7 @@ beforeEach(() => {
   m.requireUser.mockResolvedValue({ userId: 42, email: "a@b.c", displayName: "A" });
   m.runPromoSportsRefresh.mockResolvedValue({ status: "confirm_required" });
   m.getActivePromos.mockResolvedValue([nflPromo, donePromo]);
+  m.getActiveNoSweatPromos.mockResolvedValue([]);
   m.getPromoCompletions.mockResolvedValue([{ promoId: 2 }]);
   m.getUserBookKeys.mockResolvedValue(["fanduel"]);
   m.getHedgeBookKeys.mockResolvedValue(["fanduel", "draftkings"]);
@@ -99,6 +101,28 @@ describe("refreshPromos", () => {
     expect(m.runPromoSportsRefresh).not.toHaveBeenCalled();
 
     m.getActivePromos.mockResolvedValue([]);
+    expect((await refreshPromos({ confirmed: false })).status).toBe("no_promos");
+    expect(m.runPromoSportsRefresh).not.toHaveBeenCalled();
+  });
+
+  it("no-sweat-only member is not no_promos; its sport is refreshed, alt spreads stay guaranteed-only", async () => {
+    m.getActivePromos.mockResolvedValue([]);
+    m.getActiveNoSweatPromos.mockResolvedValue([
+      { id: 9, scope: { kind: "sport_window", sportKey: "americanfootball_nfl" }, eligibleMarketTypes: ["moneyline"] },
+    ]);
+    await refreshPromos({ confirmed: true });
+    expect(m.getActiveNoSweatPromos).toHaveBeenCalledWith(expect.any(Date), 42);
+    const passed = m.runPromoSportsRefresh.mock.calls[0][0];
+    expect(passed.sportKeys).toEqual(["americanfootball_nfl"]);
+    expect(passed.altGameEstimate).toBe(0);
+    expect(passed.altSpreads).toEqual({ pins: [], scopedEventIds: [] });
+  });
+
+  it("a Done no-sweat is ignored; none of either -> no_promos", async () => {
+    m.getActivePromos.mockResolvedValue([]);
+    m.getActiveNoSweatPromos.mockResolvedValue([
+      { id: 2, scope: { kind: "sport_window", sportKey: "americanfootball_nfl" }, eligibleMarketTypes: ["moneyline"] },
+    ]);
     expect((await refreshPromos({ confirmed: false })).status).toBe("no_promos");
     expect(m.runPromoSportsRefresh).not.toHaveBeenCalled();
   });

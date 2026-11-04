@@ -35,7 +35,7 @@
 **Milestone Goal:** Turn intro (sign-up) offers and no-sweat promos into ranked, ready-to-place opportunities with exact lines.
 
 - [x] **Phase 8: No-Sweat Bet Math** - Exact no-sweat hedge solver and the bonus-bet conversion rate that values its refund (completed 2026-10-22)
-- [ ] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals
+- [x] **Phase 9: No-Sweat Promos in the Feed** - DraftKings, FanDuel and Bally Bet no-sweat promos are recognised and ranked as labelled estimates, kept out of guaranteed totals (completed 2026-11-03)
 - [ ] **Phase 10: Ranked Intro Offers** - Sign-up offers screen ranks intro offers by estimated value with exact qualifying bet, hedge and whole-plan view
 - [ ] **Phase 11: More Sportsbooks** - Hard Rock Bet and BetMGM scrapers (plus time-boxed checks of the other Colorado books) feed promos and intro offers automatically
 - [ ] **Phase 12: Add Kalshi and Polymarket as hedge venues** - Opt-in Kalshi / Polymarket US hedges across the finder, promo hedges, paired promos and Arbitrage tab, whole contracts with exact fees, zero extra credits
@@ -85,51 +85,51 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — no_sweat type, guaranteed-only type guard, getActivePromos excludes no-sweats, Statistics queries exclude them (FEED-02, FEED-04)
-- [ ] 09-02-PLAN.md — tracked_no_sweats + user_low_profile_settings tables (migration 0018, BLOCKING apply), snapshot and settings schemas (FEED-05)
-- [ ] 09-03-PLAN.md — classifyNoSweat detector, exclusions reorder, tighter new-customer rule (fixture sweep), Sign-up offers headline fix (FEED-01)
-- [ ] 09-04-PLAN.md — live recon of DraftKings / FanDuel / Bally promo lists, fixtures + decision note (FEED-01)
+- [x] 09-01-PLAN.md — no_sweat type, guaranteed-only type guard, getActivePromos excludes no-sweats, Statistics queries exclude them (FEED-02, FEED-04)
+- [x] 09-02-PLAN.md — tracked_no_sweats + user_low_profile_settings tables (migration 0018, BLOCKING apply), snapshot and settings schemas (FEED-05)
+- [x] 09-03-PLAN.md — classifyNoSweat detector, exclusions reorder, tighter new-customer rule (fixture sweep), Sign-up offers headline fix (FEED-01)
+- [x] 09-04-PLAN.md — live recon of DraftKings / FanDuel / Bally promo lists, fixtures + decision note (FEED-01)
 
 **Wave 2**
 
-- [ ] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline (bounded typecheck sweep), pair finder guard (FEED-02, FEED-04)
-- [ ] 09-06-PLAN.md — Low-profile limits in the line search, rankNoSweatFeed, no-sweat row DTOs (FEED-03)
-- [ ] 09-07-PLAN.md — TDD settle math and shared refund-conversion ranker (FEED-05)
-- [ ] 09-08-PLAN.md — AI reader no_sweat kind, prompt bump, reconcile disagreements to review, reader budget (FEED-01, FEED-02)
-- [ ] 09-20-PLAN.md — Refresh promos covers no-sweat sports (FEED-03)
+- [x] 09-05-PLAN.md — exhaustive promo-type switches across the guaranteed pipeline (bounded typecheck sweep), pair finder guard (FEED-02, FEED-04)
+- [x] 09-06-PLAN.md — Low-profile limits in the line search, rankNoSweatFeed, no-sweat row DTOs (FEED-03)
+- [x] 09-07-PLAN.md — TDD settle math and shared refund-conversion ranker (FEED-05)
+- [x] 09-08-PLAN.md — AI reader no_sweat kind, prompt bump, reconcile disagreements to review, reader budget (FEED-01, FEED-02)
+- [x] 09-20-PLAN.md — Refresh promos covers no-sweat sports (FEED-03)
 
 **Wave 3**
 
-- [ ] 09-09-PLAN.md — re-check of stored promos (pure planner + dry-run script) (FEED-02)
-- [ ] 09-10-PLAN.md — DraftKings no-sweat candidates (FEED-01, FEED-02)
-- [ ] 09-11-PLAN.md — FanDuel and Bally Bet no-sweat paths (FEED-01)
-- [ ] 09-12-PLAN.md — Opportunities composition: ranked estimates, notes, Tracking cards, leak invariants (FEED-03, FEED-04)
-- [ ] 09-13-PLAN.md — manual no-sweat add/edit (prefill)/expire/delete (FEED-03)
-- [ ] 09-19-PLAN.md — classify-as-no-sweat and review readings (FEED-02)
+- [x] 09-09-PLAN.md — re-check of stored promos (pure planner + dry-run script) (FEED-02)
+- [x] 09-10-PLAN.md — DraftKings no-sweat candidates (FEED-01, FEED-02)
+- [x] 09-11-PLAN.md — FanDuel and Bally Bet no-sweat paths (FEED-01)
+- [x] 09-12-PLAN.md — Opportunities composition: ranked estimates, notes, Tracking cards, leak invariants (FEED-03, FEED-04)
+- [x] 09-13-PLAN.md — manual no-sweat add/edit (prefill)/expire/delete (FEED-03)
+- [x] 09-19-PLAN.md — classify-as-no-sweat and review readings (FEED-02)
 
 **Wave 4**
 
-- [ ] 09-14-PLAN.md — Track / settle / refund / undo actions, Low-profile save, Done DTO (FEED-05)
+- [x] 09-14-PLAN.md — Track / settle / refund / undo actions, Low-profile save, Done DTO (FEED-05)
 
 **Wave 5**
 
-- [ ] 09-15-PLAN.md — no-sweat row components, Track button with risk line, risk advisory (FEED-03)
-- [ ] 09-17-PLAN.md — Settings Low-profile card, No-sweat add form, review disagreement card (FEED-03, FEED-02)
+- [x] 09-15-PLAN.md — no-sweat row components, Track button with risk line, risk advisory (FEED-03)
+- [x] 09-17-PLAN.md — Settings Low-profile card, No-sweat add form, review disagreement card (FEED-03, FEED-02)
 
 **Wave 6**
 
-- [ ] 09-16-PLAN.md — Tracking strip, tracked card (with risk line), Done row variant (FEED-05)
+- [x] 09-16-PLAN.md — Tracking strip, tracked card (with risk line), Done row variant (FEED-05)
 
 **Wave 7**
 
-- [ ] 09-18-PLAN.md — Opportunities screen wiring, stored-promo re-check with owner OK, phone check (FEED-01..05)
+- [x] 09-18-PLAN.md — Opportunities screen wiring, stored-promo re-check with owner OK, phone check (FEED-01..05)
 **UI hint**: yes
 
 ### Phase 10: Ranked Intro Offers
 
 **Goal**: Members can open Sign-up offers and see which new-book intro offers are worth the most, with the exact bets to place.
 **Depends on**: Phase 8, Phase 9
-**Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04, INTRO-05, INTRO-06, INTRO-07
+**Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04, INTRO-05, INTRO-06, INTRO-07, INTRO-08, INTRO-09, INTRO-10, INTRO-11
 **Success Criteria** (what must be TRUE):
 
   1. The Sign-up offers screen lists intro offers at books the member doesn't have, ranked by estimated value, best first.
@@ -137,6 +137,9 @@ Plans:
   3. "Bet & get bonus bets" offers are valued correctly for win-only vs win-or-lose, with each installment's expiry and each installment valued at the live conversion rate; "No-sweat first bet" offers are valued with the no-sweat solver.
   4. Each offer has a whole-plan view: place the qualifying bet and hedge, then each bonus bet as it arrives, with a link to the bonus-bet finder to convert it.
   5. Offers whose terms can't be read in full are marked "terms incomplete" and ranked lower; offers at books with no odds show the headline only under a "can't price" note, never invented odds.
+  6. The Opportunities page has a separate "Best intro offers" section with the top-ranked intro offers; intro offers never appear in or sort with the promos list (including hand-entered ones), and the full ranked list stays on Sign-up offers.
+  7. Intro-offer profit is not counted in the Dashboard profit graph.
+  8. No-sweat refunds and intro-offer bonus bets are valued at a historical per-book conversion rate from the recorded snapshots, not only today's single best.
 
 **Plans**: TBD
 **UI hint**: yes
@@ -219,7 +222,7 @@ Plans:
 | 1–05.1 (7 phases) | v1.0 | 61/61 | Complete | 2026-10-02 |
 | 6–07.1 (3 phases) | v1.1 | 17/17 | Complete | 2026-10-22 |
 | 8. No-Sweat Bet Math | v1.2 | 3/3 | Complete    | 2026-10-22 |
-| 9. No-Sweat Promos in the Feed | v1.2 | 0/20 | Planned | - |
+| 9. No-Sweat Promos in the Feed | v1.2 | 20/20 | Complete    | 2026-11-03 |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
 | 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 2/16 | In Progress|  |
@@ -230,7 +233,7 @@ Plans:
 
 **Goal:** [Captured for future planning] An owner-only admin page. Candidate scope to confirm with the owner (captured 2026-10-02): create/copy invite links in the app (today: `npm run invite:create` on the laptop), see/manage members (list, disable, password reset — today `scripts/password-reset.ts`), Odds API credit usage history, scrape/cron run status + a manual "scrape now" trigger, and reminders like the GitHub dispatch token expiry (~2026-12-30).
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** 20/20 plans complete
 
 Plans:
 

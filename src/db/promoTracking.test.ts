@@ -4,7 +4,8 @@ const { mockGetDb } = vi.hoisted(() => ({ mockGetDb: vi.fn() }));
 vi.mock("./client", () => ({ getDb: mockGetDb }));
 
 import { buildPairSnapshot } from "@/domain/promos/pairSnapshot";
-import { unmarkPairDone, unmarkPromoUsed } from "./promoTracking";
+import { markPromoDone, updateNoSweatCompletion, unmarkPairDone, unmarkPromoUsed } from "./promoTracking";
+import { buildDoneSnapshotFixture } from "@/domain/promos/noSweatSnapshot.fixture";
 
 /** Chainable drizzle stub: select().from().where().limit() resolves to `rows`; delete().where() is recorded. */
 function makeDb(rows: { snapshot: unknown }[]) {
@@ -144,5 +145,47 @@ describe("unmarkPairDone", () => {
     expect(db.delete).toHaveBeenCalledTimes(1);
     const params = paramsOf(deleteWhere.mock.calls[0][0]);
     expect(params).toEqual(expect.arrayContaining([7, 1, 2]));
+  });
+});
+
+describe("updateNoSweatCompletion", () => {
+  it("issues one UPDATE filtered by userId and promoId", async () => {
+    const where = vi.fn((_cond: unknown) => Promise.resolve(undefined));
+    const set = vi.fn((_v: unknown) => ({ where }));
+    const update = vi.fn(() => ({ set }));
+    mockGetDb.mockReturnValue({ update });
+    await updateNoSweatCompletion({ userId: 7, promoId: 101, snapshot: buildDoneSnapshotFixture(), profitExtracted: "20.00" });
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(set.mock.calls[0][0]).toMatchObject({ profitExtracted: "20.00" });
+    const params = paramsOf(where.mock.calls[0][0]);
+    expect(params).toEqual(expect.arrayContaining([7, 101]));
+  });
+});
+
+describe("markPromoDone (WR-05)", () => {
+  function stubInsert(returned: unknown[]) {
+    const returning = vi.fn().mockResolvedValue(returned);
+    const onConflictDoNothing = vi.fn(() => ({ returning }));
+    const values = vi.fn(() => ({ onConflictDoNothing }));
+    mockGetDb.mockReturnValue({ insert: vi.fn(() => ({ values })) });
+    return { values, onConflictDoNothing, returning };
+  }
+  const args = {
+    userId: 7,
+    promoId: 101,
+    now: new Date("2026-11-03T00:00:00Z"),
+    snapshot: buildDoneSnapshotFixture(),
+    profitExtracted: "12.34",
+  };
+
+  it("resolves true when this call inserted the completion", async () => {
+    const { returning } = stubInsert([{ promoId: 101 }]);
+    await expect(markPromoDone(args)).resolves.toBe(true);
+    expect(returning).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves false when a completion already existed (conflict, nothing inserted)", async () => {
+    stubInsert([]);
+    await expect(markPromoDone(args)).resolves.toBe(false);
   });
 });

@@ -5,6 +5,8 @@ import { marketBadgeLabel, selectionLabel } from "@/domain/arb/labels";
 import { formatAmerican, formatUsd } from "@/lib/format";
 import { getSportLabel } from "@/config/sports";
 import { formatBoostPercent } from "./describe";
+import { guaranteedPromoTypeLabel } from "./promoTypeLabel";
+import { assertNever } from "./types";
 import { pricesAsOfFor, type PriceAgeContext } from "./priceAge";
 import type { PromoOpportunity, RankablePromo, UnprofitablePromo } from "./rankPromoHedges";
 
@@ -68,7 +70,7 @@ export function yourCapFor(promo: PresentablePromo): YourCapDTO | undefined {
   };
 }
 
-function attributionLineFor(promo: PresentablePromo): string | null {
+export function attributionLineFor(promo: Pick<PresentablePromo, "attribution">): string | null {
   if (promo.attribution.length === 0) return null;
   return promo.attribution.map((a) => `${a.verb} ${a.displayName}`).join(" · ");
 }
@@ -129,7 +131,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     rowKey: `promo-${promo.id}`,
     promoId: promo.id,
     promoType: promo.promoType,
-    promoTypeLabel: promo.promoType === "profit_boost" ? "Boost" : "Bonus bet",
+    promoTypeLabel: guaranteedPromoTypeLabel(promo.promoType),
     sportLabel: getSportLabel(selection.sportKey),
     commenceTime: selection.commenceTime.toISOString(),
     homeTeam: selection.homeTeam,
@@ -150,7 +152,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
       selectionLabel: promoSelectionLabel,
       oddsAmerican: promoOddsAmerican,
       oddsDerived: promoOddsDerived,
-      baseOddsAmerican: promo.promoType === "profit_boost" ? (opportunity.promoBaseOddsAmerican ?? null) : null,
+      baseOddsAmerican: promo.promoType === "profit_boost" ? (opportunity.promoBaseOddsAmerican ?? null) : null, // boost-only field; bonus_bet has no base odds
     },
     hedge: {
       bookKey: hedge.bookKey,
@@ -181,13 +183,17 @@ export function toPromoRowDTO<P extends PresentablePromo>(
 export function promoTitle(
   promo: Pick<RankablePromo, "promoType" | "boostedOddsAmerican" | "boostPercent" | "bonusAmount">,
 ): string {
-  if (promo.promoType === "profit_boost") {
-    if (promo.boostedOddsAmerican !== null) {
-      return `Boosted to ${formatAmerican(promo.boostedOddsAmerican)}`;
-    }
-    return `${formatBoostPercent(promo.boostPercent ?? "0.00")} profit boost`;
+  switch (promo.promoType) {
+    case "profit_boost":
+      if (promo.boostedOddsAmerican !== null) {
+        return `Boosted to ${formatAmerican(promo.boostedOddsAmerican)}`;
+      }
+      return `${formatBoostPercent(promo.boostPercent ?? "0.00")} profit boost`;
+    case "bonus_bet":
+      return `${formatUsd(promo.bonusAmount ?? "0.00")} bonus bet`;
+    default:
+      return assertNever(promo.promoType);
   }
-  return `${formatUsd(promo.bonusAmount ?? "0.00")} bonus bet`;
 }
 
 /**
@@ -220,7 +226,7 @@ export function toUnprofitablePromoRowDTO<P extends PresentablePromo>(
     rowKey: `unprofitable-promo-${promo.id}`,
     promoId: promo.id,
     promoType: promo.promoType,
-    promoTypeLabel: promo.promoType === "profit_boost" ? "Boost" : "Bonus bet",
+    promoTypeLabel: guaranteedPromoTypeLabel(promo.promoType),
     bookKey: promo.bookKey,
     bookName: bookNames.get(promo.bookKey) ?? promo.bookKey,
     title: promoTitle(promo),

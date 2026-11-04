@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
+import { isNoSweatTrackedOrDone } from "@/db/noSweatGuard";
 import {
   EditPromoInputSchema,
   MSG_LOCKED,
@@ -31,6 +32,14 @@ export async function editPromo(input: unknown): Promise<AddedPromoResponse> {
 
   if (promo.bookKey !== existing.bookKey || promo.promoType !== existing.promoType) {
     return { status: "invalid", fieldErrors: { form: [MSG_LOCKED] } };
+  }
+
+  // D-14: a no-sweat you are tracking (or finished) stays put until you stop tracking it.
+  if (await isNoSweatTrackedOrDone(user.userId, promoId)) {
+    return {
+      status: "invalid",
+      fieldErrors: { form: ["This one is already being tracked. Stop tracking it first."] },
+    };
   }
 
   const prepared = await prepareAddedPromoValues({

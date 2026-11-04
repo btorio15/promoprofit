@@ -1,0 +1,785 @@
+{
+  "promoPlacements": [
+    {
+      "placementId": "SBK_PROMOHUB",
+      "promotions": [
+        {
+          "promoCode": "ACQB5G200BB1102",
+          "name": "Get $200 in Bonus Bets guaranteed! Bet $5 each day for 4 days and earn $50 in Bonus Bets daily. Place your first wager now!",
+          "title": "Bet $5, Get $50 for 4 days",
+          "callToAction": {
+            "url": "https://sportsbook.fanduel.com/login?external-referrer-next=promotions%3FpromoCode%3DACQB5G200BB1102",
+            "text": "Join Now",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "steps": [
+              {
+                "action": "Deposit a minimum of $5.00",
+                "completed": false,
+                "status": "WAITING",
+                "sourceId": "CompoundCriteriaModel.DepositCriteriaModel-1"
+              },
+              {
+                "action": "Bet $5.00",
+                "completed": false,
+                "status": "WAITING",
+                "sourceId": "CompoundCriteriaModel.SportsbookBetCountCriteriaModel-2"
+              },
+              {
+                "action": "Get your $50.00 bonus bet",
+                "completed": false,
+                "status": "WAITING",
+                "sourceId": "FREE_BET_FIXED_WALLET_32f8081b-a7bc-4d44-8e72-17057037235d"
+              }
+            ],
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "criteriaState": {
+              "fulfilled": false,
+              "ratio": 0,
+              "children": [
+                {
+                  "criteriaId": "CompoundCriteriaModel.DepositCriteriaModel-1",
+                  "fulfilled": false,
+                  "ratio": 0,
+                  "category": "GAUGE",
+                  "params": {
+                    "gauge": {
+                      "current": 0,
+                      "target": 5,
+                      "minValue": 5,
+                      "type": "DEPOSIT_AMOUNT"
+                    },
+                    "deposit": {
+                      "products": [
+                        "SPORTSBOOK"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "criteriaId": "CompoundCriteriaModel.SportsbookBetCountCriteriaModel-2",
+                  "fulfilled": false,
+                  "ratio": 0,
+                  "category": "GAUGE",
+                  "params": {
+                    "gauge": {
+                      "current": 0,
+                      "target": 1,
+                      "minValue": 5,
+                      "type": "SPORTSBOOK_BET_COUNT_CRITERIA"
+                    },
+                    "sportsbookBetCount": {
+                      "products": [
+                        "SPORTSBOOK"
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            "promoStateExpiryDate": "2026-11-23T04:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "SIMPLE_REWARD",
+              "reward": {
+                "balance": 50,
+                "description": "Congrats! Your $50 in Bonus Bets are in Your Account!",
+                "expiry": "Expires in: 7 days",
+                "expirationDate": "2026-11-10T21:24:28.337Z",
+                "type": "BONUS_BET",
+                "numberOfTokens": 1
+              }
+            },
+            "groupedSteps": {
+              "incomplete": [
+                {
+                  "action": "Deposit a minimum of $5.00",
+                  "completed": false,
+                  "status": "WAITING",
+                  "sourceId": "CompoundCriteriaModel.DepositCriteriaModel-1"
+                },
+                {
+                  "action": "Bet $5.00",
+                  "completed": false,
+                  "status": "WAITING",
+                  "sourceId": "CompoundCriteriaModel.SportsbookBetCountCriteriaModel-2"
+                },
+                {
+                  "action": "Get your $50.00 bonus bet",
+                  "completed": false,
+                  "status": "WAITING",
+                  "sourceId": "FREE_BET_FIXED_WALLET_32f8081b-a7bc-4d44-8e72-17057037235d"
+                }
+              ],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_13-32-14_1400x400.jpg",
+              "alt": "Get $200 in Bonus Bets guaranteed! Bet $5 each day for 4 days and earn $50 in Bonus Bets daily. Place your first wager now!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_13-32-17_600x300.jpg",
+              "alt": "Get $200 in Bonus Bets guaranteed! Bet $5 each day for 4 days and earn $50 in Bonus Bets daily. Place your first wager now!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_13-32-21_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_13-32-21_624x220.jpg",
+              "alt": "Get $200 in Bonus Bets guaranteed! Bet $5 each day for 4 days and earn $50 in Bonus Bets daily. Place your first wager now!",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_13-32-24_600x800.jpg",
+              "alt": "Get $200 in Bonus Bets guaranteed! Bet $5 each day for 4 days and earn $50 in Bonus Bets daily. Place your first wager now!",
+              "width": 300,
+              "height": 400
+            }
+          },
+          "showTimeLeft": false,
+          "additionalAttributes": {
+            "automatedPromotionV2": "true"
+          },
+          "combinedEndDate": "2026-11-23T04:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "national-acq-offer",
+            "acquisition-tracker",
+            "cyoo",
+            "ftd-growth"
+          ]
+        },
+        {
+          "promoCode": "LOCBBPARPB1101",
+          "name": "Get a 30% Profit Boost Token to use on a 3+ Leg Parlay / SGP / SGP+ wager for any College Basketball Games on November 2nd through November 4th, 2026!",
+          "title": "College Basketball Parlay Profit Boost",
+          "callToAction": {
+            "url": "https://sportsbook.fanduel.com/login",
+            "text": "Log In",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2026-11-05T08:00:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/2/2026-11-02_21-43-01_1400x400.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on a 3+ Leg Parlay / SGP / SGP+ wager for any College Basketball Games on November 2nd through November 4th, 2026!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/2/2026-11-02_21-43-04_600x300.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on a 3+ Leg Parlay / SGP / SGP+ wager for any College Basketball Games on November 2nd through November 4th, 2026!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/2/2026-11-02_21-43-06_468x165.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/2/2026-11-02_21-43-06_936x330.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on a 3+ Leg Parlay / SGP / SGP+ wager for any College Basketball Games on November 2nd through November 4th, 2026!",
+              "width": 468,
+              "height": 165
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/2/2026-11-02_21-43-13_600x800.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on a 3+ Leg Parlay / SGP / SGP+ wager for any College Basketball Games on November 2nd through November 4th, 2026!",
+              "width": 300,
+              "height": 400
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2026-11-05T08:00:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "ncaab",
+            "basketball"
+          ]
+        },
+        {
+          "promoCode": "LOSOCCERPB1103",
+          "name": "Get a 30% Profit Boost Token to use on ANY wager for any Soccer Matches on November 3rd and November 4th, 2026!",
+          "title": "Soccer Profit Boost",
+          "callToAction": {
+            "url": "https://sportsbook.fanduel.com/login",
+            "text": "Log in",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2026-11-05T05:00:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/3/2026-11-03_16-50-25_1400x400.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on ANY wager for any Soccer Matches on November 3rd and November 4th, 2026!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/3/2026-11-03_16-50-29_600x300.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on ANY wager for any Soccer Matches on November 3rd and November 4th, 2026!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/3/2026-11-03_16-50-33_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/3/2026-11-03_16-50-33_624x220.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on ANY wager for any Soccer Matches on November 3rd and November 4th, 2026!",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/11/3/2026-11-03_16-53-43_300x400.jpg",
+              "alt": "Get a 30% Profit Boost Token to use on ANY wager for any Soccer Matches on November 3rd and November 4th, 2026!",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2026-11-05T05:00:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "soccer"
+          ]
+        },
+        {
+          "promoCode": "FODENTRYWEEK1102",
+          "name": "Every day this week, play a game and you'll earn a discount on that day's game of the day on FanDuel Faceoff. Jump in and see your rewards page for details.",
+          "title": "Faceoff Daily Discounts Week",
+          "callToAction": {
+            "url": "https://fdfaceoff.onelink.me/Z1Od/npmg5bwt",
+            "text": "PLAY NOW",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2026-11-09T08:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/15/2026-09-15_19-53-45_1400x400.jpg",
+              "alt": "Every day this week, play a game and you'll earn a discount on that day's game of the day on FanDuel Faceoff. Jump in and see your rewards page for details.",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/15/2026-09-15_16-00-25_600x300.jpg",
+              "alt": "Every day this week, play a game and you'll earn a discount on that day's game of the day on FanDuel Faceoff. Jump in and see your rewards page for details.",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/15/2026-09-15_16-00-29_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/15/2026-09-15_16-00-29_624x220.jpg",
+              "alt": "Every day this week, play a game and you'll earn a discount on that day's game of the day on FanDuel Faceoff. Jump in and see your rewards page for details.",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/15/2026-09-15_16-23-09_300x400.jpg",
+              "alt": "Every day this week, play a game and you'll earn a discount on that day's game of the day on FanDuel Faceoff. Jump in and see your rewards page for details.",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2026-11-09T08:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ]
+        },
+        {
+          "promoCode": "APVTNFSTATIC0917",
+          "name": "Now you can link your FanDuel and Prime Video accounts to track your bets live while you watch Thursday Night Football!",
+          "title": "Amazon Prime Video: Thursday Night Football",
+          "callToAction": {
+            "url": "https://watch.amazon.com/settings?page=bettracking&ref_=fanduelingress",
+            "text": "Learn More",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2027-01-01T04:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/16/2026-09-16_17-31-06_1400x400.jpg",
+              "alt": "Now you can link your FanDuel and Prime Video accounts to track your bets live while you watch Thursday Night Football!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/16/2026-09-16_17-31-11_600x300.jpg",
+              "alt": "Now you can link your FanDuel and Prime Video accounts to track your bets live while you watch Thursday Night Football!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/16/2026-09-16_17-28-44_312x110.png",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/16/2026-09-16_17-28-44_624x220.png",
+              "alt": "Now you can link your FanDuel and Prime Video accounts to track your bets live while you watch Thursday Night Football!",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/6/2026-10-06_20-05-13_600x800.jpg",
+              "alt": "Now you can link your FanDuel and Prime Video accounts to track your bets live while you watch Thursday Night Football!",
+              "width": 300,
+              "height": 400
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2027-01-01T04:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "nfl",
+            "american-football"
+          ]
+        },
+        {
+          "promoCode": "RAF092126STAT",
+          "name": "Invite your friends to join FanDuel from anywhere and earn Bonus Bets!",
+          "title": "Refer-A-Friend Get Bonus Bets",
+          "callToAction": {
+            "url": "https://sportsbook.fanduel.com/refer",
+            "text": "Invite friends",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2027-01-01T04:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/29/2026-09-29_18-53-56_1400x400.jpg",
+              "alt": "Invite your friends to join FanDuel from anywhere and earn Bonus Bets!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/29/2026-09-29_18-54-00_600x300.jpg",
+              "alt": "Invite your friends to join FanDuel from anywhere and earn Bonus Bets!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/29/2026-09-29_18-54-03_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/29/2026-09-29_18-54-03_624x220.jpg",
+              "alt": "Invite your friends to join FanDuel from anywhere and earn Bonus Bets!",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/17/2026-09-17_14-06-31_300x400.jpg",
+              "alt": "Invite your friends to join FanDuel from anywhere and earn Bonus Bets!",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2027-01-01T04:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "soccer",
+            "basketball",
+            "golf",
+            "mlb",
+            "nhl",
+            "nfl",
+            "baseball",
+            "nba",
+            "ice-hockey",
+            "ncaaf",
+            "tennis"
+          ]
+        },
+        {
+          "promoCode": "NBAPRIMEST26",
+          "name": "Link your FanDuel and Prime Video accounts to track your bets live while you watch NBA games!",
+          "title": "Track Your Bets on Prime Video",
+          "callToAction": {
+            "url": "https://watch.amazon.com/settings?page=bettracking&ref_=fanduelingress",
+            "text": "Learn More",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2027-04-10T03:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/23/2026-10-23_19-47-41_1400x400.jpg",
+              "alt": "Link your FanDuel and Prime Video accounts to track your bets live while you watch NBA games!",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/23/2026-10-23_19-47-59_600x300.jpg",
+              "alt": "Link your FanDuel and Prime Video accounts to track your bets live while you watch NBA games!",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/23/2026-10-23_19-48-05_468x165.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/23/2026-10-23_19-48-05_936x330.jpg",
+              "alt": "Link your FanDuel and Prime Video accounts to track your bets live while you watch NBA games!",
+              "width": 468,
+              "height": 165
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/23/2026-10-23_19-48-19_600x800.jpg",
+              "alt": "Link your FanDuel and Prime Video accounts to track your bets live while you watch NBA games!",
+              "width": 300,
+              "height": 400
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2027-04-10T03:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "nba"
+          ]
+        },
+        {
+          "promoCode": "NBABPSTATIC1103",
+          "name": "Bet Protect+: Full-Game Injury Protection is Back",
+          "title": "NBA Bet Protect+ Enhancements",
+          "callToAction": {
+            "url": "https://www.fanduel.com/betprotect",
+            "text": "Learn More",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2026-11-15T04:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_21-43-52_1400x400.jpg",
+              "alt": "Bet Protect+: Full-Game Injury Protection is Back",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_21-43-55_600x300.jpg",
+              "alt": "Bet Protect+: Full-Game Injury Protection is Back",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_21-44-01_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_21-44-01_624x220.jpg",
+              "alt": "Bet Protect+: Full-Game Injury Protection is Back",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/10/29/2026-10-29_21-45-11_300x400.jpg",
+              "alt": "Bet Protect+: Full-Game Injury Protection is Back",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2026-11-15T04:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ],
+          "tags": [
+            "basketball",
+            "nba"
+          ]
+        },
+        {
+          "promoCode": "COSBKRGMSCCSTAT",
+          "name": "Stay informed about how you bet, your deposit and withdrawal habits, and much more.",
+          "title": "Check Your Stats With My Spend",
+          "callToAction": {
+            "url": "https://account.co.sportsbook.fanduel.com/my-spend",
+            "text": "Check My Stats",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2027-05-28T03:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/5/27/2026-05-27_14-29-28_1400x400.jpg",
+              "alt": "Stay informed about how you bet, your deposit and withdrawal habits, and much more.",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/5/27/2026-05-27_14-29-33_600x300.jpg",
+              "alt": "Stay informed about how you bet, your deposit and withdrawal habits, and much more.",
+              "width": 150,
+              "height": 75
+            },
+            "carousel": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/5/27/2026-05-27_14-29-36_312x110.jpg",
+              "url@2x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/5/27/2026-05-27_14-29-36_624x220.jpg",
+              "alt": "Stay informed about how you bet, your deposit and withdrawal habits, and much more.",
+              "width": 312,
+              "height": 110
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/9/7/2026-09-07_11-57-44_300x400.png",
+              "alt": "Stay informed about how you bet, your deposit and withdrawal habits, and much more.",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2027-05-28T03:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ]
+        },
+        {
+          "promoCode": "SBKRCFAQEDU",
+          "name": "Learn how to earn Reward Points, level up, and unlock bigger rewards",
+          "title": "FanDuel Rewards Club FAQs",
+          "callToAction": {
+            "url": "https://fanduel.com/rewards-club",
+            "text": "Learn more",
+            "action": "REDIRECT",
+            "redirectOpenStrategy": "PARENT"
+          },
+          "customerPromotionState": {
+            "eligibility": {
+              "canOptIn": false,
+              "canConsent": false,
+              "eligible": true
+            },
+            "promoStateExpiryDate": "2027-08-28T03:59:00.000Z",
+            "optInState": "NOT_OPTED_IN",
+            "hasAccepted": false,
+            "claimsLeft": 1,
+            "rewardDefinition": {
+              "variant": "UNSUPPORTED_REWARD"
+            },
+            "groupedSteps": {
+              "incomplete": [],
+              "completed": []
+            }
+          },
+          "imageEntities": {
+            "banner": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/8/27/2026-08-27_16-38-32_1400x400.jpg",
+              "alt": "Learn how to earn Reward Points, level up, and unlock bigger rewards",
+              "width": 700,
+              "height": 200
+            },
+            "square": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/8/27/2026-08-27_16-38-38_600x300.jpg",
+              "alt": "Learn how to earn Reward Points, level up, and unlock bigger rewards",
+              "width": 150,
+              "height": 75
+            },
+            "rewards_hub": {
+              "url@1x": "https://d1m565i184w2i9.cloudfront.net/cpp/fd/2026/8/25/2026-08-25_14-55-44_300x400.png",
+              "alt": "Learn how to earn Reward Points, level up, and unlock bigger rewards",
+              "width": 150,
+              "height": 200
+            }
+          },
+          "showTimeLeft": false,
+          "combinedEndDate": "2027-08-28T03:59:00.000Z",
+          "isFdProPromotion": false,
+          "isGenerosityGamesPromotion": false,
+          "isEndOfYearWrappedPromotion": false,
+          "isChallengesPromotion": false,
+          "products": [
+            "SPORTSBOOK"
+          ]
+        }
+      ],
+      "totalPromotions": 10,
+      "hasMorePages": false
+    }
+  ]
+}

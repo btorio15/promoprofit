@@ -15,12 +15,23 @@ describe("Statistics loaders exclude members' private promos", () => {
   it("daily profit history keeps only promos with no added_by_user_id", () => {
     const { sql } = buildDailyProfitHistoryQuery(db).toSQL();
     expect(sql).toMatch(/^select .* from "promo_profit_observations" left join "promos"/);
-    expect(sql).toMatch(/where "promos"\."added_by_user_id" is null$/);
+    expect(sql).toMatch(/where \("promos"\."added_by_user_id" is null and \("promos"\."promo_type" is null or "promos"\."promo_type" <> \$\d+\)\)$/);
+  });
+
+  it("daily profit history excludes no_sweat estimates (FEED-04)", () => {
+    const { params } = buildDailyProfitHistoryQuery(db).toSQL();
+    expect(params).toContain("no_sweat");
+  });
+
+  it("funnel excludes no_sweat estimates (FEED-04)", () => {
+    const { sql, params } = buildFunnelPromosQuery(db).toSQL();
+    expect(sql).toContain('"promos"."promo_type" <> $');
+    expect(params).toContain("no_sweat");
   });
 
   it("funnel and book health keep only promos with no added_by_user_id", () => {
     const { sql } = buildFunnelPromosQuery(db).toSQL();
     expect(sql).toMatch(/^select .* from "promos"/);
-    expect(sql).toMatch(/where "promos"\."added_by_user_id" is null$/);
+    expect(sql).toMatch(/where \("promos"\."added_by_user_id" is null and "promos"\."promo_type" <> \$\d+\)$/);
   });
 });

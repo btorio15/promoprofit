@@ -1,4 +1,5 @@
-import type { CapField, PromoType, ReviewReason } from "./types";
+import type { CapField, GuaranteedPromoType, PromoType, ReviewReason } from "./types";
+import type { PromoTypeLabel } from "./promoTypeLabel";
 import type { CorrectionOptions } from "./correctionOptions";
 import type { DonePromoDTO } from "./doneSnapshot";
 
@@ -53,7 +54,7 @@ export type PromosEmptyVariant = "none-scraped" | "no-active" | "no-books" | "no
 export interface PromoRowDTO {
   rowKey: string;
   promoId: number;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   promoTypeLabel: "Boost" | "Bonus bet";
   sportLabel: string;
   commenceTime: string;
@@ -125,7 +126,7 @@ export interface PromoRowDTO {
 export interface UnprofitablePromoRowDTO {
   rowKey: string;
   promoId: number;
-  promoType: PromoType;
+  promoType: GuaranteedPromoType;
   promoTypeLabel: "Boost" | "Bonus bet";
   bookKey: string;
   bookName: string;
@@ -184,11 +185,23 @@ export interface ClassifyQueueItemDTO {
   maxWinningsKindKnown: boolean;
 }
 
+/** Phase 9 (D-15): scraper and reader readings of one promo, shown side by side in the review queue. */
+export interface QueueReadingsDTO {
+  scraper: { label: PromoTypeLabel | null; amount: string | null; minOddsAmerican: number | null };
+  reader: {
+    label: PromoTypeLabel | "Not usable";
+    amount: string | null;
+    minOddsAmerican: number | null;
+    confidence: "high" | "medium" | "low";
+    refundForm: "bonus_bet" | "cash" | "unknown" | null;
+  };
+}
+
 export interface QueueItemDTO {
   promoId: number;
   kind: ReviewReason;
   bookName: string;
-  promoTypeLabel: "Boost" | "Bonus bet";
+  promoTypeLabel: PromoTypeLabel;
   description: string;
   bestGuessLabel: string | null;
   matchedLabel: string | null;
@@ -201,6 +214,10 @@ export interface QueueItemDTO {
    * Presentational -- the server re-validates whatever the member submits.
    */
   scrapedWindow: { sportKey: string; startEtDate: string; endEtDate: string } | null;
+  /** Phase 9 (D-15): null unless the scraper and the promo reader both produced a reading. */
+  readings: QueueReadingsDTO | null;
+  /** Phase 9 (D-17): a refund that may be paid in cash (never priced). */
+  cashRefund: boolean;
 }
 
 export type GetPromosResponse =

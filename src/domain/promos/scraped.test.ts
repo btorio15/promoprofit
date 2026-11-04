@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ScrapedPromoSchema, SKIP_REASONS, type ScrapedPromo } from "./scraped";
+import { ScrapedPromoSchema, ScrapedPromoFieldsSchema, SKIP_REASONS, type ScrapedPromo } from "./scraped";
+import { promoDedupeKey } from "./dedupe";
 
 /**
  * Base fixtures cover the two scope shapes recon found: sport-wide (no
@@ -197,7 +198,7 @@ describe("SKIP_REASONS", () => {
       "prop",
       "new_customer",
       "deposit",
-      "no_sweat",
+      "no_sweat_cash",
       "not_a_promo",
       "unsupported_sport",
       "not_half_point",
@@ -205,5 +206,41 @@ describe("SKIP_REASONS", () => {
       "schema_invalid",
     ];
     expect([...SKIP_REASONS].sort()).toEqual([...expected].sort());
+  });
+});
+
+describe("no_sweat candidates (Phase 9)", () => {
+  const noSweat: ScrapedPromo = {
+    ...sportWideBoost,
+    promoType: "no_sweat",
+    boostPercent: null,
+    maxStake: null,
+    bonusAmount: "10.00",
+  };
+
+  it("accepts a no_sweat with a refund cap", () => {
+    expect(ScrapedPromoSchema.safeParse(noSweat).success).toBe(true);
+  });
+
+  it("rejects a no_sweat without bonusAmount", () => {
+    const r = ScrapedPromoSchema.safeParse({ ...noSweat, bonusAmount: null });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues.map((i) => i.message)).toContain("a no_sweat needs bonusAmount (the refund cap)");
+  });
+
+  it("rejects a no_sweat with a boostPercent", () => {
+    expect(ScrapedPromoSchema.safeParse({ ...noSweat, boostPercent: "10.00" }).success).toBe(false);
+  });
+
+  it("accepts optional reviewReadings and the dedupe key ignores it", () => {
+    const withReadings: ScrapedPromo = {
+      ...noSweat,
+      reviewReadings: {
+        scraper: { promoType: "no_sweat", amount: "10.00", minOddsAmerican: null },
+        reader: { kind: "bonus_bet", amount: "10.00", minOddsAmerican: null, confidence: "high", refundForm: null },
+      },
+    };
+    expect(ScrapedPromoFieldsSchema.safeParse(withReadings).success).toBe(true);
+    expect(promoDedupeKey(withReadings)).toBe(promoDedupeKey(noSweat));
   });
 });

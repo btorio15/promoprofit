@@ -16,6 +16,7 @@ import {
   type AddPromoDraft,
   type AddPromoFieldErrors,
 } from "@/domain/promos/addPromoDraft";
+import { assertNever } from "@/domain/promos/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BonusBetFields } from "./BonusBetFields";
 import { BoostFields } from "./BoostFields";
+import { NoSweatFields } from "./NoSweatFields";
 
 export type AddPromoFormMode = { kind: "add" } | { kind: "edit"; promoId: number };
 
@@ -44,6 +46,8 @@ const LOAD_FAILED = "Couldn't load your books. Check your connection and try aga
 const FOCUS_ORDER: { field: keyof AddPromoFieldErrors; id: string }[] = [
   { field: "bookKey", id: "add-book" },
   { field: "bonusAmount", id: "add-bonus-amount" },
+  { field: "refundCap", id: "add-nosweat-cap" },
+  { field: "marketType", id: "add-market-type" },
   { field: "boostPercent", id: "add-boost-percent" },
   { field: "boostedOddsAmerican", id: "add-boosted-odds" },
   { field: "scope", id: "add-search" },
@@ -282,7 +286,7 @@ export function AddPromoForm({ mode, onSaved, onCancel }: AddPromoFormProps) {
           value={[draft.promoType]}
           onValueChange={(values) => {
             const next = values[0];
-            if (next === "profit_boost" || next === "bonus_bet") {
+            if (next === "profit_boost" || next === "bonus_bet" || next === "no_sweat") {
               setDraft(switchPromoType(draft, next));
               setFieldErrors({});
             }
@@ -295,26 +299,31 @@ export function AddPromoForm({ mode, onSaved, onCancel }: AddPromoFormProps) {
           <ToggleGroupItem value="bonus_bet" className="min-h-11 flex-1 px-4">
             Bonus bet
           </ToggleGroupItem>
+          <ToggleGroupItem value="no_sweat" className="min-h-11 flex-1 px-4">
+            No-sweat
+          </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
-      {draft.promoType === "profit_boost" ? (
-        <BoostFields
-          draft={draft}
-          onDraftChange={setDraft}
-          options={options}
-          fieldErrors={fieldErrors}
-          disabled={isSaving}
-        />
-      ) : (
-        <BonusBetFields
-          draft={draft}
-          onDraftChange={setDraft}
-          options={options}
-          fieldErrors={fieldErrors}
-          disabled={isSaving}
-        />
-      )}
+      {(() => {
+        const fieldProps = {
+          draft,
+          onDraftChange: setDraft,
+          options,
+          fieldErrors,
+          disabled: isSaving,
+        };
+        switch (draft.promoType) {
+          case "profit_boost":
+            return <BoostFields {...fieldProps} />;
+          case "no_sweat":
+            return <NoSweatFields {...fieldProps} />;
+          case "bonus_bet":
+            return <BonusBetFields {...fieldProps} />;
+          default:
+            return assertNever(draft.promoType);
+        }
+      })()}
 
       {showDuplicateHint ? (
         <Alert>

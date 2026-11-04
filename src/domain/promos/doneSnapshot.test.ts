@@ -7,6 +7,7 @@ import {
   toDonePromoDTO,
   type DonePromoTerms,
 } from "./doneSnapshot";
+import { buildDoneSnapshotFixture, buildTrackedSnapshotFixture } from "./noSweatSnapshot.fixture";
 import type { PromoRowDTO, UnprofitablePromoRowDTO } from "./dto";
 
 const NOW = new Date("2026-09-29T15:00:00.000Z");
@@ -174,6 +175,22 @@ describe("toDonePromoDTO", () => {
     expect(bare.bookName).toBe("mystery");
   });
 
+  it("legacy no_sweat completion is labelled No-sweat and never titled as a bonus bet", () => {
+    const dto = toDonePromoDTO(
+      { ...completion, snapshot: null, promoType: "no_sweat", promoBonusAmount: "50.00" },
+      names,
+    );
+    expect(dto.promoTypeLabel).toBe("No-sweat");
+    expect(dto.title).toBe("Promo #5");
+  });
+
+  it("v1 snapshot schema rejects a no_sweat promo type", () => {
+    const { snapshot } = buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx);
+    const bad = JSON.parse(JSON.stringify(snapshot));
+    bad.promo.promoType = "no_sweat";
+    expect(DonePromoSnapshotSchema.safeParse(bad).success).toBe(false);
+  });
+
   it("unreadable snapshot is legacy with the column amount", () => {
     const dto = toDonePromoDTO({ ...completion, snapshot: { version: 99 } }, names);
     expect(dto.kind).toBe("legacy");
@@ -241,5 +258,70 @@ describe("Done DTO source state (D-11)", () => {
       expect(dto.addedByYou).toBe(false);
       expect(dto.addedPromoStatus).toBeNull();
     }
+  });
+});
+
+describe("toDonePromoDTO no-sweat (Phase 9)", () => {
+  const names = new Map<string, string>();
+  const base = {
+    promoId: 101,
+    completedAt: new Date("2026-11-08T23:00:00.000Z"),
+    profitExtracted: "26.38",
+    promoBookKey: "draftkings",
+    promoType: "no_sweat",
+    promoParsed: {},
+  };
+
+  it("maps a won settle to kind no_sweat, never v1", () => {
+    const dto = toDonePromoDTO({ ...base, snapshot: JSON.parse(JSON.stringify(buildDoneSnapshotFixture())) }, names);
+    expect(dto.kind).toBe("no_sweat");
+    expect(dto.promoTypeLabel).toBe("No-sweat");
+    expect(dto.profitExtracted).toBe("26.38");
+    expect(dto.noSweat?.outcomeLabel).toBe("Won");
+    expect(dto.noSweat?.profitSource).toBe("computed");
+    expect(dto.bookName).toBe("DraftKings");
+    expect(dto.row).toBeNull();
+  });
+
+  it.each([
+    ["push", "Push"],
+    ["void", "Voided"],
+  ] as const)("labels %s", (outcome, label) => {
+    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ outcome }) }, names);
+    expect(dto.noSweat?.outcomeLabel).toBe(label);
+  });
+
+  it("labels a lost outcome with its refund", () => {
+    const refund = {
+      optionKey: "k",
+      eventId: "e2",
+      refundBookKey: "draftkings",
+      amount: "50.00",
+      bonusSelectionLabel: "X ML",
+      bonusOddsAmerican: 200,
+      hedgeBookKey: "fanduel",
+      hedgeSelectionLabel: "Y ML",
+      hedgeOddsAmerican: -220,
+      hedgeStake: "30.00",
+      profit: "35.00",
+    };
+    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ outcome: "lost", refund }) }, names);
+    expect(dto.noSweat?.outcomeLabel).toBe("Lost, refund converted");
+    expect(dto.noSweat?.refund?.profit).toBe("35.00");
+  });
+
+  it("summarises corrected amounts", () => {
+    const correction = { qualifyingStake: "40.00", qualifyingOddsAmerican: 140, hedgeStake: "35.00", hedgeOddsAmerican: -150 };
+    const dto = toDonePromoDTO({ ...base, snapshot: buildDoneSnapshotFixture({ correction, profitSource: "corrected" }) }, names);
+    expect(dto.noSweat?.qualifyingSummary).toContain("$40.00");
+    expect(dto.noSweat?.hedgeSummary).toContain("$35.00");
+  });
+
+  it("falls back to legacy for an invalid v2 snapshot", () => {
+    const bad = { ...buildDoneSnapshotFixture(), outcome: "lost", refund: null };
+    const dto = toDonePromoDTO({ ...base, snapshot: bad }, names);
+    expect(dto.kind).toBe("legacy");
+    expect(dto.note).toBe("Saved details unavailable");
+    expect(buildTrackedSnapshotFixture().stage).toBe("tracked");
   });
 });

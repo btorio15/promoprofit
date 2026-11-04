@@ -20,6 +20,7 @@ import { toDoneRows } from "@/domain/promos/doneSnapshot";
 import { recordCurrentProfitObservations } from "@/db/promoObservations";
 import { recordMemberFeedObservations } from "@/db/memberFeedRecording";
 import { toPromoRowDTO, toUnprofitablePromoRowDTO } from "@/domain/promos/promoRowDto";
+import { promoTypeLabel as promoTypeLabelFor } from "@/domain/promos/promoTypeLabel";
 import { buildPriceAgeContext } from "@/domain/promos/priceAge";
 import { describePromo, scopeGuessLabel } from "@/domain/promos/describe";
 import { listCorrectionOptions, scrapedWindowEtDays } from "@/domain/promos/correctionOptions";
@@ -335,7 +336,7 @@ function toClassifyQueueItemDTO(row: QueueRow): ClassifyQueueItemDTO {
  */
 function toQueueItemDTO(row: QueueRow): QueueItemDTO {
   const bookName = COLORADO_BOOKS.find((b) => b.key === row.bookKey)?.displayName ?? row.bookKey;
-  const promoTypeLabel: "Boost" | "Bonus bet" = row.promoType === "profit_boost" ? "Boost" : "Bonus bet";
+  const promoTypeLabel = promoTypeLabelFor(row.promoType);
 
   return {
     promoId: row.id,
@@ -353,6 +354,8 @@ function toQueueItemDTO(row: QueueRow): QueueItemDTO {
     unparsedCapFields: row.unparsedCapFields,
     classify: row.reviewReason === "classify" ? toClassifyQueueItemDTO(row) : null,
     scrapedWindow: scrapedWindowFor(row),
+    readings: row.readings,
+    cashRefund: row.cashRefund,
   };
 }
 

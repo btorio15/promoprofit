@@ -13,14 +13,17 @@ import type { SkipReason } from "@/domain/promos/scraped";
 const NEW_CUSTOMER_CATEGORY_RE = /^new customers?$/i;
 // "sign up" stays a full-text check: the real DraftKings/Bally fixtures'
 // acquisition offers only reveal themselves through it in their body copy.
-const NEW_CUSTOMER_TEXT_RE = /\bnew (?:customers?|users?)\b|\bfirst[- ]bet\b|\bsign[- ]up\b/i;
+//
+// Phase 9 (A-06): the bare "first bet" alternative was removed -- "no sweat on
+// your first bet of the game" is not a new-customer offer. "first bet/wager"
+// now only counts next to new/welcome wording.
+const NEW_CUSTOMER_TEXT_RE =
+  /\bnew (?:customers?|users?)\b|\b(?:new|welcome)\b[^.\n]{0,40}\bfirst[- ](?:bet|wager)\b|\bfirst[- ](?:bet|wager)\b[^.\n]{0,40}\b(?:new|welcome)\b|\bwelcome (?:offer|bonus)\b|\bsign[- ]up\b/i;
 const DEPOSIT_RE = /\bdeposit bonus\b|\bdeposit match\b/i;
 
-// quick-261016-k8a: a no-sweat bet refunds a losing stake as a Bonus Bet
-// (DraftKings "NFL London No Sweat"). It is bet insurance, not a bonus bet
-// the user holds, so it is a clear skip -- never a not_a_promo the reader
-// could rescue as a bonus_bet. DK also files these under a "No Sweat" category.
-const NO_SWEAT_RE = /\bno[- ]sweat\b/i;
+// quick-261016-k8a / Phase 9: no-sweats are no longer a blanket skip here.
+// They are detected by classifyNoSweat (noSweat.ts), which callers run only
+// AFTER this function returns null, so parlay/sgp/new_customer win first.
 
 // The negative lookahead on refer-a-friend excludes DraftKings' generic
 // promotion-abuse boilerplate ("...or any bonuses, the refer-a-friend
@@ -125,7 +128,6 @@ export function classifyExclusion(input: {
   if (category && NEW_CUSTOMER_CATEGORY_RE.test(category.trim())) return "new_customer";
   if (NEW_CUSTOMER_TEXT_RE.test(combined)) return "new_customer";
   if (DEPOSIT_RE.test(combined)) return "deposit";
-  if (NO_SWEAT_RE.test(combined) || (category && NO_SWEAT_RE.test(category))) return "no_sweat";
 
   if (NOT_A_PROMO_RE.test(combined)) return "not_a_promo";
 

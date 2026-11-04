@@ -7,11 +7,13 @@ import { getOpportunities } from "@/app/actions/get-opportunities";
 import { pickTop, TOP_N } from "@/domain/opportunities/pick";
 import {
   OPPORTUNITIES_ARB_TOTAL_STAKE,
+  isNoSweatRow,
   SOURCE_META,
   SOURCE_ORDER,
   type OpportunitiesEmptyVariant,
   type OpportunitiesResponse,
 } from "@/domain/opportunities/types";
+import type { NoSweatNoteRowDTO } from "@/domain/promos/noSweatRowDto";
 import { STORAGE_KEYS, usePersistentString } from "@/lib/persistentState";
 import { parseSortMode, sortCaption } from "@/lib/sortPreference";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +21,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { RiskAdvisory } from "@/components/RiskAdvisory";
 import { PromoRow } from "@/components/promos/PromoRow";
+import { NoSweatRow } from "@/components/promos/NoSweatRow";
+import { NoSweatNoteRow } from "@/components/promos/NoSweatNoteRow";
+import { groupNoSweatNotes, lowProfileBlockedHeading } from "@/components/promos/noSweatRowView";
+import { AddPromoForm } from "@/components/promos/AddPromoForm";
 import { ArbRow } from "@/components/arb/ArbRow";
 import { formatUsd } from "@/lib/format";
 import { describeOddsAge, STALE_AFTER_MINUTES } from "@/components/finder/oddsAge";
@@ -27,6 +33,7 @@ import { OpportunitySection } from "./OpportunitySection";
 import { PairCard } from "./PairCard";
 import { ProfitGraph } from "./ProfitGraph";
 import { SortSwitch } from "./SortSwitch";
+import { TrackingStrip } from "./TrackingStrip";
 
 export interface OpportunitiesScreenProps {
   hasCachedOdds: boolean;
@@ -79,6 +86,49 @@ function WholeScreenEmpty({ variant }: { variant: OpportunitiesEmptyVariant }) {
   );
 }
 
+/** Phase 9 (D-10, D-11): unsliced notes; never passed through pickTop. */
+function NoSweatNotesSection({
+  notes,
+  onChanged,
+  addedActions,
+}: {
+  notes: NoSweatNoteRowDTO[];
+  onChanged: () => void;
+  addedActions: { onError: (message: string) => void; onEdit: (promoId: number, trigger: HTMLElement | null) => void };
+}) {
+  const { cantPrice, notWorth, lowProfileBlocked } = groupNoSweatNotes(notes);
+  const render = (n: NoSweatNoteRowDTO) => (
+    <NoSweatNoteRow key={n.rowKey} dto={n} onChanged={onChanged} addedActions={n.addedByYou ? addedActions : undefined} />
+  );
+  return (
+    <section className="flex flex-col gap-3">
+      {cantPrice.length > 0 ? (
+        <>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-xl font-semibold">Can&apos;t price yet</h2>
+            <p className="text-sm text-muted-foreground">
+              We have no odds for the refund at these books, so there is no estimate to show.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">{cantPrice.map(render)}</div>
+        </>
+      ) : null}
+      {notWorth.length > 0 ? (
+        <>
+          <h3 className="text-sm text-muted-foreground">Not worth it right now</h3>
+          <div className="flex flex-col gap-3">{notWorth.map(render)}</div>
+        </>
+      ) : null}
+      {lowProfileBlocked.length > 0 ? (
+        <>
+          <h3 className="text-sm text-muted-foreground">{lowProfileBlockedHeading(lowProfileBlocked)}</h3>
+          <div className="flex flex-col gap-3">{lowProfileBlocked.map(render)}</div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 /**
  * Dashboard tab (Phase 7, formerly Opportunities) (D-01..D-04, D-13..D-17): the landing screen. Fetches
  * every source's full own-book list once; the Profit/ROI switch re-picks the
@@ -101,6 +151,11 @@ export function OpportunitiesScreen({
   const [loadFailed, setLoadFailed] = useState(false);
   const [isPending, startTransition] = useTransition();
   const requestIdRef = useRef(0);
+  // Edit host for hand-added no-sweats (D-13): same AddPromoForm PromosScreen uses.
+  const [editingPromoId, setEditingPromoId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const editTriggerRef = useRef<HTMLElement | null>(null);
+  const formPanelRef = useRef<HTMLDivElement | null>(null);
   const isFirstRecompute = useRef(true);
 
   function runGetOpportunities() {
@@ -138,6 +193,28 @@ export function OpportunitiesScreen({
     runGetOpportunities();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only these counters should re-trigger this
   }, [recomputeKey, promosVersion]);
+
+  function handleEdit(promoId: number, trigger: HTMLElement | null) {
+    editTriggerRef.current = trigger;
+    setActionError(null);
+    setEditingPromoId(promoId);
+    setTimeout(() => formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  function closeEdit() {
+    setEditingPromoId(null);
+    setTimeout(() => {
+      const trigger = editTriggerRef.current;
+      if (trigger && trigger.isConnected) trigger.focus();
+    }, 0);
+  }
+
+  function handleEditSaved() {
+    closeEdit();
+    onPromosChanged();
+  }
+
+  const addedActions = { onError: setActionError, onEdit: handleEdit };
 
   const showSkeleton = isPending && response === null;
   const ok = response?.status === "ok" ? response : null;
@@ -188,6 +265,25 @@ export function OpportunitiesScreen({
         </p>
       ) : null}
 
+      {ok ? <TrackingStrip cards={ok.tracking} onChanged={onPromosChanged} /> : null}
+
+      {editingPromoId !== null ? (
+        <div ref={formPanelRef}>
+          <AddPromoForm
+            key={`edit-${editingPromoId}`}
+            mode={{ kind: "edit", promoId: editingPromoId }}
+            onSaved={handleEditSaved}
+            onCancel={closeEdit}
+          />
+        </div>
+      ) : null}
+
+      {actionError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{actionError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <SortSwitch value={sort} onChange={setSortStored} />
 
       {showSkeleton ? (
@@ -225,25 +321,36 @@ export function OpportunitiesScreen({
             switch (source.id) {
               case "promos": {
                 const top = pickTop(source.items, sort, TOP_N);
+                const hasEstimate = top.some((item) => item.estimated === true);
                 return (
                   <OpportunitySection
                     key={id}
                     title={meta.title}
-                    caption={sortCaption(sort)}
+                    caption={sortCaption(sort, hasEstimate)}
                     seeAll={seeAll ? { label: seeAll.label, onClick: () => onNavigate(seeAll.tab) } : null}
                     emptyCopy={meta.emptyCopy}
                     isEmpty={top.length === 0}
                   >
-                    {top.map((item) => (
-                      <PromoRow
-                        key={item.rowKey}
-                        row={item.data}
-                        precision={precision}
-                        onChanged={onPromosChanged}
-                        capEditable
-                        capFieldIdPrefix="opp-your-cap"
-                      />
-                    ))}
+                    {top.map((item) =>
+                      isNoSweatRow(item.data) ? (
+                        <NoSweatRow
+                          key={item.rowKey}
+                          dto={item.data}
+                          precision={precision}
+                          onChanged={onPromosChanged}
+                          addedActions={item.data.addedByYou ? addedActions : undefined}
+                        />
+                      ) : (
+                        <PromoRow
+                          key={item.rowKey}
+                          row={item.data}
+                          precision={precision}
+                          onChanged={onPromosChanged}
+                          capEditable
+                          capFieldIdPrefix="opp-your-cap"
+                        />
+                      ),
+                    )}
                   </OpportunitySection>
                 );
               }
@@ -292,6 +399,9 @@ export function OpportunitiesScreen({
               }
             }
           })}
+          {ok.noSweatNotes.length > 0 ? (
+            <NoSweatNotesSection notes={ok.noSweatNotes} onChanged={onPromosChanged} addedActions={addedActions} />
+          ) : null}
         </>
       ) : null}
     </div>

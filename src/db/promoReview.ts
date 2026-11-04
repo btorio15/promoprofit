@@ -3,9 +3,15 @@ import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
 import { getDb } from "./client";
 import { promos } from "./schema";
 import { promoVisibilityCondition } from "./promos";
-import { ScrapedPromoFieldsSchema, ScrapedPromoSchema, type ScrapedPromo } from "@/domain/promos/scraped";
+import {
+  NO_SWEAT_CASH_MARKER,
+  ScrapedPromoFieldsSchema,
+  ScrapedPromoSchema,
+  type ScrapedPromo,
+} from "@/domain/promos/scraped";
 import { ScopeGuessSchema, gamesWindow, type ScopeGuess } from "@/domain/promos/scope";
 import { statusAfterMatch } from "@/domain/promos/lifecycle";
+import { promoTypeLabel, type PromoTypeLabel } from "@/domain/promos/promoTypeLabel";
 import {
   CAP_FIELDS,
   PROMO_TYPES,
@@ -45,6 +51,21 @@ export interface QueueRow {
   minOddsAmerican: number | null;
   bonusAmount: string | null;
   unparsedCapFields: CapField[];
+  /** Phase 9 (D-15): scraper and reader readings side by side; null when the draft carries none. */
+  readings: QueueReadings | null;
+  /** Phase 9 (D-17): a cash-refund no-sweat (never priced); the card leads with the cash-refund note. */
+  cashRefund: boolean;
+}
+
+export interface QueueReadings {
+  scraper: { label: PromoTypeLabel | null; amount: string | null; minOddsAmerican: number | null };
+  reader: {
+    label: PromoTypeLabel | "Not usable";
+    amount: string | null;
+    minOddsAmerican: number | null;
+    confidence: "high" | "medium" | "low";
+    refundForm: "bonus_bet" | "cash" | "unknown" | null;
+  };
 }
 
 interface PendingPromoRow {
@@ -198,7 +219,7 @@ function scopeColumnsFrom(scope: ScopeGuess | null) {
  * down the whole review queue. No date/expiry filtering here -- that's the
  * caller's concern (getReviewQueue's SQL WHERE + D-16 drop, below).
  */
-function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
+export function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
   if (!(PROMO_TYPES as readonly string[]).includes(row.promoType)) {
     console.warn(`promoReview: dropping promo ${row.id}, unknown promo_type=${row.promoType}`);
     return null;
@@ -247,6 +268,33 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
       ? (row.maxWinningsKind as WinningsCapKind)
       : null;
 
+  const rr = parsedResult.data.reviewReadings ?? null;
+  const readings: QueueReadings | null = rr
+    ? {
+        scraper: {
+          label: rr.scraper.promoType === null ? null : promoTypeLabel(rr.scraper.promoType),
+          amount: rr.scraper.amount,
+          minOddsAmerican: rr.scraper.minOddsAmerican,
+        },
+        reader: {
+          label: rr.reader.kind === "not_usable" ? "Not usable" : promoTypeLabel(rr.reader.kind),
+          amount: rr.reader.amount,
+          minOddsAmerican: rr.reader.minOddsAmerican,
+          confidence: rr.reader.confidence,
+          refundForm: rr.reader.refundForm,
+        },
+      }
+    : null;
+  // The skip reason is not persisted as a column; reconcile.ts stamps it into the
+  // rawText summary line ("[Promo reader check: no_sweat_cash]"), the reader's refundForm
+  // carries it, and (WR-02) a reader-less classify draft carries NO_SWEAT_CASH_MARKER.
+  const rawText = parsedResult.data.rawText;
+  const cashRefund =
+    row.reviewReason === "classify" &&
+    (rawText.includes("[Promo reader check: no_sweat_cash]") ||
+      rawText.includes(NO_SWEAT_CASH_MARKER) ||
+      rr?.reader.refundForm === "cash");
+
   return {
     id: row.id,
     bookKey: row.bookKey,
@@ -262,6 +310,8 @@ function mapPendingPromoRow(row: PendingPromoRow): QueueRow | null {
     minOddsAmerican: row.minOddsAmerican,
     bonusAmount: row.bonusAmount,
     unparsedCapFields,
+    readings,
+    cashRefund,
   };
 }
 

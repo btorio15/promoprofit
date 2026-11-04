@@ -5,6 +5,7 @@ const {
   mockRunOddsRefresh,
   mockRecordCurrentProfitObservations,
   mockRecordSnapshots,
+  mockRecordConversion,
   mockListUserIds,
   mockLoadCtx,
   mockRecordMember,
@@ -14,6 +15,7 @@ const {
   mockRunOddsRefresh: vi.fn(),
   mockRecordCurrentProfitObservations: vi.fn(),
   mockRecordSnapshots: vi.fn(),
+  mockRecordConversion: vi.fn(),
   mockListUserIds: vi.fn(),
   mockLoadCtx: vi.fn(),
   mockRecordMember: vi.fn(),
@@ -25,6 +27,9 @@ vi.mock("./refresh", () => ({ runOddsRefresh: mockRunOddsRefresh }));
 vi.mock("@/db/promoObservations", () => ({
   recordCurrentProfitObservations: mockRecordCurrentProfitObservations,
   recordCurrentProfitSnapshots: mockRecordSnapshots,
+}));
+vi.mock("@/db/bonusConversionSnapshots", () => ({
+  recordCurrentBonusConversionSnapshots: mockRecordConversion,
 }));
 vi.mock("@/db/queries", () => ({ listUserIds: mockListUserIds }));
 vi.mock("@/db/feedContext", () => ({ loadMemberFeedContext: mockLoadCtx }));
@@ -63,6 +68,7 @@ beforeEach(() => {
   mockRunOddsRefresh.mockResolvedValue(OK_OUTCOME);
   mockRecordCurrentProfitObservations.mockResolvedValue(undefined);
   mockRecordSnapshots.mockResolvedValue(undefined);
+  mockRecordConversion.mockResolvedValue(undefined);
   mockListUserIds.mockResolvedValue([1, 2]);
   mockLoadCtx.mockImplementation(async ({ userId }: { userId: number }) => ({
     userBookSet: new Set([`book${userId}`]),
@@ -105,6 +111,7 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     expect(mockRunOddsRefresh).not.toHaveBeenCalled();
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(MORNING_INSTANT);
     expect(mockRecordSnapshots).toHaveBeenCalledWith(MORNING_INSTANT);
+    expect(mockRecordConversion).toHaveBeenCalledWith(MORNING_INSTANT);
     expect(mockRecordMember).toHaveBeenCalledTimes(2);
     expect(spy).toHaveBeenCalledWith(expect.stringContaining("no Odds API key"));
     spy.mockRestore();
@@ -138,6 +145,7 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     expect(result).toMatchObject({ status: "ran", refreshOutcome: OK_OUTCOME });
     expect(mockRunOddsRefresh).toHaveBeenCalledWith({ confirmed: true, triggeredByUserId: null, now: MORNING_INSTANT });
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledWith(MORNING_INSTANT);
+    expect(mockRecordConversion).toHaveBeenCalledWith(MORNING_INSTANT);
   });
 
   it("still records observations from cache when the refresh comes back blocked", async () => {
@@ -146,6 +154,7 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
 
     expect(result).toMatchObject({ status: "ran", refreshOutcome: BLOCKED_OUTCOME });
+    expect(mockRecordConversion).toHaveBeenCalledWith(MORNING_INSTANT);
     expect(mockRecordCurrentProfitObservations).toHaveBeenCalledTimes(1);
   });
 
@@ -173,6 +182,16 @@ describe("runMorningObservation (quick-260927-n12 scope change B)", () => {
     mockRecordSnapshots.mockRejectedValueOnce(new Error("read failed"));
     const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
     expect(result.status).toBe("ran");
+    expect(mockRecordMember).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+
+  it("still runs the member pass when the conversion snapshot recorder rejects", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockRecordConversion.mockRejectedValueOnce(new Error("no such table"));
+    const result = await runMorningObservation({ now: MORNING_INSTANT, hasApiKey: true });
+    expect(result.status).toBe("ran");
+    expect(mockRecordSnapshots).toHaveBeenCalledTimes(1);
     expect(mockRecordMember).toHaveBeenCalledTimes(2);
     spy.mockRestore();
   });

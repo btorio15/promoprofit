@@ -4,9 +4,25 @@
  * change this file's shape.
  */
 
-/** boost = profit boost, bonus = bonus bet (D-01). */
-export const PROMO_TYPES = ["profit_boost", "bonus_bet"] as const;
+/**
+ * boost = profit boost, bonus = bonus bet (D-01). no_sweat = refund-if-it-loses
+ * promo, priced only as an estimate, never a guaranteed number (Phase 9).
+ */
+export const PROMO_TYPES = ["profit_boost", "bonus_bet", "no_sweat"] as const;
 export type PromoType = (typeof PROMO_TYPES)[number];
+
+/** The promo types the guaranteed ranking pipeline can price (D-19). */
+export const GUARANTEED_PROMO_TYPES = ["profit_boost", "bonus_bet"] as const;
+export type GuaranteedPromoType = (typeof GUARANTEED_PROMO_TYPES)[number];
+
+export function isGuaranteedPromoType(t: PromoType): t is GuaranteedPromoType {
+  return (GUARANTEED_PROMO_TYPES as readonly string[]).includes(t);
+}
+
+/** Exhaustiveness guard: a new promo type becomes a compile error at every switch. */
+export function assertNever(x: never): never {
+  throw new Error("Unhandled promo type: " + String(x));
+}
 
 /**
  * active: hedgeable now. pending_review: auto-match confidence was below
@@ -21,7 +37,7 @@ export type PromoStatus = (typeof PROMO_STATUSES)[number];
  * Why a promo sits in pending_review (D-10/D-18/quick-260928-it1): match =
  * event/market confidence too low, caps = a stake/winnings/odds cap couldn't
  * be parsed, classify = the scraper couldn't tell what this entry is; a
- * member classifies it (into a profit boost or bonus bet) before it can be
+ * member classifies it (into a profit boost, bonus bet or no-sweat) before it can be
  * matched or capped at all.
  */
 export const REVIEW_REASONS = ["match", "caps", "classify"] as const;

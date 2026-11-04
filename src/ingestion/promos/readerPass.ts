@@ -2,7 +2,7 @@ import type { ParseResult, ScrapedPromo, SkippedEntry } from "@/domain/promos/sc
 import { readerText } from "./promoReading";
 import type { PromoReader } from "./promoReader";
 import { reconcileEntry, type ReconcileEntry, type ReconcileOutcome } from "./reconcile";
-import { isReviewWorthySkip } from "./reviewTriage";
+import { CLEAR_SKIP_REASONS, isReviewWorthySkip } from "./reviewTriage";
 import { guardReading, type GuardedReading } from "./verbatimGuard";
 
 /**
@@ -26,6 +26,8 @@ export interface ReaderBookStats {
   clearSkipOverrides: number;
   /** quick-260928-mgi (owner decision 2): a reader rescue with no guard-backed amount, skipped and suppressed. */
   rescuesWithoutAmount: number;
+  /** Phase 9 (A-08): clear parser exclusions passed through without spending a reader call. */
+  clearSkipsNotRead: number;
   inputTokens: number;
   outputTokens: number;
 }
@@ -42,6 +44,7 @@ function emptyStats(): ReaderBookStats {
     skippedByReader: 0,
     clearSkipOverrides: 0,
     rescuesWithoutAmount: 0,
+    clearSkipsNotRead: 0,
     inputTokens: 0,
     outputTokens: 0,
   };
@@ -80,7 +83,10 @@ export async function applyPromoReader(input: {
   const stats = emptyStats();
 
   const reviewWorthy = parseResult.skipped.filter(isReviewWorthySkip);
-  const remaining = parseResult.skipped.filter((skip) => !isReviewWorthySkip(skip));
+  // A-08: a clear parser exclusion is always kept as-is (clear_reason_kept), so
+  // reading it would only burn the shared call cap -- pass it through unread.
+  const clearSkips = parseResult.skipped.filter((skip) => !isReviewWorthySkip(skip) && CLEAR_SKIP_REASONS.has(skip.reason));
+  const remaining = parseResult.skipped.filter((skip) => !isReviewWorthySkip(skip) && !CLEAR_SKIP_REASONS.has(skip.reason));
 
   const orderedEntries: ReconcileEntry[] = [
     ...parseResult.candidates.map((candidate): ReconcileEntry => ({ kind: "candidate", candidate })),
@@ -91,6 +97,11 @@ export async function applyPromoReader(input: {
   const candidates: ScrapedPromo[] = [];
   const rescuedCandidates: ScrapedPromo[] = [];
   const skipped: SkippedEntry[] = [];
+
+  for (const skip of clearSkips) {
+    skipped.push(skip);
+    stats.clearSkipsNotRead++;
+  }
 
   function applyOutcome(entry: ReconcileEntry, outcome: ReconcileOutcome, guarded?: GuardedReading): void {
     if (outcome.kind === "candidate") {
