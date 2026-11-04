@@ -200,12 +200,6 @@ export function StatsScreen({ active }: { active: boolean }) {
               </Table>
             </div>
           )}
-          {stats.sportWeekday.unscheduledPromos > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {stats.sportWeekday.unscheduledPromos} promo{stats.sportWeekday.unscheduledPromos === 1 ? "" : "s"} had no game
-              time and are not in this table.
-            </p>
-          ) : null}
         </div>
       </StatsCard>
 

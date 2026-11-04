@@ -6,9 +6,8 @@ import { loadDailyProfitHistory, loadFunnelPromos, loadScrapeRunTimes } from "@/
 import {
   timeOfDayStats,
   type HourOfDayStat,
-  type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
-import { dailyHistoryStats, gameWeekdayStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
+import { dailyHistoryStats, gameWeekdayStats, type DailyHistoryStats, type GameWeekdayStats } from "@/domain/stats/dailyHistory";
 import { promoFunnel, type PromoFunnelStats } from "@/domain/stats/promoFunnel";
 import { parseStatsRange, rangeStartDate, type StatsRange } from "@/domain/stats/statsRange";
 import { denverDate } from "@/domain/promos/profitTotals";
@@ -21,7 +20,7 @@ export interface StatsDTO {
   firstRunAt: string | null;
   lastRunAt: string | null;
   timeOfDay: HourOfDayStat[];
-  sportWeekday: SportWeekdayStats;
+  sportWeekday: GameWeekdayStats;
   /** Older daily data (promo_profit_observations) in the range. */
   history: DailyHistoryStats;
   /** Promo availability and per-book health (current state, not ranged). */

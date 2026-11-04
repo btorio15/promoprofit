@@ -1,5 +1,5 @@
 import Decimal from "decimal.js";
-import { WEEKDAYS, denverWeekday, type SportWeekdayRow, type SportWeekdayStats, type Weekday } from "./profitStats";
+import { WEEKDAYS, denverWeekday, type SportWeekdayRow, type Weekday } from "./profitStats";
 
 /**
  * Totals for the "Since Sep 27" section, built from the older daily
@@ -282,20 +282,20 @@ export function dailyHistoryStats(
   };
 }
 
+export interface GameWeekdayStats {
+  rows: SportWeekdayRow[];
+}
+
 /**
  * Profit by sport and game weekday, from the same daily history as the By
  * sport table: each daily record counts on the Denver weekday its game
- * starts. Records with no game time are counted as unscheduled instead of
- * being guessed onto a weekday. No I/O.
+ * starts. Records with no game time are left out, and no-sweat estimates
+ * never count (FEED-04). No I/O.
  */
-export function gameWeekdayStats(rows: HistoryRow[]): SportWeekdayStats {
+export function gameWeekdayStats(rows: HistoryRow[]): GameWeekdayStats {
   const sports = new Map<string, Record<Weekday, Decimal>>();
-  let unscheduledPromos = 0;
   for (const row of rows) {
-    if (!row.gameAt) {
-      unscheduledPromos += 1;
-      continue;
-    }
+    if (row.promoType === "no_sweat" || !row.gameAt) continue;
     const sportKey = row.sportKey ?? UNKNOWN_SPORT;
     const days =
       sports.get(sportKey) ?? (Object.fromEntries(WEEKDAYS.map((day) => [day, new Decimal(0)])) as Record<Weekday, Decimal>);
@@ -321,5 +321,5 @@ export function gameWeekdayStats(rows: HistoryRow[]): SportWeekdayStats {
       return { sportKey, byDay, total: total.toFixed(2), bestDay };
     });
 
-  return { rows: result, unscheduledPromos };
+  return { rows: result };
 }
