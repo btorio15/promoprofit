@@ -66,7 +66,8 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     firstRunAt: first === null ? null : new Date(first).toISOString(),
     lastRunAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows, runTimes),
-    sportWeekday: sportWeekdayStats(rows),
+    // Always all time, whatever range is selected.
+    sportWeekday: sportWeekdayStats(allRows),
     history: dailyHistoryStats(historyRows, window),
     funnel: promoFunnel(funnelPromos),
   };
