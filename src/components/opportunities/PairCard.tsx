@@ -7,6 +7,8 @@ import { formatAmerican, formatKickoff, formatPct, formatUsd } from "@/lib/forma
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarketLegBadges, MarketLegLine } from "@/components/market/MarketLeg";
+import { tieRiskTooltipText } from "@/domain/market/legDto";
 import { PriceAgeNote } from "@/components/promos/PriceAgeNote";
 import { YourCapField } from "@/components/promos/YourCapField";
 import { MarkPairDoneButton } from "./MarkPairDoneButton";
@@ -20,7 +22,19 @@ export interface PairCardProps {
   actions?: ReactNode;
 }
 
-function LegLine({ leg, tieRisk, idPrefix, onChanged }: { leg: PairLegDTO; tieRisk: boolean; idPrefix: string; onChanged: () => void }) {
+function LegLine({
+  leg,
+  tieRisk,
+  hasMarketLeg = false,
+  idPrefix,
+  onChanged,
+}: {
+  leg: PairLegDTO;
+  tieRisk: boolean;
+  hasMarketLeg?: boolean;
+  idPrefix: string;
+  onChanged: () => void;
+}) {
   return (
     <div className="flex min-w-0 flex-col gap-2 border-l-2 border-border pl-4">
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-base">
@@ -51,10 +65,7 @@ function LegLine({ leg, tieRisk, idPrefix, onChanged }: { leg: PairLegDTO; tieRi
                 </Badge>
               }
             />
-            <TooltipContent>
-              Regular-season NFL games can end in a tie (&lt;1% historically). A tie voids both bets: profit becomes
-              $0, no cash loss.
-            </TooltipContent>
+            <TooltipContent>{tieRiskTooltipText(hasMarketLeg)}</TooltipContent>
           </Tooltip>
         ) : null}
       </div>
@@ -112,7 +123,7 @@ export function PairCard({ row, precision, onChanged, actions }: PairCardProps) 
 
           <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,1.4fr)_120px_96px_20px] md:gap-4">
             <div className="flex flex-col gap-2 md:contents">
-              <LegLine leg={row.legA} tieRisk={row.tieRisk} idPrefix={`pair-${row.rowKey}-cap`} onChanged={onChanged} />
+              <LegLine leg={row.legA} tieRisk={row.tieRisk} hasMarketLeg={Boolean(row.legC?.market)} idPrefix={`pair-${row.rowKey}-cap`} onChanged={onChanged} />
               <LegLine leg={row.legB} tieRisk={false} idPrefix={`pair-${row.rowKey}-cap`} onChanged={onChanged} />
             </div>
 
@@ -128,7 +139,16 @@ export function PairCard({ row, precision, onChanged, actions }: PairCardProps) 
             <ChevronDown className="hidden size-5 shrink-0 self-center text-muted-foreground transition-transform group-data-open:rotate-180 md:block" />
           </div>
 
-          {row.legC ? (
+          {row.legC?.market ? (
+            <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
+              <span>{row.legC.bookName}</span>
+              <span>{row.legC.selectionLabel}</span>
+              <MarketLegLine leg={row.legC.market} />
+              <span className="pointer-events-auto">
+                <MarketLegBadges leg={row.legC.market} />
+              </span>
+            </div>
+          ) : row.legC ? (
             <div className="flex min-w-0 flex-wrap items-center gap-2 border-l-2 border-border pl-4 text-base">
               <span>{row.legC.bookName}</span>
               <Badge variant="outline">Ordinary bet</Badge>

@@ -12,16 +12,23 @@ import type {
 import { getBonusBooks, getHedgeBookKeys, getUserBookKeys, getCachedEvents } from "@/db/queries";
 import { extractTwoWayMoneylines, type TwoWayMoneylineMarket } from "@/domain/hedge/marketFilter";
 import { rankBonusBetHedges, type BonusBetOpportunity, type HedgeLeg, type RankOptions } from "@/domain/hedge/rankBonusBetHedges";
+import { toMarketLegDTO } from "@/domain/market/legDto";
+import { usableHedgeBooks } from "@/config/books";
 import { SPORT_KEYS, getSportLabel } from "@/config/sports";
 import { requireUser } from "@/lib/session";
 
 const WINDOW_DAYS = 7;
 const RESULT_LIMIT = 10;
 
+/** Display name for sportsbooks and market venues from config (bookNames only holds bonus books). */
+function configDisplayName(key: string): string {
+  return usableHedgeBooks().find((b) => b.key === key)?.displayName ?? key;
+}
+
 function toLegDTO(leg: HedgeLeg, bookNames: Map<string, string>): FinderLegDTO {
   return {
     bookKey: leg.bookKey,
-    bookName: bookNames.get(leg.bookKey) ?? leg.bookKey,
+    bookName: bookNames.get(leg.bookKey) ?? configDisplayName(leg.bookKey),
     team: leg.team,
     oddsAmerican: leg.oddsAmerican,
   };
@@ -44,6 +51,12 @@ function toResultDTO(
     sameBook: opportunity.sameBook,
     bonus: toLegDTO(opportunity.bonus, bookNames),
     hedge: toLegDTO(opportunity.hedge, bookNames),
+    hedgeMarket: opportunity.market
+      ? toMarketLegDTO(opportunity.market, {
+          sportKey: opportunity.sportKey,
+          venueName: configDisplayName(opportunity.hedge.bookKey),
+        })
+      : null,
     bonusAmount: normalizedBonusAmount,
     hedgeStake: result.hedgeStake.toFixed(2),
     bonusPayout: result.bonusPayout.toFixed(2),

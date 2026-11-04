@@ -161,6 +161,49 @@ describe("three-bet pair (quick-261003-fxf)", () => {
       oddsAmerican: -165,
       stake: "30.76",
       payout: "49.99",
+      market: null,
+    });
+  });
+
+  describe("market top-up leg", () => {
+    const market = {
+      venueKey: "kalshi" as const,
+      venueName: "Kalshi",
+      side: "yes" as const,
+      contracts: 42,
+      priceCents: 61,
+      cost: "25.62",
+      fee: "0.70",
+      outlay: "26.32",
+      americanDisplay: -156,
+      liquidity: { kind: "price_may_move" as const },
+      settlementNote: "note",
+    };
+    const marketLegC = {
+      ...legC,
+      bookKey: "kalshi",
+      bookName: "Kalshi",
+      stake: "26.32",
+      payout: "42.00",
+      market,
+    };
+    const built = buildPairSnapshot(
+      { row: { ...row, legC: marketLegC }, termsA: termsFor(1, "draftkings"), termsB: termsFor(2, "fanduel") },
+      ctx,
+    );
+
+    it("stores legC.market, records the pair profit, and round-trips", () => {
+      expect(built.primary.snapshot.row.legC?.market).toEqual(market);
+      expect(built.primary.profitExtracted).toBe(row.guaranteedProfit);
+      const parsed = DonePairSnapshotSchema.safeParse(JSON.parse(JSON.stringify(built.primary.snapshot)));
+      expect(parsed.success).toBe(true);
+      expect(toDonePairDTO(parsed.data!).legC?.market).toEqual(market);
+    });
+
+    it("rejects a market priceCents of 100", () => {
+      const bad = JSON.parse(JSON.stringify(built.primary.snapshot));
+      bad.row.legC.market.priceCents = 100;
+      expect(DonePairSnapshotSchema.safeParse(bad).success).toBe(false);
     });
   });
 

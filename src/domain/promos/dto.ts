@@ -2,6 +2,7 @@ import type { CapField, GuaranteedPromoType, PromoType, ReviewReason } from "./t
 import type { PromoTypeLabel } from "./promoTypeLabel";
 import type { CorrectionOptions } from "./correctionOptions";
 import type { DonePromoDTO } from "./doneSnapshot";
+import type { MarketLegDTO } from "@/domain/market/legDto";
 
 export type { DonePromoDTO } from "./doneSnapshot";
 
@@ -85,6 +86,8 @@ export interface PromoRowDTO {
     baseOddsAmerican?: number | null;
   };
   hedge: { bookKey: string; bookName: string; selectionLabel: string; oddsAmerican: number };
+  /** Phase 12: set when the hedge is a Kalshi/Polymarket contract fill; null/absent for sportsbook hedges. Optional so pre-phase snapshots and fixtures still type. */
+  hedgeMarket?: MarketLegDTO | null;
   promoStake: string;
   hedgeStake: string;
   totalStaked: string;

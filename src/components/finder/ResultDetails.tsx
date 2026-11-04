@@ -1,5 +1,6 @@
 import type { FinderResultDTO } from "@/domain/finder/types";
 import { formatAmerican, formatPct, formatUsd } from "@/lib/format";
+import { marketLegText } from "@/domain/market/legDto";
 import {
   Table,
   TableBody,
@@ -47,9 +48,18 @@ export function ResultDetails({ result }: ResultDetailsProps) {
               B
             </span>
             <span className="text-base">
-              Bet <span className="num">{formatUsd(result.hedgeStake)}</span> at{" "}
-              {result.hedge.bookName} on {result.hedge.team}{" "}
-              <span className="num">{formatAmerican(result.hedge.oddsAmerican)}</span>
+              {result.hedgeMarket ? (
+                <span className="num">
+                  At {result.hedge.bookName}, {marketLegText(result.hedgeMarket)} on{" "}
+                  {result.hedge.team}
+                </span>
+              ) : (
+                <>
+                  Bet <span className="num">{formatUsd(result.hedgeStake)}</span> at{" "}
+                  {result.hedge.bookName} on {result.hedge.team}{" "}
+                  <span className="num">{formatAmerican(result.hedge.oddsAmerican)}</span>
+                </>
+              )}
             </span>
           </li>
         </ol>

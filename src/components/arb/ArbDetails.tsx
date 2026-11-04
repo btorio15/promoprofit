@@ -42,9 +42,24 @@ export function ArbDetails({ result }: ArbDetailsProps) {
               Leg A
             </span>
             <span className="text-base">
-              Bet <span className="num">{formatUsd(result.stakeA)}</span> at{" "}
-              {result.sideA.bookName} on {result.sideA.selection}{" "}
-              <span className="num">{formatAmerican(result.sideA.oddsAmerican)}</span>
+              {result.sideA.market ? (
+                <>
+                  At {result.sideA.bookName}, buy{" "}
+                  <span className="num">
+                    {result.sideA.market.contracts} {result.sideA.market.side.toUpperCase()}
+                  </span>{" "}
+                  on {result.sideA.selection} @{" "}
+                  <span className="num">{result.sideA.market.priceCents}¢</span> (
+                  <span className="num">{formatUsd(result.sideA.market.cost)}</span> +{" "}
+                  <span className="num">{formatUsd(result.sideA.market.fee)}</span> fee)
+                </>
+              ) : (
+                <>
+                  Bet <span className="num">{formatUsd(result.stakeA)}</span> at{" "}
+                  {result.sideA.bookName} on {result.sideA.selection}{" "}
+                  <span className="num">{formatAmerican(result.sideA.oddsAmerican)}</span>
+                </>
+              )}
             </span>
           </li>
           <li className="flex gap-2">
@@ -52,9 +67,24 @@ export function ArbDetails({ result }: ArbDetailsProps) {
               Leg B
             </span>
             <span className="text-base">
-              Bet <span className="num">{formatUsd(result.stakeB)}</span> at{" "}
-              {result.sideB.bookName} on {result.sideB.selection}{" "}
-              <span className="num">{formatAmerican(result.sideB.oddsAmerican)}</span>
+              {result.sideB.market ? (
+                <>
+                  At {result.sideB.bookName}, buy{" "}
+                  <span className="num">
+                    {result.sideB.market.contracts} {result.sideB.market.side.toUpperCase()}
+                  </span>{" "}
+                  on {result.sideB.selection} @{" "}
+                  <span className="num">{result.sideB.market.priceCents}¢</span> (
+                  <span className="num">{formatUsd(result.sideB.market.cost)}</span> +{" "}
+                  <span className="num">{formatUsd(result.sideB.market.fee)}</span> fee)
+                </>
+              ) : (
+                <>
+                  Bet <span className="num">{formatUsd(result.stakeB)}</span> at{" "}
+                  {result.sideB.bookName} on {result.sideB.selection}{" "}
+                  <span className="num">{formatAmerican(result.sideB.oddsAmerican)}</span>
+                </>
+              )}
             </span>
           </li>
         </ol>

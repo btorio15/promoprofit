@@ -67,8 +67,20 @@ export function PromoDetails({ row }: PromoDetailsProps) {
               B
             </span>
             <span className="text-base">
-              Bet <span className="num">{formatUsd(row.hedgeStake)}</span> on {row.hedge.selectionLabel} at{" "}
-              {row.hedge.bookName} (<span className="num">{formatAmerican(row.hedge.oddsAmerican)}</span>)
+              {row.hedgeMarket ? (
+                <>
+                  At {row.hedgeMarket.venueName}, buy <span className="num">{row.hedgeMarket.contracts}</span>{" "}
+                  {row.hedgeMarket.side.toUpperCase()} on {row.hedge.selectionLabel} @{" "}
+                  <span className="num">{row.hedgeMarket.priceCents}¢</span> (
+                  <span className="num">${row.hedgeMarket.cost}</span> +{" "}
+                  <span className="num">${row.hedgeMarket.fee}</span> fee)
+                </>
+              ) : (
+                <>
+                  Bet <span className="num">{formatUsd(row.hedgeStake)}</span> on {row.hedge.selectionLabel} at{" "}
+                  {row.hedge.bookName} (<span className="num">{formatAmerican(row.hedge.oddsAmerican)}</span>)
+                </>
+              )}
             </span>
           </li>
         </ol>

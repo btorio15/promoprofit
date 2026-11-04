@@ -142,6 +142,13 @@ describe("makeConversionRateFor", () => {
     expect(mine!.hedgeBookKey).not.toBe("draftkings");
     expect(fn("draftkings", new Decimal(100), new Set())).toBeNull();
   });
+
+  it("ignores market venues in hedgeBookKeys (Phase 12: no-sweat markets deferred)", () => {
+    const withMarket = new Set([...allKeys, "kalshi", "polymarket_us"]);
+    const a = topConversionFor({ events, now, refundBookKey: "draftkings", amount: new Decimal(100), hedgeBookKeys: withMarket });
+    const b = topConversionFor({ events, now, refundBookKey: "draftkings", amount: new Decimal(100), hedgeBookKeys: allKeys });
+    expect(a).toEqual(b);
+  });
 });
 
 describe("rankRefundOpportunities", () => {

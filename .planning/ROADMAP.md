@@ -188,27 +188,27 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 12-04-PLAN.md — TDD whole-contract solvers for bonus bet, profit boost and arb with brute-force oracle (MKT-05)
-- [ ] 12-05-PLAN.md — TDD boost + boost pair with a market top-up leg, oracle-proven (MKT-05)
-- [ ] 12-06-PLAN.md — MarketLegDTO, leg text, settlement notes and shared MarketLeg component (MKT-07)
-- [ ] 12-07-PLAN.md — My Books "Prediction markets" group with availability note (MKT-01)
+- [x] 12-04-PLAN.md — TDD whole-contract solvers for bonus bet, profit boost and arb with brute-force oracle (MKT-05)
+- [x] 12-05-PLAN.md — TDD boost + boost pair with a market top-up leg, oracle-proven (MKT-05)
+- [x] 12-06-PLAN.md — MarketLegDTO, leg text, settlement notes and shared MarketLeg component (MKT-07)
+- [x] 12-07-PLAN.md — My Books "Prediction markets" group with availability note (MKT-01)
 - [ ] 12-08-PLAN.md — Apply probe branch to venue config; finalize PROJECT/REQUIREMENTS (MKT-09, MKT-10)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
-- [ ] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
-- [ ] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
+- [x] 12-09-PLAN.md — Bonus-bet finder market hedges end to end (MKT-06, MKT-07)
+- [x] 12-10-PLAN.md — Arbitrage tab book-vs-market arbs end to end (MKT-06, MKT-07)
+- [x] 12-11-PLAN.md — Promo-hedge ranker market path; no-sweat stays sportsbook-only (MKT-06)
 - [ ] 12-15-PLAN.md — Kalshi public API client, game matcher and pure depth/price enrichment, not yet wired (MKT-07, MKT-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-12-PLAN.md — Promo row DTO, Done snapshot (Zod only, no migration) and promo row UI (MKT-07, MKT-08)
-- [ ] 12-13-PLAN.md — Paired promos market top-up with fee-aware prune (MKT-06)
+- [x] 12-12-PLAN.md — Promo row DTO, Done snapshot (Zod only, no migration) and promo row UI (MKT-07, MKT-08)
+- [x] 12-13-PLAN.md — Paired promos market top-up with fee-aware prune (MKT-06)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
+- [x] 12-14-PLAN.md — Pair DTO, pair snapshot and pair UI for market top-ups (MKT-07, MKT-08)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -225,7 +225,7 @@ Plans:
 | 9. No-Sweat Promos in the Feed | v1.2 | 20/20 | Complete    | 2026-11-03 |
 | 10. Ranked Intro Offers | v1.2 | 0/0 | Not started | - |
 | 11. More Sportsbooks | v1.2 | 0/0 | Not started | - |
-| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 2/16 | In Progress|  |
+| 12. Add Kalshi and Polymarket as hedge venues | v1.2 | 12/16 | In Progress|  |
 
 ## Backlog
 

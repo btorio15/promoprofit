@@ -9,9 +9,10 @@ import { resolveSaveBooksOutcome } from "./saveBooksOutcome";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BookPicker } from "./BookPicker";
+import { hasSportsbook, type BookPickerOption } from "./bookPickerGroups";
 
 export interface SettingsBooksFormProps {
-  books: { key: string; displayName: string }[];
+  books: BookPickerOption[];
   initialKeys: string[];
 }
 
@@ -43,7 +44,8 @@ export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps
   const [saved, setSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const isUnchanged = sameKeys(selected, lastSaved);
+  const sportsbookPicked = hasSportsbook(selected, books);
+  const isUnchanged =sameKeys(selected, lastSaved);
 
   function handleSave() {
     startTransition(async () => {
@@ -75,11 +77,15 @@ export function SettingsBooksForm({ books, initialKeys }: SettingsBooksFormProps
         }}
         disabled={isPending}
       />
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : selected.size > 0 && !sportsbookPicked ? (
+        <p className="text-sm text-destructive">Select at least one sportsbook.</p>
+      ) : null}
       <Button
         type="button"
         className="h-10"
-        disabled={selected.size === 0 || isPending || isUnchanged}
+        disabled={!sportsbookPicked || isPending || isUnchanged}
         onClick={handleSave}
       >
         Save changes

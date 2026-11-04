@@ -325,3 +325,50 @@ describe("toDonePromoDTO no-sweat (Phase 9)", () => {
     expect(buildTrackedSnapshotFixture().stage).toBe("tracked");
   });
 });
+
+describe("market hedge snapshot (Phase 12)", () => {
+  const leg = { venueKey: "kalshi" as const, venueName: "Kalshi", side: "yes" as const, contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32", americanDisplay: -156, liquidity: { kind: "price_may_move" as const }, settlementNote: "Settles on the official result." };
+  const marketRow = () =>
+    makeRow({
+      hedge: { bookKey: "kalshi", bookName: "Kalshi", selectionLabel: "Home", oddsAmerican: -156 },
+      hedgeMarket: leg,
+      hedgeStake: "26.32",
+      hedgePayout: "42.00",
+      guaranteedProfit: "28.00",
+    });
+
+  it("parses a pre-phase snapshot without hedgeMarket and one with it", () => {
+    const old = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: makeRow() }, ctx).snapshot));
+    expect("hedgeMarket" in old.row).toBe(false);
+    expect(DonePromoSnapshotSchema.safeParse(old).success).toBe(true);
+    const fresh = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx).snapshot));
+    expect(DonePromoSnapshotSchema.safeParse(fresh).success).toBe(true);
+    const nulled = { ...old, row: { ...old.row, hedgeMarket: null } };
+    expect(DonePromoSnapshotSchema.safeParse(nulled).success).toBe(true);
+  });
+
+  it("rejects a snapshot whose hedgeMarket price is 0 cents", () => {
+    const snap = JSON.parse(JSON.stringify(buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx).snapshot));
+    snap.row.hedgeMarket.priceCents = 0;
+    expect(DonePromoSnapshotSchema.safeParse(snap).success).toBe(false);
+  });
+
+  it("round-trips contracts, price, cost, fee and outlay byte-identical; profit equals guaranteed", () => {
+    const { snapshot, profitExtracted } = buildDoneSnapshot({ kind: "hedge", terms, row: marketRow() }, ctx);
+    expect(profitExtracted).toBe("28.00");
+    const dto = toDonePromoDTO(
+      {
+        promoId: 5,
+        completedAt: new Date("2026-09-29T16:00:00.000Z"),
+        snapshot: JSON.parse(JSON.stringify(snapshot)),
+        profitExtracted,
+        promoBookKey: "draftkings",
+        promoType: "profit_boost",
+        promoParsed: {},
+      },
+      new Map(),
+    );
+    expect(dto.kind).toBe("hedge");
+    expect(dto.row?.hedgeMarket).toMatchObject({ contracts: 42, priceCents: 61, cost: "25.62", fee: "0.70", outlay: "26.32" });
+  });
+});

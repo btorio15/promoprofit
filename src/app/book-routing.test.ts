@@ -17,7 +17,14 @@ const TWO_BOOK_STUB = [
   { key: "fanduel", displayName: "FanDuel" },
 ];
 const mockGetBonusBooks = vi.hoisted(() => vi.fn(() => Promise.resolve(TWO_BOOK_STUB)));
-const mockGetOddsFreshness = vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
+const mockGetMyBookOptions = vi.hoisted(() => vi.fn(() => Promise.resolve(TWO_BOOK_STUB)));
+const mockGetUserMyBookKeys = vi.hoisted(() =>
+  vi.fn((_userId: number) => {
+    void _userId;
+    return Promise.resolve<string[]>([]);
+  }),
+);
+const mockGetOddsFreshness =vi.hoisted(() => vi.fn(() => Promise.resolve(null)));
 // Spy that must NOT be called by any of the three pages under test (CR-02/WR-01:
 // they must all go through getUsableUserBooks instead).
 const mockGetUserBookKeys = vi.hoisted(() => vi.fn(() => Promise.resolve([])));
@@ -37,6 +44,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/db/queries", () => ({
   getUsableUserBooks: mockGetUsableUserBooks,
   getBonusBooks: mockGetBonusBooks,
+  getMyBookOptions: mockGetMyBookOptions,
+  getUserMyBookKeys: mockGetUserMyBookKeys,
   getOddsFreshness: mockGetOddsFreshness,
   getUserBookKeys: mockGetUserBookKeys,
 }));
@@ -129,6 +138,7 @@ describe("book routing invariant (CR-02, WR-01)", () => {
 describe("SettingsPage seeds initialKeys from getUsableUserBooks (WR-01)", () => {
   it("passes only usable saved keys as initialKeys", async () => {
     mockGetUsableUserBooks.mockReset().mockResolvedValue([{ key: "draftkings", displayName: "DraftKings" }]);
+    mockGetUserMyBookKeys.mockReset().mockResolvedValue(["draftkings"]);
     mockSettingsBooksForm.mockClear();
 
     const element = await SettingsPage();
@@ -141,6 +151,7 @@ describe("SettingsPage seeds initialKeys from getUsableUserBooks (WR-01)", () =>
 
   it("passes an empty initialKeys array when the user has no usable saved books", async () => {
     mockGetUsableUserBooks.mockReset().mockResolvedValue([]);
+    mockGetUserMyBookKeys.mockReset().mockResolvedValue([]);
     mockSettingsBooksForm.mockClear();
 
     const element = await SettingsPage();
@@ -149,5 +160,27 @@ describe("SettingsPage seeds initialKeys from getUsableUserBooks (WR-01)", () =>
     expect(mockSettingsBooksForm).toHaveBeenCalled();
     const props = mockSettingsBooksForm.mock.calls[0][0];
     expect(props.initialKeys).toEqual([]);
+  });
+});
+
+describe("saved markets and onboarding (D-14)", () => {
+  it("Settings seeds saved market keys from getUserMyBookKeys", async () => {
+    mockGetUsableUserBooks.mockReset().mockResolvedValue([{ key: "draftkings", displayName: "DraftKings" }]);
+    mockGetUserMyBookKeys.mockReset().mockResolvedValue(["draftkings", "kalshi"]);
+    mockSettingsBooksForm.mockClear();
+
+    const element = await SettingsPage();
+    renderToStaticMarkup(element as Parameters<typeof renderToStaticMarkup>[0]);
+
+    expect(mockGetUserMyBookKeys).toHaveBeenCalledWith(1);
+    expect(mockSettingsBooksForm.mock.calls[0][0].initialKeys).toEqual(["draftkings", "kalshi"]);
+  });
+
+  it("onboarding redirects to / only when getUsableUserBooks is non-empty", async () => {
+    mockGetUserMyBookKeys.mockReset().mockResolvedValue(["kalshi"]);
+    mockGetUsableUserBooks.mockReset().mockResolvedValue([]);
+    expect((await runAndCaptureRedirect(() => OnboardingBooksPage())).redirected).toBe(false);
+    mockGetUsableUserBooks.mockReset().mockResolvedValue([{ key: "fanduel", displayName: "FanDuel" }]);
+    expect(await runAndCaptureRedirect(() => OnboardingBooksPage())).toEqual({ redirected: true, to: "/" });
   });
 });

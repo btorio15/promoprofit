@@ -722,6 +722,25 @@ describe("rankNoSweat search", () => {
     expect(r.opportunity.hedge.bookKey).toBe("hardrockbet");
     expect(r.opportunity.sameBook).toBe(true);
   });
+
+  it("hedges at sportsbooks only: a better Kalshi price changes nothing (market no-sweat deferred to post-Phase 9)", () => {
+    const g = moneylineEvent({
+      id: "kal",
+      quotes: [
+        { bookKey: "hardrockbet", homePrice: -500, awayPrice: 150 },
+        { bookKey: "draftkings", homePrice: -700, awayPrice: 380 },
+        { bookKey: "kalshi", homePrice: -600, awayPrice: 900 },
+      ],
+    });
+    const without = rankNoSweat(promo, opts({ moneylineEvents: [g] }));
+    const withKalshi = rankNoSweat(
+      promo,
+      opts({ moneylineEvents: [g], hedgeBookKeys: new Set([...HEDGE_BOOKS, "kalshi"]) }),
+    );
+    expect(without.kind).toBe("ok");
+    expect(JSON.stringify(withKalshi)).toBe(JSON.stringify(without));
+    if (withKalshi.kind === "ok") expect(withKalshi.opportunity.hedge.bookKey).not.toBe("kalshi");
+  });
 });
 
 describe("rankNoSweat Low-profile limits, market limit and expiry (Phase 9)", () => {

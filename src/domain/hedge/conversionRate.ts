@@ -15,6 +15,7 @@ import type { OddsEvent } from "@/domain/odds/schemas";
 import { extractTwoWayMoneylines } from "./marketFilter";
 import { rankBonusBetHedges, type BonusBetOpportunity } from "./rankBonusBetHedges";
 import { SPORT_KEYS } from "@/config/sports";
+import { isMarketVenue } from "@/config/books";
 
 /** Must stay equal to WINDOW_DAYS in src/app/actions/find-hedges.ts. */
 export const CONVERSION_WINDOW_DAYS = 7;
@@ -57,8 +58,10 @@ export function rankRefundOpportunities(args: {
   hedgeBookKeys: ReadonlySet<string>;
   limit: number;
 }): BonusBetOpportunity[] {
-  const { events, now, refundBookKey, amount, hedgeBookKeys, limit } = args;
+  const { events, now, refundBookKey, amount, limit } = args;
   assertAmount(amount);
+  // Phase 12 D-01: no-sweat refunds stay sportsbook-only (market hedges deferred, see ROADMAP).
+  const hedgeBookKeys = new Set([...args.hedgeBookKeys].filter((k) => !isMarketVenue(k)));
   const allowed = new Set([...hedgeBookKeys, refundBookKey]);
   const markets = extractTwoWayMoneylines(events, {
     now,
