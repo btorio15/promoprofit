@@ -138,6 +138,7 @@ async function computeCurrentProfitEntries(
     extendedEvents = ext.events;
     oddsFetchedAt = ml.fetchedAt;
     // No cached odds at all yet -- nothing to rank; skip the book read.
+    // getHedgeBookKeys() with no argument = groupHedgeBookKeys() (sportsbooks only), identical to the cached path.
     everyUsableBookKeys = oddsFetchedAt === null ? [] : await getHedgeBookKeys();
   }
   // No cached odds at all yet -- nothing to rank, nothing to observe.

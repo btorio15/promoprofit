@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const source = readFileSync(join(__dirname, "AppShell.tsx"), "utf8");
 
-// Captures each TabsTrigger's value attribute and the first word of its visible text.
-const triggerRe = /<TabsTrigger\b([^>]*)>\s*([A-Za-z]+)/g;
+// Ignore an optional decorative icon before each tab's visible label.
+const triggerRe = /<TabsTrigger\b([^>]*)>\s*(?:<[^>]+\/>\s*)?([A-Za-z]+)/g;
 
 function triggers(): Array<{ value: string; label: string }> {
   return [...source.matchAll(triggerRe)].map((m) => ({

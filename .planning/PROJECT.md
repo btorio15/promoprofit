@@ -60,6 +60,7 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - [ ] No-sweat promos ranked in the Opportunities feed
 - [ ] Promo + intro-offer scrapers for more Colorado books (BetMGM, Fanatics, Caesars, BetRivers, Hard Rock Bet, theScore Bet as feasible)
 - [ ] Revamped Sign-up offers screen with ranked intro offers and exact qualifying lines for books the member doesn't have
+- [ ] Kalshi and Polymarket US as opt-in hedge-only venues across the finder, promo hedges, paired promos and Arbitrage tab (Phase 12)
 
 
 ### Out of Scope
@@ -68,7 +69,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 - Scheduled/automatic odds refresh — v1 uses a user-triggered refresh button; smart scheduled refresh of games with active promos is v2
 - Saving per-user bonus-bet balances and bet history — bonus-bet finder is enter-and-look, nothing saved
 - Deposit-match bonuses — playthrough rules make value unclear (no-sweat and bet & get intro offers moved into v1.2)
-- Hedging on exchanges / prediction markets (Prophet X, Novig, Sporttrade, Kalshi) — sportsbooks only
+- Hedging on other exchanges (Prophet X, Novig, Sporttrade) — only Kalshi and Polymarket US were added as hedge venues (Phase 12, owner decision 2026-10-22/26)
+- Market-vs-market arbs and promos from prediction markets — every opportunity keeps one sportsbook leg; promos come only from sportsbooks
 - Multi-state support — Colorado only
 - Alerts (Discord/Telegram/SMS) — web app only for v1
 - Scraping odds directly from books — odds come from the odds API; scraping is for promos only
@@ -89,7 +91,7 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 
 - **Budget**: The Odds API free tier (~500 credits/month) — odds refresh only when a user presses refresh, with cached results and a credit meter
 - **Geography**: Colorado sportsbooks only
-- **Hedge venues**: Regulated sportsbooks only
+- **Hedge venues**: Regulated sportsbooks, plus Kalshi and Polymarket US (CFTC-regulated prediction markets) as opt-in, hedge-only venues (Phase 12; final venue set confirmed by the Phase 12 live probe). Promos come only from sportsbooks
 - **Access**: Private, small group — no public signup
 - **Correctness**: Stake/profit math must be exact and account for promo mechanics (stake-not-returned for bonus bets, boost caps/max stake)
 
@@ -106,7 +108,8 @@ Show every profitable opportunity from current promos, ranked by guaranteed prof
 | Competing promos hedged in tandem (both legs promo-adjusted) | Two promos on opposite sides beat hedging each against plain odds | ✓ Good (Phase 4) |
 | Hedge engine rules: equal profit on both outcomes; boost stake defaults to the max allowed by caps; binding max-winnings cap auto-reduces the stake with an explanation; boost % applies to profit | Carried from the superseded Phase 1 discussion | — Pending |
 | Display rules: American odds only; money to the cent; conversion % for bonus bets, ROI % for cash legs; account-risk advisory as a small footnote | Carried from the superseded Phase 1 discussion | — Pending |
-| Colorado only, sportsbooks only | Owner's state; keeps scope tight | — Pending |
+| Colorado only; promos from sportsbooks only | Owner's state; keeps scope tight (hedge venues widened in Phase 12) | — Pending |
+| Kalshi and Polymarket US as hedge-only venues: priced via the Odds API `bookmakers=` list at zero extra credits (Kalshi public API as fallback), whole contracts, exact published fees, used only when strictly more profitable after fees and only for members who opt in | Owner scope reversal 2026-10-22/26 (Phase 12 CONTEXT D-01..D-16) | — Pending (probe outcome recorded by plan 12-08) |
 | Sport filter is client-side tabs over results (top 10 overall + top 10 per sport) | Owner didn't want to re-submit the search to change sport | ✓ Good (Phase 1) |
 | NFL moneylines shown with a "Tie risk" badge rather than excluded | A tie voids both legs: $0 profit, no cash lost | ✓ Good (Phase 1, owner sign-off) |
 | Arbitrage tab: strict implied-sum < 1 only (no near-arbs); total stake is a hard cap on rounded legs | Sure bets only; never lay more than the user entered | ✓ Good (Phase 01.1; owner saw zero arbs at verification — correct, closest market was break-even) |
@@ -133,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-22 after Phase 8 (No-Sweat Bet Math)*
+*Last updated: 2026-11-02 for Phase 12 planning (prediction-market hedge venues scope reversal)*

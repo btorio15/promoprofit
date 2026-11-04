@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Intro Offers & No-Sweat
-status: ready_to_plan
-stopped_at: Phase 9 complete (20/20) — ready to discuss Phase 10
-last_updated: 2026-11-03T23:19:34.663Z
-last_activity: 2026-11-03 -- Phase 9 complete (verified 5/5, review fixes applied)
+status: executing
+stopped_at: Phase 12 UI-SPEC approved
+last_updated: "2026-11-03T06:27:08.075Z"
+last_activity: 2026-11-03 -- Phase 12 execution started
 progress:
-  total_phases: 5
-  completed_phases: 2
-  total_plans: 23
-  completed_plans: 23
-  percent: 40
+  total_phases: 6
+  completed_phases: 1
+  total_plans: 39
+  completed_plans: 3
+  percent: 8
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-22)
 
 **Core value:** Show every profitable opportunity from current promos, ranked by guaranteed profit, with the exact stakes and hedge book — correct to the cent, so a user can just pick and place bets.
-**Current focus:** Phase 10 — Ranked Intro Offers
+**Current focus:** Phase 12 — add-kalshi-and-polymarket-as-hedge-venues
 
 ## Current Position
 
-Phase: 10 (Ranked Intro Offers)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-11-03 -- Phase 9 complete
+Phase: 12 (add-kalshi-and-polymarket-as-hedge-venues) — EXECUTING
+Plan: 1 of 16
+Status: Executing Phase 12
+Last activity: 2026-11-03 -- Phase 12 execution started
 
 ## Performance Metrics
 
@@ -93,6 +93,7 @@ Last activity: 2026-11-03 -- Phase 9 complete
 - Phase 8 added (owner 2026-10-22): More Sportsbooks: promo and intro-offer scrapers for BetMGM, bet365, Fanatics and other Colorado books; listed under the next milestone, not v1.1
 - v1.2 roadmap (2026-10-22): placeholder Phase 8 More Sportsbooks absorbed; v1.2 phases 8 No-Sweat Bet Math, 9 No-Sweat Promos in the Feed, 10 Ranked Intro Offers, 11 More Sportsbooks
 - Phase 07.1 inserted after Phase 7: Profit Stats Cleanup: close v1.1 audit tech debt (owner chose option B 2026-10-22)
+- Phase 12 added (owner 2026-10-22): Add Kalshi and Polymarket as hedge venues (prediction markets alongside regulated sportsbooks)
 
 ### Decisions
 
@@ -240,9 +241,9 @@ Items acknowledged and deferred at v1.1 milestone close on 2026-10-22:
 
 ## Session Continuity
 
-Last session: 2026-10-22T22:24:10.342Z
-Stopped at: Phase 9 UI-SPEC approved
-Resume file: .planning/phases/09-no-sweat-promos-in-the-feed/09-UI-SPEC.md
+Last session: 2026-10-29T21:36:46.093Z
+Stopped at: Phase 12 UI-SPEC approved
+Resume file: .planning/phases/12-add-kalshi-and-polymarket-as-hedge-venues/12-UI-SPEC.md
 
 ## Operator Next Steps
 
