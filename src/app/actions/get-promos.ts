@@ -123,7 +123,7 @@ export async function getPromos(input: unknown): Promise<GetPromosResponse> {
   const colBookNames = new Map<string, string>(COLORADO_BOOKS.map((b) => [b.key, b.displayName]));
   const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
-  const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
+  const feedPromos = activePromos.filter((p) => !doneIds.has(p.id) && !p.introOffer);
   const queue = queueRows.map(toQueueItemDTO);
   // quick-260928-it1: classify items also need correctionOptions (their
   // "Game or day" selector reuses the same CorrectionScopeSelect data).

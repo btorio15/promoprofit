@@ -99,7 +99,9 @@ export async function loadMemberFeedContext({
   );
   const doneRows = toDoneRows(completions, colBookNames);
   const doneIds = new Set(completions.map((c) => c.promoId));
-  const feedPromos = activePromos.filter((p) => !doneIds.has(p.id));
+  // quick-261104-prg: intro offers never reach the promo pipeline (pairs, recorders, totals).
+  const feedPromos = activePromos.filter((p) => !doneIds.has(p.id) && !p.introOffer);
+  const introPromos = activePromos.filter((p) => !doneIds.has(p.id) && p.introOffer);
   const bookNames = new Map(bonusBooks.map((b) => [b.key, b.displayName]));
 
   const rankOpts: RankOptions = {
@@ -116,6 +118,7 @@ export async function loadMemberFeedContext({
     completions,
     doneIds,
     feedPromos,
+    introPromos,
     doneRows,
     hedgeBookKeys,
     // Site-wide / group list (sportsbooks only, same source as getHedgeBookKeys() with no argument): group recording never includes a member's markets (Phase 12, D-03).

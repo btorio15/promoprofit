@@ -71,6 +71,8 @@ export interface PromoRowDTO {
   flaggable?: boolean;
   /** True when the viewing member added this promo themselves (phase 5). Optional: frozen Done snapshots lack it. */
   addedByYou?: boolean;
+  /** quick-261104-prg: a one-time sign-up offer (shown under "Intro offers"). Optional: frozen Done snapshots lack it. */
+  introOffer?: boolean;
   finePrintNote: string | null;
   /** "Opt in / claim in the app first" when the promo requires it, else null. */
   claimHint: string | null;

@@ -58,6 +58,8 @@ export type OpportunitiesResponse =
       tracking: TrackedNoSweatCardDTO[];
       /** Phase 9 (D-10, D-11): can't-price / not-worth-it / Low-profile-blocked no-sweats, unsliced. */
       noSweatNotes: NoSweatNoteRowDTO[];
+      /** quick-261104-prg: one-time sign-up offers, always sorted by profit, outside the sources/Top 5. */
+      introOffers: OpportunityItem<PromoRowDTO | NoSweatRowDTO>[];
     };
 
 export const SOURCE_ORDER: SourceId[] = ["promos", "pairs", "arbs"];

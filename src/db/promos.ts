@@ -85,6 +85,8 @@ export interface ActivePromo extends RankablePromo {
   attribution: { verb: "Confirmed by" | "Corrected by" | "Cap entered by"; displayName: string }[];
   /** True when the viewer hand-added this promo (personal, D-01). */
   addedByYou: boolean;
+  /** quick-261104-prg: a one-time sign-up offer (parsed.introOffer); kept out of promos, pairs and totals. */
+  introOffer?: boolean;
   /** quick-261001-dhn: the promo's own max stake (set when a viewer's caps were applied). */
   promoMaxStake?: string | null;
   /** quick-261001-dhn: the viewer's "Your cap" override, or null (set when a viewer's caps were applied). */
@@ -119,6 +121,7 @@ export interface ActiveNoSweatPromo {
   scraped: boolean;
   attribution: ActivePromo["attribution"];
   addedByYou: boolean;
+  introOffer?: boolean;
   addedByUserId: number | null;
 }
 
@@ -334,6 +337,7 @@ function mapPromoRowCore<T extends PromoType>(
     attribution,
     scraped: row.addedByUserId === null,
     addedByYou: viewerUserId !== undefined && row.addedByUserId === viewerUserId,
+    introOffer: parsedResult.data.introOffer === true,
   };
 }
 
@@ -373,6 +377,7 @@ export function mapActiveNoSweatRow(row: ActivePromoRow, viewerUserId?: number):
     scraped: core.scraped,
     attribution: core.attribution,
     addedByYou: core.addedByYou,
+    introOffer: core.introOffer,
     addedByUserId: row.addedByUserId,
   };
 }

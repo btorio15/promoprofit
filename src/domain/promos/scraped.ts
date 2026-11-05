@@ -120,6 +120,8 @@ export interface ScrapedPromo {
   finePrintNote: string | null;
   /** Phase 9 (D-15): only set on review drafts; never hashed into the dedupe key. */
   reviewReadings?: ReviewReadings;
+  /** quick-261104-prg: one-time sign-up offer; shown under "Intro offers". Absent = false. */
+  introOffer?: boolean;
 }
 
 /**
@@ -273,6 +275,8 @@ export const ScrapedPromoFieldsSchema = z.strictObject({
   claimRequired: z.enum(["opt_in", "claim_token"]).nullable(),
   finePrintNote: z.string().max(160).nullable(),
   reviewReadings: ReviewReadingsSchema.optional(),
+  /** quick-261104-prg: one-time sign-up offer, shown under "Intro offers" instead of with promos. Absent = false. */
+  introOffer: z.boolean().optional(),
 });
 
 export const ScrapedPromoSchema = ScrapedPromoFieldsSchema

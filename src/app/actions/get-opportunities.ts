@@ -20,12 +20,14 @@ import { toPairRowDTO, type PairRowDTO } from "@/domain/promos/pairRowDto";
 import type { StakePrecision } from "@/domain/hedge/arbMath";
 import {
   OPPORTUNITIES_ARB_TOTAL_STAKE,
+  isNoSweatRow,
   type OpportunitiesEmptyVariant,
   type OpportunitiesResponse,
   type OpportunityItem,
   type OpportunitySourceDTO,
 } from "@/domain/opportunities/types";
 import type { PromoRowDTO } from "@/domain/promos/dto";
+import { splitIntroOffers } from "@/domain/opportunities/introOffers";
 import type { NoSweatRowDTO } from "@/domain/promos/noSweatRowDto";
 import type { ArbResultDTO } from "@/domain/arb/types";
 
@@ -109,6 +111,11 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     console.error("getOpportunities: no-sweat feed failed", err);
   }
 
+  // quick-261104-prg: intro offers (guaranteed or no-sweat) get their own list,
+  // always profit-sorted (set below once odds exist). Their can't-price /
+  // not-worth-it notes are dropped from the promo notes.
+  let introItems: OpportunityItem<PromoRowDTO | NoSweatRowDTO>[] = [];
+
   const respond = (
     emptyVariant: OpportunitiesEmptyVariant | null,
     sources: OpportunitySourceDTO[],
@@ -121,7 +128,8 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     profitSeries,
     sources,
     tracking: noSweat.tracking,
-    noSweatNotes: noSweat.notes,
+    noSweatNotes: noSweat.notes.filter((n) => !n.introOffer),
+    introOffers: introItems,
   });
 
   if (!feed) {
@@ -143,6 +151,9 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   const rows: PromoRowDTO[] = singles
     .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet, priceAge))
     .filter((r) => r.hasPromoBook);
+  const introRows: PromoRowDTO[] = rankPromoHedges(ctx.introPromos, ctx.rankOpts)
+    .map((o) => toPromoRowDTO(o, ctx.bookNames, ctx.userBookSet, priceAge))
+    .filter((r) => r.hasPromoBook);
 
   const items: OpportunityItem<PromoRowDTO | NoSweatRowDTO>[] = rows.map((row) => ({
     rowKey: row.rowKey,
@@ -153,7 +164,29 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
     data: row,
   }));
   // D-08, A-10: priced no-sweats ride in the promos source, flagged as estimates.
+  const toIntroItem = (row: PromoRowDTO | NoSweatRowDTO): OpportunityItem<PromoRowDTO | NoSweatRowDTO> =>
+    isNoSweatRow(row)
+      ? {
+          rowKey: row.rowKey,
+          profit: row.estimatedProfit,
+          pct: row.estRoiPct,
+          pctLabel: "Est. ROI",
+          estimated: true,
+          commenceTime: row.commenceTime,
+          data: row,
+        }
+      : {
+          rowKey: row.rowKey,
+          profit: row.guaranteedProfit,
+          pct: row.ratePct,
+          pctLabel: row.rateLabel,
+          commenceTime: row.commenceTime,
+          data: row,
+        };
+  introItems = splitIntroOffers([...introRows, ...noSweat.rows]).intro.map(toIntroItem);
+  introItems.sort((a, b) => new Decimal(b.profit).comparedTo(new Decimal(a.profit)));
   for (const row of noSweat.rows) {
+    if (row.introOffer) continue;
     items.push({
       rowKey: row.rowKey,
       profit: row.estimatedProfit,
@@ -209,7 +242,7 @@ export async function getOpportunities(input: unknown): Promise<OpportunitiesRes
   ];
 
   // A-10: a screen with only no-sweat rows, notes or Tracking cards is not "Nothing profitable".
-  if (sources.some((s) => s.items.length > 0) || noSweat.notes.length > 0 || noSweat.tracking.length > 0) {
+  if (sources.some((s) => s.items.length > 0) || introItems.length > 0 || noSweat.notes.length > 0 || noSweat.tracking.length > 0) {
     return respond(null, sources);
   }
 

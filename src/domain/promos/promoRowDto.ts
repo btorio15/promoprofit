@@ -26,6 +26,7 @@ export interface PresentablePromo extends RankablePromo {
   autoMatched: boolean;
   scraped?: boolean;
   addedByYou?: boolean;
+  introOffer?: boolean;
   /** quick-261001-dhn: the promo's own max stake / the viewer's override (see ActivePromo). */
   promoMaxStake?: string | null;
   capOverride?: string | null;
@@ -158,6 +159,7 @@ export function toPromoRowDTO<P extends PresentablePromo>(
     autoMatched: promo.autoMatched,
     flaggable: promo.scraped === true,
     addedByYou: promo.addedByYou === true,
+    introOffer: promo.introOffer === true,
     finePrintNote: promo.finePrintNote,
     claimHint: promo.claimHint,
     tieRisk: selection.tieRisk,

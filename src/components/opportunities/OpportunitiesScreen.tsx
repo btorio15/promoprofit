@@ -399,6 +399,40 @@ export function OpportunitiesScreen({
               }
             }
           })}
+          {ok.introOffers.length > 0 ? (
+            <section className="flex flex-col gap-3" aria-labelledby="intro-offers-heading">
+              <div className="flex flex-col gap-1">
+                <h2 id="intro-offers-heading" className="text-xl font-semibold">
+                  Intro offers
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  One-time sign-up offers at new books. Kept separate from your promos.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                {ok.introOffers.map((item) =>
+                  isNoSweatRow(item.data) ? (
+                    <NoSweatRow
+                      key={item.rowKey}
+                      dto={item.data}
+                      precision={precision}
+                      onChanged={onPromosChanged}
+                      addedActions={item.data.addedByYou ? addedActions : undefined}
+                    />
+                  ) : (
+                    <PromoRow
+                      key={item.rowKey}
+                      row={item.data}
+                      precision={precision}
+                      onChanged={onPromosChanged}
+                      capEditable
+                      capFieldIdPrefix="opp-intro-cap"
+                    />
+                  ),
+                )}
+              </div>
+            </section>
+          ) : null}
           {ok.noSweatNotes.length > 0 ? (
             <NoSweatNotesSection notes={ok.noSweatNotes} onChanged={onPromosChanged} addedActions={addedActions} />
           ) : null}

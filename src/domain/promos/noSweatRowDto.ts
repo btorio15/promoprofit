@@ -22,6 +22,7 @@ export type PresentableNoSweatPromo = NoSweatPromo & {
   title: string;
   scopeLabel: string | null;
   addedByYou: boolean;
+  introOffer?: boolean;
   finePrintNote: string | null;
   claimHint: string | null;
   expiresAt: Date | null;
@@ -38,6 +39,8 @@ export interface NoSweatRowDTO {
   title: string;
   scopeLabel: string | null;
   addedByYou: boolean;
+  /** quick-261104-prg: shown under "Intro offers" instead of with promos. */
+  introOffer: boolean;
   finePrintNote: string | null;
   claimHint: string | null;
   attribution: PromoRowDTO["attribution"];
@@ -95,6 +98,7 @@ export interface NoSweatNoteRowDTO {
   refundCap: string;
   expiresAt: string | null;
   addedByYou: boolean;
+  introOffer?: boolean;
   filteredOut: number;
 }
 
@@ -140,6 +144,7 @@ export function toNoSweatRowDTO<P extends PresentableNoSweatPromo>(
     title: titleFor(promo),
     scopeLabel: promo.scopeLabel,
     addedByYou: promo.addedByYou,
+    introOffer: promo.introOffer === true,
     finePrintNote: promo.finePrintNote,
     claimHint: promo.claimHint,
     attribution: attributionLineFor(promo),
@@ -204,6 +209,7 @@ export function toNoSweatNoteRowDTO(
     refundCap: promo.refundCap.toFixed(2),
     expiresAt: promo.expiresAt ? promo.expiresAt.toISOString() : null,
     addedByYou: promo.addedByYou,
+    introOffer: promo.introOffer === true,
     filteredOut,
   };
 }

@@ -120,7 +120,7 @@ async function computeCurrentProfitEntries(
   // only scraped (group) promos are ranked, whatever list the caller passed.
   // This is the same visibility the scheduled job's getActivePromos(now) uses
   // (WR-02).
-  const activePromos = (opts.activePromos ?? (await getActivePromos(now))).filter((promo) => promo.scraped);
+  const activePromos = (opts.activePromos ?? (await getActivePromos(now))).filter((promo) => promo.scraped && !promo.introOffer);
   if (activePromos.length === 0) return [];
 
   let moneylineEvents: OddsEvent[];
