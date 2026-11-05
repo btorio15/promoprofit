@@ -24,6 +24,8 @@ export function buildDailyProfitHistoryQuery(db: Db) {
       promoType: promos.promoType,
       bonusAmount: promos.bonusAmount,
       maxStake: promos.maxStake,
+      eventCommenceTime: promos.eventCommenceTime,
+      windowStart: promos.windowStart,
     })
     .from(promoProfitObservations)
     .leftJoin(promos, eq(promos.id, promoProfitObservations.promoId))
@@ -45,6 +47,7 @@ export async function loadDailyProfitHistory(): Promise<HistoryRow[]> {
     promoType: row.promoType ?? "unknown",
     bonusAmount: row.bonusAmount,
     maxStake: row.maxStake,
+    gameAt: row.eventCommenceTime ?? row.windowStart ?? null,
   }));
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UNKNOWN_SPORT, dailyHistoryStats, type HistoryRow } from "./dailyHistory";
+import { UNKNOWN_SPORT, dailyHistoryStats, gameWeekdayStats, type HistoryRow } from "./dailyHistory";
 
 let nextPromoId = 1;
 
@@ -11,6 +11,7 @@ function row(partial: Partial<HistoryRow> & Pick<HistoryRow, "denverDate" | "pro
     promoType: "profit_boost",
     bonusAmount: null,
     maxStake: null,
+    gameAt: null,
     ...partial,
   };
 }
@@ -208,5 +209,24 @@ describe("dailyHistoryStats ignores no_sweat estimates (FEED-04)", () => {
     expect(withEstimate.bonusConversion).toEqual(without.bonusConversion);
     expect(withEstimate.boostConversion).toEqual(without.boostConversion);
     expect(withEstimate.types.find((t) => t.key === "no_sweat")).toBeUndefined();
+  });
+});
+
+describe("gameWeekdayStats", () => {
+  it("counts each daily record on the Denver weekday its game starts, and leaves out records with no game time and no-sweats", () => {
+    const fridayGame = new Date("2026-10-16T18:00:00Z"); // Fri noon MDT
+    const rows: HistoryRow[] = [
+      { ...row({ denverDate: "2026-09-27", profit: "3.00", sportKey: "americanfootball_ncaaf" }), gameAt: new Date("2026-10-13T18:00:00Z") },
+      { ...row({ denverDate: "2026-09-28", profit: "2.00", sportKey: "americanfootball_ncaaf" }), gameAt: new Date("2026-10-13T18:00:00Z") },
+      { ...row({ denverDate: "2026-09-29", profit: "4.00", sportKey: "americanfootball_ncaaf" }), gameAt: fridayGame },
+      { ...row({ denverDate: "2026-09-30", profit: "1.00", sportKey: "basketball_nba" }), gameAt: null },
+      { ...row({ denverDate: "2026-09-30", profit: "7.00", sportKey: "basketball_nba", promoType: "no_sweat" }), gameAt: fridayGame },
+    ];
+
+    const stats = gameWeekdayStats(rows);
+    expect(stats.rows).toHaveLength(1);
+    expect(stats.rows[0]).toMatchObject({ sportKey: "americanfootball_ncaaf", total: "9.00", bestDay: "Tue" });
+    expect(stats.rows[0].byDay.Tue).toBe("5.00");
+    expect(stats.rows[0].byDay.Fri).toBe("4.00");
   });
 });

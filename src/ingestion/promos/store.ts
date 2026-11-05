@@ -23,6 +23,7 @@ import { ScopeGuessSchema, gamesWindow, type ScopeGuess } from "@/domain/promos/
 import type { ScrapedPromo } from "@/domain/promos/scraped";
 import type { CapField, PromoMarketType, PromoSelection, PromoSide, PromoStatus, PromoType, ReviewReason } from "@/domain/promos/types";
 import { commitSignupOffers, type CommitSignupOffersOutcome } from "./signupStore";
+import { sportFromPromoText } from "./sportHints";
 import type { SignupOfferInput } from "./signupOffers";
 
 export interface PromoWrite {
@@ -117,12 +118,22 @@ function structuredCapColumns(parsed: ScrapedPromo) {
   };
 }
 
-/** scope_kind/event_id/sport_key/event_commence_time/home_team/away_team/window_start/window_end/scope_games from a ScopeGuess (null clears all). */
-function scopeColumnsFrom(scope: ScopeGuess | null) {
+/**
+ * The sport a promo can still be placed in when its game is not matched.
+ * Taken from its own text (see sportFromPromoText), so a promo that names a
+ * sport keeps it even without a matched scope.
+ */
+function sportFallbackFor(parsed: ScrapedPromo): string | null {
+  const hint = sportFromPromoText(parsed.title ?? "", parsed.rawText);
+  return hint.kind === "supported" ? hint.sportKey : null;
+}
+
+/** scope_kind/event_id/sport_key/event_commence_time/home_team/away_team/window_start/window_end/scope_games from a ScopeGuess (null clears all but the sport fallback). */
+function scopeColumnsFrom(scope: ScopeGuess | null, fallbackSportKey: string | null) {
   if (scope === null) {
     return {
       scopeKind: null,
-      sportKey: null,
+      sportKey: fallbackSportKey,
       eventId: null,
       eventCommenceTime: null,
       homeTeam: null,
@@ -420,7 +431,7 @@ async function buildUpsertStatements(
           reviewReason: decision.reviewReason,
           autoMatched: decision.autoMatched,
           autoMatchBlocked: false,
-          ...scopeColumnsFrom(decision.scope),
+          ...scopeColumnsFrom(decision.scope, sportFallbackFor(parsed)),
           ...pinColumnsFrom(decision.pinned),
           bestGuess: decision.bestGuess,
           parsed,
@@ -450,7 +461,7 @@ async function buildUpsertStatements(
           status: decision.status,
           reviewReason: decision.reviewReason,
           autoMatched: decision.autoMatched,
-          ...scopeColumnsFrom(decision.scope),
+          ...scopeColumnsFrom(decision.scope, sportFallbackFor(parsed)),
           ...pinColumnsFrom(decision.pinned),
           bestGuess: decision.bestGuess,
           ...capColumns,
@@ -516,7 +527,7 @@ async function buildUpsertStatements(
           reviewReason: decision.reviewReason,
           autoMatched: decision.autoMatched,
           autoMatchBlocked: false,
-          ...scopeColumnsFrom(decision.scope),
+          ...scopeColumnsFrom(decision.scope, sportFallbackFor(draft)),
           ...pinColumnsFrom(decision.pinned),
           bestGuess: decision.bestGuess,
           parsed: draft,
@@ -545,7 +556,7 @@ async function buildUpsertStatements(
           status: decision.status,
           reviewReason: decision.reviewReason,
           autoMatched: decision.autoMatched,
-          ...scopeColumnsFrom(decision.scope),
+          ...scopeColumnsFrom(decision.scope, sportFallbackFor(draft)),
           ...pinColumnsFrom(decision.pinned),
           bestGuess: decision.bestGuess,
           ...classifyCapColumns,

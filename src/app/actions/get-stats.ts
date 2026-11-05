@@ -4,12 +4,10 @@ import { requireUser } from "@/lib/session";
 import { loadProfitSnapshotRows } from "@/db/profitSnapshots";
 import { loadDailyProfitHistory, loadFunnelPromos, loadScrapeRunTimes } from "@/db/profitHistory";
 import {
-  sportWeekdayStats,
   timeOfDayStats,
   type HourOfDayStat,
-  type SportWeekdayStats,
 } from "@/domain/stats/profitStats";
-import { dailyHistoryStats, type DailyHistoryStats } from "@/domain/stats/dailyHistory";
+import { dailyHistoryStats, gameWeekdayStats, type DailyHistoryStats, type GameWeekdayStats } from "@/domain/stats/dailyHistory";
 import { buildRunningTotal, type RunningTotal } from "@/domain/stats/runningTotal";
 import { promoFunnel, type PromoFunnelStats } from "@/domain/stats/promoFunnel";
 import { parseStatsRange, rangeStartDate, type StatsRange } from "@/domain/stats/statsRange";
@@ -23,7 +21,7 @@ export interface StatsDTO {
   firstRunAt: string | null;
   lastRunAt: string | null;
   timeOfDay: HourOfDayStat[];
-  sportWeekday: SportWeekdayStats;
+  sportWeekday: GameWeekdayStats;
   /** Older daily data (promo_profit_observations) in the range. */
   history: DailyHistoryStats;
   /** Running total of profit offered (each promo once, at its best) for the hero chart. */
@@ -69,7 +67,8 @@ export async function getStats(range: string = "all"): Promise<StatsDTO> {
     firstRunAt: first === null ? null : new Date(first).toISOString(),
     lastRunAt: last === null ? null : new Date(last).toISOString(),
     timeOfDay: timeOfDayStats(rows, runTimes),
-    sportWeekday: sportWeekdayStats(rows),
+    // Always all time, whatever range is selected. Same daily history as the By sport table.
+    sportWeekday: gameWeekdayStats(historyRows),
     history: dailyHistoryStats(historyRows, window),
     runningTotal: buildRunningTotal(historyRows, window),
     funnel: promoFunnel(funnelPromos),
